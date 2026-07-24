@@ -3,7 +3,7 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { livePreviewContextFacet } from "./context";
 import {
   buildLivePreviewHideDecorations,
@@ -265,16 +265,52 @@ describe("live preview hide formatting", () => {
 
     // Theme must opt out of `.cm-lineWrapping { overflow-wrap: anywhere }`,
     // which otherwise stacks CJK one glyph per line in squeezed columns.
+    // Scroll belongs on the wrap — table itself must not be max-width:100%.
     const sheetText = Array.from(document.querySelectorAll("style"))
       .map((node) => node.textContent ?? "")
       .join("\n");
+    expect(sheetText).toMatch(
+      /cm-live-preview-table-wrap[^}]*overflow-x:\s*auto/,
+    );
     expect(sheetText).toMatch(/cm-live-preview-table[^}]*max-content/);
+    expect(sheetText).not.toMatch(
+      /\.cm-live-preview-table\s*\{[^}]*max-width:\s*100%/,
+    );
     expect(sheetText).toMatch(/word-break:\s*keep-all/);
     expect(sheetText).toMatch(
       /cm-live-preview-table th\s*\{[^}]*white-space:\s*nowrap/,
     );
   });
 
+  it("remasures the editor when an editing table cell wraps on input", async () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, doc.length - 1, [
+      livePreviewTheme,
+      livePreviewTables,
+    ]);
+    const spy = vi.spyOn(view, "requestMeasure");
+    const cell = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="1"]',
+    ) as HTMLElement | null;
+    expect(cell).not.toBeNull();
+
+    cell!.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const editing = view.dom.querySelector(
+      ".cm-live-preview-table-cell-editing",
+    ) as HTMLElement | null;
+    expect(editing).not.toBeNull();
+    spy.mockClear();
+
+    editing!.textContent =
+      "很长很长的需求描述内容需要换行显示完整，不能被裁切掉";
+    editing!.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    expect(spy).toHaveBeenCalled();
+  });
   it("edits a table cell in place without revealing pipe source", async () => {
     const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
     const view = mount(doc, doc.length - 1, [livePreviewTables]);

@@ -1188,15 +1188,15 @@
 }
 
 /* Live table: content-sized columns + CJK-friendly wrapping.
-   Avoids short headers being crushed to one glyph per line by
-   `.cm-lineWrapping { overflow-wrap: anywhere }` + width:100%. */
+   Scroll on the wrap; do not max-width the table or short CJK columns
+   get crushed and long cells clip without a scrollbar. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
   overflow-x: auto;
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
   width: max-content;
-  max-width: 100%;
+  max-width: none;
   table-layout: auto;
 }
 
@@ -1216,6 +1216,7 @@
 
 .editor-pane-layout[data-live-preview="true"]
   .cm-live-preview-table-cell-editing {
+  outline-offset: 0;
   white-space: pre-wrap;
   word-break: normal;
   overflow-wrap: anywhere;
