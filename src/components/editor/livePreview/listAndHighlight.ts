@@ -12,9 +12,10 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
+  ensureLivePreviewViewportTree,
+  getLivePreviewDecorationRange,
   hasSkipAncestor,
   maxVisibleParseTo,
   selectionTouchesRange,
@@ -116,42 +117,42 @@ export function buildLivePreviewListMarkerDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
-  const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
+  const parseTo = maxVisibleParseTo(view);
+  const tree = ensureLivePreviewViewportTree(view, parseTo);
+  const { from: viewportFrom, to: viewportTo } =
+    getLivePreviewDecorationRange(view);
 
-  for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
-    tree.iterate({
-      from: viewportFrom,
-      to: viewportTo,
-      enter: (node) => {
-        if (node.name !== "ListMark") return;
-        const { from, to } = node;
-        if (from >= to) return;
-        const line = state.doc.lineAt(from);
-        if (selectionTouchesRange(state, line.from, line.to)) return;
-        if (hasSkipAncestor(state, from)) return;
+  tree.iterate({
+    from: viewportFrom,
+    to: viewportTo,
+    enter: (node) => {
+      if (node.name !== "ListMark") return;
+      const { from, to } = node;
+      if (from >= to) return;
+      const line = state.doc.lineAt(from);
+      if (selectionTouchesRange(state, line.from, line.to)) return;
+      if (hasSkipAncestor(state, from)) return;
 
-        const markText = state.doc.sliceString(from, to).trim();
-        // Skip task list lines — TaskMarker widget owns them.
-        const after = state.doc.sliceString(to, Math.min(line.to, to + 4));
-        if (/^\s*\[[ xX]\]/.test(after)) return;
+      const markText = state.doc.sliceString(from, to).trim();
+      // Skip task list lines — TaskMarker widget owns them.
+      const after = state.doc.sliceString(to, Math.min(line.to, to + 4));
+      if (/^\s*\[[ xX]\]/.test(after)) return;
 
-        const ordered = /^\d+[.)]?$/.test(markText);
-        const label = markText.replace(/[.)]$/, "");
-        // Include trailing space after marker when present.
-        let end = to;
-        if (state.doc.sliceString(to, to + 1) === " ") end = to + 1;
+      const ordered = /^\d+[.)]?$/.test(markText);
+      const label = markText.replace(/[.)]$/, "");
+      // Include trailing space after marker when present.
+      let end = to;
+      if (state.doc.sliceString(to, to + 1) === " ") end = to + 1;
 
-        builder.add(
-          from,
-          end,
-          Decoration.replace({
-            widget: new BulletWidget(ordered, label),
-          }),
-        );
-      },
-    });
-  }
+      builder.add(
+        from,
+        end,
+        Decoration.replace({
+          widget: new BulletWidget(ordered, label),
+        }),
+      );
+    },
+  });
 
   return builder.finish();
 }
@@ -166,34 +167,32 @@ export function buildLivePreviewHighlightDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
+  const { from, to } = getLivePreviewDecorationRange(view);
+  const text = state.doc.sliceString(from, to);
+  for (const range of findHighlightRanges(text, 0, text.length)) {
+    const absFrom = from + range.from;
+    const absTo = from + range.to;
+    if (selectionTouchesRange(state, absFrom, absTo)) continue;
+    if (hasSkipAncestor(state, absFrom)) continue;
+    ranges.push({
+      from: absFrom,
+      to: absTo,
+      deco: Decoration.replace({
+        widget: new HighlightWidget(range.content),
+      }),
+    });
+  }
 
-  for (const { from, to } of view.visibleRanges) {
-    const text = state.doc.sliceString(from, to);
-    for (const range of findHighlightRanges(text, 0, text.length)) {
-      const absFrom = from + range.from;
-      const absTo = from + range.to;
-      if (selectionTouchesRange(state, absFrom, absTo)) continue;
-      if (hasSkipAncestor(state, absFrom)) continue;
-      ranges.push({
-        from: absFrom,
-        to: absTo,
-        deco: Decoration.replace({
-          widget: new HighlightWidget(range.content),
-        }),
-      });
-    }
-
-    for (const range of findCommentRanges(text, 0, text.length)) {
-      const absFrom = from + range.from;
-      const absTo = from + range.to;
-      if (selectionTouchesRange(state, absFrom, absTo)) continue;
-      if (hasSkipAncestor(state, absFrom)) continue;
-      ranges.push({
-        from: absFrom,
-        to: absTo,
-        deco: Decoration.replace({}),
-      });
-    }
+  for (const range of findCommentRanges(text, 0, text.length)) {
+    const absFrom = from + range.from;
+    const absTo = from + range.to;
+    if (selectionTouchesRange(state, absFrom, absTo)) continue;
+    if (hasSkipAncestor(state, absFrom)) continue;
+    ranges.push({
+      from: absFrom,
+      to: absTo,
+      deco: Decoration.replace({}),
+    });
   }
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);

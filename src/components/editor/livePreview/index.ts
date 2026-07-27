@@ -119,6 +119,8 @@ export {
   expandRangesToBlocks,
   scheduleLivePreviewMeasure,
   bindLivePreviewWidgetResizeMeasure,
+  getLivePreviewDecorationRange,
+  LIVE_PREVIEW_VIEWPORT_DECORATION_PAD,
   cancelPendingLivePreviewReveals,
   livePreviewGeometryRemeasure,
 } from "./shared";

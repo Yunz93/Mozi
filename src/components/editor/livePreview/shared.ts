@@ -5,7 +5,7 @@ import type {
   Transaction,
 } from "@codemirror/state";
 import { Range, StateField } from "@codemirror/state";
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import {
   Decoration,
   EditorView,
@@ -83,35 +83,47 @@ export function collectWikiLinkRanges(
 
 /**
  * Collect wiki ranges near the visible viewport without allocating `doc.toString()`.
- * Cached for the same EditorState + visibleRanges signature so hide/images/links
+ * Cached for the same EditorState + decoration-window signature so hide/images/links
  * plugins in one update do not each re-run the regex.
  */
 let visibleWikiCacheState: EditorState | null = null;
 let visibleWikiCacheKey = "";
 let visibleWikiCacheRanges: WikiLinkRange[] = [];
 
+/** Pad shared by {@link ViewportDecorationWindow} and viewport decoration builders. */
+export const LIVE_PREVIEW_VIEWPORT_DECORATION_PAD = 2400;
+
+/**
+ * Doc range viewport plugins must decorate. Must match
+ * {@link ViewportDecorationWindow} so scroll-within-pad still has Live widgets.
+ */
+export function getLivePreviewDecorationRange(
+  view: Pick<EditorView, "visibleRanges" | "state">,
+): { from: number; to: number } {
+  return getPaddedVisibleRange(view, LIVE_PREVIEW_VIEWPORT_DECORATION_PAD);
+}
+
 export function collectVisibleWikiRanges(
   view: Pick<EditorView, "visibleRanges" | "state">,
-  pad = 2,
+  edgePad = 2,
 ): WikiLinkRange[] {
-  const visKey = `${pad}|${view.visibleRanges.map((r) => `${r.from}:${r.to}`).join(",")}`;
+  const padded = getLivePreviewDecorationRange(view);
+  const start = Math.max(0, padded.from - edgePad);
+  const end = Math.min(view.state.doc.length, padded.to + edgePad);
+  const visKey = `${edgePad}|${start}:${end}`;
   if (visibleWikiCacheState === view.state && visibleWikiCacheKey === visKey) {
     return visibleWikiCacheRanges;
   }
 
+  const text = view.state.doc.sliceString(start, end);
   const ranges: WikiLinkRange[] = [];
-  for (const { from, to } of view.visibleRanges) {
-    const start = Math.max(0, from - pad);
-    const end = Math.min(view.state.doc.length, to + pad);
-    const text = view.state.doc.sliceString(start, end);
-    for (const range of collectWikiLinkRanges(text, 0, text.length)) {
-      ranges.push({
-        from: range.from + start,
-        to: range.to + start,
-        raw: range.raw,
-        embed: range.embed,
-      });
-    }
+  for (const range of collectWikiLinkRanges(text, 0, text.length)) {
+    ranges.push({
+      from: range.from + start,
+      to: range.to + start,
+      raw: range.raw,
+      embed: range.embed,
+    });
   }
   visibleWikiCacheState = view.state;
   visibleWikiCacheKey = visKey;
@@ -122,13 +134,26 @@ export function collectVisibleWikiRanges(
 /** Furthest doc offset we should ask the markdown parser to cover for viewport plugins. */
 export function maxVisibleParseTo(
   view: Pick<EditorView, "visibleRanges" | "state">,
-  pad = 500,
+  pad = LIVE_PREVIEW_VIEWPORT_DECORATION_PAD,
 ): number {
-  let parseTo = 0;
-  for (const { to } of view.visibleRanges) {
-    parseTo = Math.max(parseTo, to);
+  return getPaddedVisibleRange(view, pad).to;
+}
+
+/**
+ * Ensure the syntax tree covers the Live Preview decoration window.
+ * Prefer a non-blocking parse; if coverage is short, allow a short wait so
+ * newly visible nodes are not permanently skipped after window.mark().
+ */
+export function ensureLivePreviewViewportTree(
+  view: Pick<EditorView, "visibleRanges" | "state">,
+  parseTo = maxVisibleParseTo(view),
+) {
+  const { state } = view;
+  let tree = ensureSyntaxTree(state, parseTo, 0) ?? syntaxTree(state);
+  if (tree.length < parseTo) {
+    tree = ensureSyntaxTree(state, parseTo, 20) ?? tree;
   }
-  return Math.min(view.state.doc.length, parseTo + pad);
+  return tree;
 }
 
 export function rangesOverlap(
@@ -187,7 +212,12 @@ export class ViewportDecorationWindow {
   private from = -1;
   private to = -1;
 
-  constructor(private readonly pad = 2400) {}
+  constructor(private readonly pad = LIVE_PREVIEW_VIEWPORT_DECORATION_PAD) {}
+
+  /** Last built decoration window (for tests / diagnostics). */
+  get range(): { from: number; to: number } {
+    return { from: this.from, to: this.to };
+  }
 
   needsUpdate(view: Pick<EditorView, "visibleRanges" | "state">): boolean {
     if (this.from < 0 || this.to < this.from) return true;
@@ -228,7 +258,7 @@ export function shouldRebuildLivePreviewDecorations(
 /** Viewport union padded for decoration builds. */
 export function getPaddedVisibleRange(
   view: Pick<EditorView, "visibleRanges" | "state">,
-  pad = 200,
+  pad = LIVE_PREVIEW_VIEWPORT_DECORATION_PAD,
 ): { from: number; to: number } {
   let from = view.state.doc.length;
   let to = 0;
