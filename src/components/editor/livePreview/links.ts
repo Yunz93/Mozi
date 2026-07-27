@@ -15,12 +15,13 @@ import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
 import {
-  collectWikiLinkRanges,
+  collectVisibleWikiRanges,
   hasSkipAncestor,
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
   livePreviewShouldRebuild,
+  maxVisibleParseTo,
 } from "./shared";
 
 class MarkdownLinkWidget extends WidgetType {
@@ -92,15 +93,8 @@ export function buildLivePreviewLinkDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const tree =
-    ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
-  const docText = state.doc.toString();
-  const wikiRanges = view.visibleRanges.flatMap(({ from, to }) =>
-    collectWikiLinkRanges(
-      docText,
-      Math.max(0, from - 2),
-      Math.min(docText.length, to + 2),
-    ),
-  );
+    ensureSyntaxTree(state, maxVisibleParseTo(view), 50) ?? syntaxTree(state);
+  const wikiRanges = collectVisibleWikiRanges(view, 2);
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
     tree.iterate({

@@ -15,9 +15,10 @@ import {
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
-  collectWikiLinkRanges,
+  collectVisibleWikiRanges,
   hasSkipAncestor,
   livePreviewShouldRebuild,
+  maxVisibleParseTo,
   rangesOverlap,
   selectionTouchesRange,
 } from "./shared";
@@ -122,30 +123,25 @@ export function buildLivePreviewHideDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
-  let parseTo = 0;
-  for (const { to } of view.visibleRanges) {
-    parseTo = Math.max(parseTo, to);
-  }
-  const tree =
-    ensureSyntaxTree(state, Math.min(state.doc.length, parseTo + 500), 50) ??
-    syntaxTree(state);
-  const docText = state.doc.toString();
-  const wikiRanges = view.visibleRanges.flatMap(({ from, to }) =>
-    collectWikiLinkRanges(
-      docText,
-      Math.max(0, from - 2),
-      Math.min(docText.length, to + 2),
-    ),
-  );
+  const parseTo = maxVisibleParseTo(view, 500);
+  const tree = ensureSyntaxTree(state, parseTo, 50) ?? syntaxTree(state);
+  const wikiRanges = collectVisibleWikiRanges(view, 2);
   const viewFrom = view.visibleRanges.length
     ? Math.min(...view.visibleRanges.map((range) => range.from))
     : 0;
   const viewTo = view.visibleRanges.length
     ? Math.max(...view.visibleRanges.map((range) => range.to))
     : state.doc.length;
-  const calloutRanges = findCalloutRanges(docText).filter(
-    (range) => range.to >= viewFrom && range.from <= viewTo,
-  );
+  // Look back so open callouts that started above the viewport still suppress marks.
+  const calloutScanFrom = Math.max(0, viewFrom - 8000);
+  const calloutSlice = state.doc.sliceString(calloutScanFrom, viewTo);
+  const calloutRanges = findCalloutRanges(calloutSlice)
+    .map((range) => ({
+      ...range,
+      from: range.from + calloutScanFrom,
+      to: range.to + calloutScanFrom,
+    }))
+    .filter((range) => range.to >= viewFrom && range.from <= viewTo);
 
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 

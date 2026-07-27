@@ -778,7 +778,11 @@ function buildTableWidget(
 
 export function buildTableDecorations(state: EditorState): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
-  const lines = state.doc.toString().split("\n");
+  // Prefer line iteration over doc.toString().split — Text already stores lines.
+  const lines: string[] = new Array(state.doc.lines);
+  for (let n = 1; n <= state.doc.lines; n += 1) {
+    lines[n - 1] = state.doc.line(n).text;
+  }
   const seen = new Set<number>();
   const active = state.field(activeTableCellField, false) ?? null;
   const mode = getLivePreviewOptimizationMode(state);
@@ -786,8 +790,19 @@ export function buildTableDecorations(state: EditorState): DecorationSet {
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
     if (seen.has(lineIndex)) continue;
+    if (!isTablePartLine(lines[lineIndex]!)) continue;
+
     const table = findTableAt(lines, lineIndex);
-    if (!table) continue;
+    if (!table) {
+      // Contiguous pipe-like block that is not a valid GFM table — mark once so
+      // findTableAt does not re-walk the same span from every line.
+      let end = lineIndex;
+      while (end + 1 < lines.length && isTablePartLine(lines[end + 1]!)) {
+        end += 1;
+      }
+      for (let i = lineIndex; i <= end; i += 1) seen.add(i);
+      continue;
+    }
 
     for (let i = table.startLine; i <= table.endLine; i += 1) {
       seen.add(i);

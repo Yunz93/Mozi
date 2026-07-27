@@ -71,14 +71,20 @@ function getRelativePath(
   return normalizedPath;
 }
 
+const flattenCache = new WeakMap<FileNode[], FileNode[]>();
+
 function flattenFiles(nodes: FileNode[]): FileNode[] {
-  return nodes.flatMap((node) => {
+  const cached = flattenCache.get(nodes);
+  if (cached) return cached;
+  const result = nodes.flatMap((node) => {
     if (node.type === "folder") {
       return flattenFiles(node.children ?? []);
     }
 
     return node.isTrash ? [] : [node];
   });
+  flattenCache.set(nodes, result);
+  return result;
 }
 
 function splitMarkdownLines(markdown: string): string[] {

@@ -17,6 +17,7 @@ import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   hasSkipAncestor,
   livePreviewShouldRebuild,
+  maxVisibleParseTo,
   selectionTouchesRange,
 } from "./shared";
 
@@ -115,7 +116,7 @@ export function buildLivePreviewListMarkerDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const tree =
-    ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
+    ensureSyntaxTree(state, maxVisibleParseTo(view), 50) ?? syntaxTree(state);
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
     tree.iterate({
@@ -163,28 +164,32 @@ export function buildLivePreviewHighlightDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
-  const docText = state.doc.toString();
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
   for (const { from, to } of view.visibleRanges) {
-    for (const range of findHighlightRanges(docText, from, to)) {
-      if (selectionTouchesRange(state, range.from, range.to)) continue;
-      if (hasSkipAncestor(state, range.from)) continue;
+    const text = state.doc.sliceString(from, to);
+    for (const range of findHighlightRanges(text, 0, text.length)) {
+      const absFrom = from + range.from;
+      const absTo = from + range.to;
+      if (selectionTouchesRange(state, absFrom, absTo)) continue;
+      if (hasSkipAncestor(state, absFrom)) continue;
       ranges.push({
-        from: range.from,
-        to: range.to,
+        from: absFrom,
+        to: absTo,
         deco: Decoration.replace({
           widget: new HighlightWidget(range.content),
         }),
       });
     }
 
-    for (const range of findCommentRanges(docText, from, to)) {
-      if (selectionTouchesRange(state, range.from, range.to)) continue;
-      if (hasSkipAncestor(state, range.from)) continue;
+    for (const range of findCommentRanges(text, 0, text.length)) {
+      const absFrom = from + range.from;
+      const absTo = from + range.to;
+      if (selectionTouchesRange(state, absFrom, absTo)) continue;
+      if (hasSkipAncestor(state, absFrom)) continue;
       ranges.push({
-        from: range.from,
-        to: range.to,
+        from: absFrom,
+        to: absTo,
         deco: Decoration.replace({}),
       });
     }

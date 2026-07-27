@@ -210,4 +210,6 @@ export function buildLivePreviewMathDecorations(
 
 export const livePreviewMath = defineLivePreviewBlockDecorationField({
   create: buildMathDecorations,
+  // Math does not read livePreviewContextFacet — skip file-tree/theme churn rebuilds.
+  rebuildOnContextChange: false,
 });

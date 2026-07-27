@@ -570,6 +570,31 @@ const wikiDecorationsField = defineLivePreviewBlockDecorationField({
     tr.effects.some((effect) => effect.is(wikiImageResolvedEffect)),
 });
 
+/** Coalesce bursty async resolves into one decoration rebuild. */
+let pendingWikiEffects: Array<ReturnType<typeof wikiImageResolvedEffect.of>> =
+  [];
+let pendingWikiView: EditorView | null = null;
+let wikiEffectFlushScheduled = false;
+
+function dispatchWikiResolvedEffect(
+  view: EditorView,
+  effect: ReturnType<typeof wikiImageResolvedEffect.of>,
+): void {
+  pendingWikiEffects.push(effect);
+  pendingWikiView = view;
+  if (wikiEffectFlushScheduled) return;
+  wikiEffectFlushScheduled = true;
+  queueMicrotask(() => {
+    wikiEffectFlushScheduled = false;
+    const target = pendingWikiView;
+    const effects = pendingWikiEffects;
+    pendingWikiEffects = [];
+    pendingWikiView = null;
+    if (!target || !target.dom.isConnected || effects.length === 0) return;
+    target.dispatch({ effects });
+  });
+}
+
 const wikiAsyncPlugin = ViewPlugin.fromClass(
   class {
     constructor(view: EditorView) {
@@ -600,22 +625,24 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
               wikiImageResolvedCache.set(job.cacheKey, displaySrc);
               wikiImageFailedCache.delete(job.cacheKey);
               if (view.dom.isConnected) {
-                view.dispatch({
-                  effects: wikiImageResolvedEffect.of({
+                dispatchWikiResolvedEffect(
+                  view,
+                  wikiImageResolvedEffect.of({
                     cacheKey: job.cacheKey,
                     src: displaySrc,
                   }),
-                });
+                );
               }
             } catch {
               wikiImageFailedCache.add(job.cacheKey);
               if (view.dom.isConnected) {
-                view.dispatch({
-                  effects: wikiImageResolvedEffect.of({
+                dispatchWikiResolvedEffect(
+                  view,
+                  wikiImageResolvedEffect.of({
                     cacheKey: job.cacheKey,
                     src: "",
                   }),
-                });
+                );
               }
             }
           });
@@ -629,12 +656,13 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
               );
               noteEmbedCache.set(job.cacheKey, result);
               if (view.dom.isConnected) {
-                view.dispatch({
-                  effects: wikiImageResolvedEffect.of({
+                dispatchWikiResolvedEffect(
+                  view,
+                  wikiImageResolvedEffect.of({
                     cacheKey: job.cacheKey,
                     src: "note",
                   }),
-                });
+                );
               }
             } catch {
               // Leave empty embed body.

@@ -80,6 +80,42 @@ export function collectWikiLinkRanges(
   return ranges;
 }
 
+/**
+ * Collect wiki ranges near the visible viewport without allocating `doc.toString()`.
+ */
+export function collectVisibleWikiRanges(
+  view: Pick<EditorView, "visibleRanges" | "state">,
+  pad = 2,
+): WikiLinkRange[] {
+  const ranges: WikiLinkRange[] = [];
+  for (const { from, to } of view.visibleRanges) {
+    const start = Math.max(0, from - pad);
+    const end = Math.min(view.state.doc.length, to + pad);
+    const text = view.state.doc.sliceString(start, end);
+    for (const range of collectWikiLinkRanges(text, 0, text.length)) {
+      ranges.push({
+        from: range.from + start,
+        to: range.to + start,
+        raw: range.raw,
+        embed: range.embed,
+      });
+    }
+  }
+  return ranges;
+}
+
+/** Furthest doc offset we should ask the markdown parser to cover for viewport plugins. */
+export function maxVisibleParseTo(
+  view: Pick<EditorView, "visibleRanges" | "state">,
+  pad = 500,
+): number {
+  let parseTo = 0;
+  for (const { to } of view.visibleRanges) {
+    parseTo = Math.max(parseTo, to);
+  }
+  return Math.min(view.state.doc.length, parseTo + pad);
+}
+
 export function rangesOverlap(
   aFrom: number,
   aTo: number,
@@ -305,6 +341,11 @@ export function defineLivePreviewBlockDecorationField(options: {
   create: (state: EditorState) => BlockDecorationBuild | DecorationSet;
   /** Extra rebuild triggers (async resolve effects, etc.). */
   rebuildOn?: (tr: Transaction) => boolean;
+  /**
+   * Rebuild when live-preview context facet identity changes (default true).
+   * Set false for context-free fields (e.g. math) to avoid file-tree churn cost.
+   */
+  rebuildOnContextChange?: boolean;
   /** Map through changes when not rebuilding (default true). */
   mapWhenIdle?: boolean;
 }): Extension {
@@ -314,8 +355,9 @@ export function defineLivePreviewBlockDecorationField(options: {
     },
     update(value, tr) {
       const contextChanged =
+        options.rebuildOnContextChange !== false &&
         tr.startState.facet(livePreviewContextFacet) !==
-        tr.state.facet(livePreviewContextFacet);
+          tr.state.facet(livePreviewContextFacet);
       const forced =
         contextChanged || options.rebuildOn?.(tr) === true || tr.docChanged;
 
