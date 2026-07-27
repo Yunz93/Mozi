@@ -39,7 +39,11 @@ import {
 import { renderMarkdown } from "../../../utils/markdown";
 import { useAppStore } from "../../../store/appStore";
 import { t } from "../../../utils/i18n";
-import { getCachedMarkdownHtml } from "./shared";
+import {
+  getCachedMarkdownHtml,
+  scheduleLivePreviewMeasure,
+  bindLivePreviewWidgetResizeMeasure,
+} from "./shared";
 import {
   getLivePreviewOptimizationMode,
   SoftOffPlaceholderWidget,
@@ -351,6 +355,9 @@ class TableWidget extends WidgetType {
     tableEl.appendChild(tbody);
     wrap.appendChild(tableEl);
 
+    // Reflow (pane width / wrapped cells / edit growth) must remasure CM maps.
+    bindLivePreviewWidgetResizeMeasure(view, wrap);
+
     wrap.addEventListener("mousedown", (event) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest?.("th, td")) return;
@@ -398,6 +405,13 @@ class TableWidget extends WidgetType {
       cell.spellcheck = false;
       cell.classList.add("cm-live-preview-table-cell-editing");
       cell.textContent = rawText;
+      const remasure = () => scheduleLivePreviewMeasure(view);
+      // contenteditable wrap changes height without updating the doc — remasure
+      // so following lines do not cover the bottom of the cell / focus ring.
+      cell.addEventListener("input", remasure);
+      cell.addEventListener("beforeinput", remasure);
+      cell.addEventListener("compositionend", remasure);
+      queueMicrotask(remasure);
       cell.addEventListener("keydown", (event) => {
         this.onCellKeyDown(view, cell, logicalRow, col, event);
       });

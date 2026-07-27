@@ -282,7 +282,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-mermaid-status": {
     fontSize: "0.8em",
     color: "var(--mp-doc-muted, #94a3b8)",
-    marginBottom: "0.35em",
+    // Prefer padding — CM block height maps ignore vertical margins.
+    paddingBottom: "0.35em",
   },
   ".cm-live-preview-mermaid.is-error": {
     cursor: "pointer",
@@ -344,15 +345,17 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-table-wrap": {
     display: "block",
     width: "100%",
+    // Scroll container — do not also max-width the <table>, or columns get
+    // crushed and cell text / borders clip without a scrollbar.
     overflowX: "auto",
     paddingBlock: "0.75em",
   },
   ".cm-live-preview-table": {
     borderCollapse: "collapse",
-    // Size to content (like reading preview) instead of stretching to 100%,
-    // which squeezes short CJK columns into one-glyph-per-line stacks.
+    // Size to content so short CJK headers keep a readable column width.
+    // Horizontal overflow is handled by the wrap above (not max-width here).
     width: "max-content",
-    maxWidth: "100%",
+    maxWidth: "none",
     tableLayout: "auto",
     fontSize: "0.95em",
   },
@@ -379,7 +382,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-table-cell-editing": {
     outline: "2px solid var(--mp-doc-accent, #2563eb)",
-    outlineOffset: "-2px",
+    // Outside the cell so the ring does not cover wrapped descenders.
+    outlineOffset: "0",
     background:
       "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 8%, transparent)",
     whiteSpace: "pre-wrap",
@@ -444,7 +448,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-callout-title": {
     fontWeight: "700",
-    marginBottom: "0.35em",
+    // Prefer padding — CM block height maps ignore vertical margins.
+    paddingBottom: "0.35em",
     textTransform: "capitalize",
   },
   ".cm-live-preview-callout-body.markdown-body": {
@@ -515,7 +520,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     color: "var(--mp-doc-accent, #2563eb)",
     textDecoration: "underline",
     textUnderlineOffset: "0.15em",
-    marginBottom: "0.35em",
+    // Prefer padding — CM block height maps ignore vertical margins.
+    paddingBottom: "0.35em",
     cursor: "pointer",
   },
   ".cm-live-preview-note-embed-body": {
