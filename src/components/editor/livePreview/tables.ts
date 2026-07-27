@@ -39,7 +39,14 @@ import {
 import { renderMarkdown } from "../../../utils/markdown";
 import { useAppStore } from "../../../store/appStore";
 import { t } from "../../../utils/i18n";
-import { getCachedMarkdownHtml, scheduleLivePreviewMeasure } from "./shared";
+import {
+  defineLivePreviewBlockDecorationField,
+  getCachedMarkdownHtml,
+  mergeCoverageRanges,
+  scheduleLivePreviewMeasure,
+  type BlockDecorationBuild,
+  type CoverageRange,
+} from "./shared";
 import {
   getLivePreviewOptimizationMode,
   SoftOffPlaceholderWidget,
@@ -776,26 +783,53 @@ function buildTableWidget(
   );
 }
 
-export function buildTableDecorations(state: EditorState): DecorationSet {
+export function buildTableDecorations(
+  state: EditorState,
+  scanRanges?: readonly CoverageRange[],
+): DecorationSet {
+  return buildTableDecorationBuild(state, scanRanges).decorations;
+}
+
+function buildTableDecorationBuild(
+  state: EditorState,
+  scanRanges?: readonly CoverageRange[],
+): BlockDecorationBuild {
+  const coverage: CoverageRange[] = [];
+  const mode = getLivePreviewOptimizationMode(state);
+  const reason = softOffReason(mode, "table");
+  if (mode === "large") {
+    return { decorations: Decoration.none, coverage };
+  }
+
   const builder = new RangeSetBuilder<Decoration>();
   // Prefer line iteration over doc.toString().split — Text already stores lines.
-  const lines: string[] = new Array(state.doc.lines);
-  for (let n = 1; n <= state.doc.lines; n += 1) {
+  const lineCount = state.doc.lines;
+  const lines: string[] = new Array(lineCount);
+  for (let n = 1; n <= lineCount; n += 1) {
     lines[n - 1] = state.doc.line(n).text;
   }
   const seen = new Set<number>();
   const active = state.field(activeTableCellField, false) ?? null;
-  const mode = getLivePreviewOptimizationMode(state);
-  const reason = softOffReason(mode, "table");
 
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+  const lineIndexes: number[] = [];
+  if (scanRanges && scanRanges.length > 0) {
+    for (const scan of scanRanges) {
+      const startLine = state.doc.lineAt(Math.max(0, scan.from)).number - 1;
+      const endLine =
+        state.doc.lineAt(Math.max(0, Math.min(state.doc.length, scan.to)))
+          .number - 1;
+      for (let i = startLine; i <= endLine; i += 1) lineIndexes.push(i);
+    }
+  } else {
+    for (let i = 0; i < lineCount; i += 1) lineIndexes.push(i);
+  }
+
+  for (const lineIndex of lineIndexes) {
     if (seen.has(lineIndex)) continue;
     if (!isTablePartLine(lines[lineIndex]!)) continue;
 
     const table = findTableAt(lines, lineIndex);
     if (!table) {
-      // Contiguous pipe-like block that is not a valid GFM table — mark once so
-      // findTableAt does not re-walk the same span from every line.
       let end = lineIndex;
       while (end + 1 < lines.length && isTablePartLine(lines[end + 1]!)) {
         end += 1;
@@ -810,6 +844,8 @@ export function buildTableDecorations(state: EditorState): DecorationSet {
 
     const from = state.doc.line(table.startLine + 1).from;
     const to = state.doc.line(table.endLine + 1).to;
+    coverage.push({ from, to });
+
     if (reason) {
       const summary = table.header.slice(0, 3).join(" | ");
       builder.add(
@@ -833,7 +869,38 @@ export function buildTableDecorations(state: EditorState): DecorationSet {
     );
   }
 
-  return builder.finish();
+  return { decorations: builder.finish(), coverage };
+}
+
+function expandTableChangedRanges(
+  state: EditorState,
+  ranges: readonly CoverageRange[],
+): CoverageRange[] {
+  const expanded: CoverageRange[] = [];
+  for (const range of ranges) {
+    try {
+      let start = state.doc.lineAt(range.from).number;
+      let end = state.doc.lineAt(
+        Math.max(range.from, Math.min(range.to, state.doc.length)),
+      ).number;
+      while (start > 1 && isTablePartLine(state.doc.line(start - 1).text)) {
+        start -= 1;
+      }
+      while (
+        end < state.doc.lines &&
+        isTablePartLine(state.doc.line(end + 1).text)
+      ) {
+        end += 1;
+      }
+      expanded.push({
+        from: state.doc.line(start).from,
+        to: state.doc.line(end).to,
+      });
+    } catch {
+      expanded.push(range);
+    }
+  }
+  return mergeCoverageRanges(expanded);
 }
 
 /** @deprecated Prefer buildTableDecorations(state); kept for existing tests. */
@@ -843,23 +910,13 @@ export function buildLivePreviewTableDecorations(
   return buildTableDecorations(view.state);
 }
 
-const tableDecorationsField = StateField.define<DecorationSet>({
-  create(state) {
-    return buildTableDecorations(state);
-  },
-  update(deco, tr) {
-    const activeChanged = tr.effects.some((effect) =>
-      effect.is(setActiveTableCellEffect),
-    );
-    if (tr.docChanged || activeChanged) {
-      return buildTableDecorations(tr.state);
-    }
-    return deco;
-  },
-  provide: (field) => [
-    EditorView.decorations.from(field),
-    EditorView.atomicRanges.of((view) => view.state.field(field)),
-  ],
+const tableDecorationsField = defineLivePreviewBlockDecorationField({
+  create: (state) => buildTableDecorationBuild(state),
+  createInRanges: (state, ranges) => buildTableDecorationBuild(state, ranges),
+  expandChangedRanges: expandTableChangedRanges,
+  rebuildOn: (tr) =>
+    tr.effects.some((effect) => effect.is(setActiveTableCellEffect)),
+  rebuildOnContextChange: false,
 });
 
 const tableFocusPlugin = ViewPlugin.fromClass(

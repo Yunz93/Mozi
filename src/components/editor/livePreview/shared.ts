@@ -4,7 +4,7 @@ import type {
   Extension,
   Transaction,
 } from "@codemirror/state";
-import { StateField } from "@codemirror/state";
+import { Range, StateField } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
   Decoration,
@@ -16,6 +16,7 @@ import {
 import { WIKI_LINK_REGEX } from "../../../utils/markdownLinkUtils";
 import { LRUCache } from "../../../utils/performance";
 import { livePreviewContextFacet } from "./context";
+import type { LivePreviewContext } from "./context";
 
 const SKIP_ANCESTOR_NODES = new Set([
   "FencedCode",
@@ -82,11 +83,22 @@ export function collectWikiLinkRanges(
 
 /**
  * Collect wiki ranges near the visible viewport without allocating `doc.toString()`.
+ * Cached for the same EditorState + visibleRanges signature so hide/images/links
+ * plugins in one update do not each re-run the regex.
  */
+let visibleWikiCacheState: EditorState | null = null;
+let visibleWikiCacheKey = "";
+let visibleWikiCacheRanges: WikiLinkRange[] = [];
+
 export function collectVisibleWikiRanges(
   view: Pick<EditorView, "visibleRanges" | "state">,
   pad = 2,
 ): WikiLinkRange[] {
+  const visKey = `${pad}|${view.visibleRanges.map((r) => `${r.from}:${r.to}`).join(",")}`;
+  if (visibleWikiCacheState === view.state && visibleWikiCacheKey === visKey) {
+    return visibleWikiCacheRanges;
+  }
+
   const ranges: WikiLinkRange[] = [];
   for (const { from, to } of view.visibleRanges) {
     const start = Math.max(0, from - pad);
@@ -101,6 +113,9 @@ export function collectVisibleWikiRanges(
       });
     }
   }
+  visibleWikiCacheState = view.state;
+  visibleWikiCacheKey = visKey;
+  visibleWikiCacheRanges = ranges;
   return ranges;
 }
 
@@ -382,43 +397,112 @@ export function expandRangesToBlocks(
  * Provide them from a StateField instead (same pattern as Live Preview tables).
  *
  * Rebuild policy:
- * - Document / context / rebuildOn → full create.
- * - Selection → only when caret enters or leaves a coverage range (no same-line thrash).
+ * - Document change → incremental `createInRanges` when provided, else full create.
+ * - Context / rebuildOn → full create (or comparator).
+ * - Selection → only when caret enters or leaves a coverage range.
  * - Otherwise → map decorations through changes.
  */
 export function defineLivePreviewBlockDecorationField(options: {
   create: (state: EditorState) => BlockDecorationBuild | DecorationSet;
-  /** Extra rebuild triggers (async resolve effects, etc.). */
+  /**
+   * Optional ranged rebuild used for incremental doc/selection updates.
+   * Must scan only `ranges` (plus any construct wholly inside them).
+   */
+  createInRanges?: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => BlockDecorationBuild | DecorationSet;
+  /** Expand changed ranges before ranged rebuild (default: blank-line blocks). */
+  expandChangedRanges?: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => CoverageRange[];
+  /** Pad applied to raw changed ranges before expansion. */
+  changePad?: number;
+  /** Extra rebuild triggers (async resolve effects, etc.) → full create. */
   rebuildOn?: (tr: Transaction) => boolean;
   /**
    * Rebuild when live-preview context facet identity changes (default true).
-   * Set false for context-free fields (e.g. math) to avoid file-tree churn cost.
+   * Set false for context-free fields (e.g. math).
+   * Or pass a comparator that returns true only when relevant context fields change.
    */
-  rebuildOnContextChange?: boolean;
+  rebuildOnContextChange?:
+    | boolean
+    | ((prev: LivePreviewContext, next: LivePreviewContext) => boolean);
   /** Map through changes when not rebuilding (default true). */
   mapWhenIdle?: boolean;
 }): Extension {
+  const expand =
+    options.expandChangedRanges ??
+    ((state: EditorState, ranges: readonly CoverageRange[]) =>
+      expandRangesToBlocks(state, ranges));
+
   const field = StateField.define<BlockDecorationBuild>({
     create(state) {
       return normalizeBlockDecorationBuild(options.create(state));
     },
     update(value, tr) {
-      const contextChanged =
-        options.rebuildOnContextChange !== false &&
-        tr.startState.facet(livePreviewContextFacet) !==
-          tr.state.facet(livePreviewContextFacet);
-      const forced =
-        contextChanged || options.rebuildOn?.(tr) === true || tr.docChanged;
+      const prevCtx = tr.startState.facet(livePreviewContextFacet);
+      const nextCtx = tr.state.facet(livePreviewContextFacet);
+      let contextChanged = false;
+      if (options.rebuildOnContextChange === false) {
+        contextChanged = false;
+      } else if (typeof options.rebuildOnContextChange === "function") {
+        contextChanged =
+          prevCtx !== nextCtx &&
+          options.rebuildOnContextChange(prevCtx, nextCtx);
+      } else {
+        contextChanged = prevCtx !== nextCtx;
+      }
 
-      if (forced) {
+      const forceFull = contextChanged || options.rebuildOn?.(tr) === true;
+
+      if (forceFull) {
         return normalizeBlockDecorationBuild(options.create(tr.state));
       }
 
-      if (tr.selection) {
-        if (selectionAffectsCoverage(tr.startState, tr.state, value.coverage)) {
+      if (tr.docChanged) {
+        if (!options.createInRanges) {
           return normalizeBlockDecorationBuild(options.create(tr.state));
         }
-        return value;
+        return rebuildBlockDecorationsIncremental(
+          value,
+          tr,
+          options.createInRanges,
+          expand,
+          options.changePad ?? 2,
+          options.create,
+        );
+      }
+
+      if (tr.selection) {
+        if (
+          !selectionAffectsCoverage(tr.startState, tr.state, value.coverage)
+        ) {
+          return value;
+        }
+        if (!options.createInRanges) {
+          return normalizeBlockDecorationBuild(options.create(tr.state));
+        }
+        const affected = value.coverage.filter((range) => {
+          const was = selectionTouchesRange(
+            tr.startState,
+            range.from,
+            range.to,
+          );
+          const now = selectionTouchesRange(tr.state, range.from, range.to);
+          return was !== now;
+        });
+        if (affected.length === 0) {
+          return normalizeBlockDecorationBuild(options.create(tr.state));
+        }
+        return spliceBlockDecorationsInRanges(
+          value,
+          tr.state,
+          expand(tr.state, affected),
+          options.createInRanges,
+          options.create,
+        );
       }
 
       if (options.mapWhenIdle === false) {
@@ -436,6 +520,108 @@ export function defineLivePreviewBlockDecorationField(options: {
     ],
   });
   return field;
+}
+
+function rangesOverlapAny(
+  from: number,
+  to: number,
+  ranges: readonly CoverageRange[],
+): boolean {
+  for (const range of ranges) {
+    if (rangesOverlap(from, to, range.from, range.to)) return true;
+  }
+  return false;
+}
+
+function decorationSetToRanges(set: DecorationSet): Range<Decoration>[] {
+  const add: Range<Decoration>[] = [];
+  set.between(0, 1e9, (from, to, value) => {
+    add.push(value.range(from, to));
+  });
+  return add;
+}
+
+function shouldFallbackToFullRebuild(
+  state: EditorState,
+  invalidate: readonly CoverageRange[],
+): boolean {
+  if (invalidate.length === 0) return false;
+  let span = 0;
+  for (const range of invalidate) span += range.to - range.from;
+  return (
+    span > Math.max(8000, state.doc.length * 0.35) || invalidate.length > 80
+  );
+}
+
+function spliceBlockDecorationsInRanges(
+  value: BlockDecorationBuild,
+  state: EditorState,
+  invalidate: readonly CoverageRange[],
+  createInRanges: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => BlockDecorationBuild | DecorationSet,
+  createFull: (state: EditorState) => BlockDecorationBuild | DecorationSet,
+): BlockDecorationBuild {
+  const ranges = mergeCoverageRanges(invalidate);
+  if (ranges.length === 0) return value;
+  if (shouldFallbackToFullRebuild(state, ranges)) {
+    return normalizeBlockDecorationBuild(createFull(state));
+  }
+
+  const filtered = value.decorations.update({
+    filter: (from, to) => !rangesOverlapAny(from, to, ranges),
+  });
+  const keptCoverage = value.coverage.filter(
+    (c) => !rangesOverlapAny(c.from, c.to, ranges),
+  );
+  const partial = normalizeBlockDecorationBuild(createInRanges(state, ranges));
+  const decorations = filtered.update({
+    add: decorationSetToRanges(partial.decorations),
+    sort: true,
+  });
+  return {
+    decorations,
+    coverage: mergeCoverageRanges([...keptCoverage, ...partial.coverage]),
+  };
+}
+
+function rebuildBlockDecorationsIncremental(
+  value: BlockDecorationBuild,
+  tr: Transaction,
+  createInRanges: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => BlockDecorationBuild | DecorationSet,
+  expand: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => CoverageRange[],
+  changePad: number,
+  createFull: (state: EditorState) => BlockDecorationBuild | DecorationSet,
+): BlockDecorationBuild {
+  const mappedDecorations = value.decorations.map(tr.changes);
+  const mappedCoverage = mapCoverage(value.coverage, tr.changes);
+  const changed = expand(tr.state, collectChangedRanges(tr, changePad));
+  const overlappingCoverage = mappedCoverage.filter((c) =>
+    rangesOverlapAny(c.from, c.to, changed),
+  );
+  const invalidate = expand(
+    tr.state,
+    mergeCoverageRanges([...changed, ...overlappingCoverage]),
+  );
+
+  if (shouldFallbackToFullRebuild(tr.state, invalidate)) {
+    return normalizeBlockDecorationBuild(createFull(tr.state));
+  }
+
+  return spliceBlockDecorationsInRanges(
+    { decorations: mappedDecorations, coverage: mappedCoverage },
+    tr.state,
+    invalidate,
+    createInRanges,
+    createFull,
+  );
 }
 
 /** Empty block build helper. */

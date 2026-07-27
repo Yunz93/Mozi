@@ -256,56 +256,70 @@ function extractFencedInfo(
 
 export function buildMermaidDecorations(
   state: EditorState,
+  scanRanges?: readonly CoverageRange[],
 ): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
   const mode = getLivePreviewOptimizationMode(state);
   const reason = softOffReason(mode, "mermaid");
+  if (mode === "large") {
+    return { decorations: Decoration.none, coverage };
+  }
+
   const builder = new RangeSetBuilder<Decoration>();
   const ctx = state.facet(livePreviewContextFacet);
   const themeMode = ctx.themeMode ?? "light";
-  const tree =
-    ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
+  const scans =
+    scanRanges && scanRanges.length > 0
+      ? scanRanges
+      : [{ from: 0, to: state.doc.length }];
+  const parseTo = Math.max(
+    ...scans.map((s) => Math.min(state.doc.length, s.to + 200)),
+    0,
+  );
+  const tree = ensureSyntaxTree(state, parseTo, 0) ?? syntaxTree(state);
 
-  tree.iterate({
-    from: 0,
-    to: state.doc.length,
-    enter: (node) => {
-      if (node.name !== "FencedCode") return;
-      const { from, to } = node;
-      const { lang, body } = extractFencedInfo(state, from, to);
-      if (lang !== "mermaid" && lang !== "mmd") return;
-      if (!body.trim()) return;
+  for (const scan of scans) {
+    tree.iterate({
+      from: Math.max(0, scan.from),
+      to: Math.min(state.doc.length, scan.to),
+      enter: (node) => {
+        if (node.name !== "FencedCode") return;
+        const { from, to } = node;
+        const { lang, body } = extractFencedInfo(state, from, to);
+        if (lang !== "mermaid" && lang !== "mmd") return;
+        if (!body.trim()) return;
 
-      coverage.push({ from, to });
-      if (selectionTouchesRange(state, from, to)) return;
+        coverage.push({ from, to });
+        if (selectionTouchesRange(state, from, to)) return;
 
-      if (reason) {
+        if (reason) {
+          builder.add(
+            from,
+            to,
+            Decoration.replace({
+              widget: new SoftOffPlaceholderWidget(
+                "mermaid",
+                reason,
+                body.trim().slice(0, 48),
+                from,
+              ),
+              block: true,
+            }),
+          );
+          return;
+        }
+
         builder.add(
           from,
           to,
           Decoration.replace({
-            widget: new SoftOffPlaceholderWidget(
-              "mermaid",
-              reason,
-              body.trim().slice(0, 48),
-              from,
-            ),
+            widget: new MermaidWidget(body, themeMode, from),
             block: true,
           }),
         );
-        return;
-      }
-
-      builder.add(
-        from,
-        to,
-        Decoration.replace({
-          widget: new MermaidWidget(body, themeMode, from),
-          block: true,
-        }),
-      );
-    },
-  });
+      },
+    });
+  }
 
   return { decorations: builder.finish(), coverage };
 }
@@ -319,4 +333,6 @@ export function buildLivePreviewMermaidDecorations(
 
 export const livePreviewMermaid = defineLivePreviewBlockDecorationField({
   create: buildMermaidDecorations,
+  createInRanges: (state, ranges) => buildMermaidDecorations(state, ranges),
+  rebuildOnContextChange: (prev, next) => prev.themeMode !== next.themeMode,
 });

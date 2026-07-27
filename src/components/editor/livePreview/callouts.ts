@@ -159,91 +159,113 @@ class HorizontalRuleWidget extends WidgetType {
 
 export function buildCalloutDecorations(
   state: EditorState,
+  scanRanges?: readonly CoverageRange[],
 ): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
   const mode = getLivePreviewOptimizationMode(state);
   const reason = softOffReason(mode, "callout");
+  // Large-file mode: leave source visible; banner covers why.
+  if (mode === "large") {
+    return { decorations: Decoration.none, coverage };
+  }
+
   const builder = new RangeSetBuilder<Decoration>();
-  const docText = state.doc.toString();
   const ctx = state.facet(livePreviewContextFacet);
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
+  const scans =
+    scanRanges && scanRanges.length > 0
+      ? scanRanges
+      : [{ from: 0, to: state.doc.length }];
 
-  for (const callout of findCalloutRanges(docText)) {
-    coverage.push({ from: callout.from, to: callout.to });
-    if (selectionTouchesRange(state, callout.from, callout.to)) continue;
-    if (hasSkipAncestor(state, callout.from)) continue;
+  for (const scan of scans) {
+    const from = Math.max(0, scan.from);
+    const to = Math.min(state.doc.length, scan.to);
+    if (from >= to) continue;
+    const slice = state.doc.sliceString(from, to);
+    for (const callout of findCalloutRanges(slice)) {
+      const absFrom = callout.from + from;
+      const absTo = callout.to + from;
+      coverage.push({ from: absFrom, to: absTo });
+      if (selectionTouchesRange(state, absFrom, absTo)) continue;
+      if (hasSkipAncestor(state, absFrom)) continue;
 
-    if (reason) {
+      if (reason) {
+        ranges.push({
+          from: absFrom,
+          to: absTo,
+          deco: Decoration.replace({
+            widget: new SoftOffPlaceholderWidget(
+              "callout",
+              reason,
+              callout.title,
+              absFrom,
+            ),
+            block: true,
+          }),
+        });
+        continue;
+      }
+
+      let bodyHtml = "";
+      if (callout.bodyMarkdown.trim()) {
+        try {
+          const renderOpts = {
+            themeMode: ctx.themeMode,
+            markdownStylePreset: ctx.markdownStylePreset,
+            highlighter: ctx.highlighter ?? null,
+          };
+          const cacheKey = `${callout.bodyMarkdown}::${ctx.themeMode ?? "light"}::${ctx.markdownStylePreset ?? "nord"}::${ctx.highlighter?.__revision ?? 0}`;
+          bodyHtml = getCachedMarkdownHtml(
+            callout.bodyMarkdown,
+            (source) => renderMarkdown(source, renderOpts),
+            cacheKey,
+          );
+        } catch {
+          bodyHtml = "";
+        }
+      }
+
       ranges.push({
-        from: callout.from,
-        to: callout.to,
+        from: absFrom,
+        to: absTo,
         deco: Decoration.replace({
-          widget: new SoftOffPlaceholderWidget(
-            "callout",
-            reason,
+          widget: new CalloutWidget(
+            callout.type,
             callout.title,
-            callout.from,
+            bodyHtml,
+            absFrom,
           ),
           block: true,
         }),
       });
-      continue;
     }
-
-    let bodyHtml = "";
-    if (callout.bodyMarkdown.trim()) {
-      try {
-        const renderOpts = {
-          themeMode: ctx.themeMode,
-          markdownStylePreset: ctx.markdownStylePreset,
-          highlighter: ctx.highlighter ?? null,
-        };
-        const cacheKey = `${callout.bodyMarkdown}::${ctx.themeMode ?? "light"}::${ctx.markdownStylePreset ?? "nord"}::${ctx.highlighter?.__revision ?? 0}`;
-        bodyHtml = getCachedMarkdownHtml(
-          callout.bodyMarkdown,
-          (source) => renderMarkdown(source, renderOpts),
-          cacheKey,
-        );
-      } catch {
-        bodyHtml = "";
-      }
-    }
-
-    ranges.push({
-      from: callout.from,
-      to: callout.to,
-      deco: Decoration.replace({
-        widget: new CalloutWidget(
-          callout.type,
-          callout.title,
-          bodyHtml,
-          callout.from,
-        ),
-        block: true,
-      }),
-    });
   }
 
-  const tree =
-    ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
-  tree.iterate({
-    from: 0,
-    to: state.doc.length,
-    enter: (node) => {
-      if (node.name !== "HorizontalRule") return;
-      coverage.push({ from: node.from, to: node.to });
-      if (selectionTouchesRange(state, node.from, node.to)) return;
-      if (hasSkipAncestor(state, node.from)) return;
-      ranges.push({
-        from: node.from,
-        to: node.to,
-        deco: Decoration.replace({
-          widget: new HorizontalRuleWidget(node.from),
-          block: true,
-        }),
-      });
-    },
-  });
+  const parseTo = Math.max(
+    ...scans.map((s) => Math.min(state.doc.length, s.to + 200)),
+    0,
+  );
+  const tree = ensureSyntaxTree(state, parseTo, 0) ?? syntaxTree(state);
+  for (const scan of scans) {
+    tree.iterate({
+      from: Math.max(0, scan.from),
+      to: Math.min(state.doc.length, scan.to),
+      enter: (node) => {
+        if (node.name !== "HorizontalRule") return;
+        coverage.push({ from: node.from, to: node.to });
+        if (selectionTouchesRange(state, node.from, node.to)) return;
+        if (hasSkipAncestor(state, node.from)) return;
+        ranges.push({
+          from: node.from,
+          to: node.to,
+          deco: Decoration.replace({
+            widget: new HorizontalRuleWidget(node.from),
+            block: true,
+          }),
+        });
+      },
+    });
+  }
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
   let lastTo = -1;
@@ -265,4 +287,9 @@ export function buildLivePreviewCalloutDecorations(
 
 export const livePreviewCallouts = defineLivePreviewBlockDecorationField({
   create: buildCalloutDecorations,
+  createInRanges: (state, ranges) => buildCalloutDecorations(state, ranges),
+  rebuildOnContextChange: (prev, next) =>
+    prev.themeMode !== next.themeMode ||
+    prev.markdownStylePreset !== next.markdownStylePreset ||
+    prev.highlighter !== next.highlighter,
 });

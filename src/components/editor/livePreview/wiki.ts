@@ -39,10 +39,13 @@ import { livePreviewWikiQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import {
   collectWikiLinkRanges,
+  collectChangedRanges,
   defineLivePreviewBlockDecorationField,
+  expandRangesToBlocks,
   getCachedMarkdownHtml,
   hasSkipAncestor,
   livePreviewContextChanged,
+  mergeCoverageRanges,
   selectionTouchesRange,
   bindLivePreviewImageMeasure,
   bindLivePreviewMediaMeasure,
@@ -376,12 +379,29 @@ export interface WikiAsyncJob {
 }
 
 /** Collect wiki async jobs without building decorations (single-scan helper). */
-export function collectWikiAsyncJobs(state: EditorState): WikiAsyncJob[] {
+export function collectWikiAsyncJobs(
+  state: EditorState,
+  scanRanges?: readonly CoverageRange[],
+): WikiAsyncJob[] {
   if (isLargeEditorState(state)) return [];
   const jobs: WikiAsyncJob[] = [];
   const ctx = state.facet(livePreviewContextFacet);
-  const docText = state.doc.toString();
-  const ranges = collectWikiLinkRanges(docText, 0, docText.length);
+  const ranges = scanRanges?.length
+    ? scanRanges.flatMap((scan) => {
+        const from = Math.max(0, scan.from);
+        const to = Math.min(state.doc.length, scan.to);
+        if (from >= to) return [];
+        const text = state.doc.sliceString(from, to);
+        return collectWikiLinkRanges(text, 0, text.length).map((range) => ({
+          ...range,
+          from: range.from + from,
+          to: range.to + from,
+        }));
+      })
+    : (() => {
+        const docText = state.doc.toString();
+        return collectWikiLinkRanges(docText, 0, docText.length);
+      })();
 
   for (const range of ranges) {
     if (!range.raw || !range.embed) continue;
@@ -438,14 +458,35 @@ export function collectWikiAsyncJobs(state: EditorState): WikiAsyncJob[] {
   return jobs;
 }
 
-function iterWikiRanges(state: EditorState): WikiLinkRange[] {
-  const docText = state.doc.toString();
-  return collectWikiLinkRanges(docText, 0, docText.length);
+function iterWikiRanges(
+  state: EditorState,
+  scanRanges?: readonly CoverageRange[],
+): WikiLinkRange[] {
+  if (!scanRanges || scanRanges.length === 0) {
+    const docText = state.doc.toString();
+    return collectWikiLinkRanges(docText, 0, docText.length);
+  }
+  const out: WikiLinkRange[] = [];
+  for (const scan of scanRanges) {
+    const from = Math.max(0, scan.from);
+    const to = Math.min(state.doc.length, scan.to);
+    if (from >= to) continue;
+    const text = state.doc.sliceString(from, to);
+    for (const range of collectWikiLinkRanges(text, 0, text.length)) {
+      out.push({
+        ...range,
+        from: range.from + from,
+        to: range.to + from,
+      });
+    }
+  }
+  return out;
 }
 
 export function buildWikiDecorations(
   state: EditorState,
   resolvedCache: Map<string, string> = wikiImageResolvedCache,
+  scanRanges?: readonly CoverageRange[],
 ): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
   if (isLargeEditorState(state)) {
@@ -454,7 +495,10 @@ export function buildWikiDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const ctx = state.facet(livePreviewContextFacet);
-  const ranges = iterWikiRanges(state);
+  const ranges = iterWikiRanges(
+    state,
+    scanRanges ?? [{ from: 0, to: state.doc.length }],
+  );
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
   let lastTo = -1;
@@ -565,8 +609,17 @@ export function buildLivePreviewWikiDecorations(
 
 const wikiDecorationsField = defineLivePreviewBlockDecorationField({
   create: (state) => buildWikiDecorations(state),
+  createInRanges: (state, ranges) =>
+    buildWikiDecorations(state, undefined, ranges),
   rebuildOn: (tr) =>
     tr.effects.some((effect) => effect.is(wikiImageResolvedEffect)),
+  rebuildOnContextChange: (prev, next) =>
+    prev.files !== next.files ||
+    prev.rootFolderPath !== next.rootFolderPath ||
+    prev.sourceFilePath !== next.sourceFilePath ||
+    prev.themeMode !== next.themeMode ||
+    prev.markdownStylePreset !== next.markdownStylePreset ||
+    prev.highlighter !== next.highlighter,
 });
 
 /** Coalesce bursty async resolves into one decoration rebuild. */
@@ -597,77 +650,8 @@ function dispatchWikiResolvedEffect(
 const wikiAsyncPlugin = ViewPlugin.fromClass(
   class {
     constructor(view: EditorView) {
-      this.scheduleJobs(view);
-    }
-
-    private scheduleJobs(view: EditorView) {
       for (const job of collectWikiAsyncJobs(view.state)) {
-        if (job.kind === "image") {
-          const pathHint = job.pathHint ?? job.raw;
-          livePreviewWikiQueue.enqueue(job.cacheKey, async () => {
-            const ctx = view.state.facet(livePreviewContextFacet);
-            try {
-              const resolverCtx = createAttachmentResolverContext(
-                ctx.files,
-                ctx.rootFolderPath,
-                ctx.sourceFilePath,
-              );
-              const resolved = await resolveAttachmentTarget(
-                resolverCtx,
-                pathHint,
-              );
-              const pathOrSrc = resolved?.path ?? pathHint;
-              const displaySrc = await resolvePreviewSource(
-                pathOrSrc,
-                ctx.sourceFilePath ?? undefined,
-              );
-              wikiImageResolvedCache.set(job.cacheKey, displaySrc);
-              wikiImageFailedCache.delete(job.cacheKey);
-              if (view.dom.isConnected) {
-                dispatchWikiResolvedEffect(
-                  view,
-                  wikiImageResolvedEffect.of({
-                    cacheKey: job.cacheKey,
-                    src: displaySrc,
-                  }),
-                );
-              }
-            } catch {
-              wikiImageFailedCache.add(job.cacheKey);
-              if (view.dom.isConnected) {
-                dispatchWikiResolvedEffect(
-                  view,
-                  wikiImageResolvedEffect.of({
-                    cacheKey: job.cacheKey,
-                    src: "",
-                  }),
-                );
-              }
-            }
-          });
-        } else {
-          livePreviewWikiQueue.enqueue(job.cacheKey, async () => {
-            try {
-              const result = await resolveNoteEmbedHtml(
-                view,
-                job.raw,
-                job.pathHint,
-              );
-              noteEmbedCache.set(job.cacheKey, result);
-              if (view.dom.isConnected) {
-                dispatchWikiResolvedEffect(
-                  view,
-                  wikiImageResolvedEffect.of({
-                    cacheKey: job.cacheKey,
-                    src: "note",
-                  }),
-                );
-              }
-            } catch {
-              // Leave empty embed body.
-            }
-          });
-        }
+        this.enqueueJob(view, job);
       }
     }
 
@@ -677,17 +661,102 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
         // and drop stale note embeds keyed by previous tree.
         wikiImageFailedCache.clear();
       }
-      // Do NOT rescan on viewport/scroll — collectWikiAsyncJobs is full-doc and
-      // was the main Live-mode scroll jank source. Mount + doc/context/effect
-      // changes are enough to enqueue unresolved embeds.
-      if (
-        update.docChanged ||
-        livePreviewContextChanged(update) ||
-        update.transactions.some((tr) =>
-          tr.effects.some((effect) => effect.is(wikiImageResolvedEffect)),
-        )
-      ) {
-        this.scheduleJobs(update.view);
+      // Schedule on mount (constructor), doc edits, and context changes only.
+      // Skip async-resolve effects — they do not invent new wiki embeds.
+      // On doc change, scan only expanded changed blocks.
+      if (update.docChanged) {
+        const ranges: CoverageRange[] = [];
+        for (const tr of update.transactions) {
+          if (!tr.docChanged) continue;
+          for (const range of expandRangesToBlocks(
+            tr.state,
+            collectChangedRanges(tr, 4),
+          )) {
+            ranges.push(range);
+          }
+        }
+        const merged = mergeCoverageRanges(ranges);
+        for (const job of collectWikiAsyncJobs(
+          update.state,
+          merged.length ? merged : undefined,
+        )) {
+          this.enqueueJob(update.view, job);
+        }
+        return;
+      }
+      if (livePreviewContextChanged(update)) {
+        for (const job of collectWikiAsyncJobs(update.state)) {
+          this.enqueueJob(update.view, job);
+        }
+      }
+    }
+
+    private enqueueJob(view: EditorView, job: WikiAsyncJob) {
+      if (job.kind === "image") {
+        const pathHint = job.pathHint ?? job.raw;
+        livePreviewWikiQueue.enqueue(job.cacheKey, async () => {
+          const ctx = view.state.facet(livePreviewContextFacet);
+          try {
+            const resolverCtx = createAttachmentResolverContext(
+              ctx.files,
+              ctx.rootFolderPath,
+              ctx.sourceFilePath,
+            );
+            const resolved = await resolveAttachmentTarget(
+              resolverCtx,
+              pathHint,
+            );
+            const pathOrSrc = resolved?.path ?? pathHint;
+            const displaySrc = await resolvePreviewSource(
+              pathOrSrc,
+              ctx.sourceFilePath ?? undefined,
+            );
+            wikiImageResolvedCache.set(job.cacheKey, displaySrc);
+            wikiImageFailedCache.delete(job.cacheKey);
+            if (view.dom.isConnected) {
+              dispatchWikiResolvedEffect(
+                view,
+                wikiImageResolvedEffect.of({
+                  cacheKey: job.cacheKey,
+                  src: displaySrc,
+                }),
+              );
+            }
+          } catch {
+            wikiImageFailedCache.add(job.cacheKey);
+            if (view.dom.isConnected) {
+              dispatchWikiResolvedEffect(
+                view,
+                wikiImageResolvedEffect.of({
+                  cacheKey: job.cacheKey,
+                  src: "",
+                }),
+              );
+            }
+          }
+        });
+      } else {
+        livePreviewWikiQueue.enqueue(job.cacheKey, async () => {
+          try {
+            const result = await resolveNoteEmbedHtml(
+              view,
+              job.raw,
+              job.pathHint,
+            );
+            noteEmbedCache.set(job.cacheKey, result);
+            if (view.dom.isConnected) {
+              dispatchWikiResolvedEffect(
+                view,
+                wikiImageResolvedEffect.of({
+                  cacheKey: job.cacheKey,
+                  src: "note",
+                }),
+              );
+            }
+          } catch {
+            // Leave empty embed body.
+          }
+        });
       }
     }
   },

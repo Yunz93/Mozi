@@ -16,6 +16,7 @@ import {
   collectWikiLinkRanges,
   defineLivePreviewBlockDecorationField,
   hasSkipAncestor,
+  mergeCoverageRanges,
   rangesOverlap,
   selectionTouchesRange,
   scheduleLivePreviewMeasure,
@@ -116,24 +117,24 @@ class MathWidget extends WidgetType {
     return (
       this.content === other.content &&
       this.displayMode === other.displayMode &&
+      this.html === other.html &&
       this.from === other.from
     );
   }
 
   toDOM(view: EditorView) {
-    const el = document.createElement(this.displayMode ? "div" : "span");
-    el.className = this.displayMode
-      ? "cm-live-preview-math cm-live-preview-math-display katex-display"
-      : "cm-live-preview-math cm-live-preview-math-inline";
-    el.setAttribute("contenteditable", "false");
-    el.innerHTML = this.html;
-    // KaTeX metrics can settle after font load; refresh CM height maps.
+    const wrap = document.createElement(this.displayMode ? "div" : "span");
+    wrap.className = this.displayMode
+      ? "cm-live-preview-math is-display"
+      : "cm-live-preview-math is-inline";
+    wrap.setAttribute("contenteditable", "false");
+    wrap.innerHTML = this.html;
+    bindLivePreviewWidgetCaret(view, wrap, this.from);
     queueMicrotask(() => scheduleLivePreviewMeasure(view));
     if (typeof document !== "undefined" && document.fonts?.ready) {
       void document.fonts.ready.then(() => scheduleLivePreviewMeasure(view));
     }
-    bindLivePreviewWidgetCaret(view, el, this.from);
-    return el;
+    return wrap;
   }
 
   ignoreEvent() {
@@ -141,64 +142,91 @@ class MathWidget extends WidgetType {
   }
 }
 
-export function buildMathDecorations(state: EditorState): BlockDecorationBuild {
+function buildMathDecorationsInScanRanges(
+  state: EditorState,
+  scanRanges: readonly CoverageRange[],
+): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
-
-  // Large-file mode: keep source visible; banner explains why widgets are off.
-  if (isLargeEditorState(state)) {
+  if (isLargeEditorState(state) || scanRanges.length === 0) {
     return { decorations: Decoration.none, coverage };
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  const docText = state.doc.toString();
-  const wikiRanges = collectWikiLinkRanges(docText, 0, docText.length);
-  const candidates = findMathRangesInText(docText);
+  const pending: Array<{ from: number; to: number; deco?: Decoration }> = [];
 
-  candidates.sort((a, b) => a.from - b.from || a.to - b.to);
+  for (const scan of scanRanges) {
+    const from = Math.max(0, scan.from);
+    const to = Math.min(state.doc.length, scan.to);
+    if (from >= to) continue;
+    const text = state.doc.sliceString(from, to);
+    const wikiRanges = collectWikiLinkRanges(text, 0, text.length).map((w) => ({
+      from: w.from + from,
+      to: w.to + from,
+    }));
+    const candidates = findMathRangesInText(text).map((range) => ({
+      ...range,
+      from: range.from + from,
+      to: range.to + from,
+    }));
+
+    for (const range of candidates) {
+      if (range.from >= range.to) continue;
+      if (hasSkipAncestor(state, range.from)) continue;
+      if (
+        wikiRanges.some((w) =>
+          rangesOverlap(range.from, range.to, w.from, w.to),
+        )
+      ) {
+        continue;
+      }
+
+      coverage.push({ from: range.from, to: range.to });
+
+      if (selectionTouchesRange(state, range.from, range.to)) {
+        continue;
+      }
+
+      let html: string;
+      try {
+        html = renderKatexHtml(range.content, range.displayMode);
+      } catch {
+        continue;
+      }
+
+      pending.push({
+        from: range.from,
+        to: range.to,
+        deco: Decoration.replace({
+          widget: new MathWidget(
+            range.content,
+            range.displayMode,
+            html,
+            range.from,
+          ),
+          block: range.displayMode,
+        }),
+      });
+    }
+  }
+
+  pending.sort((a, b) => a.from - b.from || a.to - b.to);
   let lastTo = -1;
-
-  for (const range of candidates) {
-    if (range.from < lastTo) continue;
-    if (range.from >= range.to) continue;
-    if (hasSkipAncestor(state, range.from)) continue;
-    if (
-      wikiRanges.some((w) => rangesOverlap(range.from, range.to, w.from, w.to))
-    ) {
-      continue;
-    }
-
-    coverage.push({ from: range.from, to: range.to });
-
-    if (selectionTouchesRange(state, range.from, range.to)) {
-      lastTo = range.to;
-      continue;
-    }
-
-    let html: string;
-    try {
-      html = renderKatexHtml(range.content, range.displayMode);
-    } catch {
-      lastTo = range.to;
-      continue;
-    }
-
-    builder.add(
-      range.from,
-      range.to,
-      Decoration.replace({
-        widget: new MathWidget(
-          range.content,
-          range.displayMode,
-          html,
-          range.from,
-        ),
-        block: range.displayMode,
-      }),
-    );
+  for (const range of pending) {
+    if (range.from < lastTo || !range.deco) continue;
+    builder.add(range.from, range.to, range.deco);
     lastTo = range.to;
   }
 
   return { decorations: builder.finish(), coverage };
+}
+
+export function buildMathDecorations(state: EditorState): BlockDecorationBuild {
+  if (isLargeEditorState(state)) {
+    return { decorations: Decoration.none, coverage: [] };
+  }
+  return buildMathDecorationsInScanRanges(state, [
+    { from: 0, to: state.doc.length },
+  ]);
 }
 
 /** @deprecated Prefer buildMathDecorations(state). */
@@ -208,8 +236,58 @@ export function buildLivePreviewMathDecorations(
   return buildMathDecorations(view.state).decorations;
 }
 
+function expandMathChangedRanges(
+  state: EditorState,
+  ranges: readonly CoverageRange[],
+): CoverageRange[] {
+  // Display math can span blank lines — expand farther when `$` is nearby.
+  const expanded: CoverageRange[] = [];
+  for (const range of ranges) {
+    let from = range.from;
+    let to = range.to;
+    try {
+      let line = state.doc.lineAt(from);
+      // Walk back across non-empty lines, and one extra blank if a $$ may open above.
+      while (line.number > 1) {
+        const prev = state.doc.line(line.number - 1);
+        if (!prev.text.trim()) {
+          const look = state.doc.line(Math.max(1, prev.number - 1)).text;
+          if (look.includes("$$") || look.includes("$")) {
+            line = state.doc.line(Math.max(1, prev.number - 1));
+            continue;
+          }
+          break;
+        }
+        line = prev;
+      }
+      from = line.from;
+
+      line = state.doc.lineAt(Math.max(from, Math.min(to, state.doc.length)));
+      while (line.number < state.doc.lines) {
+        const next = state.doc.line(line.number + 1);
+        if (!next.text.trim()) {
+          if (line.text.includes("$$") || next.text.includes("$$")) {
+            line = next;
+            continue;
+          }
+          break;
+        }
+        line = next;
+      }
+      to = line.to;
+    } catch {
+      // keep
+    }
+    expanded.push({ from, to });
+  }
+  // Merge via shared helper.
+  return mergeCoverageRanges(expanded);
+}
+
 export const livePreviewMath = defineLivePreviewBlockDecorationField({
   create: buildMathDecorations,
+  createInRanges: buildMathDecorationsInScanRanges,
+  expandChangedRanges: expandMathChangedRanges,
   // Math does not read livePreviewContextFacet — skip file-tree/theme churn rebuilds.
   rebuildOnContextChange: false,
 });
