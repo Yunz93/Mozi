@@ -652,6 +652,40 @@ export function scheduleLivePreviewMeasure(view: EditorView): void {
 }
 
 /**
+ * Remasure when a widget's laid-out box changes (wrap reflow, async HTML,
+ * contenteditable growth). Coalesces to one measure per animation frame.
+ * Returns a disconnect function — call it if the widget outlives the node
+ * without CM destroying the DOM (rare); MutationObserver cleanup is optional.
+ */
+export function bindLivePreviewWidgetResizeMeasure(
+  view: EditorView,
+  root: HTMLElement,
+): () => void {
+  if (typeof ResizeObserver === "undefined") {
+    queueMicrotask(() => scheduleLivePreviewMeasure(view));
+    return () => undefined;
+  }
+
+  let raf = 0;
+  const remasure = () => {
+    if (raf) return;
+    raf = window.requestAnimationFrame(() => {
+      raf = 0;
+      scheduleLivePreviewMeasure(view);
+    });
+  };
+
+  const observer = new ResizeObserver(remasure);
+  observer.observe(root);
+  queueMicrotask(remasure);
+
+  return () => {
+    if (raf) window.cancelAnimationFrame(raf);
+    observer.disconnect();
+  };
+}
+
+/**
  * Bind img load/error (and already-complete images) to a remasure.
  * Also remasures once on the next microtask for sync layout settles.
  */
@@ -721,12 +755,16 @@ export function scheduleLivePreviewReveal(
 }
 
 /**
- * Remasure height maps when Live Preview mounts and when webfonts settle.
- * Heading/font metric changes otherwise leave `posAtCoords` 1–2 lines off.
+ * Remasure height maps when Live Preview mounts, webfonts settle, and the
+ * editor scroller width changes (pane resize / readable-line CSS vars).
+ * Stale maps leave `posAtCoords` 1–2 lines off under wrapped text + widgets.
  */
 export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
   class {
     private disposed = false;
+    private resizeObserver: ResizeObserver | null = null;
+    private lastWidth = 0;
+    private raf = 0;
 
     constructor(view: EditorView) {
       scheduleLivePreviewMeasure(view);
@@ -740,10 +778,30 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
           scheduleLivePreviewMeasure(view);
         });
       }
+
+      this.lastWidth = view.scrollDOM.clientWidth;
+      if (typeof ResizeObserver === "undefined") return;
+
+      this.resizeObserver = new ResizeObserver(() => {
+        if (this.disposed || !view.dom.isConnected) return;
+        const width = view.scrollDOM.clientWidth;
+        if (width === this.lastWidth) return;
+        this.lastWidth = width;
+        if (this.raf) return;
+        this.raf = window.requestAnimationFrame(() => {
+          this.raf = 0;
+          if (this.disposed || !view.dom.isConnected) return;
+          scheduleLivePreviewMeasure(view);
+        });
+      });
+      this.resizeObserver.observe(view.scrollDOM);
     }
 
     destroy() {
       this.disposed = true;
+      if (this.raf) window.cancelAnimationFrame(this.raf);
+      this.resizeObserver?.disconnect();
+      this.resizeObserver = null;
     }
   },
 );

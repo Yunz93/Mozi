@@ -21,6 +21,7 @@ import {
   selectionTouchesRange,
   scheduleLivePreviewMeasure,
   bindLivePreviewWidgetCaret,
+  bindLivePreviewWidgetResizeMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -133,6 +134,9 @@ class MathWidget extends WidgetType {
     queueMicrotask(() => scheduleLivePreviewMeasure(view));
     if (typeof document !== "undefined" && document.fonts?.ready) {
       void document.fonts.ready.then(() => scheduleLivePreviewMeasure(view));
+    }
+    if (this.displayMode) {
+      bindLivePreviewWidgetResizeMeasure(view, wrap);
     }
     return wrap;
   }

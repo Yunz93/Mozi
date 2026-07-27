@@ -118,6 +118,7 @@ export {
   collectChangedRanges,
   expandRangesToBlocks,
   scheduleLivePreviewMeasure,
+  bindLivePreviewWidgetResizeMeasure,
   cancelPendingLivePreviewReveals,
   livePreviewGeometryRemeasure,
 } from "./shared";

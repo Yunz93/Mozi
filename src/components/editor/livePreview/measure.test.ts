@@ -6,6 +6,7 @@ import { EditorView } from "@codemirror/view";
 import {
   bindLivePreviewImageMeasure,
   bindLivePreviewWidgetCaret,
+  bindLivePreviewWidgetResizeMeasure,
   cancelPendingLivePreviewReveals,
   isLivePreviewRevealCurrent,
   scheduleLivePreviewMeasure,
@@ -38,6 +39,46 @@ describe("live preview geometry remasure", () => {
     expect(spy).not.toHaveBeenCalled();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(spy).toHaveBeenCalled();
+  });
+
+  it("bindLivePreviewWidgetResizeMeasure remasures on ResizeObserver callbacks", async () => {
+    const callbacks: ResizeObserverCallback[] = [];
+    class FakeResizeObserver {
+      constructor(cb: ResizeObserverCallback) {
+        callbacks.push(cb);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({ doc: "hello" }),
+      parent,
+    });
+    views.push(view);
+    const spy = vi.spyOn(view, "requestMeasure");
+    const root = document.createElement("div");
+    parent.appendChild(root);
+
+    const disconnect = bindLivePreviewWidgetResizeMeasure(view, root);
+    expect(callbacks.length).toBeGreaterThanOrEqual(1);
+    const widgetCb = callbacks[callbacks.length - 1]!;
+
+    // ResizeObserver helper rAF-coalesces, then scheduleLivePreviewMeasure rAF-coalesces.
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(spy).toHaveBeenCalled();
+    spy.mockClear();
+
+    widgetCb([], {} as ResizeObserver);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(spy).toHaveBeenCalled();
+    disconnect();
   });
 
   it("bindLivePreviewImageMeasure remasures on load", async () => {

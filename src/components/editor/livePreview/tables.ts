@@ -44,6 +44,7 @@ import {
   getCachedMarkdownHtml,
   mergeCoverageRanges,
   scheduleLivePreviewMeasure,
+  bindLivePreviewWidgetResizeMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -363,8 +364,8 @@ class TableWidget extends WidgetType {
     tableEl.appendChild(tbody);
     wrap.appendChild(tableEl);
 
-    // Initial height map — wrapped cells / fonts can settle after insert.
-    queueMicrotask(() => scheduleLivePreviewMeasure(view));
+    // Reflow (pane width / wrapped cells / edit growth) must remasure CM maps.
+    bindLivePreviewWidgetResizeMeasure(view, wrap);
 
     wrap.addEventListener("mousedown", (event) => {
       const target = event.target as HTMLElement | null;

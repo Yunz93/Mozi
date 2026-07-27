@@ -289,7 +289,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-mermaid-status": {
     fontSize: "0.8em",
     color: "var(--mp-doc-muted, #94a3b8)",
-    marginBottom: "0.35em",
+    // Prefer padding — CM block height maps ignore vertical margins.
+    paddingBottom: "0.35em",
   },
   ".cm-live-preview-mermaid.is-error": {
     cursor: "pointer",
@@ -454,7 +455,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-callout-title": {
     fontWeight: "700",
-    marginBottom: "0.35em",
+    // Prefer padding — CM block height maps ignore vertical margins.
+    paddingBottom: "0.35em",
     textTransform: "capitalize",
   },
   ".cm-live-preview-callout-body.markdown-body": {
@@ -525,7 +527,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     color: "var(--mp-doc-accent, #2563eb)",
     textDecoration: "underline",
     textUnderlineOffset: "0.15em",
-    marginBottom: "0.35em",
+    // Prefer padding — CM block height maps ignore vertical margins.
+    paddingBottom: "0.35em",
     cursor: "pointer",
   },
   ".cm-live-preview-note-embed-body": {
