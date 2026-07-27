@@ -11,7 +11,8 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
+import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
@@ -21,11 +22,12 @@ import {
   getCachedPreviewImageSrc,
   resolvePreviewSource,
 } from "../../../utils/previewImageCache";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewImageQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import {
   collectVisibleWikiRanges,
+  ensureLivePreviewViewportTree,
+  getLivePreviewDecorationRange,
   hasSkipAncestor,
   livePreviewContextChanged,
   rangesOverlap,
@@ -219,60 +221,60 @@ export function buildLivePreviewImageDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const ctx = state.facet(livePreviewContextFacet);
-  const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
+  const parseTo = maxVisibleParseTo(view);
+  const tree = ensureLivePreviewViewportTree(view, parseTo);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
+  const { from: viewportFrom, to: viewportTo } =
+    getLivePreviewDecorationRange(view);
 
-  for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
-    tree.iterate({
-      from: viewportFrom,
-      to: viewportTo,
-      enter: (node) => {
-        if (node.name !== "Image") return;
-        const { from, to } = node;
-        if (from >= to) return;
-        if (hasSkipAncestor(state, from)) return;
-        if (selectionTouchesRange(state, from, to)) return;
-        if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
-          return;
-        }
+  tree.iterate({
+    from: viewportFrom,
+    to: viewportTo,
+    enter: (node) => {
+      if (node.name !== "Image") return;
+      const { from, to } = node;
+      if (from >= to) return;
+      if (hasSkipAncestor(state, from)) return;
+      if (selectionTouchesRange(state, from, to)) return;
+      if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
+        return;
+      }
 
-        const { alt, url, urlFrom, urlTo } = extractImageParts(state, from, to);
-        if (!url) return;
+      const { alt, url, urlFrom, urlTo } = extractImageParts(state, from, to);
+      if (!url) return;
 
-        const key = cacheKeyFor(ctx.sourceFilePath, url);
-        let resolvedSrc =
-          resolvedCache.get(key) ??
-          getCachedPreviewImageSrc(url, ctx.sourceFilePath ?? undefined) ??
-          null;
-        const failed = !resolvedSrc && failedCache.has(key);
+      const key = cacheKeyFor(ctx.sourceFilePath, url);
+      let resolvedSrc =
+        resolvedCache.get(key) ??
+        getCachedPreviewImageSrc(url, ctx.sourceFilePath ?? undefined) ??
+        null;
+      const failed = !resolvedSrc && failedCache.has(key);
 
-        if (!resolvedSrc && isDirectDisplaySrc(url)) {
-          resolvedSrc = url;
-          resolvedCache.set(key, url);
-        } else if (!resolvedSrc && !failed) {
-          scheduleResolve(key, url);
-        }
+      if (!resolvedSrc && isDirectDisplaySrc(url)) {
+        resolvedSrc = url;
+        resolvedCache.set(key, url);
+      } else if (!resolvedSrc && !failed) {
+        scheduleResolve(key, url);
+      }
 
-        builder.add(
-          from,
-          to,
-          Decoration.replace({
-            widget: new MarkdownImageWidget(
-              alt,
-              url,
-              resolvedSrc,
-              from,
-              to,
-              urlFrom,
-              urlTo,
-              failed,
-            ),
-          }),
-        );
-      },
-    });
-  }
+      builder.add(
+        from,
+        to,
+        Decoration.replace({
+          widget: new MarkdownImageWidget(
+            alt,
+            url,
+            resolvedSrc,
+            from,
+            to,
+            urlFrom,
+            urlTo,
+            failed,
+          ),
+        }),
+      );
+    },
+  });
 
   return builder.finish();
 }

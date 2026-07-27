@@ -11,11 +11,13 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
 import {
   collectVisibleWikiRanges,
+  ensureLivePreviewViewportTree,
+  getLivePreviewDecorationRange,
   hasSkipAncestor,
   livePreviewContextChanged,
   rangesOverlap,
@@ -93,36 +95,36 @@ export function buildLivePreviewLinkDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
-  const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
+  const parseTo = maxVisibleParseTo(view);
+  const tree = ensureLivePreviewViewportTree(view, parseTo);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
+  const { from: viewportFrom, to: viewportTo } =
+    getLivePreviewDecorationRange(view);
 
-  for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
-    tree.iterate({
-      from: viewportFrom,
-      to: viewportTo,
-      enter: (node) => {
-        if (node.name !== "Link") return;
-        const { from, to } = node;
-        if (selectionTouchesRange(state, from, to)) return;
-        if (hasSkipAncestor(state, from)) return;
-        if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
-          return;
-        }
+  tree.iterate({
+    from: viewportFrom,
+    to: viewportTo,
+    enter: (node) => {
+      if (node.name !== "Link") return;
+      const { from, to } = node;
+      if (selectionTouchesRange(state, from, to)) return;
+      if (hasSkipAncestor(state, from)) return;
+      if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
+        return;
+      }
 
-        const { label, href } = extractLinkParts(state, from, to);
-        if (!href) return;
+      const { label, href } = extractLinkParts(state, from, to);
+      if (!href) return;
 
-        builder.add(
-          from,
-          to,
-          Decoration.replace({
-            widget: new MarkdownLinkWidget(label, href),
-          }),
-        );
-      },
-    });
-  }
+      builder.add(
+        from,
+        to,
+        Decoration.replace({
+          widget: new MarkdownLinkWidget(label, href),
+        }),
+      );
+    },
+  });
 
   return builder.finish();
 }

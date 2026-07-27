@@ -12,10 +12,12 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   collectVisibleWikiRanges,
+  ensureLivePreviewViewportTree,
+  getLivePreviewDecorationRange,
   hasSkipAncestor,
   maxVisibleParseTo,
   rangesOverlap,
@@ -124,16 +126,10 @@ export function buildLivePreviewHideDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
-  const parseTo = maxVisibleParseTo(view, 500);
-  // Never block the frame waiting on parse — scroll/selection rebuilds must stay cheap.
-  const tree = ensureSyntaxTree(state, parseTo, 0) ?? syntaxTree(state);
+  const parseTo = maxVisibleParseTo(view);
+  const tree = ensureLivePreviewViewportTree(view, parseTo);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
-  const viewFrom = view.visibleRanges.length
-    ? Math.min(...view.visibleRanges.map((range) => range.from))
-    : 0;
-  const viewTo = view.visibleRanges.length
-    ? Math.max(...view.visibleRanges.map((range) => range.to))
-    : state.doc.length;
+  const { from: viewFrom, to: viewTo } = getLivePreviewDecorationRange(view);
   // Look back so open callouts that started above the viewport still suppress marks.
   const calloutScanFrom = Math.max(0, viewFrom - 8000);
   const calloutSlice = state.doc.sliceString(calloutScanFrom, viewTo);
@@ -147,43 +143,41 @@ export function buildLivePreviewHideDecorations(
 
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
 
-  for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
-    tree.iterate({
-      from: viewportFrom,
-      to: viewportTo,
-      enter: (node) => {
-        const { name, from, to } = node;
-        if (from >= to) return;
-        if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
-          return;
-        }
-        if (calloutRanges.some((c) => rangesOverlap(from, to, c.from, c.to))) {
-          return;
-        }
+  tree.iterate({
+    from: viewFrom,
+    to: viewTo,
+    enter: (node) => {
+      const { name, from, to } = node;
+      if (from >= to) return;
+      if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
+        return;
+      }
+      if (calloutRanges.some((c) => rangesOverlap(from, to, c.from, c.to))) {
+        return;
+      }
 
-        if (HIDEABLE_MARK_NODES.has(name)) {
-          if (hasSkipAncestor(state, from)) return;
-          const parent = findInlineParent(state, from, to);
-          // Image/Link widgets replace the whole construct when inactive.
-          if (
-            (parent?.name === "Image" || parent?.name === "Link") &&
-            !selectionTouchesRange(state, parent.from, parent.to)
-          ) {
-            return;
-          }
-          if (shouldRevealMark(state, name, from, to)) return;
-          ranges.push({ from, to, deco: hideMarkDecoration });
+      if (HIDEABLE_MARK_NODES.has(name)) {
+        if (hasSkipAncestor(state, from)) return;
+        const parent = findInlineParent(state, from, to);
+        // Image/Link widgets replace the whole construct when inactive.
+        if (
+          (parent?.name === "Image" || parent?.name === "Link") &&
+          !selectionTouchesRange(state, parent.from, parent.to)
+        ) {
           return;
         }
+        if (shouldRevealMark(state, name, from, to)) return;
+        ranges.push({ from, to, deco: hideMarkDecoration });
+        return;
+      }
 
-        if (name === "URL") {
-          if (hasSkipAncestor(state, from)) return;
-          if (!shouldHideUrl(state, from, to)) return;
-          ranges.push({ from, to, deco: hideUrlDecoration });
-        }
-      },
-    });
-  }
+      if (name === "URL") {
+        if (hasSkipAncestor(state, from)) return;
+        if (!shouldHideUrl(state, from, to)) return;
+        ranges.push({ from, to, deco: hideUrlDecoration });
+      }
+    },
+  });
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
   let lastTo = -1;

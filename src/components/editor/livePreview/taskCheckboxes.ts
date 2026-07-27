@@ -12,9 +12,10 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
+  ensureLivePreviewViewportTree,
+  getLivePreviewDecorationRange,
   maxVisibleParseTo,
   shouldRebuildLivePreviewDecorations,
   ViewportDecorationWindow,
@@ -88,33 +89,33 @@ export function buildLivePreviewTaskDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
-  const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
+  const parseTo = maxVisibleParseTo(view);
+  const tree = ensureLivePreviewViewportTree(view, parseTo);
+  const { from: viewportFrom, to: viewportTo } =
+    getLivePreviewDecorationRange(view);
 
-  for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
-    tree.iterate({
-      from: viewportFrom,
-      to: viewportTo,
-      enter: (node) => {
-        if (node.name !== "TaskMarker") return;
-        const { from, to } = node;
-        if (from >= to) return;
-        if (selectionOnLine(state, from)) return;
+  tree.iterate({
+    from: viewportFrom,
+    to: viewportTo,
+    enter: (node) => {
+      if (node.name !== "TaskMarker") return;
+      const { from, to } = node;
+      if (from >= to) return;
+      if (selectionOnLine(state, from)) return;
 
-        const text = state.doc.sliceString(from, to);
-        const checked = /^\[[xX]\]$/.test(text);
-        if (!checked && text !== "[ ]") return;
+      const text = state.doc.sliceString(from, to);
+      const checked = /^\[[xX]\]$/.test(text);
+      if (!checked && text !== "[ ]") return;
 
-        builder.add(
-          from,
-          to,
-          Decoration.replace({
-            widget: new TaskCheckboxWidget(checked, from, to),
-          }),
-        );
-      },
-    });
-  }
+      builder.add(
+        from,
+        to,
+        Decoration.replace({
+          widget: new TaskCheckboxWidget(checked, from, to),
+        }),
+      );
+    },
+  });
 
   return builder.finish();
 }

@@ -8,6 +8,7 @@ import {
   selectionAffectsCoverage,
   shouldRebuildLivePreviewDecorations,
   ViewportDecorationWindow,
+  getLivePreviewDecorationRange,
 } from "./shared";
 
 describe("livePreviewShouldRebuild", () => {
@@ -93,6 +94,26 @@ describe("ViewportDecorationWindow", () => {
     } as never;
     expect(shouldRebuildLivePreviewDecorations(stay, "marks", window)).toBe(
       false,
+    );
+
+    view.destroy();
+    parent.remove();
+  });
+
+  it("build range matches the marked decoration window pad", () => {
+    const doc = `${"x".repeat(100)}\n`.repeat(80);
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({ doc, selection: { anchor: 0 } }),
+      parent,
+    });
+    const window = new ViewportDecorationWindow();
+    window.mark(view);
+    const buildRange = getLivePreviewDecorationRange(view);
+    expect(buildRange).toEqual(window.range);
+    expect(buildRange.to - buildRange.from).toBeGreaterThan(
+      (view.visibleRanges[0]?.to ?? 0) - (view.visibleRanges[0]?.from ?? 0),
     );
 
     view.destroy();
