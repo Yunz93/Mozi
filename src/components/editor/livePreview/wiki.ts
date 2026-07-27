@@ -48,6 +48,7 @@ import {
   bindLivePreviewImageMeasure,
   bindLivePreviewMediaMeasure,
   bindLivePreviewWidgetCaret,
+  bindLivePreviewWidgetResizeMeasure,
   scheduleLivePreviewMeasure,
   scheduleLivePreviewReveal,
   cancelPendingLivePreviewReveals,
@@ -130,6 +131,10 @@ class WikiImageWidget extends WidgetType {
       this.height === other.height &&
       this.failed === other.failed
     );
+  }
+
+  get estimatedHeight() {
+    return this.height ?? 48;
   }
 
   toDOM(view: EditorView) {
@@ -239,6 +244,7 @@ class WikiNoteEmbedWidget extends WidgetType {
       queueMicrotask(() => scheduleLivePreviewMeasure(view));
     }
 
+    bindLivePreviewWidgetResizeMeasure(view, wrap);
     bindLivePreviewWidgetCaret(view, wrap, this.from);
     return wrap;
   }

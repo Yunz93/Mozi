@@ -39,7 +39,11 @@ import {
 import { renderMarkdown } from "../../../utils/markdown";
 import { useAppStore } from "../../../store/appStore";
 import { t } from "../../../utils/i18n";
-import { getCachedMarkdownHtml, scheduleLivePreviewMeasure } from "./shared";
+import {
+  getCachedMarkdownHtml,
+  scheduleLivePreviewMeasure,
+  bindLivePreviewWidgetResizeMeasure,
+} from "./shared";
 import {
   getLivePreviewOptimizationMode,
   SoftOffPlaceholderWidget,
@@ -351,8 +355,8 @@ class TableWidget extends WidgetType {
     tableEl.appendChild(tbody);
     wrap.appendChild(tableEl);
 
-    // Initial height map — wrapped cells / fonts can settle after insert.
-    queueMicrotask(() => scheduleLivePreviewMeasure(view));
+    // Reflow (pane width / wrapped cells / edit growth) must remasure CM maps.
+    bindLivePreviewWidgetResizeMeasure(view, wrap);
 
     wrap.addEventListener("mousedown", (event) => {
       const target = event.target as HTMLElement | null;

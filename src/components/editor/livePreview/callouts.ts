@@ -18,6 +18,7 @@ import {
   selectionTouchesRange,
   bindLivePreviewMediaMeasure,
   bindLivePreviewWidgetCaret,
+  bindLivePreviewWidgetResizeMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -127,6 +128,7 @@ class CalloutWidget extends WidgetType {
       bindLivePreviewMediaMeasure(view, body);
     }
 
+    bindLivePreviewWidgetResizeMeasure(view, wrap);
     bindLivePreviewWidgetCaret(view, wrap, this.from);
     return wrap;
   }
