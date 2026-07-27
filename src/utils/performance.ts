@@ -8,9 +8,6 @@ import { useRef, useCallback, useEffect } from "react";
 export const LARGE_FILE_THRESHOLDS = {
   LINE_COUNT: 5000, // Lines
   CHAR_COUNT: 500000, // Characters
-  /** Disable tables/callouts/mermaid above this to keep typing responsive. */
-  LIVE_PREVIEW_HEAVY_LINE_COUNT: 2000,
-  LIVE_PREVIEW_HEAVY_CHAR_COUNT: 200000,
   RENDER_CHUNK_SIZE: 1000, // Lines per chunk for incremental rendering
 } as const;
 

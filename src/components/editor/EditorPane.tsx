@@ -20,7 +20,6 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore, selectContent } from "../../store/appStore";
-import { ViewMode } from "../../types";
 import {
   getPaneLayoutMetrics,
   scalePaneLayoutMetrics,
@@ -37,7 +36,6 @@ import { EditorView } from "@codemirror/view";
 import {
   getResolvedCodeFontFamily,
   getResolvedEditorFontFamily,
-  getResolvedPreviewFontFamily,
 } from "../../utils/fontSettings";
 import {
   getScaledCodeFontSize,
@@ -45,15 +43,11 @@ import {
   getUiFontScale,
 } from "../../utils/uiFontSize";
 import { useFileSystem } from "../../hooks/useFileSystem";
-import { useFileOperations } from "../../hooks/useFileOperations";
-import { openExternalUrl } from "../../utils/externalLinks";
-import { hasUriScheme } from "./preview/previewMedia";
 import {
   useCodeMirror,
   useWikiLinks,
   useImagePaste,
   useScrollSync,
-  useWikiLinkNavigation,
 } from "./hooks";
 import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
 import type { WikiLinkPreviewData } from "./hooks";
@@ -73,7 +67,6 @@ import {
   resolveAttachmentTarget,
 } from "../../utils/attachmentResolver";
 import { buildWikiPreviewMarkup } from "../../utils/wikiPreviewMarkup";
-import { countLines, LARGE_FILE_THRESHOLDS } from "../../utils/performance";
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -237,35 +230,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       () => getResolvedEditorFontFamily(settings),
       [settings.editorFontFamily],
     );
-    const previewFontFamily = useMemo(
-      () => getResolvedPreviewFontFamily(settings),
-      [settings.previewFontFamily],
-    );
     const codeFontFamily = useMemo(
       () => getResolvedCodeFontFamily(settings),
       [settings.codeFontFamily],
     );
     const { writeBinaryFile, refreshFileTree, readFile } = useFileSystem();
-    const { handleFileSelect } = useFileOperations();
-    const wikiNavigation = useWikiLinkNavigation({
-      content,
-      currentFilePath,
-      rootFolderPath,
-      files,
-      activeTabId,
-      isMarkdownPreview: true,
-      showNotification,
-      handleFileSelect,
-    });
-    const wikiNavigationRef = useRef(wikiNavigation);
-    wikiNavigationRef.current = wikiNavigation;
-    const filesRef = useRef(files);
-    filesRef.current = files;
-    const fileContentsRef = useRef(fileContents);
-    fileContentsRef.current = fileContents;
-    const readFileRef = useRef(readFile);
-    readFileRef.current = readFile;
-
     const editorRootRef = useRef<HTMLDivElement>(null);
     const layoutRef = useRef<HTMLDivElement>(null);
     const lastResetTabIdRef = useRef<string | null>(null);
@@ -413,73 +382,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     );
 
     // CodeMirror hook
-    const livePreviewOptimizationMode = useMemo(() => {
-      const lines = countLines(content);
-      const chars = content.length;
-      if (
-        lines > LARGE_FILE_THRESHOLDS.LINE_COUNT ||
-        chars > LARGE_FILE_THRESHOLDS.CHAR_COUNT
-      ) {
-        return "large" as const;
-      }
-      if (
-        lines > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_LINE_COUNT ||
-        chars > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_CHAR_COUNT
-      ) {
-        return "heavy" as const;
-      }
-      return "normal" as const;
-    }, [content]);
-
-    const livePreviewContext = useMemo(
-      () => ({
-        sourceFilePath: currentFilePath,
-        rootFolderPath,
-        files,
-        themeMode: settings.themeMode as "light" | "dark",
-        markdownStylePreset: settings.markdownStylePreset,
-        highlighter: highlighter ?? null,
-        onOpenWiki: (wikiTarget: string) => {
-          void wikiNavigationRef.current.navigateToWikilink(wikiTarget);
-        },
-        onOpenLink: async (href: string) => {
-          const trimmed = href.trim();
-          if (!trimmed) return;
-          if (hasUriScheme(trimmed) || trimmed.startsWith("//")) {
-            await openExternalUrl(trimmed);
-            return;
-          }
-          void wikiNavigationRef.current.navigateToWikilink(
-            trimmed.replace(/^\.\//, "").replace(/\.md$/i, ""),
-          );
-        },
-        getFileContent: async (filePath: string) => {
-          const byPath = filesRef.current.find((f) => f.path === filePath);
-          if (byPath && fileContentsRef.current[byPath.id] != null) {
-            return fileContentsRef.current[byPath.id] ?? null;
-          }
-          try {
-            const file = byPath ?? {
-              id: filePath,
-              name: filePath.split(/[\\/]/).pop() || filePath,
-              path: filePath,
-              type: "file" as const,
-            };
-            return await readFileRef.current(file);
-          } catch {
-            return null;
-          }
-        },
-      }),
-      [
-        currentFilePath,
-        rootFolderPath,
-        files,
-        settings.themeMode,
-        settings.markdownStylePreset,
-        highlighter,
-      ],
-    );
     const codeMirror = useCodeMirror({
       content,
       documentKey: activeTabId,
@@ -487,8 +389,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       wordWrap: settings.wordWrap,
       orderedListMode: settings.orderedListMode,
       themeMode: settings.themeMode as "light" | "dark",
-      livePreviewEnabled: viewMode === ViewMode.LIVE,
-      livePreviewContext,
       autoPairBrackets: settings.autoPairBrackets,
       autoPairMarkdown: settings.autoPairMarkdown,
       showLineNumbers: settings.showLineNumbers,
@@ -720,8 +620,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           "--editor-content-bottom": `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
           "--editor-font-family": editorFontFamily,
           "--editor-font-size": `${scaledEditorFontSize}px`,
-          "--preview-font-family":
-            viewMode === ViewMode.LIVE ? previewFontFamily : editorFontFamily,
+          "--preview-font-family": editorFontFamily,
           "--preview-font-size": `${scaledEditorFontSize}px`,
           "--editor-code-font-family": codeFontFamily,
           "--editor-code-font-size": `${scaledCodeFontSize}px`,
@@ -731,13 +630,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       [
         layoutMetrics,
         editorFontFamily,
-        previewFontFamily,
         scaledEditorFontSize,
         scaledCodeFontSize,
         codeFontFamily,
         settings.readableLineLength,
         settings.tabSize,
-        viewMode,
       ],
     );
 
@@ -958,7 +855,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             ? " show-editor-gutters"
             : ""
         }`}
-        data-live-preview={viewMode === ViewMode.LIVE ? "true" : undefined}
         style={layoutStyle}
       >
         {isSaving && (
@@ -982,19 +878,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             {t("toolbar_saving")}
           </div>
         )}
-
-        {viewMode === ViewMode.LIVE &&
-          livePreviewOptimizationMode !== "normal" && (
-            <div
-              className="live-preview-opt-banner"
-              role="status"
-              data-mode={livePreviewOptimizationMode}
-            >
-              {livePreviewOptimizationMode === "large"
-                ? t("editor_livePreviewLargeFileMode")
-                : t("editor_livePreviewHeavyFileMode")}
-            </div>
-          )}
 
         <div className="editor-pane-backdrop flex-1 min-h-0 overflow-hidden">
           <div className="editor-pane-scroll h-full overflow-hidden">

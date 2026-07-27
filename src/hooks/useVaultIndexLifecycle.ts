@@ -40,7 +40,6 @@ import {
   isCompatibleVectorSnapshot,
 } from "../services/vault/semanticEmbedService";
 import type { VectorStoreSnapshot } from "../services/vault/vectorStore";
-import { invalidateLivePreviewWikiCachesForPath } from "../components/editor/livePreview/wiki";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -408,7 +407,6 @@ export function useVaultIndexLifecycle(): {
         await refreshSemanticForChunkIndex(nextChunks, {
           previousByPath: previousChunks?.byPath,
         });
-        invalidateLivePreviewWikiCachesForPath(path);
       } catch (error) {
         console.warn("Failed to update link index for file:", path, error);
       }

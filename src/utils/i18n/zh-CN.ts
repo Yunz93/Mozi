@@ -879,10 +879,6 @@ export default {
 
   editor_emptyState: "选择文件开始编辑",
   editor_placeholder: "开始输入...",
-  editor_livePreviewHeavyFileMode:
-    "已进入大文件优化模式：表格 / Callout / Mermaid 显示占位，详情见组件提示。",
-  editor_livePreviewLargeFileMode:
-    "已进入超大文件优化模式：公式、图片、Wiki 等 Live 组件已关闭，源码仍可编辑。",
   table_cellHint: "右键可增删行列；Tab / Enter 导航",
   table_insertRowAbove: "在上方插入行",
   table_insertRowBelow: "在下方插入行",
