@@ -166,7 +166,7 @@ export const defaultSettings: AppSettings = {
   newNoteLocation: "knowledgeBaseRoot",
   newNoteFolder: "notes",
   attachmentLocation: "resourceFolder",
-  defaultViewMode: ViewMode.LIVE,
+  defaultViewMode: ViewMode.EDITOR,
   attachmentPasteFormat: "obsidian",
   orderedListMode: "strict",
   markdownStylePreset: DEFAULT_MARKDOWN_STYLE_PRESET,

@@ -25,14 +25,14 @@ export function normalizeDefaultViewMode(value: unknown): ViewMode {
   if (value === ViewMode.EDITOR || value === "EDITOR") {
     return ViewMode.EDITOR;
   }
-  if (value === ViewMode.LIVE || value === "LIVE") {
-    return ViewMode.LIVE;
-  }
-  // Legacy SPLIT maps to Live Preview (edit + render without dual panes).
   if (value === ViewMode.SPLIT || value === "SPLIT") {
-    return ViewMode.LIVE;
+    return ViewMode.SPLIT;
   }
-  return ViewMode.LIVE;
+  // Legacy LIVE maps back to source edit (Live Preview is gated off the UI).
+  if (value === ViewMode.LIVE || value === "LIVE") {
+    return ViewMode.EDITOR;
+  }
+  return ViewMode.EDITOR;
 }
 
 /** Indent string used by Tab / list nesting for the current settings. */

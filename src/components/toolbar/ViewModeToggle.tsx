@@ -1,5 +1,5 @@
 /**
- * Toolbar toggle: Source (edit) / Live Preview / Reading.
+ * Toolbar toggle: Source (edit) / Split / Reading (preview).
  */
 
 import React from "react";
@@ -55,10 +55,10 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
       </button>
 
       <button
-        onClick={() => onViewModeChange(ViewMode.LIVE)}
+        onClick={() => onViewModeChange(ViewMode.SPLIT)}
         disabled={previewOnly}
-        className={buttonClass(mode === ViewMode.LIVE, previewOnly)}
-        title={t("view_livePreview")}
+        className={buttonClass(mode === ViewMode.SPLIT, previewOnly)}
+        title={t("view_split")}
       >
         <svg
           className="h-3.5 w-3.5"
@@ -69,8 +69,8 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <line x1="12" y1="3" x2="12" y2="21" />
         </svg>
       </button>
 

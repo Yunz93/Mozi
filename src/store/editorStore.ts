@@ -52,8 +52,8 @@ export interface EditorActions {
  * Initial editor state
  */
 export const initialEditorState: EditorState = {
-  viewMode: ViewMode.LIVE,
-  lastNonSplitViewMode: ViewMode.LIVE,
+  viewMode: ViewMode.EDITOR,
+  lastNonSplitViewMode: ViewMode.EDITOR,
   lastViewModeChangeSource: "direct",
   viewModeBeforePreviewOnly: null,
   fileHistories: {}, // Initialize as empty object, histories created per file

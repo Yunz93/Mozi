@@ -14,7 +14,7 @@ export interface PreviewOnlyViewModeTransitionResult {
 }
 
 /**
- * Keep the user's chosen live/reading mode sticky across file switches.
+ * Keep the user's chosen edit/split/reading mode sticky across file switches.
  * Preview-only assets (PDF/image/HTML) temporarily force PREVIEW, then restore.
  */
 export function resolvePreviewOnlyViewModeTransition(

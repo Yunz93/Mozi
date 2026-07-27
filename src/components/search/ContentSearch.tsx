@@ -63,7 +63,7 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   useEffect(() => {
     const state = useAppStore.getState();
     if (state.viewMode === ViewMode.PREVIEW) {
-      state.setViewMode(ViewMode.LIVE, "direct");
+      state.setViewMode(ViewMode.EDITOR, "direct");
     }
     // Only on open — avoid fighting other view-mode controllers while searching.
   }, []);

@@ -411,8 +411,8 @@ export const EditorTab: React.FC<EditorTabProps> = ({
                     label: t("settings_defaultViewModeEditor"),
                   },
                   {
-                    value: ViewMode.LIVE,
-                    label: t("settings_defaultViewModeLive"),
+                    value: ViewMode.SPLIT,
+                    label: t("settings_defaultViewModeSplit"),
                   },
                   {
                     value: ViewMode.PREVIEW,

@@ -72,7 +72,7 @@ describe("defaultSettings", () => {
     expect(defaultSettings.newNoteLocation).toBe("knowledgeBaseRoot");
     expect(defaultSettings.newNoteFolder).toBe("notes");
     expect(defaultSettings.attachmentLocation).toBe("resourceFolder");
-    expect(defaultSettings.defaultViewMode).toBe("LIVE");
+    expect(defaultSettings.defaultViewMode).toBe("EDITOR");
     expect(defaultSettings.tabSize).toBe(4);
     expect(defaultSettings.readableLineLength).toBe(true);
     expect(defaultSettings.convertHtmlOnPaste).toBe(true);
