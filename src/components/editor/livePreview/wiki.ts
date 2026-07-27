@@ -298,6 +298,20 @@ const noteEmbedCache = new Map<string, { title: string; html: string }>();
 const wikiImageResolvedCache = new Map<string, string>();
 const wikiImageFailedCache = new Set<string>();
 
+function noteEmbedCacheKey(
+  sourceFilePath: string | null | undefined,
+  matchedPath: string | null | undefined,
+  raw: string,
+  ctx: {
+    themeMode?: string | null;
+    markdownStylePreset?: string | null;
+    highlighter?: { __revision?: number } | null;
+  },
+): string {
+  // Include render inputs — note HTML is theme/style/highlighter-sensitive.
+  return `note::${sourceFilePath ?? ""}::${matchedPath ?? ""}::${raw}::${ctx.themeMode ?? "light"}::${ctx.markdownStylePreset ?? "nord"}::${ctx.highlighter?.__revision ?? 0}`;
+}
+
 /** Drop Live Preview wiki embed/image caches (e.g. after target note edits). */
 export function clearLivePreviewWikiCaches(): void {
   noteEmbedCache.clear();
@@ -407,7 +421,12 @@ export function collectWikiAsyncJobs(state: EditorState): WikiAsyncJob[] {
       continue;
     }
 
-    const noteKey = `note::${ctx.sourceFilePath ?? ""}::${matched?.path ?? ""}::${range.raw}`;
+    const noteKey = noteEmbedCacheKey(
+      ctx.sourceFilePath,
+      matched?.path ?? null,
+      range.raw,
+      ctx,
+    );
     if (noteEmbedCache.has(noteKey)) continue;
     jobs.push({
       kind: "note",
@@ -495,7 +514,12 @@ export function buildWikiDecorations(
         continue;
       }
 
-      const noteKey = `note::${ctx.sourceFilePath ?? ""}::${matched?.path ?? ""}::${range.raw}`;
+      const noteKey = noteEmbedCacheKey(
+        ctx.sourceFilePath,
+        matched?.path ?? null,
+        range.raw,
+        ctx,
+      );
       const cached = noteEmbedCache.get(noteKey);
 
       builder.add(

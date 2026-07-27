@@ -37,6 +37,28 @@ describe("splitTableRow", () => {
     expect(splitTableRow("a | b")).toEqual(["a", "b"]);
     expect(splitTableRow("|  |  |")).toEqual(["", ""]);
   });
+
+  it("keeps escaped pipes inside a single cell", () => {
+    expect(splitTableRow("| a \\| b | c |")).toEqual(["a | b", "c"]);
+    expect(splitTableRow("| a\\\\| b |")).toEqual(["a\\", "b"]);
+  });
+});
+
+describe("serializeTableRow escapes", () => {
+  it("escapes pipes and collapses newlines so cells round-trip", () => {
+    const table = findTableAt(
+      ["| Name | Note |", "| --- | --- |", "| Ada | x |"],
+      0,
+    )!;
+    const updated = setTableCell(table, 1, 1, "a | b\nc");
+    expect(serializeTable(updated)).toEqual([
+      "| Name | Note |",
+      "| --- | --- |",
+      "| Ada | a \\| b c |",
+    ]);
+    const again = findTableAt(serializeTable(updated), 2)!;
+    expect(again.body[0][1]).toBe("a | b c");
+  });
 });
 
 describe("findTableAt / serializeTable", () => {
@@ -90,6 +112,14 @@ describe("cell ranges / locate", () => {
 
     const loc = locateCellInLine(line, 0, ranges[1].from);
     expect(loc?.col).toBe(1);
+  });
+
+  it("treats escaped pipes as cell content", () => {
+    const line = "| a \\| b | c |";
+    const ranges = getCellContentRanges(line);
+    expect(ranges).toHaveLength(2);
+    expect(line.slice(ranges[0].from, ranges[0].to)).toBe("a \\| b");
+    expect(line.slice(ranges[1].from, ranges[1].to)).toBe("c");
   });
 });
 

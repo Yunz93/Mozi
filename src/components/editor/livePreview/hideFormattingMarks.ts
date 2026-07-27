@@ -344,15 +344,17 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-table-wrap": {
     display: "block",
     width: "100%",
+    // Scroll container — do not also max-width the <table>, or columns get
+    // crushed and cell text / borders clip without a scrollbar.
     overflowX: "auto",
     paddingBlock: "0.75em",
   },
   ".cm-live-preview-table": {
     borderCollapse: "collapse",
-    // Size to content (like reading preview) instead of stretching to 100%,
-    // which squeezes short CJK columns into one-glyph-per-line stacks.
+    // Size to content so short CJK headers keep a readable column width.
+    // Horizontal overflow is handled by the wrap above (not max-width here).
     width: "max-content",
-    maxWidth: "100%",
+    maxWidth: "none",
     tableLayout: "auto",
     fontSize: "0.95em",
   },
@@ -379,7 +381,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-table-cell-editing": {
     outline: "2px solid var(--mp-doc-accent, #2563eb)",
-    outlineOffset: "-2px",
+    // Outside the cell so the ring does not cover wrapped descenders.
+    outlineOffset: "0",
     background:
       "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 8%, transparent)",
     whiteSpace: "pre-wrap",

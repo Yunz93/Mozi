@@ -47,13 +47,69 @@ export function isTablePartLine(line: string): boolean {
   );
 }
 
-/** Split a pipe row into cell texts (trimmed). Does not handle escaped \|. */
+/** Unescape GFM table cell escapes (`\|` → `|`, `\\` → `\`). */
+export function unescapeTableCellText(value: string): string {
+  return value.replace(/\\([\\|])/g, "$1");
+}
+
+/**
+ * Normalize cell text before serialization:
+ * - collapse newlines (GFM cells are single-line)
+ * - escape literal `|` and `\` so round-trips stay one column
+ */
+export function escapeTableCellText(value: string): string {
+  return value
+    .replace(/\r\n|\r|\n/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|");
+}
+
+/**
+ * Split a pipe row into cell texts (trimmed).
+ * Honors escaped pipes (`\|`) so `a \| b` stays one cell.
+ */
 export function splitTableRow(line: string): string[] {
   let trimmed = line.trim();
   if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
-  if (trimmed.endsWith("|")) trimmed = trimmed.slice(0, -1);
+  if (trimmed.endsWith("|") && !trimmed.endsWith("\\|")) {
+    // Only strip a trailing pipe that is not escaped.
+    let escapes = 0;
+    for (let i = trimmed.length - 2; i >= 0 && trimmed[i] === "\\"; i -= 1) {
+      escapes += 1;
+    }
+    if (escapes % 2 === 0) {
+      trimmed = trimmed.slice(0, -1);
+    }
+  }
   if (trimmed.length === 0) return [""];
-  return trimmed.split("|").map((cell) => cell.trim());
+
+  const cells: string[] = [];
+  let current = "";
+  let escaped = false;
+  for (let i = 0; i < trimmed.length; i += 1) {
+    const ch = trimmed[i];
+    if (escaped) {
+      current += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      current += ch;
+      continue;
+    }
+    if (ch === "|") {
+      cells.push(unescapeTableCellText(current.trim()));
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (escaped) {
+    // Trailing lone backslash — keep as literal text.
+  }
+  cells.push(unescapeTableCellText(current.trim()));
+  return cells;
 }
 
 export function parseAlignmentCell(cell: string): ColumnAlignment {
@@ -90,7 +146,7 @@ function normalizeRowWidth(cells: string[], columnCount: number): string[] {
 }
 
 export function serializeTableRow(cells: string[]): string {
-  return `| ${cells.map((c) => c.trim()).join(" | ")} |`;
+  return `| ${cells.map((c) => escapeTableCellText(c.trim())).join(" | ")} |`;
 }
 
 export function serializeSeparator(alignments: ColumnAlignment[]): string {
@@ -215,6 +271,7 @@ export function locateCellInLine(
 
 /**
  * Content ranges (trimmed) for each cell relative to the start of `lineText`.
+ * Escaped pipes (`\|`) stay inside a cell and do not start a new range.
  */
 export function getCellContentRanges(
   lineText: string,
@@ -230,8 +287,14 @@ export function getCellContentRanges(
 
   let endTrim = 0;
   if (working.endsWith("|")) {
-    working = working.slice(0, -1);
-    endTrim = 1;
+    let escapes = 0;
+    for (let i = working.length - 2; i >= 0 && working[i] === "\\"; i -= 1) {
+      escapes += 1;
+    }
+    if (escapes % 2 === 0) {
+      working = working.slice(0, -1);
+      endTrim = 1;
+    }
   }
 
   if (working.length === 0 && endTrim === 1) {
@@ -240,18 +303,34 @@ export function getCellContentRanges(
   }
 
   const ranges: Array<{ from: number; to: number }> = [];
-  let cursor = 0;
-  const parts = working.split("|");
+  let partStart = 0;
+  let escaped = false;
 
-  for (let i = 0; i < parts.length; i += 1) {
-    const part = parts[i];
+  const pushRange = (partEnd: number) => {
+    const part = working.slice(partStart, partEnd);
     const lead = part.match(/^\s*/)?.[0].length ?? 0;
     const trail = part.match(/\s*$/)?.[0].length ?? 0;
-    const contentFrom = cursor + lead;
-    const contentTo = cursor + part.length - trail;
+    const contentFrom = partStart + lead;
+    const contentTo = partEnd - trail;
     ranges.push({ from: base + contentFrom, to: base + contentTo });
-    cursor += part.length + 1; // +1 for the '|' separator (except last, still ok)
+  };
+
+  for (let i = 0; i < working.length; i += 1) {
+    const ch = working[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === "|") {
+      pushRange(i);
+      partStart = i + 1;
+    }
   }
+  pushRange(working.length);
 
   return ranges;
 }
