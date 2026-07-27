@@ -75,13 +75,14 @@ function seedSplitViewStore(
   overrides: Partial<ReturnType<typeof useAppStore.getState>> = {},
 ) {
   useAppStore.setState({
-    viewMode: ViewMode.LIVE,
+    viewMode: ViewMode.EDITOR,
     activeTabId: "tab-a",
     settings: {
       language: "en",
       themeMode: "light",
       markdownStylePreset: "nord",
       fontSize: 16,
+      uiFontSize: 16,
       orderedListMode: "strict",
       previewFontFamily: "system",
       codeFontFamily: "system",
@@ -122,11 +123,11 @@ describe("SplitView scroll handshake", () => {
     vi.unstubAllGlobals();
     useAppStore.setState({
       activeTabId: null,
-      viewMode: ViewMode.LIVE,
+      viewMode: ViewMode.EDITOR,
     } as never);
   });
 
-  it("does not sync preview scroll in live preview mode", async () => {
+  it("does not sync preview scroll in editor-only mode", async () => {
     renderSplitView();
 
     await waitFor(() => {
@@ -138,6 +139,23 @@ describe("SplitView scroll handshake", () => {
     });
 
     expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
+  });
+
+  it("syncs preview scroll in split mode", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.SPLIT });
+    renderSplitView();
+
+    await waitFor(() => {
+      expect(editorOnScroll).toBeTypeOf("function");
+    });
+
+    act(() => {
+      editorOnScroll?.(0.42);
+    });
+
+    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.42, {
+      immediate: true,
+    });
   });
 
   it("does not sync editor scroll from preview in reading mode", async () => {
@@ -155,8 +173,8 @@ describe("SplitView scroll handshake", () => {
     expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
   });
 
-  it("marks preview layout inactive in live preview mode", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
+  it("marks preview layout inactive in editor-only mode", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();
 
     await waitFor(() => {
@@ -167,8 +185,20 @@ describe("SplitView scroll handshake", () => {
     });
   });
 
-  it("re-anchors the reading pane when switching from live to reading", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
+  it("marks preview layout active in split mode", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.SPLIT });
+    renderSplitView();
+
+    await waitFor(() => {
+      const preview = document.querySelector(
+        '[data-testid="preview-pane"]',
+      ) as HTMLElement;
+      expect(preview.dataset.layoutActive).toBe("true");
+    });
+  });
+
+  it("re-anchors the reading pane when switching from editor to reading", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();
 
     await waitFor(() => {
@@ -209,7 +239,7 @@ describe("SplitView scroll handshake", () => {
     mockPreviewSyncScrollTo.mockClear();
 
     act(() => {
-      useAppStore.setState({ viewMode: ViewMode.LIVE } as never);
+      useAppStore.setState({ viewMode: ViewMode.EDITOR } as never);
     });
 
     await waitFor(() => {
@@ -259,7 +289,7 @@ describe("SplitView scroll handshake", () => {
 
   it("resyncs the reading pane after the width transition completes", () => {
     vi.useFakeTimers();
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
+    seedSplitViewStore({ viewMode: ViewMode.EDITOR });
     renderSplitView();
 
     act(() => {
@@ -316,6 +346,7 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("suppresses percentage sync while outline heading navigation is locked", async () => {
+    seedSplitViewStore({ viewMode: ViewMode.SPLIT });
     renderSplitView();
 
     await waitFor(() => {

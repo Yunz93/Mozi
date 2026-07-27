@@ -1,7 +1,7 @@
 /**
  * Hook for view mode management
  *
- * Toggle cycle: Source → Live Preview → Reading → Source
+ * Toggle cycle: Source → Split → Reading → Source
  */
 
 import { useCallback } from "react";
@@ -20,8 +20,8 @@ export function useViewMode() {
     setViewMode(ViewMode.EDITOR, "direct");
   }, [setViewMode]);
 
-  const setLivePreview = useCallback(() => {
-    setViewMode(ViewMode.LIVE, "direct");
+  const setSplit = useCallback(() => {
+    setViewMode(ViewMode.SPLIT, "direct");
   }, [setViewMode]);
 
   const setPreviewOnly = useCallback(() => {
@@ -35,10 +35,10 @@ export function useViewMode() {
     setViewMode,
     toggleViewMode,
     setEditorOnly,
-    setLivePreview,
+    setSplit,
     setPreviewOnly,
     isEditorOnly: normalized === ViewMode.EDITOR,
-    isLivePreview: normalized === ViewMode.LIVE,
+    isSplit: normalized === ViewMode.SPLIT,
     isPreviewOnly: normalized === ViewMode.PREVIEW,
   };
 }

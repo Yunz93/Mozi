@@ -450,7 +450,7 @@ export default {
   settings_saveFile: "Save File",
   settings_saveFileDesc: "Save the current note to disk.",
   settings_toggleView: "Toggle View",
-  settings_toggleViewDesc: "Cycle between Source, Live preview, and Reading.",
+  settings_toggleViewDesc: "Cycle between Source, Split, and Reading.",
   settings_toggleOutline: "Toggle Outline",
   settings_toggleOutlineDesc: "Show or hide the document outline panel.",
   settings_toggleSidebar: "Toggle Sidebar",

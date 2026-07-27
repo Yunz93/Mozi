@@ -426,7 +426,7 @@ export default {
   settings_saveFile: "保存文件",
   settings_saveFileDesc: "把当前笔记保存到本地。",
   settings_toggleView: "切换视图",
-  settings_toggleViewDesc: "在源码、实时预览与阅读之间循环切换。",
+  settings_toggleViewDesc: "在源码、分屏与阅读之间循环切换。",
   settings_toggleOutline: "切换目录",
   settings_toggleOutlineDesc: "显示或隐藏文档目录面板。",
   settings_toggleSidebar: "切换侧边栏",

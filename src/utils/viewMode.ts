@@ -1,61 +1,60 @@
 import { ViewMode } from "../types";
 
 /**
- * Supported session modes: source edit, Live Preview, and Reading.
- * SPLIT remains in the enum for persisted legacy values but is normalized away.
+ * Supported session modes: source edit, split, and reading preview.
+ * LIVE remains in the enum for persisted values but is normalized to EDITOR
+ * (Live Preview stays in the codebase, gated off the UI toggle).
  */
 export type SessionViewMode =
   | ViewMode.EDITOR
-  | ViewMode.LIVE
+  | ViewMode.SPLIT
   | ViewMode.PREVIEW;
 
-/** Map legacy SPLIT (and unknown) onto a supported session mode. */
+/** Map LIVE / unknown onto a supported session mode. */
 export function normalizeSessionViewMode(mode: ViewMode): SessionViewMode {
   if (mode === ViewMode.PREVIEW) return ViewMode.PREVIEW;
-  if (mode === ViewMode.EDITOR) return ViewMode.EDITOR;
-  // LIVE and legacy SPLIT → LIVE
-  return ViewMode.LIVE;
+  if (mode === ViewMode.SPLIT) return ViewMode.SPLIT;
+  // EDITOR and legacy LIVE → source editor
+  return ViewMode.EDITOR;
 }
 
 /** Solo editing surfaces (editor pane only; no HTML preview pane). */
 export function isEditorSoloMode(mode: ViewMode): boolean {
-  const normalized = normalizeSessionViewMode(mode);
-  return normalized === ViewMode.EDITOR || normalized === ViewMode.LIVE;
+  return normalizeSessionViewMode(mode) === ViewMode.EDITOR;
 }
 
 /** Any mode where the CodeMirror editor pane is visible. */
 export function isEditorVisibleMode(mode: ViewMode): boolean {
-  return isEditorSoloMode(mode);
+  const normalized = normalizeSessionViewMode(mode);
+  return normalized === ViewMode.EDITOR || normalized === ViewMode.SPLIT;
 }
 
 /** Any mode where the HTML preview pane is visible. */
 export function isPreviewVisibleMode(mode: ViewMode): boolean {
-  return normalizeSessionViewMode(mode) === ViewMode.PREVIEW;
+  const normalized = normalizeSessionViewMode(mode);
+  return normalized === ViewMode.PREVIEW || normalized === ViewMode.SPLIT;
 }
 
 /** @deprecated Use SessionViewMode; kept for store field typing. */
-export type NonSplitViewMode = SessionViewMode;
+export type NonSplitViewMode = ViewMode.EDITOR | ViewMode.PREVIEW;
 
 export function isNonSplitViewMode(mode: ViewMode): mode is NonSplitViewMode {
-  return (
-    mode === ViewMode.EDITOR ||
-    mode === ViewMode.LIVE ||
-    mode === ViewMode.PREVIEW
-  );
+  return mode === ViewMode.EDITOR || mode === ViewMode.PREVIEW;
 }
 
 /** Anchor used when leaving a temporary preview-only file. */
 export function resolveLastNonSplitViewMode(mode: ViewMode): NonSplitViewMode {
-  return normalizeSessionViewMode(mode);
+  const normalized = normalizeSessionViewMode(mode);
+  if (normalized === ViewMode.PREVIEW) return ViewMode.PREVIEW;
+  return ViewMode.EDITOR;
 }
 
 /**
- * Toggle cycle: Editor → Live → Reading → Editor.
- * Prefer Live as the default landing when leaving Reading from a legacy SPLIT.
+ * Toggle cycle: Editor → Split → Reading → Editor.
  */
 export function getNextViewMode(viewMode: ViewMode): ViewMode {
   const normalized = normalizeSessionViewMode(viewMode);
-  if (normalized === ViewMode.EDITOR) return ViewMode.LIVE;
-  if (normalized === ViewMode.LIVE) return ViewMode.PREVIEW;
+  if (normalized === ViewMode.EDITOR) return ViewMode.SPLIT;
+  if (normalized === ViewMode.SPLIT) return ViewMode.PREVIEW;
   return ViewMode.EDITOR;
 }

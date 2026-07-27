@@ -8,12 +8,12 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: false,
         isPreviewOnly: true,
-        currentViewMode: ViewMode.LIVE,
+        currentViewMode: ViewMode.SPLIT,
         viewModeBeforePreviewOnly: null,
       }),
     ).toEqual({
       nextViewMode: ViewMode.PREVIEW,
-      nextViewModeBeforePreviewOnly: ViewMode.LIVE,
+      nextViewModeBeforePreviewOnly: ViewMode.SPLIT,
     });
   });
 
@@ -37,24 +37,24 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
         wasPreviewOnly: true,
         isPreviewOnly: false,
         currentViewMode: ViewMode.PREVIEW,
-        viewModeBeforePreviewOnly: ViewMode.LIVE,
+        viewModeBeforePreviewOnly: ViewMode.EDITOR,
       }),
     ).toEqual({
-      nextViewMode: ViewMode.LIVE,
+      nextViewMode: ViewMode.EDITOR,
       nextViewModeBeforePreviewOnly: null,
     });
   });
 
-  it("maps legacy split restore onto live", () => {
+  it("maps legacy live restore onto editor", () => {
     expect(
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: true,
         isPreviewOnly: false,
         currentViewMode: ViewMode.PREVIEW,
-        viewModeBeforePreviewOnly: ViewMode.SPLIT,
+        viewModeBeforePreviewOnly: ViewMode.LIVE,
       }),
     ).toEqual({
-      nextViewMode: ViewMode.LIVE,
+      nextViewMode: ViewMode.EDITOR,
       nextViewModeBeforePreviewOnly: null,
     });
   });
@@ -78,7 +78,7 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: false,
         isPreviewOnly: false,
-        currentViewMode: ViewMode.LIVE,
+        currentViewMode: ViewMode.EDITOR,
         viewModeBeforePreviewOnly: null,
       }),
     ).toEqual({});

@@ -16,16 +16,19 @@ import {
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 import { PreviewPane, type PreviewPaneHandle } from "./PreviewPane";
 import { WritingStatsDisplay } from "../stats/WritingStatsDisplay";
+import { throttle } from "../../utils/throttle";
 import type { PaneDensity } from "./paneLayout";
 import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
 import { getMarkdownStyleCssVariables } from "../../utils/markdownStyle";
 import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
+import { getUiFontScale } from "../../utils/uiFontSize";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { isHeadingNavigationLocked } from "../../utils/previewNavigationBridge";
 
 const PANE_TRANSITION_MS = 200;
 const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+const DIVIDER_TRANSITION = `left ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), opacity 120ms ease, transform ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
 
 interface SplitViewProps {
   highlighter?: ShikiHighlighter | null;
@@ -57,8 +60,12 @@ export const SplitView: React.FC<SplitViewProps> = ({
 }) => {
   const { t } = useI18n();
   const settings = useAppStore((state) => state.settings);
+  const uiFontScale = getUiFontScale(settings.uiFontSize);
+  const MIN_SPLIT_PANE_WIDTH = 360 * uiFontScale;
   const viewMode = useAppStore((state) => state.viewMode);
   const activeTabId = useAppStore((state) => state.activeTabId);
+  const [splitRatio, setSplitRatio] = useState(50);
+  const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const editorPaneRef = useRef<EditorPaneHandle | null>(null);
   const previewPaneRef = useRef<PreviewPaneHandle | null>(null);
@@ -67,6 +74,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const [visualMode, setVisualMode] = useState<ViewMode>(viewMode);
   const editorScrollPercentageRef = useRef(0);
   const previewScrollPercentageRef = useRef(0);
+  const scrollSyncSourceRef = useRef<"editor" | "preview" | null>(null);
   const transitionResyncTimerRef = useRef<number | null>(null);
   const transitionCleanupRef = useRef<(() => void) | null>(null);
   const scrollPositionsRef = useRef<
@@ -80,16 +88,86 @@ export const SplitView: React.FC<SplitViewProps> = ({
     >
   >({});
 
+  const handleMouseDown = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const minRatio =
+        rect.width > 0 ? (MIN_SPLIT_PANE_WIDTH / rect.width) * 100 : 20;
+      const maxRatio = 100 - minRatio;
+      const newRatio = ((e.clientX - rect.left) / rect.width) * 100;
+      const clampedRatio = Math.max(
+        Math.min(minRatio, 50),
+        Math.min(
+          Math.max(maxRatio, 50),
+          Math.max(minRatio, Math.min(maxRatio, newRatio)),
+        ),
+      );
+      setSplitRatio(clampedRatio);
+    },
+    [isResizing, MIN_SPLIT_PANE_WIDTH],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Throttle resize updates to 16ms (60fps) for better performance
+    const throttledSetSplitRatio = throttle((width: number) => {
+      const minRatio = width > 0 ? (MIN_SPLIT_PANE_WIDTH / width) * 100 : 20;
+      const maxRatio = 100 - minRatio;
+      if (viewMode === ViewMode.SPLIT && minRatio < maxRatio) {
+        setSplitRatio((prev) => Math.min(Math.max(prev, minRatio), maxRatio));
+      }
+    }, 16);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      throttledSetSplitRatio(entry.contentRect.width);
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [viewMode]);
+
   // Keep `visualMode` in lockstep with `viewMode` before paint so pane widths (and
   // `previewLayoutActive`) match the store on the same frame as preview layout effects.
   useLayoutEffect(() => {
     setVisualMode(viewMode);
   }, [viewMode]);
 
-  // Track scroll position per mode. Dual-pane SPLIT sync was removed — Source /
-  // Live / Reading are solo panes, so we only mirror percentages for restore.
+  // Handle editor scroll - sync to preview in split mode.
+  // Read view mode from the store inside the handler so it stays correct even when
+  // useScrollSync's onScroll ref has not yet been updated after a view-mode change
+  // (scroll events can fire before child useEffects run).
   const handleEditorScroll = useCallback((percentage: number) => {
     editorScrollPercentageRef.current = percentage;
+    // Outline/wiki heading jumps scroll both panes absolutely; percentage sync
+    // would yank the preview off the target chapter mid-jump.
     if (isHeadingNavigationLocked()) {
       return;
     }
@@ -97,9 +175,19 @@ export const SplitView: React.FC<SplitViewProps> = ({
     if (isEditorVisibleMode(mode)) {
       previewScrollPercentageRef.current = percentage;
     }
+    if (mode === ViewMode.SPLIT) {
+      scrollSyncSourceRef.current = "editor";
+      previewPaneRef.current?.syncScrollTo(percentage, { immediate: true });
+    }
   }, []);
 
   const handlePreviewScroll = useCallback((percentage: number) => {
+    if (scrollSyncSourceRef.current === "editor") {
+      scrollSyncSourceRef.current = null;
+      previewScrollPercentageRef.current = percentage;
+      return;
+    }
+
     previewScrollPercentageRef.current = percentage;
     if (isHeadingNavigationLocked()) {
       return;
@@ -107,6 +195,10 @@ export const SplitView: React.FC<SplitViewProps> = ({
     const mode = useAppStore.getState().viewMode;
     if (isPreviewVisibleMode(mode)) {
       editorScrollPercentageRef.current = percentage;
+    }
+    if (mode === ViewMode.SPLIT) {
+      scrollSyncSourceRef.current = "preview";
+      editorPaneRef.current?.syncScrollTo(percentage, { immediate: true });
     }
   }, []);
 
@@ -204,7 +296,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
     const savedState = scrollPositionsRef.current[activeTabId] ?? {
       editor: 0,
       preview: 0,
-      lastViewMode: ViewMode.LIVE,
+      lastViewMode: ViewMode.EDITOR,
     };
     const anchorPercentage =
       savedState.lastViewMode === ViewMode.PREVIEW
@@ -241,9 +333,18 @@ export const SplitView: React.FC<SplitViewProps> = ({
     syncVisiblePanesToAnchor(anchorPercentage);
   }, [syncVisiblePanesToAnchor, viewMode]);
 
-  // Solo panes only — legacy SPLIT is normalized away before it reaches here.
-  const editorWidth = isEditorSoloMode(visualMode) ? 100 : 0;
-  const previewWidth = visualMode === ViewMode.PREVIEW ? 100 : 0;
+  const isSplitView = visualMode === ViewMode.SPLIT;
+  const editorWidth = isEditorSoloMode(visualMode)
+    ? 100
+    : visualMode === ViewMode.SPLIT
+      ? splitRatio
+      : 0;
+  const previewWidth =
+    visualMode === ViewMode.PREVIEW
+      ? 100
+      : visualMode === ViewMode.SPLIT
+        ? 100 - splitRatio
+        : 0;
   const editorActive = editorWidth > 0;
   const previewActive = previewWidth > 0;
   const previewRenderActive = isPreviewVisibleMode(viewMode) || previewActive;
@@ -261,16 +362,16 @@ export const SplitView: React.FC<SplitViewProps> = ({
     width: `${editorWidth}%`,
     opacity: editorActive ? 1 : 0,
     pointerEvents: editorActive ? "auto" : "none",
-    transition: `${PANE_TRANSITION}, opacity 120ms ease`,
-    willChange: "width, opacity",
+    transition: isResizing ? "none" : `${PANE_TRANSITION}, opacity 120ms ease`,
+    willChange: isResizing ? "auto" : "width, opacity",
   };
 
   const previewPaneStyle: React.CSSProperties = {
     width: `${previewWidth}%`,
     opacity: previewActive ? 1 : 0,
     pointerEvents: previewActive ? "auto" : "none",
-    transition: `${PANE_TRANSITION}, opacity 120ms ease`,
-    willChange: "width, opacity",
+    transition: isResizing ? "none" : `${PANE_TRANSITION}, opacity 120ms ease`,
+    willChange: isResizing ? "auto" : "width, opacity",
   };
 
   return (
@@ -283,6 +384,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
         <div
           ref={containerRef}
           className="flex-1 overflow-hidden relative flex flex-row"
+          style={{ pointerEvents: isResizing ? "none" : "auto" }}
         >
           <div
             ref={editorWrapperRef}
@@ -298,6 +400,23 @@ export const SplitView: React.FC<SplitViewProps> = ({
               onScroll={handleEditorScroll}
               onGenerateWikiFromSelection={onGenerateWikiFromSelection}
             />
+          </div>
+
+          <div
+            className="w-3 hover:bg-accent-DEFAULT/50 z-10 absolute h-full flex items-center justify-center"
+            style={{
+              left: `${editorWidth}%`,
+              opacity: isSplitView ? 1 : 0,
+              transform: `translateX(-50%) scaleY(${isSplitView ? 1 : 0.9})`,
+              pointerEvents: isSplitView ? "auto" : "none",
+              cursor: isSplitView ? "col-resize" : "default",
+              transition: isResizing ? "none" : DIVIDER_TRANSITION,
+              willChange: isResizing ? "auto" : "left, opacity, transform",
+            }}
+            onMouseDown={isSplitView ? handleMouseDown : undefined}
+          >
+            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-200/70 dark:bg-white/[0.06]" />
+            <div className="relative h-8 w-1 rounded-full bg-gray-300 dark:bg-gray-600 opacity-0 hover:opacity-100 transition-opacity" />
           </div>
 
           <div

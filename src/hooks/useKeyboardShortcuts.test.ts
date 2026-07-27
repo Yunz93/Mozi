@@ -55,8 +55,8 @@ describe("useGlobalKeyboardShortcuts", () => {
           save: "Cmd+S",
         },
       },
-      viewMode: ViewMode.LIVE,
-      lastNonSplitViewMode: ViewMode.LIVE,
+      viewMode: ViewMode.EDITOR,
+      lastNonSplitViewMode: ViewMode.EDITOR,
     });
 
     function Harness() {
