@@ -134,16 +134,18 @@ export function livePreviewContextChanged(update: ViewUpdate): boolean {
 }
 
 /**
- * Decide whether a Live Preview decoration plugin should rebuild.
- * - `marks`: rebuild on every selection change (hide/reveal formatting).
- * - `widgets`: rebuild when selection crosses a line or becomes non-empty,
- *   not on every caret nudge within a line (avoids KaTeX/markdown-it thrash).
+ * Decide whether a Live Preview decoration plugin should rebuild for
+ * document / selection / syntax changes.
+ *
+ * Viewport / scroll is intentionally NOT included — use
+ * {@link ViewportDecorationWindow} so decorations only rebuild when the
+ * visible range escapes a padded window (avoids per-frame scroll jank).
  */
 export function livePreviewShouldRebuild(
   update: ViewUpdate,
   mode: "marks" | "widgets" = "widgets",
 ): boolean {
-  if (update.docChanged || update.viewportChanged) return true;
+  if (update.docChanged) return true;
   if (syntaxTree(update.startState) !== syntaxTree(update.state)) return true;
   if (!update.selectionSet) return false;
   if (mode === "marks") return true;
@@ -159,6 +161,53 @@ export function livePreviewShouldRebuild(
   } catch {
     return true;
   }
+}
+
+/**
+ * Padded decoration window for viewport-scoped Live Preview plugins.
+ * Rebuild only when the visible range leaves the last built pad — not on
+ * every scroll tick.
+ */
+export class ViewportDecorationWindow {
+  private from = -1;
+  private to = -1;
+
+  constructor(private readonly pad = 2400) {}
+
+  needsUpdate(view: Pick<EditorView, "visibleRanges" | "state">): boolean {
+    if (this.from < 0 || this.to < this.from) return true;
+    for (const range of view.visibleRanges) {
+      if (range.from < this.from || range.to > this.to) return true;
+    }
+    return false;
+  }
+
+  mark(view: Pick<EditorView, "visibleRanges" | "state">): void {
+    const padded = getPaddedVisibleRange(view, this.pad);
+    this.from = padded.from;
+    this.to = padded.to;
+  }
+
+  invalidate(): void {
+    this.from = -1;
+    this.to = -1;
+  }
+}
+
+/**
+ * Combined rebuild gate for viewport-scoped plugins: content/selection changes
+ * always rebuild; scroll only when the padded decoration window is exceeded.
+ */
+export function shouldRebuildLivePreviewDecorations(
+  update: ViewUpdate,
+  mode: "marks" | "widgets",
+  window: ViewportDecorationWindow,
+): boolean {
+  if (livePreviewShouldRebuild(update, mode)) {
+    window.invalidate();
+    return true;
+  }
+  return update.viewportChanged && window.needsUpdate(update.view);
 }
 
 /** Viewport union padded for decoration builds. */
@@ -398,11 +447,22 @@ export function emptyBlockDecorationBuild(): BlockDecorationBuild {
  * Ask CodeMirror to refresh block height maps after a Live Preview widget
  * changes size asynchronously (image decode, Mermaid SVG, embed HTML, …).
  * Without this, `posAtCoords` can map clicks to the wrong document position.
+ *
+ * Coalesced per view/frame so bursty image/Mermaid settles do not schedule
+ * multiple height-map refreshes during scroll.
  */
+const pendingMeasureViews = new WeakSet<EditorView>();
+
 export function scheduleLivePreviewMeasure(view: EditorView): void {
   if (typeof view.requestMeasure !== "function") return;
   if (!view.dom.isConnected) return;
-  view.requestMeasure();
+  if (pendingMeasureViews.has(view)) return;
+  pendingMeasureViews.add(view);
+  requestAnimationFrame(() => {
+    pendingMeasureViews.delete(view);
+    if (!view.dom.isConnected) return;
+    view.requestMeasure();
+  });
 }
 
 /**

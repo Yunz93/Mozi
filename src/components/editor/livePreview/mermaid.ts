@@ -112,6 +112,16 @@ class MermaidWidget extends WidgetType {
 
     const tryRender = () => {
       if (cancelled || rendering || !wrap.isConnected) return;
+      const current = wrap.getAttribute("data-mermaid-status");
+      // Already rendered — skip layout reads / status churn when scrolling
+      // brings the widget back through IntersectionObserver.
+      if (
+        current === "ready" &&
+        diagram.querySelector("svg") &&
+        diagram.dataset.mermaidPendingWidth !== "true"
+      ) {
+        return;
+      }
       const rect = diagram.getBoundingClientRect();
       if (rect.width < 4) {
         setStatus("pending-width");

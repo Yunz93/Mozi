@@ -24,7 +24,7 @@ describe("live preview geometry remasure", () => {
     vi.restoreAllMocks();
   });
 
-  it("scheduleLivePreviewMeasure calls view.requestMeasure when connected", () => {
+  it("scheduleLivePreviewMeasure coalesces to one rAF requestMeasure", async () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
     const view = new EditorView({
@@ -34,7 +34,10 @@ describe("live preview geometry remasure", () => {
     views.push(view);
     const spy = vi.spyOn(view, "requestMeasure");
     scheduleLivePreviewMeasure(view);
-    expect(spy).toHaveBeenCalledTimes(1);
+    scheduleLivePreviewMeasure(view);
+    expect(spy).not.toHaveBeenCalled();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(spy).toHaveBeenCalled();
   });
 
   it("bindLivePreviewImageMeasure remasures on load", async () => {
@@ -56,6 +59,7 @@ describe("live preview geometry remasure", () => {
     expect(spy).not.toHaveBeenCalled();
 
     img.dispatchEvent(new Event("load"));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(spy).toHaveBeenCalled();
   });
 
@@ -82,6 +86,7 @@ describe("live preview geometry remasure", () => {
     await new Promise<void>((resolve) => {
       queueMicrotask(resolve);
     });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(spy).toHaveBeenCalled();
   });
 });

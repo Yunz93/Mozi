@@ -43,7 +43,6 @@ import {
   getCachedMarkdownHtml,
   hasSkipAncestor,
   livePreviewContextChanged,
-  livePreviewShouldRebuild,
   selectionTouchesRange,
   bindLivePreviewImageMeasure,
   bindLivePreviewMediaMeasure,
@@ -678,8 +677,11 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
         // and drop stale note embeds keyed by previous tree.
         wikiImageFailedCache.clear();
       }
+      // Do NOT rescan on viewport/scroll — collectWikiAsyncJobs is full-doc and
+      // was the main Live-mode scroll jank source. Mount + doc/context/effect
+      // changes are enough to enqueue unresolved embeds.
       if (
-        livePreviewShouldRebuild(update, "widgets") ||
+        update.docChanged ||
         livePreviewContextChanged(update) ||
         update.transactions.some((tr) =>
           tr.effects.some((effect) => effect.is(wikiImageResolvedEffect)),

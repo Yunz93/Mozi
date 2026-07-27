@@ -20,8 +20,9 @@ import {
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
-  livePreviewShouldRebuild,
+  shouldRebuildLivePreviewDecorations,
   maxVisibleParseTo,
+  ViewportDecorationWindow,
 } from "./shared";
 
 class MarkdownLinkWidget extends WidgetType {
@@ -93,7 +94,7 @@ export function buildLivePreviewLinkDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 50) ?? syntaxTree(state);
+    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
@@ -129,15 +130,22 @@ export function buildLivePreviewLinkDecorations(
 export const livePreviewLinks = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    private readonly viewportWindow = new ViewportDecorationWindow();
     constructor(view: EditorView) {
       this.decorations = buildLivePreviewLinkDecorations(view);
+      this.viewportWindow.mark(view);
     }
     update(update: ViewUpdate) {
       if (
-        livePreviewShouldRebuild(update, "widgets") ||
-        livePreviewContextChanged(update)
+        livePreviewContextChanged(update) ||
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "widgets",
+          this.viewportWindow,
+        )
       ) {
         this.decorations = buildLivePreviewLinkDecorations(update.view);
+        this.viewportWindow.mark(update.view);
       }
     }
   },

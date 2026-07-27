@@ -17,10 +17,11 @@ import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   collectVisibleWikiRanges,
   hasSkipAncestor,
-  livePreviewShouldRebuild,
   maxVisibleParseTo,
   rangesOverlap,
   selectionTouchesRange,
+  shouldRebuildLivePreviewDecorations,
+  ViewportDecorationWindow,
 } from "./shared";
 import { findCalloutRanges } from "./callouts";
 
@@ -124,7 +125,8 @@ export function buildLivePreviewHideDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const parseTo = maxVisibleParseTo(view, 500);
-  const tree = ensureSyntaxTree(state, parseTo, 50) ?? syntaxTree(state);
+  // Never block the frame waiting on parse — scroll/selection rebuilds must stay cheap.
+  const tree = ensureSyntaxTree(state, parseTo, 0) ?? syntaxTree(state);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
   const viewFrom = view.visibleRanges.length
     ? Math.min(...view.visibleRanges.map((range) => range.from))
@@ -197,14 +199,23 @@ export function buildLivePreviewHideDecorations(
 export const livePreviewHideFormatting = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    private readonly viewportWindow = new ViewportDecorationWindow();
 
     constructor(view: EditorView) {
       this.decorations = buildLivePreviewHideDecorations(view);
+      this.viewportWindow.mark(view);
     }
 
     update(update: ViewUpdate) {
-      if (livePreviewShouldRebuild(update, "marks")) {
+      if (
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "marks",
+          this.viewportWindow,
+        )
+      ) {
         this.decorations = buildLivePreviewHideDecorations(update.view);
+        this.viewportWindow.mark(update.view);
       }
     }
   },

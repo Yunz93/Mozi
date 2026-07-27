@@ -14,7 +14,11 @@ import {
 } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
-import { livePreviewShouldRebuild, maxVisibleParseTo } from "./shared";
+import {
+  maxVisibleParseTo,
+  shouldRebuildLivePreviewDecorations,
+  ViewportDecorationWindow,
+} from "./shared";
 
 class TaskCheckboxWidget extends WidgetType {
   constructor(
@@ -85,7 +89,7 @@ export function buildLivePreviewTaskDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 50) ?? syntaxTree(state);
+    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
     tree.iterate({
@@ -118,14 +122,23 @@ export function buildLivePreviewTaskDecorations(
 export const livePreviewTaskCheckboxes = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    private readonly viewportWindow = new ViewportDecorationWindow();
 
     constructor(view: EditorView) {
       this.decorations = buildLivePreviewTaskDecorations(view);
+      this.viewportWindow.mark(view);
     }
 
     update(update: ViewUpdate) {
-      if (livePreviewShouldRebuild(update, "marks")) {
+      if (
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "marks",
+          this.viewportWindow,
+        )
+      ) {
         this.decorations = buildLivePreviewTaskDecorations(update.view);
+        this.viewportWindow.mark(update.view);
       }
     }
   },

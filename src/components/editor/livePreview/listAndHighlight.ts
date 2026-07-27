@@ -16,9 +16,10 @@ import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   hasSkipAncestor,
-  livePreviewShouldRebuild,
   maxVisibleParseTo,
   selectionTouchesRange,
+  shouldRebuildLivePreviewDecorations,
+  ViewportDecorationWindow,
 } from "./shared";
 
 class BulletWidget extends WidgetType {
@@ -116,7 +117,7 @@ export function buildLivePreviewListMarkerDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 50) ?? syntaxTree(state);
+    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
     tree.iterate({
@@ -209,12 +210,21 @@ export function buildLivePreviewHighlightDecorations(
 export const livePreviewListMarkers = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    private readonly viewportWindow = new ViewportDecorationWindow();
     constructor(view: EditorView) {
       this.decorations = buildLivePreviewListMarkerDecorations(view);
+      this.viewportWindow.mark(view);
     }
     update(update: ViewUpdate) {
-      if (livePreviewShouldRebuild(update, "marks")) {
+      if (
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "marks",
+          this.viewportWindow,
+        )
+      ) {
         this.decorations = buildLivePreviewListMarkerDecorations(update.view);
+        this.viewportWindow.mark(update.view);
       }
     }
   },
@@ -224,12 +234,21 @@ export const livePreviewListMarkers = ViewPlugin.fromClass(
 export const livePreviewHighlights = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    private readonly viewportWindow = new ViewportDecorationWindow();
     constructor(view: EditorView) {
       this.decorations = buildLivePreviewHighlightDecorations(view);
+      this.viewportWindow.mark(view);
     }
     update(update: ViewUpdate) {
-      if (livePreviewShouldRebuild(update, "marks")) {
+      if (
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "marks",
+          this.viewportWindow,
+        )
+      ) {
         this.decorations = buildLivePreviewHighlightDecorations(update.view);
+        this.viewportWindow.mark(update.view);
       }
     }
   },

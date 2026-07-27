@@ -30,8 +30,9 @@ import {
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
-  livePreviewShouldRebuild,
+  shouldRebuildLivePreviewDecorations,
   maxVisibleParseTo,
+  ViewportDecorationWindow,
   bindLivePreviewImageMeasure,
   scheduleLivePreviewMeasure,
   scheduleLivePreviewReveal,
@@ -219,7 +220,7 @@ export function buildLivePreviewImageDecorations(
   const { state } = view;
   const ctx = state.facet(livePreviewContextFacet);
   const tree =
-    ensureSyntaxTree(state, maxVisibleParseTo(view), 50) ?? syntaxTree(state);
+    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
@@ -281,9 +282,11 @@ export const livePreviewImages = ViewPlugin.fromClass(
     decorations: DecorationSet;
     private resolvedCache = new Map<string, string>();
     private failedCache = new Set<string>();
+    private readonly viewportWindow = new ViewportDecorationWindow();
 
     constructor(view: EditorView) {
       this.decorations = this.rebuild(view);
+      this.viewportWindow.mark(view);
     }
 
     private scheduleResolve(
@@ -365,12 +368,17 @@ export const livePreviewImages = ViewPlugin.fromClass(
 
       if (
         resolved ||
+        livePreviewContextChanged(update) ||
         // Selection must rebuild immediately so click-to-reveal source works
         // on the same line as the image widget.
-        livePreviewShouldRebuild(update, "marks") ||
-        livePreviewContextChanged(update)
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "marks",
+          this.viewportWindow,
+        )
       ) {
         this.decorations = this.rebuild(update.view);
+        this.viewportWindow.mark(update.view);
       }
     }
   },
