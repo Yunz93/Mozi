@@ -25,12 +25,14 @@ import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewImageQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import {
-  collectWikiLinkRanges,
+  collectVisibleWikiRanges,
   hasSkipAncestor,
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
-  livePreviewShouldRebuild,
+  shouldRebuildLivePreviewDecorations,
+  maxVisibleParseTo,
+  ViewportDecorationWindow,
   bindLivePreviewImageMeasure,
   scheduleLivePreviewMeasure,
   scheduleLivePreviewReveal,
@@ -218,16 +220,8 @@ export function buildLivePreviewImageDecorations(
   const { state } = view;
   const ctx = state.facet(livePreviewContextFacet);
   const tree =
-    ensureSyntaxTree(state, state.doc.length, 50) ?? syntaxTree(state);
-  const docText = state.doc.toString();
-
-  const wikiRanges = view.visibleRanges.flatMap(({ from, to }) =>
-    collectWikiLinkRanges(
-      docText,
-      Math.max(0, from - 2),
-      Math.min(docText.length, to + 2),
-    ),
-  );
+    ensureSyntaxTree(state, maxVisibleParseTo(view), 0) ?? syntaxTree(state);
+  const wikiRanges = collectVisibleWikiRanges(view, 2);
 
   for (const { from: viewportFrom, to: viewportTo } of view.visibleRanges) {
     tree.iterate({
@@ -288,9 +282,11 @@ export const livePreviewImages = ViewPlugin.fromClass(
     decorations: DecorationSet;
     private resolvedCache = new Map<string, string>();
     private failedCache = new Set<string>();
+    private readonly viewportWindow = new ViewportDecorationWindow();
 
     constructor(view: EditorView) {
       this.decorations = this.rebuild(view);
+      this.viewportWindow.mark(view);
     }
 
     private scheduleResolve(
@@ -372,12 +368,17 @@ export const livePreviewImages = ViewPlugin.fromClass(
 
       if (
         resolved ||
+        livePreviewContextChanged(update) ||
         // Selection must rebuild immediately so click-to-reveal source works
         // on the same line as the image widget.
-        livePreviewShouldRebuild(update, "marks") ||
-        livePreviewContextChanged(update)
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "marks",
+          this.viewportWindow,
+        )
       ) {
         this.decorations = this.rebuild(update.view);
+        this.viewportWindow.mark(update.view);
       }
     }
   },

@@ -1099,10 +1099,6 @@
   line-height: 1.95;
 }
 
-.editor-pane-layout[data-live-preview="true"] .cm-line {
-  transition: opacity 80ms ease;
-}
-
 .editor-pane-layout[data-live-preview="true"] .tok-heading-1,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-1 {
   font-size: 1.6em;

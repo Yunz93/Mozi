@@ -4,7 +4,7 @@ import type {
   Extension,
   Transaction,
 } from "@codemirror/state";
-import { StateField } from "@codemirror/state";
+import { Range, StateField } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import {
   Decoration,
@@ -16,6 +16,7 @@ import {
 import { WIKI_LINK_REGEX } from "../../../utils/markdownLinkUtils";
 import { LRUCache } from "../../../utils/performance";
 import { livePreviewContextFacet } from "./context";
+import type { LivePreviewContext } from "./context";
 
 const SKIP_ANCESTOR_NODES = new Set([
   "FencedCode",
@@ -80,6 +81,56 @@ export function collectWikiLinkRanges(
   return ranges;
 }
 
+/**
+ * Collect wiki ranges near the visible viewport without allocating `doc.toString()`.
+ * Cached for the same EditorState + visibleRanges signature so hide/images/links
+ * plugins in one update do not each re-run the regex.
+ */
+let visibleWikiCacheState: EditorState | null = null;
+let visibleWikiCacheKey = "";
+let visibleWikiCacheRanges: WikiLinkRange[] = [];
+
+export function collectVisibleWikiRanges(
+  view: Pick<EditorView, "visibleRanges" | "state">,
+  pad = 2,
+): WikiLinkRange[] {
+  const visKey = `${pad}|${view.visibleRanges.map((r) => `${r.from}:${r.to}`).join(",")}`;
+  if (visibleWikiCacheState === view.state && visibleWikiCacheKey === visKey) {
+    return visibleWikiCacheRanges;
+  }
+
+  const ranges: WikiLinkRange[] = [];
+  for (const { from, to } of view.visibleRanges) {
+    const start = Math.max(0, from - pad);
+    const end = Math.min(view.state.doc.length, to + pad);
+    const text = view.state.doc.sliceString(start, end);
+    for (const range of collectWikiLinkRanges(text, 0, text.length)) {
+      ranges.push({
+        from: range.from + start,
+        to: range.to + start,
+        raw: range.raw,
+        embed: range.embed,
+      });
+    }
+  }
+  visibleWikiCacheState = view.state;
+  visibleWikiCacheKey = visKey;
+  visibleWikiCacheRanges = ranges;
+  return ranges;
+}
+
+/** Furthest doc offset we should ask the markdown parser to cover for viewport plugins. */
+export function maxVisibleParseTo(
+  view: Pick<EditorView, "visibleRanges" | "state">,
+  pad = 500,
+): number {
+  let parseTo = 0;
+  for (const { to } of view.visibleRanges) {
+    parseTo = Math.max(parseTo, to);
+  }
+  return Math.min(view.state.doc.length, parseTo + pad);
+}
+
 export function rangesOverlap(
   aFrom: number,
   aTo: number,
@@ -98,16 +149,18 @@ export function livePreviewContextChanged(update: ViewUpdate): boolean {
 }
 
 /**
- * Decide whether a Live Preview decoration plugin should rebuild.
- * - `marks`: rebuild on every selection change (hide/reveal formatting).
- * - `widgets`: rebuild when selection crosses a line or becomes non-empty,
- *   not on every caret nudge within a line (avoids KaTeX/markdown-it thrash).
+ * Decide whether a Live Preview decoration plugin should rebuild for
+ * document / selection / syntax changes.
+ *
+ * Viewport / scroll is intentionally NOT included — use
+ * {@link ViewportDecorationWindow} so decorations only rebuild when the
+ * visible range escapes a padded window (avoids per-frame scroll jank).
  */
 export function livePreviewShouldRebuild(
   update: ViewUpdate,
   mode: "marks" | "widgets" = "widgets",
 ): boolean {
-  if (update.docChanged || update.viewportChanged) return true;
+  if (update.docChanged) return true;
   if (syntaxTree(update.startState) !== syntaxTree(update.state)) return true;
   if (!update.selectionSet) return false;
   if (mode === "marks") return true;
@@ -123,6 +176,53 @@ export function livePreviewShouldRebuild(
   } catch {
     return true;
   }
+}
+
+/**
+ * Padded decoration window for viewport-scoped Live Preview plugins.
+ * Rebuild only when the visible range leaves the last built pad — not on
+ * every scroll tick.
+ */
+export class ViewportDecorationWindow {
+  private from = -1;
+  private to = -1;
+
+  constructor(private readonly pad = 2400) {}
+
+  needsUpdate(view: Pick<EditorView, "visibleRanges" | "state">): boolean {
+    if (this.from < 0 || this.to < this.from) return true;
+    for (const range of view.visibleRanges) {
+      if (range.from < this.from || range.to > this.to) return true;
+    }
+    return false;
+  }
+
+  mark(view: Pick<EditorView, "visibleRanges" | "state">): void {
+    const padded = getPaddedVisibleRange(view, this.pad);
+    this.from = padded.from;
+    this.to = padded.to;
+  }
+
+  invalidate(): void {
+    this.from = -1;
+    this.to = -1;
+  }
+}
+
+/**
+ * Combined rebuild gate for viewport-scoped plugins: content/selection changes
+ * always rebuild; scroll only when the padded decoration window is exceeded.
+ */
+export function shouldRebuildLivePreviewDecorations(
+  update: ViewUpdate,
+  mode: "marks" | "widgets",
+  window: ViewportDecorationWindow,
+): boolean {
+  if (livePreviewShouldRebuild(update, mode)) {
+    window.invalidate();
+    return true;
+  }
+  return update.viewportChanged && window.needsUpdate(update.view);
 }
 
 /** Viewport union padded for decoration builds. */
@@ -297,37 +397,112 @@ export function expandRangesToBlocks(
  * Provide them from a StateField instead (same pattern as Live Preview tables).
  *
  * Rebuild policy:
- * - Document / context / rebuildOn → full create.
- * - Selection → only when caret enters or leaves a coverage range (no same-line thrash).
+ * - Document change → incremental `createInRanges` when provided, else full create.
+ * - Context / rebuildOn → full create (or comparator).
+ * - Selection → only when caret enters or leaves a coverage range.
  * - Otherwise → map decorations through changes.
  */
 export function defineLivePreviewBlockDecorationField(options: {
   create: (state: EditorState) => BlockDecorationBuild | DecorationSet;
-  /** Extra rebuild triggers (async resolve effects, etc.). */
+  /**
+   * Optional ranged rebuild used for incremental doc/selection updates.
+   * Must scan only `ranges` (plus any construct wholly inside them).
+   */
+  createInRanges?: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => BlockDecorationBuild | DecorationSet;
+  /** Expand changed ranges before ranged rebuild (default: blank-line blocks). */
+  expandChangedRanges?: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => CoverageRange[];
+  /** Pad applied to raw changed ranges before expansion. */
+  changePad?: number;
+  /** Extra rebuild triggers (async resolve effects, etc.) → full create. */
   rebuildOn?: (tr: Transaction) => boolean;
+  /**
+   * Rebuild when live-preview context facet identity changes (default true).
+   * Set false for context-free fields (e.g. math).
+   * Or pass a comparator that returns true only when relevant context fields change.
+   */
+  rebuildOnContextChange?:
+    | boolean
+    | ((prev: LivePreviewContext, next: LivePreviewContext) => boolean);
   /** Map through changes when not rebuilding (default true). */
   mapWhenIdle?: boolean;
 }): Extension {
+  const expand =
+    options.expandChangedRanges ??
+    ((state: EditorState, ranges: readonly CoverageRange[]) =>
+      expandRangesToBlocks(state, ranges));
+
   const field = StateField.define<BlockDecorationBuild>({
     create(state) {
       return normalizeBlockDecorationBuild(options.create(state));
     },
     update(value, tr) {
-      const contextChanged =
-        tr.startState.facet(livePreviewContextFacet) !==
-        tr.state.facet(livePreviewContextFacet);
-      const forced =
-        contextChanged || options.rebuildOn?.(tr) === true || tr.docChanged;
+      const prevCtx = tr.startState.facet(livePreviewContextFacet);
+      const nextCtx = tr.state.facet(livePreviewContextFacet);
+      let contextChanged = false;
+      if (options.rebuildOnContextChange === false) {
+        contextChanged = false;
+      } else if (typeof options.rebuildOnContextChange === "function") {
+        contextChanged =
+          prevCtx !== nextCtx &&
+          options.rebuildOnContextChange(prevCtx, nextCtx);
+      } else {
+        contextChanged = prevCtx !== nextCtx;
+      }
 
-      if (forced) {
+      const forceFull = contextChanged || options.rebuildOn?.(tr) === true;
+
+      if (forceFull) {
         return normalizeBlockDecorationBuild(options.create(tr.state));
       }
 
-      if (tr.selection) {
-        if (selectionAffectsCoverage(tr.startState, tr.state, value.coverage)) {
+      if (tr.docChanged) {
+        if (!options.createInRanges) {
           return normalizeBlockDecorationBuild(options.create(tr.state));
         }
-        return value;
+        return rebuildBlockDecorationsIncremental(
+          value,
+          tr,
+          options.createInRanges,
+          expand,
+          options.changePad ?? 2,
+          options.create,
+        );
+      }
+
+      if (tr.selection) {
+        if (
+          !selectionAffectsCoverage(tr.startState, tr.state, value.coverage)
+        ) {
+          return value;
+        }
+        if (!options.createInRanges) {
+          return normalizeBlockDecorationBuild(options.create(tr.state));
+        }
+        const affected = value.coverage.filter((range) => {
+          const was = selectionTouchesRange(
+            tr.startState,
+            range.from,
+            range.to,
+          );
+          const now = selectionTouchesRange(tr.state, range.from, range.to);
+          return was !== now;
+        });
+        if (affected.length === 0) {
+          return normalizeBlockDecorationBuild(options.create(tr.state));
+        }
+        return spliceBlockDecorationsInRanges(
+          value,
+          tr.state,
+          expand(tr.state, affected),
+          options.createInRanges,
+          options.create,
+        );
       }
 
       if (options.mapWhenIdle === false) {
@@ -347,6 +522,108 @@ export function defineLivePreviewBlockDecorationField(options: {
   return field;
 }
 
+function rangesOverlapAny(
+  from: number,
+  to: number,
+  ranges: readonly CoverageRange[],
+): boolean {
+  for (const range of ranges) {
+    if (rangesOverlap(from, to, range.from, range.to)) return true;
+  }
+  return false;
+}
+
+function decorationSetToRanges(set: DecorationSet): Range<Decoration>[] {
+  const add: Range<Decoration>[] = [];
+  set.between(0, 1e9, (from, to, value) => {
+    add.push(value.range(from, to));
+  });
+  return add;
+}
+
+function shouldFallbackToFullRebuild(
+  state: EditorState,
+  invalidate: readonly CoverageRange[],
+): boolean {
+  if (invalidate.length === 0) return false;
+  let span = 0;
+  for (const range of invalidate) span += range.to - range.from;
+  return (
+    span > Math.max(8000, state.doc.length * 0.35) || invalidate.length > 80
+  );
+}
+
+function spliceBlockDecorationsInRanges(
+  value: BlockDecorationBuild,
+  state: EditorState,
+  invalidate: readonly CoverageRange[],
+  createInRanges: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => BlockDecorationBuild | DecorationSet,
+  createFull: (state: EditorState) => BlockDecorationBuild | DecorationSet,
+): BlockDecorationBuild {
+  const ranges = mergeCoverageRanges(invalidate);
+  if (ranges.length === 0) return value;
+  if (shouldFallbackToFullRebuild(state, ranges)) {
+    return normalizeBlockDecorationBuild(createFull(state));
+  }
+
+  const filtered = value.decorations.update({
+    filter: (from, to) => !rangesOverlapAny(from, to, ranges),
+  });
+  const keptCoverage = value.coverage.filter(
+    (c) => !rangesOverlapAny(c.from, c.to, ranges),
+  );
+  const partial = normalizeBlockDecorationBuild(createInRanges(state, ranges));
+  const decorations = filtered.update({
+    add: decorationSetToRanges(partial.decorations),
+    sort: true,
+  });
+  return {
+    decorations,
+    coverage: mergeCoverageRanges([...keptCoverage, ...partial.coverage]),
+  };
+}
+
+function rebuildBlockDecorationsIncremental(
+  value: BlockDecorationBuild,
+  tr: Transaction,
+  createInRanges: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => BlockDecorationBuild | DecorationSet,
+  expand: (
+    state: EditorState,
+    ranges: readonly CoverageRange[],
+  ) => CoverageRange[],
+  changePad: number,
+  createFull: (state: EditorState) => BlockDecorationBuild | DecorationSet,
+): BlockDecorationBuild {
+  const mappedDecorations = value.decorations.map(tr.changes);
+  const mappedCoverage = mapCoverage(value.coverage, tr.changes);
+  const changed = expand(tr.state, collectChangedRanges(tr, changePad));
+  const overlappingCoverage = mappedCoverage.filter((c) =>
+    rangesOverlapAny(c.from, c.to, changed),
+  );
+  const invalidate = expand(
+    tr.state,
+    mergeCoverageRanges([...changed, ...overlappingCoverage]),
+  );
+
+  if (shouldFallbackToFullRebuild(tr.state, invalidate)) {
+    return normalizeBlockDecorationBuild(createFull(tr.state));
+  }
+
+  return spliceBlockDecorationsInRanges(
+    { decorations: mappedDecorations, coverage: mappedCoverage },
+    tr.state,
+    invalidate,
+    createInRanges,
+    createFull,
+  );
+}
+
 /** Empty block build helper. */
 export function emptyBlockDecorationBuild(): BlockDecorationBuild {
   return { decorations: Decoration.none, coverage: [] };
@@ -356,11 +633,22 @@ export function emptyBlockDecorationBuild(): BlockDecorationBuild {
  * Ask CodeMirror to refresh block height maps after a Live Preview widget
  * changes size asynchronously (image decode, Mermaid SVG, embed HTML, …).
  * Without this, `posAtCoords` can map clicks to the wrong document position.
+ *
+ * Coalesced per view/frame so bursty image/Mermaid settles do not schedule
+ * multiple height-map refreshes during scroll.
  */
+const pendingMeasureViews = new WeakSet<EditorView>();
+
 export function scheduleLivePreviewMeasure(view: EditorView): void {
   if (typeof view.requestMeasure !== "function") return;
   if (!view.dom.isConnected) return;
-  view.requestMeasure();
+  if (pendingMeasureViews.has(view)) return;
+  pendingMeasureViews.add(view);
+  requestAnimationFrame(() => {
+    pendingMeasureViews.delete(view);
+    if (!view.dom.isConnected) return;
+    view.requestMeasure();
+  });
 }
 
 /**

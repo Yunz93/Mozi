@@ -273,6 +273,8 @@ describe("live preview hide formatting", () => {
       /cm-live-preview-table-wrap[^}]*overflow-x:\s*auto/,
     );
     expect(sheetText).toMatch(/cm-live-preview-table[^}]*max-content/);
+    // Wide tables must be allowed to exceed the wrap so overflow-x can scroll.
+    expect(sheetText).toMatch(/cm-live-preview-table[^}]*max-width:\s*none/);
     expect(sheetText).not.toMatch(
       /\.cm-live-preview-table\s*\{[^}]*max-width:\s*100%/,
     );
@@ -280,6 +282,74 @@ describe("live preview hide formatting", () => {
     expect(sheetText).toMatch(
       /cm-live-preview-table th\s*\{[^}]*white-space:\s*nowrap/,
     );
+  });
+
+  it("escapes pipes and newlines when committing a live table cell", async () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, doc.length - 1, [livePreviewTables]);
+    const cell = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="0"]',
+    ) as HTMLElement | null;
+    expect(cell).not.toBeNull();
+
+    cell!.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const editing = view.dom.querySelector(
+      ".cm-live-preview-table-cell-editing",
+    ) as HTMLElement | null;
+    expect(editing).not.toBeNull();
+    editing!.textContent = "a | b\nc";
+    editing!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const text = view.state.doc.toString();
+    expect(text).toContain("| a \\| b c |");
+    // Still a 2-column table — pipe in the cell must not invent a column.
+    const bodyLine = text.split("\n").find((line) => line.includes("\\|"));
+    expect(bodyLine).toBeDefined();
+    expect(bodyLine!.split(/(?<!\\)\|/).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("does not yank the caret back to the table on blur commit", async () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const away = doc.length - 1;
+    const view = mount(doc, away, [livePreviewTables]);
+    const cell = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="0"]',
+    ) as HTMLElement | null;
+    expect(cell).not.toBeNull();
+
+    cell!.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    const editing = view.dom.querySelector(
+      ".cm-live-preview-table-cell-editing",
+    ) as HTMLElement | null;
+    expect(editing).not.toBeNull();
+    editing!.textContent = "hello";
+
+    // Click elsewhere first, then blur the cell (as a real click would).
+    view.dispatch({ selection: { anchor: away } });
+    editing!.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    expect(view.state.doc.toString()).toContain("| hello |");
+    // Selection must stay past the table (mapped through the rewrite), not
+    // jump back to the table start.
+    const head = view.state.selection.main.head;
+    expect(head).toBeGreaterThan(doc.indexOf("\n\naway"));
+    expect(head).not.toBe(0);
   });
 
   it("remasures the editor when an editing table cell wraps on input", async () => {
@@ -309,8 +379,11 @@ describe("live preview hide formatting", () => {
     editing!.textContent =
       "很长很长的需求描述内容需要换行显示完整，不能被裁切掉";
     editing!.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(spy).toHaveBeenCalled();
   });
+
   it("edits a table cell in place without revealing pipe source", async () => {
     const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
     const view = mount(doc, doc.length - 1, [livePreviewTables]);
