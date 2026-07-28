@@ -279,9 +279,8 @@ export default {
   context_delete: "删除",
   context_emptyTrash: "清空回收站",
 
-  tab_closeOtherTabs: "关闭其他标签页",
-  tab_closeTab: "关闭标签",
-  tab_closeBlockedUnsaved: "保存失败，已保留标签页以避免丢失未保存内容",
+  tab_closeTab: "关闭文件",
+  tab_closeBlockedUnsaved: "保存失败，已保留当前文件以避免丢失未保存内容",
   notifications_moveToTrashSaveFailed:
     "无法移入回收站：未保存的修改保存失败，已保留文件",
   notifications_renameSaveFailed:
@@ -484,8 +483,8 @@ export default {
   settings_attachmentLocationSubfolder: "当前文件夹下的子文件夹",
   settings_newFolder: "新建文件夹",
   settings_newFolderDesc: "在知识库根目录新建文件夹。",
-  settings_closeTab: "关闭标签页",
-  settings_closeTabDesc: "关闭当前打开的标签页。",
+  settings_closeTab: "关闭文件",
+  settings_closeTabDesc: "关闭当前打开的文件。",
   settings_aiEnhance: "AI 增强",
   settings_aiEnhanceDesc: "对当前笔记执行 AI 增强。",
   settings_undo: "撤销",
@@ -731,7 +730,7 @@ export default {
 
   notifications_fileDeletedOnDisk: "文件已在本地被删除。",
   notifications_fileDeletedOnDiskUnsaved:
-    "文件已在本地被删除，但当前标签页仍有未保存内容。请在关闭标签页前复制您的工作内容。",
+    "文件已在本地被删除，但当前文件仍有未保存内容。请在关闭前复制您的工作内容。",
   notifications_watchFileFailed: "监听本地文件变更失败。",
   notifications_watchDirectoryFailed: "监听知识库目录变更失败。",
   notifications_fileChangedOnDisk:

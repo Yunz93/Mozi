@@ -149,7 +149,7 @@ export async function openKnowledgeBaseWorkspace(
 
   // Only restore the previously opened file on explicit restore (e.g. cold start).
   // Interactive "open folder" must not auto-open the first note or a leftover
-  // lastOpenedFilePath — that produced surprise tabs like "未命名".
+  // lastOpenedFilePath — that produced surprise opens like "未命名".
   const shouldRestoreLastOpenedFile = Boolean(options?.restoreLastOpenedFile);
   const initialFile =
     shouldRestoreLastOpenedFile && lastOpenedFilePath

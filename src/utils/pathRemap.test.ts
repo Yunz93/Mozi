@@ -21,26 +21,24 @@ describe("remapPathBoundarySafe", () => {
 });
 
 describe("buildTabPathRemapState", () => {
-  it("remaps open tab ids and cached content keys", () => {
+  it("remaps the open document id and cached content keys", () => {
     const next = buildTabPathRemapState(
       {
-        openTabs: ["/vault/old.md", "/vault/keep.md"],
+        openTabs: ["/vault/old.md"],
         activeTabId: "/vault/old.md",
         currentFilePath: "/vault/old.md",
         fileContents: {
           "/vault/old.md": "old",
-          "/vault/keep.md": "keep",
         },
         lastSavedContent: {
           "/vault/old.md": "old",
-          "/vault/keep.md": "keep",
         },
         fileHistories: {},
       },
       { "/vault/old.md": "/vault/new.md" },
     );
 
-    expect(next.openTabs).toEqual(["/vault/new.md", "/vault/keep.md"]);
+    expect(next.openTabs).toEqual(["/vault/new.md"]);
     expect(next.activeTabId).toBe("/vault/new.md");
     expect(next.fileContents?.["/vault/new.md"]).toBe("old");
   });

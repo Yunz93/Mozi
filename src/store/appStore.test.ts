@@ -171,4 +171,15 @@ describe("tab saved baseline", () => {
     );
     expect(useAppStore.getState().hasUnsavedChanges(fileId)).toBe(false);
   });
+
+  it("replaces the previous open document instead of stacking tabs", () => {
+    useAppStore.getState().addTab("/vault/a.md", "A");
+    useAppStore.getState().addTab("/vault/b.md", "B");
+
+    const state = useAppStore.getState();
+    expect(state.openTabs).toEqual(["/vault/b.md"]);
+    expect(state.activeTabId).toBe("/vault/b.md");
+    expect(state.fileContents).toEqual({ "/vault/b.md": "B" });
+    expect(state.fileContents["/vault/a.md"]).toBeUndefined();
+  });
 });

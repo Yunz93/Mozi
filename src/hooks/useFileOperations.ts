@@ -38,6 +38,7 @@ import {
   getActiveVectorStore,
   setActiveChunkIndex,
 } from "../services/vault/semanticIndexRuntime";
+import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -161,6 +162,18 @@ export function useFileOperations() {
           return;
         }
 
+        const previousId = useAppStore.getState().activeTabId;
+        if (previousId && previousId !== file.id) {
+          const flushed = await flushActiveDocumentIfDirty();
+          if (!flushed) {
+            showNotification(
+              t(settings.language, "tab_closeBlockedUnsaved"),
+              "error",
+            );
+            return;
+          }
+        }
+
         addTab(file.id);
         setCurrentFilePath(file.path);
 
@@ -173,11 +186,14 @@ export function useFileOperations() {
             updateTabContent(file.id, "");
             markAsSaved(file.id);
           }
-          // View mode stays sticky; App forces PREVIEW only while this tab is active.
+          // View mode stays sticky; App forces PREVIEW only while this file is active.
           return;
         }
 
-        const cachedContent = fileContents[file.id];
+        const cachedContent =
+          previousId === file.id
+            ? useAppStore.getState().fileContents[file.id]
+            : undefined;
 
         if (cachedContent === undefined) {
           const text = await readFile(file);
@@ -216,7 +232,6 @@ export function useFileOperations() {
       updateTabContent,
       markAsSaved,
       showNotification,
-      fileContents,
       settings.language,
     ],
   );
@@ -249,6 +264,15 @@ export function useFileOperations() {
         newNoteFolder: settings.newNoteFolder,
       });
 
+      const flushed = await flushActiveDocumentIfDirty();
+      if (!flushed) {
+        showNotification(
+          t(settings.language, "tab_closeBlockedUnsaved"),
+          "error",
+        );
+        return;
+      }
+
       const newFile = await createFile(
         finalFileName,
         initialContent,
@@ -263,9 +287,11 @@ export function useFileOperations() {
       settings.metadataFields,
       settings.newNoteLocation,
       settings.newNoteFolder,
+      settings.language,
       createFile,
       addTab,
       setCurrentFilePath,
+      showNotification,
     ],
   );
 

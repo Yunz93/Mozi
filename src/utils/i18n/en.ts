@@ -294,10 +294,9 @@ export default {
   context_delete: "Delete",
   context_emptyTrash: "Empty Trash",
 
-  tab_closeOtherTabs: "Close Other Tabs",
-  tab_closeTab: "Close tab",
+  tab_closeTab: "Close file",
   tab_closeBlockedUnsaved:
-    "Save failed. The tab was kept open to avoid losing unsaved changes.",
+    "Save failed. The current file was kept open to avoid losing unsaved changes.",
   notifications_moveToTrashSaveFailed:
     "Could not move to trash: saving unsaved changes failed, the file was kept.",
   notifications_renameSaveFailed:
@@ -519,8 +518,8 @@ export default {
   settings_attachmentLocationSubfolder: "In subfolder under current folder",
   settings_newFolder: "New Folder",
   settings_newFolderDesc: "Create a new folder in the knowledge base root.",
-  settings_closeTab: "Close Tab",
-  settings_closeTabDesc: "Close the current tab.",
+  settings_closeTab: "Close File",
+  settings_closeTabDesc: "Close the current file.",
   settings_aiEnhance: "AI Enhance",
   settings_aiEnhanceDesc: "Run AI enhancement on the current note.",
   settings_undo: "Undo",
@@ -788,7 +787,7 @@ export default {
 
   notifications_fileDeletedOnDisk: "The file was deleted on disk.",
   notifications_fileDeletedOnDiskUnsaved:
-    "The file was deleted on disk, but this tab still has unsaved changes. Copy your work before closing the tab.",
+    "The file was deleted on disk, but it still has unsaved changes. Copy your work before closing.",
   notifications_watchFileFailed: "Failed to watch file changes on disk.",
   notifications_watchDirectoryFailed:
     "Failed to watch knowledge base directory changes on disk.",

@@ -17,8 +17,8 @@ export interface HistoryState {
  * Note: `content` is NOT stored here. It is derived from
  * `fileContents[activeTabId]` via the `selectContent` selector.
  *
- * History is now per-file (keyed by fileId) to prevent cross-tab contamination
- * when switching between tabs during editing.
+ * History is keyed by fileId so undo state is cleared when the open
+ * document is replaced (single-document editing).
  */
 export interface EditorState {
   viewMode: ViewMode;
@@ -26,7 +26,7 @@ export interface EditorState {
   lastViewModeChangeSource: "direct" | "toggle";
   /** Mode to restore after leaving a preview-only file (PDF/image/HTML). */
   viewModeBeforePreviewOnly: ViewMode | null;
-  fileHistories: Record<string, HistoryState>; // Per-file history
+  fileHistories: Record<string, HistoryState>; // Per open document
 }
 
 /**

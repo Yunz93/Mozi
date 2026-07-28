@@ -17,6 +17,7 @@ import {
   getPathBasename,
 } from "../utils/pathHelpers";
 import { openKnowledgeBaseWorkspace } from "../services/filesystem/knowledgeBaseService";
+import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
 import { initializeSampleNotesIfSupported } from "../services/filesystem/sampleNotesService";
 import {
   moveItemToTrash,
@@ -268,6 +269,15 @@ export function useFileSystem() {
    */
   const openFile = useCallback(async () => {
     try {
+      const flushed = await flushActiveDocumentIfDirty();
+      if (!flushed) {
+        showNotification(
+          t(settings.language, "tab_closeBlockedUnsaved"),
+          "error",
+        );
+        return;
+      }
+
       const fs = await getFileSystem();
       const result = await openStandaloneFile(
         fs,
@@ -292,6 +302,7 @@ export function useFileSystem() {
     setCurrentFilePath,
     showNotification,
     handleFileSystemError,
+    settings.language,
   ]);
 
   const openFilePath = useCallback(
@@ -301,9 +312,20 @@ export function useFileSystem() {
     ): Promise<string | null> => {
       try {
         const existingState = useAppStore.getState();
-        if (existingState.openTabs.includes(path)) {
+        if (existingState.activeTabId === path) {
           activateTab(path, path);
           return path;
+        }
+
+        const flushed = await flushActiveDocumentIfDirty();
+        if (!flushed) {
+          if (!options?.suppressErrors) {
+            showNotification(
+              t(settings.language, "tab_closeBlockedUnsaved"),
+              "error",
+            );
+          }
+          return null;
         }
 
         const fs = await getFileSystem();
@@ -346,6 +368,7 @@ export function useFileSystem() {
       activateTab,
       setFiles,
       addTab,
+      setCurrentFilePath,
       showNotification,
       handleFileSystemError,
       settings.language,

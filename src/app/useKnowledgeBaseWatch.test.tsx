@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe("useKnowledgeBaseWatch", () => {
-  it("syncs the file tree and closes tabs when saved files are removed on disk", async () => {
+  it("syncs the file tree and closes the open file when it is removed on disk", async () => {
     const watched = {
       callback: null as ((event: DirectoryWatchEvent) => void) | null,
     };
@@ -53,15 +53,13 @@ describe("useKnowledgeBaseWatch", () => {
     useAppStore.setState({
       files: [note, otherNote],
       rootFolderPath: "/vault",
-      openTabs: [note.id, otherNote.id],
+      openTabs: [note.id],
       activeTabId: note.id,
       fileContents: {
         [note.id]: "# Note\n",
-        [otherNote.id]: "# Other\n",
       },
       lastSavedContent: {
         [note.id]: "# Note\n",
-        [otherNote.id]: "# Other\n",
       },
     });
 
@@ -89,7 +87,8 @@ describe("useKnowledgeBaseWatch", () => {
 
     await waitFor(() => {
       expect(useAppStore.getState().files).toEqual([otherNote]);
-      expect(useAppStore.getState().openTabs).toEqual([otherNote.id]);
+      expect(useAppStore.getState().openTabs).toEqual([]);
+      expect(useAppStore.getState().activeTabId).toBeNull();
       expect(showNotification).toHaveBeenCalledWith(
         "notifications_fileDeletedOnDisk",
         "error",
@@ -97,7 +96,7 @@ describe("useKnowledgeBaseWatch", () => {
     });
   });
 
-  it("keeps tabs with unsaved changes when files are removed on disk", async () => {
+  it("keeps the open file with unsaved changes when removed on disk", async () => {
     const watched = {
       callback: null as ((event: DirectoryWatchEvent) => void) | null,
     };
@@ -115,15 +114,13 @@ describe("useKnowledgeBaseWatch", () => {
     useAppStore.setState({
       files: [note, otherNote],
       rootFolderPath: "/vault",
-      openTabs: [note.id, otherNote.id],
+      openTabs: [note.id],
       activeTabId: note.id,
       fileContents: {
-        [note.id]: "# Note\n",
-        [otherNote.id]: "# Other\nunsaved",
+        [note.id]: "# Note\nunsaved",
       },
       lastSavedContent: {
         [note.id]: "# Note\n",
-        [otherNote.id]: "# Other\n",
       },
     });
 
@@ -147,10 +144,10 @@ describe("useKnowledgeBaseWatch", () => {
     const emitDirectoryEvent = watched.callback as (
       event: DirectoryWatchEvent,
     ) => void;
-    emitDirectoryEvent({ type: "changed", tree: [note] });
+    emitDirectoryEvent({ type: "changed", tree: [otherNote] });
 
     await waitFor(() => {
-      expect(useAppStore.getState().openTabs).toContain(otherNote.id);
+      expect(useAppStore.getState().openTabs).toContain(note.id);
       expect(showNotification).toHaveBeenCalledWith(
         "notifications_fileDeletedOnDiskUnsaved",
         "error",

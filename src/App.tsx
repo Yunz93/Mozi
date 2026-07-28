@@ -31,7 +31,6 @@ import type { CodeMirrorContentChangeMeta } from "./components/editor/hooks/useC
 import { RightRail } from "./components/rightRail/RightRail";
 import { AskVaultPanel } from "./components/ai/AskVaultPanel";
 import { ContentSearch } from "./components/search/ContentSearch";
-import { TabBar } from "./components/tabs/TabBar";
 import { useExportActions } from "./hooks/useExportActions";
 import { usePublishActions } from "./hooks/usePublishActions";
 import { ViewMode } from "./types";
@@ -168,7 +167,7 @@ const App: React.FC = () => {
     t,
   });
 
-  const { forceSave, saveOpenTabIfDirty } = useAutoSave({ enabled: true });
+  const { forceSave } = useAutoSave({ enabled: true });
   const { handleExportToPdf, handleExportToHtml, buildLongImageSharePayload } =
     useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
@@ -264,34 +263,6 @@ const App: React.FC = () => {
     showNotification,
     t,
   });
-
-  const handleBeforeCloseTab = useCallback(
-    async (tabId: string): Promise<boolean> => {
-      const state = useAppStore.getState();
-      if (tabId === state.activeTabId) {
-        if (state.hasUnsavedChanges(tabId)) {
-          return forceSave(undefined, { trigger: "system" });
-        }
-        return true;
-      }
-      return saveOpenTabIfDirty(tabId);
-    },
-    [forceSave, saveOpenTabIfDirty],
-  );
-
-  const handleBeforeCloseOtherTabs = useCallback(
-    async (keepFileId: string): Promise<boolean> => {
-      const tabs = useAppStore.getState().openTabs;
-      let allSaved = true;
-      for (const tabId of tabs) {
-        if (tabId === keepFileId) continue;
-        const saved = await handleBeforeCloseTab(tabId);
-        if (!saved) allSaved = false;
-      }
-      return allSaved;
-    },
-    [handleBeforeCloseTab],
-  );
 
   const activeFile = activeTabId
     ? findFileInTree(files, activeTabId)
@@ -522,12 +493,9 @@ const App: React.FC = () => {
 
   const handleSwitchKnowledgeBase = useCallback(async () => {
     const state = useAppStore.getState();
-    for (const tabId of state.openTabs) {
-      if (!state.hasUnsavedChanges(tabId)) continue;
-      const saved =
-        tabId === state.activeTabId
-          ? await forceSave(undefined, { trigger: "system" })
-          : await saveOpenTabIfDirty(tabId);
+    const tabId = state.activeTabId;
+    if (tabId && state.hasUnsavedChanges(tabId)) {
+      const saved = await forceSave(undefined, { trigger: "system" });
       if (!saved) {
         showNotification(
           t("notifications_switchKnowledgeBaseSaveFailed"),
@@ -537,7 +505,7 @@ const App: React.FC = () => {
       }
     }
     await openDirectory();
-  }, [openDirectory, forceSave, saveOpenTabIfDirty, showNotification, t]);
+  }, [openDirectory, forceSave, showNotification, t]);
 
   const handleOpenPublishDialog = useCallback(() => {
     if (isPreviewOnlyActiveFile) {
@@ -815,12 +783,6 @@ const App: React.FC = () => {
                 setIsShareLongImageDialogOpen(true);
               }}
               isPreviewOnlyFile={isPreviewOnlyActiveFile}
-            />
-
-            <TabBar
-              onToggleSidebar={() => setSidebarOpen(true)}
-              onBeforeCloseTab={handleBeforeCloseTab}
-              onBeforeCloseOtherTabs={handleBeforeCloseOtherTabs}
             />
 
             <div className="flex-1 min-w-0 flex overflow-hidden relative">

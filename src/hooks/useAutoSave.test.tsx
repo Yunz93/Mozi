@@ -196,7 +196,7 @@ describe("useAutoSave", () => {
     expect(useAppStore.getState().isSaving).toBe(false);
   });
 
-  it("auto-saves the previous tab when switching away before the debounce", async () => {
+  it("replaces the open document buffer when opening another file", async () => {
     const NOTE_B = "/vault/other.md";
     const base = useAppStore.getState();
 
@@ -215,38 +215,34 @@ describe("useAutoSave", () => {
           type: "file",
         },
       ],
-      openTabs: [NOTE_ID, NOTE_B],
+      openTabs: [NOTE_ID],
       activeTabId: NOTE_ID,
       currentFilePath: NOTE_ID,
       fileContents: {
         [NOTE_ID]: "edited locally",
-        [NOTE_B]: "other",
       },
       lastSavedContent: {
         [NOTE_ID]: "original",
-        [NOTE_B]: "other",
       },
       settings: { ...base.settings, autoSaveInterval: 60_000 },
     });
 
     render(<Harness debounceMs={60_000} />);
 
-    writeFile.mockClear();
-
     await act(async () => {
-      useAppStore.getState().setActiveTab(NOTE_B);
+      expect(useAppStore.getState().hasUnsavedChanges(NOTE_ID)).toBe(true);
+      // Open paths flush before replace; addTab itself keeps only the new buffer.
+      useAppStore.getState().addTab(NOTE_B, "other");
+      useAppStore.getState().markAsSaved(NOTE_B, "other");
       await Promise.resolve();
     });
 
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, "edited locally");
-    expect(useAppStore.getState().hasUnsavedChanges(NOTE_ID)).toBe(false);
+    expect(useAppStore.getState().activeTabId).toBe(NOTE_B);
+    expect(useAppStore.getState().openTabs).toEqual([NOTE_B]);
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBeUndefined();
   });
 
-  it("auto-saves after switching back to a tab with unsaved edits", async () => {
+  it("ignores content updates for a document that is not open", async () => {
     const NOTE_B = "/vault/other.md";
     const base = useAppStore.getState();
 
@@ -265,15 +261,13 @@ describe("useAutoSave", () => {
           type: "file",
         },
       ],
-      openTabs: [NOTE_ID, NOTE_B],
-      activeTabId: NOTE_ID,
-      currentFilePath: NOTE_ID,
+      openTabs: [NOTE_B],
+      activeTabId: NOTE_B,
+      currentFilePath: NOTE_B,
       fileContents: {
-        [NOTE_ID]: "original",
         [NOTE_B]: "other",
       },
       lastSavedContent: {
-        [NOTE_ID]: "original",
         [NOTE_B]: "other",
       },
       settings: { ...base.settings, autoSaveInterval: 1000 },
@@ -281,15 +275,8 @@ describe("useAutoSave", () => {
 
     render(<Harness debounceMs={1000} />);
 
-    // Switch away (no dirty flush), then edit A while it is inactive via store,
-    // then switch back so the active-tab debounce path saves it.
     act(() => {
-      useAppStore.getState().setActiveTab(NOTE_B);
-    });
-
-    act(() => {
-      useAppStore.getState().updateTabContent(NOTE_ID, "edited while inactive");
-      useAppStore.getState().setActiveTab(NOTE_ID);
+      useAppStore.getState().updateTabContent(NOTE_ID, "edited while closed");
     });
 
     writeFile.mockClear();
@@ -298,10 +285,11 @@ describe("useAutoSave", () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
 
-    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, "edited while inactive");
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBeUndefined();
   });
 
-  it("marks the original tab saved when an in-flight save completes after switching tabs", async () => {
+  it("keeps the open document stable when an in-flight save completes after replace", async () => {
     const NOTE_B = "/vault/other.md";
     const base = useAppStore.getState();
 
@@ -320,16 +308,14 @@ describe("useAutoSave", () => {
           type: "file",
         },
       ],
-      openTabs: [NOTE_ID, NOTE_B],
+      openTabs: [NOTE_ID],
       activeTabId: NOTE_ID,
       currentFilePath: NOTE_ID,
       fileContents: {
         [NOTE_ID]: "tab-a",
-        [NOTE_B]: "tab-b",
       },
       lastSavedContent: {
         [NOTE_ID]: "tab-a",
-        [NOTE_B]: "tab-b",
       },
       settings: { ...base.settings, autoSaveInterval: 60_000 },
     });
@@ -358,7 +344,8 @@ describe("useAutoSave", () => {
       const promise = saveHook!.forceSave(undefined, { trigger: "manual" });
       await Promise.resolve();
       act(() => {
-        useAppStore.getState().setActiveTab(NOTE_B);
+        useAppStore.getState().addTab(NOTE_B, "tab-b");
+        useAppStore.getState().markAsSaved(NOTE_B, "tab-b");
         useAppStore.getState().setCurrentFilePath(NOTE_B);
       });
       resolveWrite?.();
@@ -367,12 +354,11 @@ describe("useAutoSave", () => {
 
     await pendingSave;
 
-    expect(useAppStore.getState().lastSavedContent[NOTE_B]).toBe("tab-b");
+    expect(useAppStore.getState().activeTabId).toBe(NOTE_B);
     expect(useAppStore.getState().fileContents[NOTE_B]).toBe("tab-b");
-    expect(useAppStore.getState().lastSavedContent[NOTE_ID]).toBe(
-      "tab-a-edited",
-    );
-    expect(useAppStore.getState().fileContents[NOTE_ID]).toBe("tab-a-edited");
+    expect(useAppStore.getState().lastSavedContent[NOTE_B]).toBe("tab-b");
+    // Previous buffer is replaced; in-flight save should not resurrect it.
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBeUndefined();
   });
 
   it("drains a queued manual save after an in-flight save completes", async () => {
