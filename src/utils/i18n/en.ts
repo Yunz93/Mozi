@@ -138,18 +138,22 @@ export default {
     "Open a note first to use current folder / current note scope.",
   askVault_placeholder:
     "Ask in natural language, e.g. What was the last conclusion about the release process?",
-  askVault_retrieve: "Retrieve snippets",
+  askVault_retrieve: "Retrieve only",
   askVault_retrieving: "Retrieving…",
   askVault_ask: "Generate answer",
   askVault_asking: "Generating…",
+  askVault_retrieveHint:
+    "Retrieve snippets without calling AI — review sources first if you want.",
   askVault_toggleSources: "Show snippets to send",
   askVault_sourcesPreview: "Snippets to send",
   askVault_sourcesTab: "Sources",
   askVault_sourcesHint:
-    "Review these snippets, then click Generate. They will be sent to your configured AI.",
-  askVault_sourcesEmpty: "Retrieve snippets first — results appear here.",
+    "These snippets are sent as AI context. Or click Generate answer to retrieve and answer in one step.",
+  askVault_sourcesEmpty:
+    "After Generate answer or Retrieve only, matching snippets appear here.",
   askVault_answer: "Answer",
-  askVault_answerEmpty: "Answers appear here after generation. Retrieve first.",
+  askVault_answerEmpty:
+    "Type a question and click Generate answer (Cmd/Ctrl+Enter).",
   askVault_insert: "Insert into current note (confirm required)",
   askVault_insertNeedsNote: "Open a note before inserting.",
   askVault_citations: "Citations",
