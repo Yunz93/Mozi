@@ -28,7 +28,6 @@ import { requestVaultLinkIndexRebuild } from "../../services/vault/linkIndexEven
 import type { AskVaultCitation } from "../../types/vaultIndex";
 import type { RetrieveHit } from "../../types/vaultIndex";
 import type { FileNode } from "../../types";
-import { findFileInTree } from "../../utils/fileTree";
 import { AppSelect } from "../ui/AppSelect";
 import { LAYOUT, clamp, getStoredPanelWidth } from "../../config/layout";
 
@@ -43,22 +42,6 @@ type AskScope = "vault" | "folder" | "files";
 type PrimaryTab = "ask" | "history";
 type SecondaryTab = "answer" | "sources";
 
-function hitPathStillExists(files: FileNode[], path: string): boolean {
-  if (findFileInTree(files, path)) return true;
-  const norm = path.replace(/\\/g, "/").toLowerCase();
-  const stack = [...files];
-  while (stack.length) {
-    const node = stack.pop()!;
-    if (
-      node.type === "file" &&
-      node.path.replace(/\\/g, "/").toLowerCase() === norm
-    ) {
-      return true;
-    }
-    if (node.children?.length) stack.push(...node.children);
-  }
-  return false;
-}
 function isAiConfigured(settings: {
   aiProvider?: string;
   geminiApiKey?: string;
@@ -253,6 +236,28 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     [question, scope, currentFilePath],
   );
 
+  const ensureAskConfig = useCallback(
+    async (activeSettings: typeof settings) => {
+      try {
+        const { ensureAIConfiguration } =
+          await import("../../services/aiService");
+        ensureAIConfiguration(activeSettings);
+        return true;
+      } catch (error) {
+        showNotification(
+          error instanceof Error
+            ? localizeKnownError(language, error.message)
+            : t("notifications_aiConfigFirst"),
+          "error",
+        );
+        setSettingsOpen(true, "ai");
+        return false;
+      }
+    },
+    [language, showNotification, setSettingsOpen, t],
+  );
+
+  /** Optional: preview snippets without calling the chat model. */
   const handleRetrieve = useCallback(async () => {
     const trimmed = question.trim();
     if (!trimmed || !rootFolderPath || !canAsk || scopeBlocked) return;
@@ -263,20 +268,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     setPrimaryTab("ask");
     try {
       const activeSettings = await resolveHydratedSettings();
-      try {
-        const { ensureAIConfiguration } =
-          await import("../../services/aiService");
-        ensureAIConfiguration(activeSettings);
-      } catch (error) {
-        showNotification(
-          error instanceof Error
-            ? localizeKnownError(language, error.message)
-            : t("notifications_aiConfigFirst"),
-          "error",
-        );
-        setSettingsOpen(true, "ai");
-        return;
-      }
+      if (!(await ensureAskConfig(activeSettings))) return;
 
       const hits = await retrieveAskVaultHits(buildRequest(activeSettings));
       setPendingHits(hits);
@@ -302,6 +294,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     canAsk,
     scopeBlocked,
     resolveHydratedSettings,
+    ensureAskConfig,
     buildRequest,
     language,
     showNotification,
@@ -309,31 +302,42 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     t,
   ]);
 
-  const handleGenerate = useCallback(async () => {
+  /**
+   * One-click ask: always retrieve fresh snippets, then generate.
+   * Use「仅检索」when you only want to preview sources first.
+   */
+  const handleAsk = useCallback(async () => {
     const trimmed = question.trim();
-    if (!trimmed || !rootFolderPath || pendingHits.length === 0) return;
+    if (!trimmed || !rootFolderPath || !canAsk || scopeBlocked) return;
 
-    const files = useAppStore.getState().files;
-    const freshHits = pendingHits.filter((hit) =>
-      hitPathStillExists(files, hit.chunk.path),
-    );
-    if (freshHits.length === 0) {
-      setPendingHits([]);
-      showNotification(t("askVault_sourcesStale"), "info");
-      return;
-    }
-    if (freshHits.length !== pendingHits.length) {
-      setPendingHits(freshHits);
-      showNotification(t("askVault_sourcesRefreshed"), "info");
-    }
-
-    setGenerating(true);
     setPrimaryTab("ask");
+    setGenerating(true);
+    setRetrieving(true);
+    setAnswerMarkdown("");
+    setCitations([]);
+
     try {
       const activeSettings = await resolveHydratedSettings();
+      if (!(await ensureAskConfig(activeSettings))) return;
+
+      let hits: RetrieveHit[] = [];
+      try {
+        hits = await retrieveAskVaultHits(buildRequest(activeSettings));
+        setPendingHits(hits);
+        setPreviewSnippets(hitsToPreviewSnippets(hits));
+      } finally {
+        setRetrieving(false);
+      }
+
+      if (hits.length === 0) {
+        setSecondaryTab("sources");
+        showNotification(t("askVault_noHits"), "info");
+        return;
+      }
+
       const result = await answerAskVaultFromHits(
         trimmed,
-        freshHits,
+        hits,
         activeSettings,
       );
       setAnswerMarkdown(result.answerMarkdown);
@@ -357,13 +361,17 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       );
       setSettingsOpen(true, "ai");
     } finally {
+      setRetrieving(false);
       setGenerating(false);
     }
   }, [
     question,
     rootFolderPath,
-    pendingHits,
+    canAsk,
+    scopeBlocked,
     resolveHydratedSettings,
+    ensureAskConfig,
+    buildRequest,
     language,
     showNotification,
     setSettingsOpen,
@@ -706,7 +714,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
               onKeyDown={(event) => {
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                   event.preventDefault();
-                  void handleRetrieve();
+                  void handleAsk();
                 }
               }}
             />
@@ -715,22 +723,23 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                 type="button"
                 className="ask-vault-primary"
                 disabled={!canAsk || !question.trim() || scopeBlocked}
-                onClick={() => void handleRetrieve()}
+                onClick={() => void handleAsk()}
               >
-                {retrieving ? t("askVault_retrieving") : t("askVault_retrieve")}
+                {retrieving
+                  ? t("askVault_retrieving")
+                  : generating
+                    ? t("askVault_asking")
+                    : t("askVault_ask")}
               </button>
               <button
                 type="button"
-                className="ask-vault-primary"
-                disabled={
-                  generating ||
-                  retrieving ||
-                  pendingHits.length === 0 ||
-                  !aiReady
-                }
-                onClick={() => void handleGenerate()}
+                disabled={!canAsk || !question.trim() || scopeBlocked}
+                onClick={() => void handleRetrieve()}
+                title={t("askVault_retrieveHint")}
               >
-                {generating ? t("askVault_asking") : t("askVault_ask")}
+                {retrieving && !generating
+                  ? t("askVault_retrieving")
+                  : t("askVault_retrieve")}
               </button>
             </div>
           </div>
