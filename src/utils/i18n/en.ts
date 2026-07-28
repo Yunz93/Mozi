@@ -962,10 +962,6 @@ export default {
 
   editor_emptyState: "Select a file to start editing",
   editor_placeholder: "Start writing...",
-  editor_livePreviewHeavyFileMode:
-    "Large-file optimization: tables, callouts, and Mermaid show placeholders.",
-  editor_livePreviewLargeFileMode:
-    "Very large file mode: math, images, and wiki Live widgets are off; source remains editable.",
   table_cellHint:
     "Right-click to add/delete rows or columns; Tab/Enter to navigate",
   table_insertRowAbove: "Insert row above",

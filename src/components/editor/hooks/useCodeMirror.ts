@@ -40,13 +40,6 @@ import {
   createEditorPreferenceCompartments,
   type EditorPreferenceOptions,
 } from "./editorPreferenceExtensions";
-import {
-  createLivePreviewContextExtension,
-  createLivePreviewPluginExtensions,
-} from "../livePreview";
-import type { LivePreviewContext } from "../livePreview";
-import { EMPTY_LIVE_PREVIEW_CONTEXT } from "../livePreview";
-import { scheduleLivePreviewMeasure } from "../livePreview/shared";
 
 export { getEditorTooltipSpace };
 
@@ -62,9 +55,6 @@ export interface UseCodeMirrorOptions {
   orderedListMode?: OrderedListMode;
   /** 与 html.dark / 应用主题一致，供补全浮层等 CodeMirror 主题作用域使用 */
   themeMode?: ThemeMode;
-  /** Obsidian-style inline live preview (hide marks when inactive). */
-  livePreviewEnabled?: boolean;
-  livePreviewContext?: LivePreviewContext;
   autoPairBrackets?: boolean;
   autoPairMarkdown?: boolean;
   showLineNumbers?: boolean;
@@ -114,8 +104,6 @@ export function useCodeMirror(
     wordWrap = true,
     orderedListMode = "strict",
     themeMode = "light",
-    livePreviewEnabled = false,
-    livePreviewContext = EMPTY_LIVE_PREVIEW_CONTEXT,
     autoPairBrackets = DEFAULT_PREFERENCES.autoPairBrackets,
     autoPairMarkdown = DEFAULT_PREFERENCES.autoPairMarkdown,
     showLineNumbers = DEFAULT_PREFERENCES.showLineNumbers,
@@ -184,8 +172,6 @@ export function useCodeMirror(
       keymap: new Compartment(),
       darkTheme: new Compartment(),
       markdown: new Compartment(),
-      livePreview: new Compartment(),
-      livePreviewContext: new Compartment(),
     }),
     [],
   );
@@ -227,39 +213,6 @@ export function useCodeMirror(
       ),
     });
   }, [compartments.wrap, wordWrap]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const scrollTop = view.scrollDOM.scrollTop;
-    view.dispatch({
-      effects: compartments.livePreview.reconfigure(
-        livePreviewEnabled ? createLivePreviewPluginExtensions() : [],
-      ),
-    });
-    // Remounting widgets changes document height; keep the user's place.
-    view.scrollDOM.scrollTop = scrollTop;
-    if (livePreviewEnabled) {
-      scheduleLivePreviewMeasure(view);
-      if (typeof document !== "undefined" && document.fonts?.ready) {
-        void document.fonts.ready.then(() => {
-          if (viewRef.current === view && view.dom.isConnected) {
-            scheduleLivePreviewMeasure(view);
-          }
-        });
-      }
-    }
-  }, [compartments.livePreview, livePreviewEnabled]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    view.dispatch({
-      effects: compartments.livePreviewContext.reconfigure(
-        createLivePreviewContextExtension(livePreviewContext),
-      ),
-    });
-  }, [compartments.livePreviewContext, livePreviewContext]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -433,8 +386,6 @@ export function useCodeMirror(
         orderedListMode,
         wordWrap,
         placeholder,
-        livePreviewEnabled,
-        livePreviewContext,
         preferences,
         compartments,
         preferenceCompartments,
@@ -557,12 +508,6 @@ export function useCodeMirror(
           compartments.wrap.reconfigure(
             wordWrap ? EditorView.lineWrapping : [],
           ),
-          compartments.livePreview.reconfigure(
-            livePreviewEnabled ? createLivePreviewPluginExtensions() : [],
-          ),
-          compartments.livePreviewContext.reconfigure(
-            createLivePreviewContextExtension(livePreviewContext),
-          ),
           compartments.keymap.reconfigure(
             Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
           ),
@@ -630,16 +575,12 @@ export function useCodeMirror(
     documentKey,
     compartments.darkTheme,
     compartments.wrap,
-    compartments.livePreview,
-    compartments.livePreviewContext,
     compartments.keymap,
     compartments.placeholder,
     preferenceCompartments,
     preferences,
     themeMode,
     wordWrap,
-    livePreviewEnabled,
-    livePreviewContext,
     orderedListMode,
     placeholder,
   ]);
