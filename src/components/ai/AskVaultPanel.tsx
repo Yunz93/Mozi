@@ -28,7 +28,6 @@ import { requestVaultLinkIndexRebuild } from "../../services/vault/linkIndexEven
 import type { AskVaultCitation } from "../../types/vaultIndex";
 import type { RetrieveHit } from "../../types/vaultIndex";
 import type { FileNode } from "../../types";
-import { findFileInTree } from "../../utils/fileTree";
 import { AppSelect } from "../ui/AppSelect";
 import { LAYOUT, clamp, getStoredPanelWidth } from "../../config/layout";
 
@@ -43,22 +42,6 @@ type AskScope = "vault" | "folder" | "files";
 type PrimaryTab = "ask" | "history";
 type SecondaryTab = "answer" | "sources";
 
-function hitPathStillExists(files: FileNode[], path: string): boolean {
-  if (findFileInTree(files, path)) return true;
-  const norm = path.replace(/\\/g, "/").toLowerCase();
-  const stack = [...files];
-  while (stack.length) {
-    const node = stack.pop()!;
-    if (
-      node.type === "file" &&
-      node.path.replace(/\\/g, "/").toLowerCase() === norm
-    ) {
-      return true;
-    }
-    if (node.children?.length) stack.push(...node.children);
-  }
-  return false;
-}
 function isAiConfigured(settings: {
   aiProvider?: string;
   geminiApiKey?: string;
