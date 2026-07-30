@@ -1089,3 +1089,147 @@
     --pane-sheet-max-width: 920px;
   }
 }
+
+/* Live markdown table overlay */
+.editor-pane-layout .mp-live-table-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.55em 0 0.85em;
+  padding: 0.45rem 0.55rem 0.55rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  background: color-mix(
+    in srgb,
+    var(--mp-doc-code-bg, #f8fafc) 72%,
+    transparent
+  );
+  box-sizing: border-box;
+}
+
+.dark .editor-pane-layout .mp-live-table-wrap {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: color-mix(in srgb, rgba(15, 23, 42, 0.9) 80%, transparent);
+}
+
+.editor-pane-layout .mp-live-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.45rem;
+}
+
+.editor-pane-layout .mp-live-table-tool-btn {
+  appearance: none;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.78);
+  color: #334155;
+  border-radius: 6px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.dark .editor-pane-layout .mp-live-table-tool-btn {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+}
+
+.editor-pane-layout .mp-live-table-tool-btn:hover {
+  border-color: rgba(59, 130, 246, 0.55);
+  color: #1d4ed8;
+}
+
+.dark .editor-pane-layout .mp-live-table-tool-btn:hover {
+  color: #93c5fd;
+}
+
+.editor-pane-layout .mp-live-table-hint {
+  margin-left: 0.25rem;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.editor-pane-layout .mp-live-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: inherit;
+  line-height: 1.45;
+}
+
+.editor-pane-layout .mp-live-table-cell {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 0.35rem 0.55rem;
+  min-width: 3.5rem;
+  vertical-align: top;
+  outline: none;
+  background: rgba(255, 255, 255, 0.72);
+  color: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dark .editor-pane-layout .mp-live-table-cell {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.35);
+}
+
+.editor-pane-layout .mp-live-table thead .mp-live-table-cell {
+  font-weight: 650;
+  background: rgba(241, 245, 249, 0.95);
+}
+
+.dark .editor-pane-layout .mp-live-table thead .mp-live-table-cell {
+  background: rgba(30, 41, 59, 0.85);
+}
+
+.editor-pane-layout .mp-live-table-cell:focus {
+  border-color: rgba(59, 130, 246, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
+}
+
+.mp-live-table-menu {
+  position: fixed;
+  z-index: 180;
+  min-width: 180px;
+  padding: 0.35rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.dark .mp-live-table-menu {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.mp-live-table-menu-item {
+  display: block;
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.85rem;
+  color: #334155;
+  cursor: pointer;
+}
+
+.dark .mp-live-table-menu-item {
+  color: #e2e8f0;
+}
+
+.mp-live-table-menu-item:hover {
+  background: rgba(148, 163, 184, 0.16);
+}
