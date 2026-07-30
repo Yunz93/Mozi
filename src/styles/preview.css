@@ -705,11 +705,11 @@
 }
 
 .preview-pane-document.markdown-body table {
-  display: block;
-  width: max-content;
+  display: table;
+  width: 100%;
   max-width: 100%;
-  overflow-x: auto;
   border-collapse: collapse;
+  table-layout: auto;
   color: var(--mp-doc-text, #1f2937);
 }
 

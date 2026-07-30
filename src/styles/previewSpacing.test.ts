@@ -134,4 +134,18 @@ describe("preview spacing CSS", () => {
       /\.preview-pane-document\.markdown-body h6\s*\{[^}]*font-size:\s*0\.9em;/m,
     );
   });
+
+  it("makes preview tables fill the document width by default", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "src/styles/preview.css"),
+      "utf8",
+    );
+
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body table\s*\{[^}]*display:\s*table;[^}]*width:\s*100%;[^}]*max-width:\s*100%;/m,
+    );
+    expect(css).not.toMatch(
+      /\.preview-pane-document\.markdown-body table\s*\{[^}]*width:\s*max-content;/m,
+    );
+  });
 });
