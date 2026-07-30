@@ -292,6 +292,10 @@ export const Icons = {
     >
       <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
       <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+      <path d="M5 8h3" />
+      <path d="M5 11h3" />
+      <path d="M16 8h3" />
+      <path d="M16 11h3" />
     </svg>
   ),
 
@@ -304,9 +308,24 @@ export const Icons = {
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
       <line x1="12" y1="3" x2="12" y2="21" />
+      <line x1="5.5" y1="8" x2="9.5" y2="8" />
+      <line x1="5.5" y1="12" x2="9.5" y2="12" />
+      <line x1="5.5" y1="16" x2="8.5" y2="16" />
+      <rect
+        x="13.5"
+        y="7"
+        width="5.5"
+        height="10"
+        rx="1"
+        fill="currentColor"
+        stroke="none"
+        opacity="0.4"
+      />
     </svg>
   ),
 
