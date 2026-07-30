@@ -69,7 +69,7 @@
       "endpoints": [
         "https://github.com/Yunz93/markdown-press/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZEMEVEREM2QTJGQTYxQUYKUldTdllmcWl4dDBPYlhXY3l5dGdtNHVLYWVNWjFjRTQ5OFBqSSt0d3g2eWZjNkNGdHNEK05ZR2UK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE3M0ZBRkZFQUUzNUFCNzMKUldSenF6V3UvcTgvRjMwZTdUbVp6ajMxVWNsZW9lRXJHRTVSNFRyM05ZbTJjSk5iWUNUOEVxR0UK",
       "windows": {
         "installMode": "passive"
       }
