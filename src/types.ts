@@ -190,6 +190,8 @@ export interface AppSettings {
   fontSize: number;
   wordWrap: boolean;
   formatMarkdownOnManualSave: boolean;
+  /** When true, manual/system saves refresh frontmatter update-time fields. */
+  refreshFrontmatterOnSave: boolean;
   autoPairBrackets: boolean;
   autoPairMarkdown: boolean;
   readableLineLength: boolean;

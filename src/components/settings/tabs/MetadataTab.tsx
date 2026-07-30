@@ -106,6 +106,39 @@ export const MetadataTab: React.FC<MetadataTabProps> = ({
 
   return (
     <div className="space-y-6 animate-fade-in-02s">
+      <div className="flex items-center justify-between">
+        <div className="pr-4">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t("settings_refreshFrontmatterOnSave")}
+          </label>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t("settings_refreshFrontmatterOnSaveDesc")}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            onUpdateSettings({
+              refreshFrontmatterOnSave: !settings.refreshFrontmatterOnSave,
+            })
+          }
+          className={`w-10 h-6 rounded-full transition-colors duration-200 relative shrink-0 ${
+            settings.refreshFrontmatterOnSave
+              ? "bg-green-500"
+              : "bg-gray-200 dark:bg-gray-700"
+          }`}
+          aria-pressed={settings.refreshFrontmatterOnSave}
+        >
+          <span
+            className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 shadow-sm ${
+              settings.refreshFrontmatterOnSave
+                ? "translate-x-4"
+                : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+
       <div>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="min-w-0">

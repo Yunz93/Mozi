@@ -157,6 +157,38 @@ describe("useAutoSave", () => {
     expect(useAppStore.getState().isSaving).toBe(false);
   });
 
+  it("skips frontmatter update-time refresh when refreshFrontmatterOnSave is off", async () => {
+    vi.setSystemTime(new Date("2026-05-11T12:34:56.000Z"));
+
+    const doc = setupDocumentWithUpdateTime();
+    const edited = `${doc}\n\nEdited`;
+    useAppStore.setState((state) => ({
+      fileContents: { ...state.fileContents, [NOTE_ID]: edited },
+      settings: { ...state.settings, refreshFrontmatterOnSave: false },
+    }));
+
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    writeFile.mockClear();
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "manual" });
+    });
+
+    expect(writeFile).toHaveBeenCalledTimes(1);
+    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, edited);
+    expect(edited).toContain("date modified: 2020-01-01 00:00:00");
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBe(edited);
+    expect(useAppStore.getState().isSaving).toBe(false);
+  });
+
   it("queues a single auto follow-up save when the user edits during manual save", async () => {
     setupStore(60_000);
     let saveHook: ReturnType<typeof useAutoSave>;

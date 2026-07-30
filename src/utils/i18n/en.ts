@@ -667,6 +667,9 @@ export default {
   settings_seconds: "{count} s",
   settings_minutes: "{count} min",
 
+  settings_refreshFrontmatterOnSave: "Auto-fill on save",
+  settings_refreshFrontmatterOnSaveDesc:
+    "On manual save, automatically refresh frontmatter update-time fields (such as date modified / update_time). Auto-save does not trigger this.",
   settings_metadataTemplate: "Metadata Template",
   settings_metadataTemplateDesc:
     "Fields added to frontmatter when creating a new file.",

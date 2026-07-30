@@ -620,6 +620,9 @@ export default {
   settings_seconds: "{count} 秒",
   settings_minutes: "{count} 分钟",
 
+  settings_refreshFrontmatterOnSave: "保存时自动填充",
+  settings_refreshFrontmatterOnSaveDesc:
+    "手动保存时自动更新 frontmatter 中的修改时间字段（如 date modified / update_time）。自动保存不会触发。",
   settings_metadataTemplate: "元数据模板",
   settings_metadataTemplateDesc: "创建新文件时添加到 frontmatter 的属性。",
   settings_addField: "添加字段",
