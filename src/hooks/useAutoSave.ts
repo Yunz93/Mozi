@@ -329,10 +329,13 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
             })
           : currentContent;
 
-        contentToSave =
-          options?.trigger === "auto"
-            ? preparedContent
-            : refreshDocumentUpdateTime(preparedContent);
+        const shouldRefreshFrontmatter =
+          options?.trigger !== "auto" &&
+          settings.refreshFrontmatterOnSave !== false;
+
+        contentToSave = shouldRefreshFrontmatter
+          ? refreshDocumentUpdateTime(preparedContent)
+          : preparedContent;
 
         // Check if content has changed (compare post-transform payload for manual saves)
         if (contentToSave === lastSavedContentRef.current) {
@@ -472,6 +475,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       retryDelayMs,
       settings.orderedListMode,
       settings.language,
+      settings.refreshFrontmatterOnSave,
     ],
   );
 
