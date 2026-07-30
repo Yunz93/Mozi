@@ -764,6 +764,32 @@
   margin-bottom: 0;
 }
 
+.ask-vault-inline-cite {
+  display: inline;
+  margin: 0 0.05em;
+  padding: 0 0.15em;
+  border-radius: 0.3em;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ask-vault-inline-cite:hover {
+  background: rgba(37, 99, 235, 0.1);
+  text-decoration: none;
+}
+
+.dark .ask-vault-inline-cite {
+  color: #93c5fd;
+}
+
+.dark .ask-vault-inline-cite:hover {
+  background: rgba(147, 197, 253, 0.14);
+}
+
 .ask-vault-sources-preview pre {
   margin: 0;
   padding: 8px 10px;

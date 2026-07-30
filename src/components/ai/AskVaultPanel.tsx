@@ -20,6 +20,10 @@ import { hydrateSensitiveSettingsIntoStore } from "../../services/secureSettings
 import { localizeKnownError } from "../../utils/i18n";
 import { renderMarkdown } from "../../utils/markdown";
 import {
+  normalizeAskVaultCitationMarkers,
+  renderAskVaultAnswerHtml,
+} from "../../utils/askVaultAnswerCitations";
+import {
   getActiveEditorSelection,
   requestEditorRangeFocus,
 } from "../../utils/editorSelectionBridge";
@@ -142,10 +146,12 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
 
   const answerHtml = useMemo(() => {
     if (!answerMarkdown.trim()) return "";
-    return renderMarkdown(answerMarkdown, {
-      themeMode: settings.themeMode,
-      markdownStylePreset: settings.markdownStylePreset,
-    });
+    return renderAskVaultAnswerHtml(answerMarkdown, (markdown) =>
+      renderMarkdown(markdown, {
+        themeMode: settings.themeMode,
+        markdownStylePreset: settings.markdownStylePreset,
+      }),
+    );
   }, [answerMarkdown, settings.themeMode, settings.markdownStylePreset]);
 
   useEffect(() => {
@@ -340,7 +346,9 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         hits,
         activeSettings,
       );
-      setAnswerMarkdown(result.answerMarkdown);
+      setAnswerMarkdown(
+        normalizeAskVaultCitationMarkers(result.answerMarkdown),
+      );
       setCitations(result.citations);
       setSecondaryTab("answer");
 
@@ -450,7 +458,9 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
 
   const restoreHistoryItem = useCallback((item: AskVaultHistoryItem) => {
     setQuestion(item.question);
-    setAnswerMarkdown(item.answer.answerMarkdown);
+    setAnswerMarkdown(
+      normalizeAskVaultCitationMarkers(item.answer.answerMarkdown),
+    );
     setCitations(item.answer.citations);
     setPreviewSnippets(
       item.answer.citations.map(
@@ -461,6 +471,23 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     setPrimaryTab("ask");
     setSecondaryTab("answer");
   }, []);
+
+  const handleAnswerClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = (event.target as HTMLElement | null)?.closest(
+        "[data-ask-cite]",
+      ) as HTMLElement | null;
+      if (!target) return;
+      event.preventDefault();
+      const index = Number(target.dataset.askCite);
+      if (!Number.isFinite(index)) return;
+      const citation = citations.find((item) => item.index === index);
+      if (citation) {
+        void handleOpenCitation(citation);
+      }
+    },
+    [citations, handleOpenCitation],
+  );
 
   if (!open) return null;
 
@@ -627,6 +654,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                     <div
                       className="ask-vault-answer-body markdown-body"
                       dangerouslySetInnerHTML={{ __html: answerHtml }}
+                      onClick={handleAnswerClick}
                     />
                     <div className="ask-vault-actions">
                       <button
