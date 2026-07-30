@@ -15,6 +15,7 @@ import {
   isBlankLine,
   getLeadingIndent,
   getIndentUnit,
+  getMarkdownListHangPrefixCharCount,
 } from "./core";
 import {
   type ListItemInfo,
@@ -83,6 +84,33 @@ function getListContentStartColumn(item: ListItemInfo): number {
   const quoteLength = item.quotePrefix?.length ?? 0;
   const markerText = getMarkerText(item);
   return quoteLength + item.indent.length + markerText.length + 1;
+}
+
+/**
+ * 按「实际行文本」计算正文起点。formatListItem 后若把 Tab 展开成空格，
+ * newItem.indent.length 会与 newText 不一致，必须解析/测量最终文本。
+ */
+function getListContentStartColumnFromText(lineText: string): number {
+  const hang = getMarkdownListHangPrefixCharCount(lineText);
+  if (hang !== null) {
+    return hang;
+  }
+
+  const item = parseListItem(lineText, 1, 0);
+  if (item) {
+    return getListContentStartColumn(item);
+  }
+
+  return 0;
+}
+
+/** 格式化列表行，并把缩进里的 Tab 展开成当前 indentUnit，避免结构与文本漂移。 */
+function formatListItemText(item: ListItemInfo, indentUnit: string): string {
+  const normalized: ListItemInfo = {
+    ...item,
+    indent: item.indent.replace(/\t/g, indentUnit),
+  };
+  return formatListItem(normalized).replace(/\t/g, indentUnit);
 }
 
 function getChildIndentForParent(
@@ -241,22 +269,27 @@ function getOutdentedOrderedItem(
 }
 
 function mapListCursorColumn(
-  oldItem: ListItemInfo,
-  newItem: ListItemInfo,
+  oldText: string,
   newText: string,
   oldColumn: number,
 ): number {
-  const oldContentStart = getListContentStartColumn(oldItem);
-  const newContentStart = getListContentStartColumn(newItem);
+  const oldContentStart = getListContentStartColumnFromText(oldText);
+  const newContentStart = getListContentStartColumnFromText(newText);
 
+  let nextColumn: number;
   if (oldColumn <= oldContentStart) {
-    return Math.min(newText.length, newContentStart);
+    // 原先在缩进/列表符上：落到正文起点（列表符后），方便继续输入
+    nextColumn = newContentStart;
+  } else {
+    nextColumn = newContentStart + (oldColumn - oldContentStart);
   }
 
-  return Math.min(
-    newText.length,
-    newContentStart + (oldColumn - oldContentStart),
-  );
+  // 最终文本若因 Tab→空格展开等与结构字段不一致，仍禁止停在列表符前
+  if (newContentStart > 0) {
+    nextColumn = Math.max(nextColumn, newContentStart);
+  }
+
+  return Math.min(newText.length, nextColumn);
 }
 
 function dispatchListItemLevelChanges(
@@ -300,12 +333,7 @@ function dispatchListItemLevelChanges(
           const oldColumn = range.from - line.from;
           return EditorSelection.cursor(
             newLineFrom +
-              mapListCursorColumn(
-                update.item,
-                update.newItem,
-                update.newText,
-                oldColumn,
-              ),
+              mapListCursorColumn(line.text, update.newText, oldColumn),
           );
         }),
         state.selection.mainIndex,
@@ -362,7 +390,7 @@ function outdentSelectedLine(
       item,
       findOutdentIndent(state, item),
     );
-    return formatListItem(newItem).replace(/\t/g, indentUnit);
+    return formatListItemText(newItem, indentUnit);
   }
 
   const indent = getLeadingIndent(lineText);
@@ -398,8 +426,8 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
         findOutdentIndent(state, item),
       );
       newItem.content = "";
-      const next = formatListItem(newItem);
-      const selectionColumn = getListContentStartColumn(newItem);
+      const next = formatListItemText(newItem, getIndentUnit(state));
+      const selectionColumn = getListContentStartColumnFromText(next);
       const initialChanges = { from: line.from, to: line.to, insert: next };
       const initialSelection = EditorSelection.cursor(
         line.from + selectionColumn,
@@ -457,8 +485,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
       number: nextNumber,
       content: "",
     };
-    const insert =
-      "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
+    const insert = "\n" + formatListItemText(newItem, getIndentUnit(state));
 
     dispatch(
       state.update({
@@ -479,8 +506,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
       checkbox,
       content: "",
     };
-    const insert =
-      "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
+    const insert = "\n" + formatListItemText(newItem, getIndentUnit(state));
 
     dispatch(
       state.update({
@@ -498,8 +524,7 @@ export const handleListEnter: StateCommand = ({ state, dispatch }): boolean => {
     ...item,
     content: "",
   };
-  const insert =
-    "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
+  const insert = "\n" + formatListItemText(newItem, getIndentUnit(state));
 
   dispatch(
     state.update({
@@ -531,8 +556,7 @@ export const handleOrderedListContinuationEnter: StateCommand = ({
     number: (parent.number ?? 1) + 1,
     content: "",
   };
-  const insert =
-    "\n" + formatListItem(newItem).replace(/\t/g, getIndentUnit(state));
+  const insert = "\n" + formatListItemText(newItem, getIndentUnit(state));
 
   dispatch(
     state.update({
@@ -748,7 +772,7 @@ export const handleListTab = (options?: {
             : undefined,
         });
         // Ensure output uses spaces only, replace any tabs with the editor indent unit.
-        const formatted = formatListItem(newItem).replace(/\t/g, indentUnit);
+        const formatted = formatListItemText(newItem, indentUnit);
         updates.push({ item, newItem, newText: formatted });
         plannedItems.set(item.lineNumber, newItem);
       }
@@ -815,7 +839,7 @@ export const handleListShiftTab = (options?: {
         updates.push({
           item,
           newItem,
-          newText: formatListItem(newItem).replace(/\t/g, getIndentUnit(state)),
+          newText: formatListItemText(newItem, getIndentUnit(state)),
         });
       }
 
