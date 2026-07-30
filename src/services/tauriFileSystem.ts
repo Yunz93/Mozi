@@ -160,8 +160,11 @@ export class TauriFileSystem implements IFileSystem {
     let normalized = content;
 
     if (targetLineEnding === "\r\n") {
-      normalized = normalized.replace(/\r?\n/g, "\r\n");
-    } else {
+      // Skip full-doc rewrite when there are no bare LFs left to convert.
+      if (/(?<!\r)\n/.test(normalized)) {
+        normalized = normalized.replace(/\r?\n/g, "\r\n");
+      }
+    } else if (normalized.includes("\r\n")) {
       normalized = normalized.replace(/\r\n/g, "\n");
     }
 

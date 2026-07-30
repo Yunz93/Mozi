@@ -164,43 +164,84 @@ export const SplitView: React.FC<SplitViewProps> = ({
   // Read view mode from the store inside the handler so it stays correct even when
   // useScrollSync's onScroll ref has not yet been updated after a view-mode change
   // (scroll events can fire before child useEffects run).
-  const handleEditorScroll = useCallback((percentage: number) => {
-    editorScrollPercentageRef.current = percentage;
-    // Outline/wiki heading jumps scroll both panes absolutely; percentage sync
-    // would yank the preview off the target chapter mid-jump.
-    if (isHeadingNavigationLocked()) {
-      return;
+  const pendingEditorSyncPctRef = useRef<number | null>(null);
+  const pendingPreviewSyncPctRef = useRef<number | null>(null);
+  const peerSyncRafRef = useRef<number | null>(null);
+
+  const flushPeerScrollSync = useCallback(() => {
+    peerSyncRafRef.current = null;
+    const editorPct = pendingEditorSyncPctRef.current;
+    const previewPct = pendingPreviewSyncPctRef.current;
+    pendingEditorSyncPctRef.current = null;
+    pendingPreviewSyncPctRef.current = null;
+
+    if (editorPct !== null) {
+      previewPaneRef.current?.syncScrollTo(editorPct, { immediate: true });
     }
-    const mode = useAppStore.getState().viewMode;
-    if (isEditorVisibleMode(mode)) {
-      previewScrollPercentageRef.current = percentage;
-    }
-    if (mode === ViewMode.SPLIT) {
-      scrollSyncSourceRef.current = "editor";
-      previewPaneRef.current?.syncScrollTo(percentage, { immediate: true });
+    if (previewPct !== null) {
+      editorPaneRef.current?.syncScrollTo(previewPct, { immediate: true });
     }
   }, []);
 
-  const handlePreviewScroll = useCallback((percentage: number) => {
-    if (scrollSyncSourceRef.current === "editor") {
-      scrollSyncSourceRef.current = null;
-      previewScrollPercentageRef.current = percentage;
-      return;
-    }
+  const schedulePeerScrollSync = useCallback(() => {
+    if (peerSyncRafRef.current !== null) return;
+    peerSyncRafRef.current = window.requestAnimationFrame(flushPeerScrollSync);
+  }, [flushPeerScrollSync]);
 
-    previewScrollPercentageRef.current = percentage;
-    if (isHeadingNavigationLocked()) {
-      return;
-    }
-    const mode = useAppStore.getState().viewMode;
-    if (isPreviewVisibleMode(mode)) {
+  useEffect(() => {
+    return () => {
+      if (peerSyncRafRef.current !== null) {
+        window.cancelAnimationFrame(peerSyncRafRef.current);
+        peerSyncRafRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleEditorScroll = useCallback(
+    (percentage: number) => {
       editorScrollPercentageRef.current = percentage;
-    }
-    if (mode === ViewMode.SPLIT) {
-      scrollSyncSourceRef.current = "preview";
-      editorPaneRef.current?.syncScrollTo(percentage, { immediate: true });
-    }
-  }, []);
+      // Outline/wiki heading jumps scroll both panes absolutely; percentage sync
+      // would yank the preview off the target chapter mid-jump.
+      if (isHeadingNavigationLocked()) {
+        return;
+      }
+      const mode = useAppStore.getState().viewMode;
+      if (isEditorVisibleMode(mode)) {
+        previewScrollPercentageRef.current = percentage;
+      }
+      if (mode === ViewMode.SPLIT) {
+        scrollSyncSourceRef.current = "editor";
+        pendingEditorSyncPctRef.current = percentage;
+        schedulePeerScrollSync();
+      }
+    },
+    [schedulePeerScrollSync],
+  );
+
+  const handlePreviewScroll = useCallback(
+    (percentage: number) => {
+      if (scrollSyncSourceRef.current === "editor") {
+        scrollSyncSourceRef.current = null;
+        previewScrollPercentageRef.current = percentage;
+        return;
+      }
+
+      previewScrollPercentageRef.current = percentage;
+      if (isHeadingNavigationLocked()) {
+        return;
+      }
+      const mode = useAppStore.getState().viewMode;
+      if (isPreviewVisibleMode(mode)) {
+        editorScrollPercentageRef.current = percentage;
+      }
+      if (mode === ViewMode.SPLIT) {
+        scrollSyncSourceRef.current = "preview";
+        pendingPreviewSyncPctRef.current = percentage;
+        schedulePeerScrollSync();
+      }
+    },
+    [schedulePeerScrollSync],
+  );
 
   const cleanupTransition = useCallback(() => {
     if (transitionCleanupRef.current) {
