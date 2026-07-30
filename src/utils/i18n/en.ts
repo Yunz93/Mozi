@@ -969,7 +969,7 @@ export default {
   editor_emptyState: "Select a file to start editing",
   editor_placeholder: "Start writing...",
   table_cellHint:
-    "Right-click to add/delete rows or columns; Tab/Enter to navigate",
+    "Use the toolbar or right-click to add/delete rows or columns; Tab/Enter to navigate cells",
   table_insertRowAbove: "Insert row above",
   table_insertRowBelow: "Insert row below",
   table_deleteRow: "Delete row",

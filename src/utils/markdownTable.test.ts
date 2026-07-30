@@ -22,6 +22,8 @@ import {
   cellContentOffset,
   createEmptyTable,
   parseAlignmentCell,
+  findAllTables,
+  getTableDocRange,
 } from "./markdownTable";
 
 const SAMPLE = [
@@ -247,5 +249,60 @@ describe("format / replace / cursor", () => {
     const lines = serializeTable(table);
     const offset = cellContentOffset(lines, 0, 0)!;
     expect(lines.join("\n").slice(offset.from, offset.to)).toBe("列1");
+  });
+});
+
+describe("findAllTables", () => {
+  it("finds multiple tables and skips non-table lines", () => {
+    const lines = [
+      "# Title",
+      "",
+      "| A | B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      "",
+      "para",
+      "| X | Y |",
+      "| --- | --- |",
+      "| 3 | 4 |",
+    ];
+    const tables = findAllTables(lines);
+    expect(tables).toHaveLength(2);
+    expect(tables[0].header).toEqual(["A", "B"]);
+    expect(tables[1].header).toEqual(["X", "Y"]);
+  });
+});
+
+describe("getTableDocRange", () => {
+  it("maps table line span to absolute offsets", () => {
+    const docText = [
+      "alpha",
+      "| A | B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      "z",
+    ].join("\n");
+    // Minimal Text-like adapter using CodeMirror Text would be ideal; emulate line API.
+    const lines = docText.split("\n");
+    let offset = 0;
+    const lineStarts = lines.map((line) => {
+      const from = offset;
+      offset += line.length + 1;
+      return from;
+    });
+    const doc = {
+      line: (n: number) => {
+        const i = n - 1;
+        return {
+          from: lineStarts[i],
+          to: lineStarts[i] + lines[i].length,
+        };
+      },
+    };
+    const table = findTableAt(lines, 1)!;
+    const range = getTableDocRange(doc, table);
+    expect(docText.slice(range.from, range.to)).toBe(
+      ["| A | B |", "| --- | --- |", "| 1 | 2 |"].join("\n"),
+    );
   });
 });

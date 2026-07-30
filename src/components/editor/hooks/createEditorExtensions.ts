@@ -48,6 +48,7 @@ import {
   markdownListDecorations,
   markdownHighlightStyle,
 } from "../decorations";
+import { tableLiveOverlay } from "../tableLiveOverlay";
 import { clearPendingEditorRangeFocus } from "../../../utils/editorSelectionBridge";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
@@ -195,6 +196,7 @@ export function createEditorExtensions(
     frontmatterDecorations,
     fencedCodeDecorations,
     markdownListDecorations,
+    tableLiveOverlay,
     compartments.wrap.of(wordWrap ? EditorView.lineWrapping : []),
     syntaxHighlighting(markdownHighlightStyle),
     compartments.placeholder.of(cmPlaceholder(placeholder)),

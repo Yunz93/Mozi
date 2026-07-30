@@ -662,6 +662,39 @@ export function createEmptyTable(rows: number, cols: number): MarkdownTable {
   };
 }
 
+/**
+ * Find every contiguous GFM table block in `lines` (skips overlapping re-scans).
+ */
+export function findAllTables(lines: string[]): MarkdownTable[] {
+  const tables: MarkdownTable[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const table = findTableAt(lines, i);
+    if (!table) {
+      i += 1;
+      continue;
+    }
+    if (table.startLine === i) {
+      tables.push(table);
+    }
+    i = table.endLine + 1;
+  }
+  return tables;
+}
+
+/**
+ * Absolute document offsets covering the table lines (exclusive of the
+ * newline after the last table line).
+ */
+export function getTableDocRange(
+  doc: { line: (numberOneBased: number) => { from: number; to: number } },
+  table: Pick<MarkdownTable, "startLine" | "endLine">,
+): { from: number; to: number } {
+  const start = doc.line(table.startLine + 1);
+  const end = doc.line(table.endLine + 1);
+  return { from: start.from, to: end.to };
+}
+
 /** Replace table lines in a line array; returns new lines and the new table span. */
 export function replaceTableLines(
   lines: string[],
