@@ -288,22 +288,6 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         options.formatBeforeSave === true &&
         isMarkdownDocumentPath(savePath);
 
-      const preparedContent = shouldFormatBeforeSave
-        ? formatMarkdownForSave(currentContent, {
-            orderedListMode: settings.orderedListMode,
-          })
-        : currentContent;
-
-      const contentToSave =
-        options?.trigger === "auto"
-          ? preparedContent
-          : refreshDocumentUpdateTime(preparedContent);
-
-      // Check if content has changed (compare post-transform payload for manual saves)
-      if (contentToSave === lastSavedContentRef.current) {
-        return true; // No changes to save
-      }
-
       // Prevent concurrent saves; queue a follow-up instead of dropping work
       if (isSavingRef.current) {
         pendingSaveRef.current = mergePendingSaveOptions(
@@ -318,7 +302,46 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       setSaving(true);
       saveStateRef.current.status = "saving";
 
+      let contentToSave = currentContent;
+
       try {
+        // Yield one frame before sync format so the saving indicator can paint.
+        if (shouldFormatBeforeSave) {
+          await new Promise<void>((resolve) => {
+            if (typeof requestAnimationFrame === "function") {
+              requestAnimationFrame(() => resolve());
+            } else {
+              resolve();
+            }
+          });
+          if (isSaveContextStale(generation, tabId, savePath)) {
+            isSavingRef.current = false;
+            setSaving(false);
+            notifySaveIdle();
+            drainPendingSave(false);
+            return false;
+          }
+        }
+
+        const preparedContent = shouldFormatBeforeSave
+          ? formatMarkdownForSave(currentContent, {
+              orderedListMode: settings.orderedListMode,
+            })
+          : currentContent;
+
+        contentToSave =
+          options?.trigger === "auto"
+            ? preparedContent
+            : refreshDocumentUpdateTime(preparedContent);
+
+        // Check if content has changed (compare post-transform payload for manual saves)
+        if (contentToSave === lastSavedContentRef.current) {
+          isSavingRef.current = false;
+          setSaving(false);
+          notifySaveIdle();
+          return true;
+        }
+
         await withErrorHandling(async () => {
           const fs = await getFileSystem();
           await fs.writeFile(savePath, contentToSave);

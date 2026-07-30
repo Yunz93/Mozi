@@ -149,8 +149,11 @@ describe("SplitView scroll handshake", () => {
       expect(editorOnScroll).toBeTypeOf("function");
     });
 
-    act(() => {
+    await act(async () => {
       editorOnScroll?.(0.42);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
     });
 
     expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.42, {
