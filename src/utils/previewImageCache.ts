@@ -16,6 +16,26 @@ function hasUrlScheme(value: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(value);
 }
 
+/**
+ * Decode percent-encoded local paths (`foo%20bar.png`) before filesystem lookup.
+ * Leaves remote URLs alone so `%20` in query strings stays intact.
+ */
+function decodeLocalPreviewPath(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (hasUrlScheme(trimmed) && !trimmed.startsWith("file:")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("file://")) {
+    return decodeFileUrlPath(trimmed);
+  }
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
 function isAbsoluteFilePath(value: string): boolean {
   return /^(\/|[a-zA-Z]:[\\/]|\\\\)/.test(value);
 }
@@ -149,17 +169,19 @@ export async function resolvePreviewSource(
     return trimmedSrc;
   }
 
+  const decodedLocalSrc = decodeLocalPreviewPath(trimmedSrc);
+
   const localSourceCandidate = trimmedSrc.startsWith("file://")
-    ? decodeFileUrlPath(trimmedSrc)
-    : isAbsoluteFilePath(trimmedSrc) ||
-        isBrowserVirtualPath(trimmedSrc) ||
+    ? decodedLocalSrc
+    : isAbsoluteFilePath(decodedLocalSrc) ||
+        isBrowserVirtualPath(decodedLocalSrc) ||
         (!hasUrlScheme(trimmedSrc) && sourceFilePath)
       ? sourceFilePath &&
         !hasUrlScheme(trimmedSrc) &&
-        !isAbsoluteFilePath(trimmedSrc) &&
-        !isBrowserVirtualPath(trimmedSrc)
-        ? resolveRelativeLocalPath(sourceFilePath, trimmedSrc)
-        : trimmedSrc
+        !isAbsoluteFilePath(decodedLocalSrc) &&
+        !isBrowserVirtualPath(decodedLocalSrc)
+        ? resolveRelativeLocalPath(sourceFilePath, decodedLocalSrc)
+        : decodedLocalSrc
       : "";
 
   if (localSourceCandidate) {
@@ -186,10 +208,10 @@ export async function resolvePreviewSource(
       absolutePath = localSourceCandidate;
     } else if (trimmedSrc.startsWith("file://")) {
       absolutePath = decodeFileUrlPath(trimmedSrc);
-    } else if (isAbsoluteFilePath(trimmedSrc)) {
-      absolutePath = trimmedSrc;
+    } else if (isAbsoluteFilePath(decodedLocalSrc)) {
+      absolutePath = decodedLocalSrc;
     } else if (sourceFilePath && !hasUrlScheme(trimmedSrc)) {
-      absolutePath = await join(await dirname(sourceFilePath), trimmedSrc);
+      absolutePath = await join(await dirname(sourceFilePath), decodedLocalSrc);
     } else {
       return trimmedSrc;
     }
@@ -204,9 +226,9 @@ export async function resolvePreviewSource(
     typeof window !== "undefined"
   ) {
     try {
-      return new URL(trimmedSrc, window.location.href).toString();
+      return new URL(decodedLocalSrc, window.location.href).toString();
     } catch {
-      return trimmedSrc;
+      return decodedLocalSrc;
     }
   }
 

@@ -308,7 +308,10 @@ export async function enhancePreviewHtml(
         let resolvedTarget;
         try {
           resolvedTarget = parsedTarget.path
-            ? await resolveAttachmentTarget(attachmentResolverContext, target)
+            ? await resolveAttachmentTarget(
+                attachmentResolverContext,
+                parsedTarget.path,
+              )
             : currentFilePath
               ? {
                   path: currentFilePath,

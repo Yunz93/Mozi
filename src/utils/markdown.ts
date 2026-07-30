@@ -1,19 +1,26 @@
-import DOMPurify from 'dompurify';
-import { useEffect } from 'react';
-import MarkdownIt from 'markdown-it';
-import Token from 'markdown-it/lib/token.mjs';
-import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
-import taskLists from 'markdown-it-task-lists';
-import footnote from 'markdown-it-footnote';
-import { initKaTeX, initMermaid, applyKatexDarkTheme } from './markdown-extensions';
-import { normalizeShikiLanguage } from './shikiLanguages';
-import { getMarkdownPressShikiTheme } from './shikiTheme';
-import { parseWikiLinkReference } from './wikiLinks';
-import type { MarkdownStylePreset, OrderedListMode, ThemeMode } from '../types';
-import { LRUCache, hashContent } from './performance';
-import { normalizeMarkdownTablesForRender } from './markdownTableNormalize';
-import { preprocessAlphaRomanLists, applyAlphaRomanListAttrs } from './markdownAlphaRomanList';
-import type { ShikiHighlighter } from '../hooks/useShikiHighlighter';
+import DOMPurify from "dompurify";
+import { useEffect } from "react";
+import MarkdownIt from "markdown-it";
+import Token from "markdown-it/lib/token.mjs";
+import type StateInline from "markdown-it/lib/rules_inline/state_inline.mjs";
+import taskLists from "markdown-it-task-lists";
+import footnote from "markdown-it-footnote";
+import {
+  initKaTeX,
+  initMermaid,
+  applyKatexDarkTheme,
+} from "./markdown-extensions";
+import { normalizeShikiLanguage } from "./shikiLanguages";
+import { getMarkdownPressShikiTheme } from "./shikiTheme";
+import { parseWikiLinkReference } from "./wikiLinks";
+import type { MarkdownStylePreset, OrderedListMode, ThemeMode } from "../types";
+import { LRUCache, hashContent } from "./performance";
+import { normalizeMarkdownTablesForRender } from "./markdownTableNormalize";
+import {
+  preprocessAlphaRomanLists,
+  applyAlphaRomanListAttrs,
+} from "./markdownAlphaRomanList";
+import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
 
 interface MarkdownRenderOptions {
   highlighter?: ShikiHighlighter | null;
@@ -51,9 +58,9 @@ const createMarkdownIt = () => {
   // 它与列表编辑中间态强冲突:在 `- test` 下一行只敲了一个孤立 `-`、还没写空格和内容时,
   // markdown-it 会按 CommonMark 把上一项渲染成 <h2>,导致预览突然跳成大字标题。
   // 项目只保留 ATX 风格(`# foo`)的标题,符合现代 markdown 风格指南。
-  md.disable('lheading');
+  md.disable("lheading");
 
-  md.core.ruler.after('inline', 'obsidian_block_references', (state) => {
+  md.core.ruler.after("inline", "obsidian_block_references", (state) => {
     const nextTokens: Token[] = [];
     let lastRenderableOpenIndex: number | null = null;
 
@@ -62,22 +69,35 @@ const createMarkdownIt = () => {
       const inlineToken = state.tokens[index + 1];
       const closeToken = state.tokens[index + 2];
 
-      const blockReferenceMatch = token.type === 'paragraph_open'
-        && inlineToken?.type === 'inline'
-        && closeToken?.type === 'paragraph_close'
-        ? inlineToken.content.trim().match(/^\^([A-Za-z0-9_-]+)$/)
-        : null;
+      const blockReferenceMatch =
+        token.type === "paragraph_open" &&
+        inlineToken?.type === "inline" &&
+        closeToken?.type === "paragraph_close"
+          ? inlineToken.content.trim().match(/^\^([A-Za-z0-9_-]+)$/)
+          : null;
 
       if (blockReferenceMatch) {
         if (lastRenderableOpenIndex !== null) {
-          nextTokens[lastRenderableOpenIndex]?.attrSet('data-block-id', blockReferenceMatch[1]);
+          nextTokens[lastRenderableOpenIndex]?.attrSet(
+            "data-block-id",
+            blockReferenceMatch[1],
+          );
         }
         index += 2;
         continue;
       }
 
       const nextIndex = nextTokens.push(token) - 1;
-      if (token.nesting === 1 && ['paragraph_open', 'heading_open', 'blockquote_open', 'list_item_open', 'table_open'].includes(token.type)) {
+      if (
+        token.nesting === 1 &&
+        [
+          "paragraph_open",
+          "heading_open",
+          "blockquote_open",
+          "list_item_open",
+          "table_open",
+        ].includes(token.type)
+      ) {
         lastRenderableOpenIndex = nextIndex;
       }
     }
@@ -85,27 +105,35 @@ const createMarkdownIt = () => {
     state.tokens = nextTokens;
   });
 
-  const parseWikiSyntax = (state: StateInline, silent: boolean, embed: boolean) => {
+  const parseWikiSyntax = (
+    state: StateInline,
+    silent: boolean,
+    embed: boolean,
+  ) => {
     const start = state.pos;
     const source = state.src;
     const linkStart = embed ? start + 1 : start;
 
     if (embed) {
-      if (source[start] !== '!' || source[start + 1] !== '[' || source[start + 2] !== '[') {
+      if (
+        source[start] !== "!" ||
+        source[start + 1] !== "[" ||
+        source[start + 2] !== "["
+      ) {
         return false;
       }
-    } else if (source[linkStart] !== '[' || source[linkStart + 1] !== '[') {
+    } else if (source[linkStart] !== "[" || source[linkStart + 1] !== "[") {
       return false;
     }
 
-    const end = source.indexOf(']]', linkStart + 2);
+    const end = source.indexOf("]]", linkStart + 2);
     if (end === -1) return false;
 
     const rawContent = source.slice(linkStart + 2, end).trim();
-    if (!rawContent || rawContent.includes('\n')) return false;
+    if (!rawContent || rawContent.includes("\n")) return false;
 
     if (!silent) {
-      const token = state.push(embed ? 'wikiembed' : 'wikilink', '', 0);
+      const token = state.push(embed ? "wikiembed" : "wikilink", "", 0);
       token.content = rawContent;
     }
 
@@ -113,8 +141,12 @@ const createMarkdownIt = () => {
     return true;
   };
 
-  md.inline.ruler.before('image', 'wikiembed', (state, silent) => parseWikiSyntax(state, silent, true));
-  md.inline.ruler.before('link', 'wikilink', (state, silent) => parseWikiSyntax(state, silent, false));
+  md.inline.ruler.before("image", "wikiembed", (state, silent) =>
+    parseWikiSyntax(state, silent, true),
+  );
+  md.inline.ruler.before("link", "wikilink", (state, silent) =>
+    parseWikiSyntax(state, silent, false),
+  );
 
   md.renderer.rules.wikilink = (tokens, idx) => {
     const rawContent = tokens[idx].content;
@@ -126,22 +158,33 @@ const createMarkdownIt = () => {
 
   md.renderer.rules.wikiembed = (tokens, idx) => {
     const rawContent = tokens[idx].content;
-    const { target, displayText, embedSize } = parseWikiLinkReference(rawContent, { embed: true });
+    const { target, displayText, embedSize } = parseWikiLinkReference(
+      rawContent,
+      { embed: true },
+    );
     const escapedTarget = md.utils.escapeHtml(target);
     const escapedLabel = md.utils.escapeHtml(displayText || target);
     const sizeAttributes = [
-      embedSize?.width ? ` data-wiki-width="${embedSize.width}"` : '',
-      embedSize?.height ? ` data-wiki-height="${embedSize.height}"` : '',
-    ].join('');
+      embedSize?.width ? ` data-wiki-width="${embedSize.width}"` : "",
+      embedSize?.height ? ` data-wiki-height="${embedSize.height}"` : "",
+    ].join("");
     return `<a class="markdown-link markdown-embed" href="#" data-wikilink="${escapedTarget}" data-wiki-embed="true" data-wiki-target="${escapedTarget}" data-wiki-label="${escapedLabel}"${sizeAttributes}>${escapedLabel}</a>`;
   };
 
-  md.renderer.rules.list_item_open = function listItemOpen(tokens, idx, options, env: MarkdownRenderEnv, self) {
+  md.renderer.rules.list_item_open = function listItemOpen(
+    tokens,
+    idx,
+    options,
+    env: MarkdownRenderEnv,
+    self,
+  ) {
     const token = tokens[idx];
-    if (env?.orderedListMode === 'loose' && token.info) {
-      const digitMatch = String(token.info).trim().match(/^(\d+)/);
+    if (env?.orderedListMode === "loose" && token.info) {
+      const digitMatch = String(token.info)
+        .trim()
+        .match(/^(\d+)/);
       if (digitMatch) {
-        token.attrSet('value', digitMatch[1]);
+        token.attrSet("value", digitMatch[1]);
       }
     }
     return self.renderToken(tokens, idx, options);
@@ -168,16 +211,16 @@ const createMarkdownIt = () => {
   const defaultImageRenderer = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    const srcIdx = token.attrIndex('src');
+    const srcIdx = token.attrIndex("src");
     if (srcIdx >= 0 && token.attrs) {
       const raw = token.attrs[srcIdx][1];
-      if (typeof raw === 'string') {
+      if (typeof raw === "string") {
         token.attrs[srcIdx][1] = normalizeHttpUrlForHtmlAttribute(raw);
       }
     }
-    token.attrSet('decoding', 'async');
-    token.attrSet('loading', 'lazy');
-    token.attrSet('fetchpriority', 'auto');
+    token.attrSet("decoding", "async");
+    token.attrSet("loading", "lazy");
+    token.attrSet("fetchpriority", "auto");
 
     if (defaultImageRenderer) {
       return defaultImageRenderer(tokens, idx, options, env, self);
@@ -189,14 +232,17 @@ const createMarkdownIt = () => {
   const defaultLinkOpen = md.renderer.rules.link_open;
   md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    const hrefIdx = token.attrIndex('href');
+    const hrefIdx = token.attrIndex("href");
     if (hrefIdx >= 0 && token.attrs) {
       const raw = token.attrs[hrefIdx][1];
-      if (typeof raw === 'string') {
+      if (typeof raw === "string") {
         token.attrs[hrefIdx][1] = normalizeHttpUrlForHtmlAttribute(raw);
       }
     }
-    return defaultLinkOpen?.(tokens, idx, options, env, self) || self.renderToken(tokens, idx, options);
+    return (
+      defaultLinkOpen?.(tokens, idx, options, env, self) ||
+      self.renderToken(tokens, idx, options)
+    );
   };
 
   return md;
@@ -204,7 +250,7 @@ const createMarkdownIt = () => {
 
 // Get or create markdown-it instance
 let mdInstance: MarkdownIt | null = null;
-let baseFenceRenderer: MarkdownIt['renderer']['rules']['fence'] | null = null;
+let baseFenceRenderer: MarkdownIt["renderer"]["rules"]["fence"] | null = null;
 
 export function getMarkdownIt(): MarkdownIt {
   if (!mdInstance) {
@@ -217,21 +263,27 @@ export function getMarkdownIt(): MarkdownIt {
 
 // Store highlighter reference for the current render
 let currentHighlighter: ShikiHighlighter | null = null;
-let currentTheme: ThemeMode = 'light';
+let currentTheme: ThemeMode = "light";
 
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 4;
-const PREVIEW_BLANK_LINE_HTML = '<div class="preview-source-blank-line"></div>\n';
+const MARKDOWN_RENDERER_CACHE_VERSION = 5;
+const PREVIEW_BLANK_LINE_HTML =
+  '<div class="preview-source-blank-line"></div>\n';
 
-function canUseShikiLanguage(highlighter: ShikiHighlighter | null, lang: string): boolean {
+function canUseShikiLanguage(
+  highlighter: ShikiHighlighter | null,
+  lang: string,
+): boolean {
   if (!highlighter || !lang) return false;
 
-  const loadedLanguages = new Set<string>(highlighter.getLoadedLanguages?.() ?? []);
+  const loadedLanguages = new Set<string>(
+    highlighter.getLoadedLanguages?.() ?? [],
+  );
   if (loadedLanguages.has(lang)) return true;
 
-  if (typeof highlighter.supportsLanguage === 'function') {
+  if (typeof highlighter.supportsLanguage === "function") {
     return Boolean(highlighter.supportsLanguage(lang));
   }
 
@@ -241,8 +293,8 @@ function canUseShikiLanguage(highlighter: ShikiHighlighter | null, lang: string)
 function configureFenceRenderer(
   md: MarkdownIt,
   highlighter: ShikiHighlighter | null,
-  themeMode: ThemeMode = 'light',
-  markdownStylePreset: MarkdownStylePreset = 'nord',
+  themeMode: ThemeMode = "light",
+  markdownStylePreset: MarkdownStylePreset = "nord",
 ) {
   // Always update current highlighter reference for the latest instance
   currentHighlighter = highlighter;
@@ -258,13 +310,19 @@ function configureFenceRenderer(
   const localThemeMode = themeMode;
 
   // Always update the fence renderer to ensure it has access to the latest highlighter
-  md.renderer.rules.fence = (tokens, idx, options, env: MarkdownRenderEnv, self) => {
+  md.renderer.rules.fence = (
+    tokens,
+    idx,
+    options,
+    env: MarkdownRenderEnv,
+    self,
+  ) => {
     const token = tokens[idx];
-    const rawLang = token.info.trim().split(/\s+/)[0] || '';
+    const rawLang = token.info.trim().split(/\s+/)[0] || "";
     const lang = normalizeShikiLanguage(rawLang);
-    const shouldAvoidShellHighlight = rawLang.trim().toLowerCase() === 'shell';
+    const shouldAvoidShellHighlight = rawLang.trim().toLowerCase() === "shell";
 
-    if (lang === 'mermaid' || lang === 'mmd') {
+    if (lang === "mermaid" || lang === "mmd") {
       return baseFence
         ? baseFence(tokens, idx, options, env, self)
         : `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
@@ -275,11 +333,22 @@ function configureFenceRenderer(
     const activeHighlighter = localHighlighter ?? currentHighlighter;
     const activeThemeMode = localThemeMode ?? currentTheme;
 
-    if (!shouldAvoidShellHighlight && activeHighlighter && lang && canUseShikiLanguage(activeHighlighter, lang)) {
+    if (
+      !shouldAvoidShellHighlight &&
+      activeHighlighter &&
+      lang &&
+      canUseShikiLanguage(activeHighlighter, lang)
+    ) {
       try {
-        const activeTheme = getMarkdownPressShikiTheme(activeThemeMode, markdownStylePreset);
+        const activeTheme = getMarkdownPressShikiTheme(
+          activeThemeMode,
+          markdownStylePreset,
+        );
         const shikiHtml = wrapShikiBlockHtml(
-          activeHighlighter.codeToHtml(token.content.trim(), { lang, theme: activeTheme }),
+          activeHighlighter.codeToHtml(token.content.trim(), {
+            lang,
+            theme: activeTheme,
+          }),
         );
         const shikiBlocks = env.shikiBlocks ?? (env.shikiBlocks = []);
         const blockIndex = shikiBlocks.push(shikiHtml) - 1;
@@ -290,28 +359,37 @@ function configureFenceRenderer(
         // so we can diagnose why Shiki falls back to the base fence renderer.
         void (async () => {
           try {
-            const [{ writeTextFile, mkdir }, { appDataDir, join }] = await Promise.all([
-              import('@tauri-apps/plugin-fs'),
-              import('@tauri-apps/api/path'),
-            ]);
+            const [{ writeTextFile, mkdir }, { appDataDir, join }] =
+              await Promise.all([
+                import("@tauri-apps/plugin-fs"),
+                import("@tauri-apps/api/path"),
+              ]);
             const dir = await appDataDir();
-            const folder = await join(dir, 'MarkdownPress');
-            const file = await join(folder, 'shiki-diagnostics.log');
+            const folder = await join(dir, "MarkdownPress");
+            const file = await join(folder, "shiki-diagnostics.log");
             const now = new Date().toISOString();
-            const details = error instanceof Error
-              ? `${error.message}\n${error.stack ?? ''}`.trim()
-              : String(error ?? '').trim();
+            const details =
+              error instanceof Error
+                ? `${error.message}\n${error.stack ?? ""}`.trim()
+                : String(error ?? "").trim();
             await mkdir(folder, { recursive: true });
-            await writeTextFile(file, `[${now}] Shiki failed for ${lang}\n${details}\n\n`, { append: true });
+            await writeTextFile(
+              file,
+              `[${now}] Shiki failed for ${lang}\n${details}\n\n`,
+              { append: true },
+            );
           } catch {
             // ignore
           }
         })();
         // Log detailed error in build mode
-        if (typeof window !== 'undefined') {
-          console.warn('[Shiki Error Details]', {
+        if (typeof window !== "undefined") {
+          console.warn("[Shiki Error Details]", {
             lang,
-            theme: getMarkdownPressShikiTheme(activeThemeMode, markdownStylePreset),
+            theme: getMarkdownPressShikiTheme(
+              activeThemeMode,
+              markdownStylePreset,
+            ),
             hasHighlighter: !!activeHighlighter,
             highlighterMethods: Object.keys(activeHighlighter || {}),
           });
@@ -330,52 +408,66 @@ function configureFenceRenderer(
 /**
  * React hook for markdown renderer with Shiki syntax highlighting
  */
-export function useMarkdownRenderer(_highlighter: ShikiHighlighter | null, _themeMode: ThemeMode) {
+export function useMarkdownRenderer(
+  _highlighter: ShikiHighlighter | null,
+  _themeMode: ThemeMode,
+) {
   useEffect(() => {
     applyKatexDarkTheme();
   }, []);
 }
 
-function createCacheKey(markdown: string, options: MarkdownRenderOptions): string {
+function createCacheKey(
+  markdown: string,
+  options: MarkdownRenderOptions,
+): string {
   const hl = options.highlighter;
   const hlToken = hl
-    ? `1_${typeof hl.__revision === 'number' ? hl.__revision : 0}`
-    : '0';
-  const olMode = options.orderedListMode ?? 'strict';
-  const sourceBlankLineMode = options.preserveSourceBlankLines === false ? 'compact' : 'preview-blanks';
-  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? 'light'}_${options.markdownStylePreset ?? 'nord'}_${olMode}_${sourceBlankLineMode}`;
+    ? `1_${typeof hl.__revision === "number" ? hl.__revision : 0}`
+    : "0";
+  const olMode = options.orderedListMode ?? "strict";
+  const sourceBlankLineMode =
+    options.preserveSourceBlankLines === false ? "compact" : "preview-blanks";
+  return `${MARKDOWN_RENDERER_CACHE_VERSION}_${hashContent(markdown)}_${hlToken}_${options.themeMode ?? "light"}_${options.markdownStylePreset ?? "nord"}_${olMode}_${sourceBlankLineMode}`;
 }
 
 /**
- * CommonMark ends a bare link destination at the first space. Wrap http(s) URLs that contain
- * spaces in angle brackets so markdown-it parses the full destination (fixes broken <img src>).
+ * CommonMark ends a bare link/image destination at the first space. Wrap destinations that
+ * contain spaces in angle brackets so markdown-it keeps the full path (local vault paths and
+ * http(s) URLs). Editor source can keep literal spaces; this is render-time only.
  */
-function angleBracketBareMarkdownHttpUrls(markdown: string): string {
+function angleBracketBareMarkdownDestinations(markdown: string): string {
   const wrap = (prefix: string, url: string, suffix: string): string => {
     const trimmed = url.trim();
-    if (!trimmed || !/\s/.test(trimmed) || trimmed.startsWith('<')) {
+    if (!trimmed || !/\s/.test(trimmed) || trimmed.startsWith("<")) {
       return `${prefix}${url}${suffix}`;
     }
     return `${prefix}<${trimmed}>${suffix}`;
   };
 
+  // Images: ![alt](dest with spaces)
   let out = markdown.replace(
-    /(!\[[^\]]*\]\()\s*(https?:\/\/[^)\n]+)\s*(\))/gi,
-    (full, open: string, url: string, close: string) => wrap(open, url, close),
+    /(!\[[^\]]*\]\()\s*(?!<)([^)\n]+)\s*(\))/g,
+    (_full, open: string, url: string, close: string) => wrap(open, url, close),
   );
 
+  // Links: [label](dest with spaces) — skip image syntax via (?<!!)
   out = out.replace(
-    /(\[[^\]]+\]\()\s*(https?:\/\/[^)\n]+)\s*(\))/gi,
-    (full, open: string, url: string, close: string) => wrap(open, url, close),
+    /(?<!!)(\[[^\]]+\]\()\s*(?!<)([^)\n]+)\s*(\))/g,
+    (_full, open: string, url: string, close: string) => wrap(open, url, close),
   );
 
   return out;
 }
 
-function countBlankSourceLines(lines: string[], startLine: number, endLine: number): number {
+function countBlankSourceLines(
+  lines: string[],
+  startLine: number,
+  endLine: number,
+): number {
   let count = 0;
   for (let lineIndex = startLine; lineIndex < endLine; lineIndex += 1) {
-    if ((lines[lineIndex] ?? '').trim() === '') {
+    if ((lines[lineIndex] ?? "").trim() === "") {
       count += 1;
     }
   }
@@ -383,22 +475,32 @@ function countBlankSourceLines(lines: string[], startLine: number, endLine: numb
 }
 
 function createPreviewBlankLineToken(count: number): Token {
-  const token = new Token('html_block', '', 0);
+  const token = new Token("html_block", "", 0);
   token.block = true;
   token.content = PREVIEW_BLANK_LINE_HTML.repeat(count);
   return token;
 }
 
-function preservePreviewSourceBlankLines(tokens: Token[], markdown: string): Token[] {
-  const lines = markdown.split('\n');
+function preservePreviewSourceBlankLines(
+  tokens: Token[],
+  markdown: string,
+): Token[] {
+  const lines = markdown.split("\n");
   const nextTokens: Token[] = [];
   let previousTopLevelEndLine: number | null = null;
 
   for (const token of tokens) {
     if (token.level === 0 && token.map && token.nesting !== -1) {
       const [startLine, endLine] = token.map;
-      if (previousTopLevelEndLine !== null && startLine > previousTopLevelEndLine) {
-        const blankLineCount = countBlankSourceLines(lines, previousTopLevelEndLine, startLine);
+      if (
+        previousTopLevelEndLine !== null &&
+        startLine > previousTopLevelEndLine
+      ) {
+        const blankLineCount = countBlankSourceLines(
+          lines,
+          previousTopLevelEndLine,
+          startLine,
+        );
         if (blankLineCount > 0) {
           nextTokens.push(createPreviewBlankLineToken(blankLineCount));
         }
@@ -415,7 +517,10 @@ function preservePreviewSourceBlankLines(tokens: Token[], markdown: string): Tok
 /**
  * Render markdown to HTML with sanitization and caching
  */
-export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
+export function renderMarkdown(
+  markdown: string,
+  options: MarkdownRenderOptions = {},
+): string {
   // Check cache for non-large documents
   const shouldCache = markdown.length <= MAX_CACHEABLE_LENGTH;
 
@@ -429,62 +534,65 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
 
   const md = getMarkdownIt();
   const highlighter = options.highlighter ?? null;
-  const themeMode = options.themeMode ?? 'light';
-  const markdownStylePreset = options.markdownStylePreset ?? 'nord';
+  const themeMode = options.themeMode ?? "light";
+  const markdownStylePreset = options.markdownStylePreset ?? "nord";
 
   // Configure fence renderer with the highlighter
   configureFenceRenderer(md, highlighter, themeMode, markdownStylePreset);
 
   const env: MarkdownRenderEnv = {
-    orderedListMode: options.orderedListMode ?? 'strict',
+    orderedListMode: options.orderedListMode ?? "strict",
   };
   const normalizedMarkdown = normalizeMarkdownTablesForRender(
-    angleBracketBareMarkdownHttpUrls(markdown),
+    angleBracketBareMarkdownDestinations(markdown),
   );
   // 把 alpha/roman marker 改写成阿拉伯数字,让 markdown-it 正常识别为有序列表;
   // 后续通过 token.map[0] 把原始风格(A./a./I./i.)以 type/start 属性回填到 ordered_list_open。
-  const { src: alphaPreparedSrc, meta: alphaRomanMeta } = preprocessAlphaRomanLists(normalizedMarkdown);
+  const { src: alphaPreparedSrc, meta: alphaRomanMeta } =
+    preprocessAlphaRomanLists(normalizedMarkdown);
   const parsedTokens = md.parse(alphaPreparedSrc, env);
-  const tokens = options.preserveSourceBlankLines === false
-    ? parsedTokens
-    : preservePreviewSourceBlankLines(parsedTokens, alphaPreparedSrc);
+  const tokens =
+    options.preserveSourceBlankLines === false
+      ? parsedTokens
+      : preservePreviewSourceBlankLines(parsedTokens, alphaPreparedSrc);
   applyAlphaRomanListAttrs(tokens, alphaRomanMeta);
   const renderedHtml = md.renderer.render(tokens, md.options, env);
 
   // Sanitize HTML to prevent XSS attacks
   const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
-    ADD_TAGS: ['iframe', 'section', 'sup'], // section/sup: markdown-it-footnote; iframe: embeds
+    ADD_TAGS: ["iframe", "section", "sup"], // section/sup: markdown-it-footnote; iframe: embeds
     // Preserve Shiki token styling while still sanitizing the rest of the HTML.
     ADD_ATTR: [
-      'align',
-      'allow',
-      'allowfullscreen',
-      'frameborder',
-      'fetchpriority',
-      'height',
-      'scrolling',
-      'style',
-      'tabindex',
-      'width',
-      'data-wikilink',
-      'data-wiki-embed',
-      'data-wiki-target',
-      'data-wiki-label',
-      'data-wiki-width',
-      'data-wiki-height',
-      'data-block-id',
-      'data-shiki-block',
-      'value',
+      "align",
+      "allow",
+      "allowfullscreen",
+      "frameborder",
+      "fetchpriority",
+      "height",
+      "scrolling",
+      "style",
+      "tabindex",
+      "width",
+      "data-wikilink",
+      "data-wiki-embed",
+      "data-wiki-target",
+      "data-wiki-label",
+      "data-wiki-width",
+      "data-wiki-height",
+      "data-block-id",
+      "data-shiki-block",
+      "value",
       // 用于 alpha/roman 有序列表: <ol type="A" start="3"> 等
-      'type',
-      'start',
+      "type",
+      "start",
     ],
   });
 
   const result = env.shikiBlocks?.length
     ? sanitizedHtml.replace(
         /<div data-shiki-block="(\d+)"><\/div>/g,
-        (_match, blockIndex: string) => env.shikiBlocks?.[Number(blockIndex)] ?? ''
+        (_match, blockIndex: string) =>
+          env.shikiBlocks?.[Number(blockIndex)] ?? "",
       )
     : sanitizedHtml;
 
@@ -507,12 +615,15 @@ export function clearMarkdownCache(): void {
 /**
  * Configure custom CSS classes for markdown rendering
  */
-export function configureMarkdownClasses(md: MarkdownIt, _classes: Record<string, string>) {
+export function configureMarkdownClasses(
+  md: MarkdownIt,
+  _classes: Record<string, string>,
+) {
   // Configure heading classes
   md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
     const level = token.tag.substring(1);
-    token.attrPush(['class', `heading-${level}`]);
+    token.attrPush(["class", `heading-${level}`]);
     return self.renderToken(tokens, idx, options);
   };
 
@@ -520,8 +631,11 @@ export function configureMarkdownClasses(md: MarkdownIt, _classes: Record<string
   const defaultLinkOpen = md.renderer.rules.link_open;
   md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    token.attrPush(['class', 'markdown-link']);
-    return defaultLinkOpen?.(tokens, idx, options, env, self) || self.renderToken(tokens, idx, options);
+    token.attrPush(["class", "markdown-link"]);
+    return (
+      defaultLinkOpen?.(tokens, idx, options, env, self) ||
+      self.renderToken(tokens, idx, options)
+    );
   };
 }
 

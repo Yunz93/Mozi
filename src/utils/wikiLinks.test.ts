@@ -233,6 +233,43 @@ describe("resolveWikiLinkFile", () => {
     expect(result?.name).toBe("hello.md");
   });
 
+  it("resolves targets with literal spaces and percent-encoded spaces", () => {
+    const spacedFiles: FileNode[] = [
+      {
+        id: "/vault/resources/05-模型广场模块 PRD-1.png",
+        name: "05-模型广场模块 PRD-1.png",
+        path: "/vault/resources/05-模型广场模块 PRD-1.png",
+        type: "file",
+      },
+      {
+        id: "/vault/docs/完整 PRD.md",
+        name: "完整 PRD.md",
+        path: "/vault/docs/完整 PRD.md",
+        type: "file",
+      },
+    ];
+
+    expect(
+      resolveWikiLinkFile(
+        spacedFiles,
+        "resources/05-模型广场模块 PRD-1.png",
+        "/vault",
+      )?.path,
+    ).toBe("/vault/resources/05-模型广场模块 PRD-1.png");
+
+    expect(
+      resolveWikiLinkFile(
+        spacedFiles,
+        "resources/05-模型广场模块%20PRD-1.png",
+        "/vault",
+      )?.path,
+    ).toBe("/vault/resources/05-模型广场模块 PRD-1.png");
+
+    expect(
+      resolveWikiLinkFile(spacedFiles, "docs/完整%20PRD", "/vault")?.path,
+    ).toBe("/vault/docs/完整 PRD.md");
+  });
+
   it("returns null when basename matches multiple files", () => {
     const ambiguousFiles: FileNode[] = [
       {

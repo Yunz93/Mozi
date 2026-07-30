@@ -364,4 +364,32 @@ describe("renderMarkdown", () => {
     const html = renderMarkdown(md);
     expect(html).toContain("https://example.com/my%20doc.pdf");
   });
+
+  it("renders local image paths with spaces without requiring %20 in the source", () => {
+    const html = renderMarkdown("![shot](resources/05-模型广场模块 PRD-1.png)");
+    expect(html).toContain("<img");
+    // markdown-it percent-encodes the HTML attribute; source may keep literal spaces.
+    expect(html).toContain("PRD-1.png");
+    expect(html).toMatch(/%20| /);
+  });
+
+  it("renders local markdown links with spaces as hyperlinks without requiring %20", () => {
+    const html = renderMarkdown("[PRD](docs/完整 PRD.md)");
+    expect(html).toContain("<a ");
+    expect(html).toContain('href="');
+    expect(html).toMatch(/PRD\.md/);
+  });
+
+  it("keeps literal spaces in wiki embeds and wiki links (no %20 in source attrs)", () => {
+    const embedHtml = renderMarkdown(
+      "![[resources/05-模型广场模块 PRD-1.png]]",
+    );
+    expect(embedHtml).toContain("data-wiki-embed");
+    expect(embedHtml).toContain("05-模型广场模块 PRD-1.png");
+    expect(embedHtml).not.toContain("%20");
+
+    const linkHtml = renderMarkdown("See [[docs/完整 PRD]]");
+    expect(linkHtml).toContain("markdown-wikilink");
+    expect(linkHtml).toContain('data-wikilink="docs/完整 PRD"');
+  });
 });

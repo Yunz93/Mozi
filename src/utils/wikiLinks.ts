@@ -49,9 +49,25 @@ function parseEmbedSize(
   };
 }
 
+/**
+ * Decode percent-encoded local wiki targets (`%20`, UTF-8 sequences) so
+ * `[[note%20name]]` / `![[resources/foo%20bar.png]]` resolve to the same
+ * on-disk files as their literal-space forms. Remote URLs are not used here.
+ */
+function decodeWikiLinkPath(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function normalizeWikiLinkTarget(target: string): string {
   return stripMarkdownExtension(
-    normalizeSlashes(target).replace(/^\/+/, "").replace(/^\.\//, "").trim(),
+    normalizeSlashes(decodeWikiLinkPath(target))
+      .replace(/^\/+/, "")
+      .replace(/^\.\//, "")
+      .trim(),
   ).toLowerCase();
 }
 
