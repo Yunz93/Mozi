@@ -42,8 +42,7 @@ export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
     return null;
   }
 
-  // Releases currently ship without updater artifacts (`createUpdaterArtifacts: false`).
-  // Skip the network check so auto/manual polls do not 404 on missing latest.json.
+  // When createUpdaterArtifacts is off, skip the network check so polls do not 404 on missing latest.json.
   if (!areUpdaterArtifactsEnabled()) {
     return null;
   }

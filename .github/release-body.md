@@ -4,7 +4,7 @@ See the assets to download this version and install.
 
 Release notes for this tag are tracked in the repository history and pull requests merged since the previous release.
 
-> Windows in-app updates: this build ships with `createUpdaterArtifacts: false`, so clients will not receive `latest.json` until that flag is re-enabled.
+> Windows in-app updates: this build ships with `createUpdaterArtifacts: true`, so clients can receive `latest.json` and signed updater packages from the GitHub Release.
 
 ### macOS 安装说明
 
