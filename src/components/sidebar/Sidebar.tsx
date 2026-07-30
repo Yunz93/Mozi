@@ -440,9 +440,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
               </button>
             </div>
 
-            <div className="flex items-center gap-2 md:mt-1">
-              <label className="relative flex-1 min-w-0">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-2.5 md:mt-1">
+              <div className="flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-gray-200/80 bg-white/70 py-0 pl-3 pr-1 transition-colors focus-within:border-gray-300 focus-within:bg-white/90 dark:border-white/10 dark:bg-[#141a25] dark:focus-within:border-white/20 dark:focus-within:bg-[#181f2c]">
+                <span className="pointer-events-none flex shrink-0 items-center text-gray-400 dark:text-gray-500">
                   <svg
                     className="h-4 w-4"
                     viewBox="0 0 24 24"
@@ -460,11 +460,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t("sidebar_search")}
-                  className="w-full rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/70 dark:bg-[#141a25] py-2 pl-9 pr-[5.75rem] text-sm font-medium text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-gray-300 dark:focus:border-white/20 focus:bg-white/90 dark:focus:bg-[#181f2c]"
+                  className="min-w-0 flex-1 border-0 bg-transparent py-2 text-sm font-medium text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-slate-500"
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-1 right-1 inline-flex max-w-[5.5rem] items-center gap-0.5 rounded-lg px-1.5 text-[11px] font-medium text-gray-500 hover:text-gray-800 hover:bg-black/[0.04] dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-white/10 transition-colors"
+                  className="inline-flex h-8 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-black/[0.04] hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100"
                   title={`${t("search_mode_label")}: ${
                     searchMode === "keyword"
                       ? t("search_mode_keyword")
@@ -479,15 +479,14 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                         ? t("search_mode_semantic")
                         : t("search_mode_hybrid")
                   }`}
-                  onClick={(event) => {
-                    event.preventDefault();
+                  onClick={() => {
                     const order = ["keyword", "semantic", "hybrid"] as const;
                     const next =
                       order[(order.indexOf(searchMode) + 1) % order.length]!;
                     setSearchMode(next);
                   }}
                 >
-                  <span>
+                  <span className="max-w-[3.25rem] truncate">
                     {searchMode === "keyword"
                       ? t("search_mode_keyword")
                       : searchMode === "semantic"
@@ -495,7 +494,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                         : t("search_mode_hybrid")}
                   </span>
                   <svg
-                    className="h-3 w-3 opacity-60"
+                    className="h-3 w-3 shrink-0 opacity-60"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -506,8 +505,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                     <polyline points="7 16 12 21 17 16" />
                   </svg>
                 </button>
-              </label>
+              </div>
               <button
+                type="button"
                 onClick={() => openNewFileDialog(undefined, t("app_untitled"))}
                 className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-white dark:hover:bg-[#181f2c] active:scale-95"
                 title={t("sidebar_newNote")}
