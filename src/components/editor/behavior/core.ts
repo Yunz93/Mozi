@@ -274,6 +274,16 @@ export function mapColumnAfterLineUpdate(
   newText: string,
   column: number,
 ): number {
+  // 列表行：按正文相对位置映射，避免 Tab/缩进后光标停在列表符前
+  const oldListStart = getMarkdownListHangPrefixCharCount(oldText);
+  const newListStart = getMarkdownListHangPrefixCharCount(newText);
+  if (oldListStart !== null && newListStart !== null) {
+    if (column <= oldListStart) {
+      return Math.min(newText.length, newListStart);
+    }
+    return Math.min(newText.length, newListStart + (column - oldListStart));
+  }
+
   let prefix = 0;
   const maxPrefix = Math.min(oldText.length, newText.length);
   while (prefix < maxPrefix && oldText[prefix] === newText[prefix]) {
