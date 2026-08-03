@@ -437,8 +437,18 @@ fn resolve_secret_key(key: &str) -> Option<&'static str> {
     }
 }
 
+/// Must stay `async`: reads take an exclusive file lock and do disk I/O; on
+/// the main thread that freezes input handling for every window.
 #[tauri::command]
-pub(crate) fn get_secure_settings(app: tauri::AppHandle) -> Result<SecureSettingsResult, String> {
+pub(crate) async fn get_secure_settings(
+    app: tauri::AppHandle,
+) -> Result<SecureSettingsResult, String> {
+    tauri::async_runtime::spawn_blocking(move || get_secure_settings_blocking(&app))
+        .await
+        .map_err(|e| format!("Failed to join secure settings read task: {}", e))?
+}
+
+fn get_secure_settings_blocking(app: &tauri::AppHandle) -> Result<SecureSettingsResult, String> {
     Ok(SecureSettingsResult {
         blog_github_token: read_secure_secret(&app, SECRET_KEY_BLOG_GITHUB_TOKEN)?,
         wechat_app_secret: read_secure_secret(&app, SECRET_KEY_WECHAT_APP_SECRET)?,
@@ -464,15 +474,21 @@ pub(crate) fn get_secure_settings(app: tauri::AppHandle) -> Result<SecureSetting
     })
 }
 
+/// Must stay `async`: writes take an exclusive file lock and do disk I/O; on
+/// the main thread that freezes input handling for every window.
 #[tauri::command]
-pub(crate) fn set_secure_secret(
+pub(crate) async fn set_secure_secret(
     app: tauri::AppHandle,
     key: String,
     value: Option<String>,
 ) -> Result<(), String> {
-    let Some(secret_key) = resolve_secret_key(&key) else {
-        return Err(format!("Unsupported secure setting key: {}", key));
-    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(secret_key) = resolve_secret_key(&key) else {
+            return Err(format!("Unsupported secure setting key: {}", key));
+        };
 
-    write_secure_secret(&app, secret_key, value.as_deref())
+        write_secure_secret(&app, secret_key, value.as_deref())
+    })
+    .await
+    .map_err(|e| format!("Failed to join secure settings write task: {}", e))?
 }
