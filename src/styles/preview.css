@@ -312,6 +312,23 @@
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
 }
 
+.preview-attachment-html,
+.preview-pane-document.markdown-body .preview-attachment-html {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 120px;
+  max-height: 75vh;
+  overflow: auto;
+  margin: 1rem 0;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.2));
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.96);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+}
+
 .preview-pdfjs-pages {
   display: flex;
   flex-direction: column;
@@ -891,6 +908,13 @@
   border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.16));
   background: var(--mp-doc-code-bg, rgba(15, 23, 42, 0.82));
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.3);
+}
+
+.dark .preview-attachment-html,
+.dark .preview-pane-document.markdown-body .preview-attachment-html {
+  border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.16));
+  background: var(--mp-doc-code-bg, rgba(15, 23, 42, 0.82));
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
 }
 
 .dark .preview-pdfjs-page {

@@ -321,6 +321,37 @@ describe("usePreviewRenderer wiki embed integration", () => {
     });
   });
 
+  it("replaces wiki html embeds with a sanitized HTML attachment host", async () => {
+    mockedResolveAttachmentTarget.mockResolvedValue({
+      path: "/vault/resources/card.html",
+      name: "card.html",
+    });
+
+    render(
+      <MarkdownHarness
+        testId="wiki-html-embed"
+        content="![[resources/card.html|420]]"
+        readFile={async () =>
+          '<h1>Card</h1><p>Body <img src="x" onerror="alert(1)"></p>'
+        }
+      />,
+    );
+
+    await waitFor(() => {
+      const out = queryOut("wiki-html-embed");
+      const html = out.querySelector(
+        ".preview-attachment-html.preview-html-document",
+      ) as HTMLElement | null;
+      expect(html).toBeTruthy();
+      expect(html?.dataset.htmlPath).toBe("/vault/resources/card.html");
+      expect(html?.textContent).toContain("Card");
+      expect(html?.textContent).toContain("Body");
+      expect(html?.innerHTML).not.toContain("onerror");
+      expect(html?.style.width).toBe("420px");
+      expect(html?.parentElement?.tagName).not.toBe("P");
+    });
+  });
+
   it("replaces unknown wiki attachment embeds with a generic file chip", async () => {
     mockedResolveAttachmentTarget.mockResolvedValue({
       path: "/vault/archive/data.zip",

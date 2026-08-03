@@ -63,6 +63,25 @@ export function createPreviewPdfContainer(
   return container;
 }
 
+/** Host for sanitized HTML attachment embeds (`![[page.html]]`). */
+export function createPreviewHtmlContainer(
+  document: Document,
+  sanitizedHtml: string,
+  options?: { title?: string; path?: string },
+): HTMLDivElement {
+  const container = document.createElement("div");
+  container.className = "preview-attachment-html preview-html-document";
+  if (options?.path) {
+    container.dataset.htmlPath = options.path;
+  }
+  if (options?.title) {
+    container.dataset.htmlTitle = options.title;
+    container.title = options.title;
+  }
+  container.innerHTML = sanitizedHtml;
+  return container;
+}
+
 export function isVideoAttachment(fileName: string): boolean {
   return /\.(mp4|m4v|mov|webm|ogv|ogg)$/i.test(fileName);
 }

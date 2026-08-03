@@ -1,11 +1,23 @@
-import React from 'react';
-import { parseWikiLinkReference } from '../../utils/wikiLinks';
-import { resolveAttachmentTarget, type AttachmentResolverContext } from '../../utils/attachmentResolver';
-import { isImageAttachment, isMarkdownNote, isPdfAttachment } from './previewUtils';
-import { warmPreviewImage, resolvePreviewSource } from '../../utils/previewImageCache';
-import { useI18n } from '../../hooks/useI18n';
-import type { ShikiHighlighter } from '../../hooks/useShikiHighlighter';
-import type { FileNode, MarkdownStylePreset, ThemeMode } from '../../types';
+import React from "react";
+import { parseWikiLinkReference } from "../../utils/wikiLinks";
+import {
+  resolveAttachmentTarget,
+  type AttachmentResolverContext,
+} from "../../utils/attachmentResolver";
+import {
+  isHtmlDocument,
+  isImageAttachment,
+  isMarkdownNote,
+  isPdfAttachment,
+} from "./previewUtils";
+import { sanitizeHtmlPreview } from "../editor/preview/previewRenderCore";
+import {
+  warmPreviewImage,
+  resolvePreviewSource,
+} from "../../utils/previewImageCache";
+import { useI18n } from "../../hooks/useI18n";
+import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
+import type { FileNode, MarkdownStylePreset, ThemeMode } from "../../types";
 
 interface WikiLinkHandlerProps {
   target: string;
@@ -67,7 +79,9 @@ interface AttachmentEmbedProps {
   attachmentResolverContext: AttachmentResolverContext;
   fileContents?: Record<string, string>;
   content?: string;
-  readFile?: (node: Pick<FileNode, 'id' | 'name' | 'type' | 'path'>) => Promise<string>;
+  readFile?: (
+    node: Pick<FileNode, "id" | "name" | "type" | "path">,
+  ) => Promise<string>;
   renderMarkdown?: (markdown: string, options: RenderMarkdownOptions) => string;
   markdownStylePreset?: MarkdownStylePreset;
   themeMode?: ThemeMode;
@@ -85,13 +99,13 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   content,
   readFile,
   renderMarkdown,
-  markdownStylePreset = 'nord',
-  themeMode = 'light',
+  markdownStylePreset = "nord",
+  themeMode = "light",
   highlighter,
 }) => {
   const { t } = useI18n();
   const [resolved, setResolved] = React.useState<{
-    type: 'image' | 'pdf' | 'note' | 'file';
+    type: "image" | "pdf" | "html" | "note" | "file";
     path: string;
     name: string;
     content?: string;
@@ -107,7 +121,10 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
     const resolveEmbed = async () => {
       try {
         const parsedTarget = parseWikiLinkReference(target, { embed: true });
-        const resolvedTarget = await resolveAttachmentTarget(attachmentResolverContext, target);
+        const resolvedTarget = await resolveAttachmentTarget(
+          attachmentResolverContext,
+          target,
+        );
 
         if (!resolvedTarget) {
           if (!cancelled) {
@@ -118,31 +135,36 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
         }
 
         if (isMarkdownNote(resolvedTarget.name)) {
-          if (resolvedTarget.path === currentFilePath && !parsedTarget.subpath.trim()) {
+          if (
+            resolvedTarget.path === currentFilePath &&
+            !parsedTarget.subpath.trim()
+          ) {
             if (!cancelled) {
-              setError('Cannot embed the entire current note into itself');
+              setError("Cannot embed the entire current note into itself");
               setLoading(false);
             }
             return;
           }
 
-          const sourceContent = resolvedTarget.path === currentFilePath && currentFilePath
-            ? (fileContents?.[currentFilePath] ?? content ?? '')
-            : readFile
-              ? await readFile({
-                  id: resolvedTarget.path,
-                  name: resolvedTarget.name,
-                  type: 'file',
-                  path: resolvedTarget.path,
-                })
-              : '';
+          const sourceContent =
+            resolvedTarget.path === currentFilePath && currentFilePath
+              ? (fileContents?.[currentFilePath] ?? content ?? "")
+              : readFile
+                ? await readFile({
+                    id: resolvedTarget.path,
+                    name: resolvedTarget.name,
+                    type: "file",
+                    path: resolvedTarget.path,
+                  })
+                : "";
 
           // Simple fragment extraction - in real implementation would use extractWikiNoteFragment
-          const title = label || resolvedTarget.name.replace(/\.(md|markdown)$/i, '');
+          const title =
+            label || resolvedTarget.name.replace(/\.(md|markdown)$/i, "");
 
           if (!cancelled) {
             setResolved({
-              type: 'note',
+              type: "note",
               path: resolvedTarget.path,
               name: resolvedTarget.name,
               content: sourceContent,
@@ -153,11 +175,36 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
           return;
         }
 
+        if (isHtmlDocument(resolvedTarget.name)) {
+          const htmlContent = readFile
+            ? await readFile({
+                id: resolvedTarget.path,
+                name: resolvedTarget.name,
+                type: "file",
+                path: resolvedTarget.path,
+              })
+            : "";
+
+          if (!cancelled) {
+            setResolved({
+              type: "html",
+              path: resolvedTarget.path,
+              name: resolvedTarget.name,
+              content: htmlContent,
+              title: label || resolvedTarget.name,
+            });
+            setLoading(false);
+          }
+          return;
+        }
+
         if (!cancelled) {
           setResolved({
-            type: isImageAttachment(resolvedTarget.name) ? 'image'
-                 : isPdfAttachment(resolvedTarget.name) ? 'pdf'
-                 : 'file',
+            type: isImageAttachment(resolvedTarget.name)
+              ? "image"
+              : isPdfAttachment(resolvedTarget.name)
+                ? "pdf"
+                : "file",
             path: resolvedTarget.path,
             name: resolvedTarget.name,
           });
@@ -176,10 +223,18 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [target, currentFilePath, attachmentResolverContext, fileContents, content, readFile, label]);
+  }, [
+    target,
+    currentFilePath,
+    attachmentResolverContext,
+    fileContents,
+    content,
+    readFile,
+    label,
+  ]);
 
   if (loading) {
-    return <span className="text-gray-400">{t('preview_loading')}</span>;
+    return <span className="text-gray-400">{t("preview_loading")}</span>;
   }
 
   if (error || !resolved) {
@@ -187,11 +242,14 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
     if (embedWidth) missingStyle.maxWidth = `${embedWidth}px`;
     if (embedHeight) {
       missingStyle.maxHeight = `${embedHeight}px`;
-      missingStyle.overflow = 'auto';
+      missingStyle.overflow = "auto";
     }
     return (
-      <span className="preview-attachment-file preview-attachment-file-missing" style={missingStyle}>
-        {error || 'Missing attachment'}
+      <span
+        className="preview-attachment-file preview-attachment-file-missing"
+        style={missingStyle}
+      >
+        {error || "Missing attachment"}
       </span>
     );
   }
@@ -200,10 +258,10 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   if (embedWidth) containerStyle.maxWidth = `${embedWidth}px`;
   if (embedHeight) {
     containerStyle.maxHeight = `${embedHeight}px`;
-    containerStyle.overflow = 'auto';
+    containerStyle.overflow = "auto";
   }
 
-  if (resolved.type === 'image') {
+  if (resolved.type === "image") {
     return (
       <img
         src={resolved.path}
@@ -214,14 +272,14 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
           maxWidth: embedWidth,
           height: embedHeight,
           maxHeight: embedHeight,
-          objectFit: embedHeight ? 'contain' : undefined,
+          objectFit: embedHeight ? "contain" : undefined,
         }}
         decoding="async"
       />
     );
   }
 
-  if (resolved.type === 'pdf') {
+  if (resolved.type === "pdf") {
     return (
       <iframe
         src={`${resolved.path}#toolbar=0&navpanes=0&scrollbar=1`}
@@ -233,7 +291,29 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
     );
   }
 
-  if (resolved.type === 'note') {
+  if (resolved.type === "html") {
+    const htmlStyle: React.CSSProperties = { ...containerStyle };
+    if (embedWidth) htmlStyle.width = `${embedWidth}px`;
+    if (embedHeight) {
+      htmlStyle.height = `${embedHeight}px`;
+      htmlStyle.maxHeight = `${embedHeight}px`;
+      htmlStyle.overflow = "auto";
+    }
+    return (
+      <div
+        className="preview-attachment-html preview-html-document"
+        data-html-path={resolved.path}
+        data-html-title={resolved.title || resolved.name}
+        title={resolved.title || resolved.name}
+        style={htmlStyle}
+        dangerouslySetInnerHTML={{
+          __html: sanitizeHtmlPreview(resolved.content || "", true),
+        }}
+      />
+    );
+  }
+
+  if (resolved.type === "note") {
     return (
       <section className="preview-note-embed" style={containerStyle}>
         <div className="preview-note-embed-title">{resolved.title}</div>
@@ -241,7 +321,11 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
           <article
             className="markdown-body preview-note-embed-body"
             dangerouslySetInnerHTML={{
-              __html: renderMarkdown(resolved.content, { highlighter, markdownStylePreset, themeMode }),
+              __html: renderMarkdown(resolved.content, {
+                highlighter,
+                markdownStylePreset,
+                themeMode,
+              }),
             }}
           />
         )}
@@ -254,7 +338,7 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
   if (embedWidth) fileStyle.maxWidth = `${embedWidth}px`;
   if (embedHeight) {
     fileStyle.maxHeight = `${embedHeight}px`;
-    fileStyle.overflow = 'auto';
+    fileStyle.overflow = "auto";
   }
   return (
     <a
@@ -262,11 +346,15 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
       href="#"
       data-attachment-path={resolved.path}
       data-attachment-name={resolved.name}
-      title={`${t('preview_doubleClickReveal')}: ${resolved.name}`}
+      title={`${t("preview_doubleClickReveal")}: ${resolved.name}`}
       style={fileStyle}
     >
-      <span className="preview-attachment-file-name">{label || resolved.name}</span>
-      <span className="preview-attachment-file-hint">{t('preview_doubleClickReveal')}</span>
+      <span className="preview-attachment-file-name">
+        {label || resolved.name}
+      </span>
+      <span className="preview-attachment-file-hint">
+        {t("preview_doubleClickReveal")}
+      </span>
     </a>
   );
 };
