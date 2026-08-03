@@ -418,12 +418,21 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
 
       const flush = async () => {
         try {
+          // Hard cap re-render passes so a diagram that keeps re-queueing
+          // itself (render → DOM mutation → observer → queue) can never spin
+          // this loop forever and freeze the page.
+          const MAX_RENDER_PASSES = 5;
+          let passes = 0;
           do {
             mermaidRenderQueuedRef.current = false;
             await renderMermaidDiagrams(container, {
               themeMode: settings.themeMode as "light" | "dark",
             });
-          } while (mermaidRenderQueuedRef.current);
+            passes += 1;
+          } while (
+            mermaidRenderQueuedRef.current &&
+            passes < MAX_RENDER_PASSES
+          );
         } finally {
           mermaidRenderRunningRef.current = false;
         }
@@ -525,10 +534,16 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       const schedule = throttle(() => {
         const hasPendingMermaid = Array.from(
           container.querySelectorAll<HTMLElement>(".mermaid"),
-        ).some(
-          (el) =>
-            !el.querySelector("svg") || el.dataset.mermaidRendered !== "true",
-        );
+        ).some((el) => {
+          // "error" is a settled state: re-rendering a failed diagram mutates
+          // the DOM again and would loop this observer forever. A source edit
+          // replaces the article HTML (fresh nodes without dataset), so real
+          // changes still re-render.
+          if (el.dataset.mermaidRendered === "error") return false;
+          return (
+            !el.querySelector("svg") || el.dataset.mermaidRendered !== "true"
+          );
+        });
 
         if (hasPendingMermaid) {
           runMermaidInPreview();
