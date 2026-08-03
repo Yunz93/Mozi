@@ -26,8 +26,10 @@ import type { ShikiHighlighter } from "../../../hooks/useShikiHighlighter";
 import {
   buildIframeEmbed,
   configurePreviewImageElement,
+  createPreviewHtmlContainer,
   createPreviewPdfContainer,
   hasUriScheme,
+  isHtmlDocument,
   isImageAttachment,
   isMarkdownNote,
   isPdfAttachment,
@@ -35,10 +37,29 @@ import {
   normalizeExistingIframe,
   resolveExternalVideoEmbed,
 } from "./previewMedia";
+import { sanitizeHtmlPreview } from "./previewRenderCore";
 import {
   protectShikiPresInHtmlString,
   restoreShikiPresFromSnapshots,
 } from "./shikiHtmlSnapshots";
+
+/**
+ * Replace a wiki-embed node, unwrapping a sole parent `<p>` when the
+ * replacement is a block element (avoids invalid `<p><div>…</div></p>`).
+ */
+function replaceWikiEmbedNode(embed: Element, replacement: Node): void {
+  const parent = embed.parentElement;
+  if (
+    parent &&
+    parent.tagName === "P" &&
+    parent.childNodes.length === 1 &&
+    parent.firstChild === embed
+  ) {
+    parent.replaceWith(replacement);
+    return;
+  }
+  embed.replaceWith(replacement);
+}
 
 /**
  * Attach a displayable image `src` without eagerly materializing every file
@@ -404,7 +425,7 @@ export async function enhancePreviewHtml(
           }
 
           noteEmbed.append(title, body);
-          embed.replaceWith(noteEmbed);
+          replaceWikiEmbedNode(embed, noteEmbed);
           return;
         }
 
@@ -454,7 +475,7 @@ export async function enhancePreviewHtml(
             );
           }
 
-          embed.replaceWith(image);
+          replaceWikiEmbedNode(embed, image);
           return;
         }
 
@@ -472,7 +493,7 @@ export async function enhancePreviewHtml(
               resolvedTarget.path,
               currentFilePath || undefined,
             );
-            embed.replaceWith(video);
+            replaceWikiEmbedNode(embed, video);
           } catch {
             embed.className =
               "preview-attachment-file preview-attachment-file-missing";
@@ -496,7 +517,39 @@ export async function enhancePreviewHtml(
             );
             if (embedWidth) pdfContainer.style.width = `${embedWidth}px`;
             if (embedHeight) pdfContainer.style.height = `${embedHeight}px`;
-            embed.replaceWith(pdfContainer);
+            replaceWikiEmbedNode(embed, pdfContainer);
+          } catch {
+            embed.className =
+              "preview-attachment-file preview-attachment-file-missing";
+            embed.textContent = `Failed to preview attachment: ${label || resolvedTarget.name}`;
+          }
+          return;
+        }
+
+        // HTML attachment embed (sanitized, same policy as HTML tab preview)
+        if (isHtmlDocument(resolvedTarget.name)) {
+          try {
+            const htmlContent = await readFile({
+              id: resolvedTarget.path,
+              name: resolvedTarget.name,
+              type: "file",
+              path: resolvedTarget.path,
+            });
+            const htmlContainer = createPreviewHtmlContainer(
+              document,
+              sanitizeHtmlPreview(htmlContent, true),
+              {
+                title: label || resolvedTarget.name,
+                path: resolvedTarget.path,
+              },
+            );
+            if (embedWidth) htmlContainer.style.width = `${embedWidth}px`;
+            if (embedHeight) {
+              htmlContainer.style.height = `${embedHeight}px`;
+              htmlContainer.style.maxHeight = `${embedHeight}px`;
+              htmlContainer.style.overflow = "auto";
+            }
+            replaceWikiEmbedNode(embed, htmlContainer);
           } catch {
             embed.className =
               "preview-attachment-file preview-attachment-file-missing";
@@ -527,7 +580,7 @@ export async function enhancePreviewHtml(
         hint.textContent = "Double-click to reveal in Finder";
 
         attachment.append(fileName, hint);
-        embed.replaceWith(attachment);
+        replaceWikiEmbedNode(embed, attachment);
       } catch (error) {
         console.warn("Failed to process embed:", error);
       }

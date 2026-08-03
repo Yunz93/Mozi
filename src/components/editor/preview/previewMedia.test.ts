@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildIframeEmbed,
   configurePreviewImageElement,
+  createPreviewHtmlContainer,
   createPreviewPdfContainer,
   getLocalPreviewLinkTarget,
   hasEmbeddableMediaLinksInHtml,
@@ -255,5 +256,21 @@ describe("createPreviewPdfContainer", () => {
     expect(container.dataset.pdfTitle).toBe("Paper");
     expect(container.dataset.pdfPath).toBe("/vault/paper.pdf");
     expect(container.dataset.pdfjsState).toBe("pending");
+  });
+});
+
+describe("createPreviewHtmlContainer", () => {
+  it("creates a sanitized HTML attachment host with metadata", () => {
+    const container = createPreviewHtmlContainer(
+      document,
+      "<p>Hello <strong>HTML</strong></p>",
+      { title: "Snippet", path: "/vault/resources/page.html" },
+    );
+
+    expect(container.className).toContain("preview-attachment-html");
+    expect(container.className).toContain("preview-html-document");
+    expect(container.dataset.htmlPath).toBe("/vault/resources/page.html");
+    expect(container.dataset.htmlTitle).toBe("Snippet");
+    expect(container.innerHTML).toContain("<strong>HTML</strong>");
   });
 });
