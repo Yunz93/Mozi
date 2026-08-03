@@ -646,12 +646,19 @@ export async function renderMermaidDiagrams(
     delete el.dataset.mermaidPendingWidth;
 
     const rendererKind = getMermaidRendererKind(def);
-    const stable =
-      el.querySelector("svg") &&
-      el.dataset.mermaidRendered === "true" &&
+    const sameConfig =
       el.dataset.mermaidSource === def &&
       (el.dataset.mermaidTheme ?? "") === themeMode &&
       (el.dataset.mermaidEngine ?? rendererKind) === rendererKind;
+    // A failed diagram ("error") with unchanged source/theme/engine is settled
+    // too: re-rendering it would fail again, mutate the DOM again, and retrigger
+    // the mutation-observer heal pass — an infinite render loop that can freeze
+    // the preview. It re-renders once its source, theme, or engine changes.
+    const stable =
+      sameConfig &&
+      (el.dataset.mermaidRendered === "true"
+        ? Boolean(el.querySelector("svg"))
+        : el.dataset.mermaidRendered === "error");
     if (stable) {
       continue;
     }

@@ -182,9 +182,17 @@ fn main_window_logical_size(app: &tauri::AppHandle) -> Option<(f64, f64)> {
     Some((size.width as f64 / scale, size.height as f64 / scale))
 }
 
+/// Must stay `async`: window-creating commands executed synchronously run on
+/// the main thread and can deadlock the whole app (all windows stop reacting
+/// to input) — see the Tauri docs on creating windows from commands.
 #[tauri::command]
-fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    let Some(normalized) = normalize_opened_file_path(PathBuf::from(path)) else {
+async fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let normalized = tauri::async_runtime::spawn_blocking(move || {
+        normalize_opened_file_path(PathBuf::from(path))
+    })
+    .await
+    .map_err(|e| format!("Failed to join path normalization task: {}", e))?;
+    let Some(normalized) = normalized else {
         return Err("Only existing Markdown files can be opened.".to_string());
     };
 
@@ -341,73 +349,89 @@ async fn list_system_fonts() -> Result<Vec<String>, String> {
         .map_err(|e| format!("Failed to join system font query task: {}", e))?
 }
 
+/// Must stay `async`: `fs::canonicalize` can block for a long time on slow or
+/// disconnected volumes (network drives, cloud placeholders). Running that on
+/// the main thread freezes input handling for every window.
 #[tauri::command]
-fn register_allowed_path(
+async fn register_allowed_path(
     path: String,
     recursive: bool,
     app: tauri::AppHandle,
-    security_state: tauri::State<'_, SecurityState>,
 ) -> Result<(), String> {
-    let canonical = canonicalize_scope_path(&path)?;
-    let fs_scope = app.fs_scope();
+    tauri::async_runtime::spawn_blocking(move || {
+        let canonical = canonicalize_scope_path(&path)?;
+        let fs_scope = app.fs_scope();
 
-    if canonical.is_dir() {
-        fs_scope
-            .allow_directory(&canonical, recursive)
-            .map_err(|e| format!("Failed to register fs scope for directory: {}", e))?;
-    } else {
-        fs_scope
-            .allow_file(&canonical)
-            .map_err(|e| format!("Failed to register fs scope for file: {}", e))?;
-    }
+        if canonical.is_dir() {
+            fs_scope
+                .allow_directory(&canonical, recursive)
+                .map_err(|e| format!("Failed to register fs scope for directory: {}", e))?;
+        } else {
+            fs_scope
+                .allow_file(&canonical)
+                .map_err(|e| format!("Failed to register fs scope for file: {}", e))?;
+        }
 
-    let mut allowed_paths = security_state
-        .allowed_paths
-        .lock()
-        .map_err(|_| "Failed to acquire security state lock.".to_string())?;
+        let security_state = app.state::<SecurityState>();
+        let mut allowed_paths = security_state
+            .allowed_paths
+            .lock()
+            .map_err(|_| "Failed to acquire security state lock.".to_string())?;
 
-    if let Some(existing) = allowed_paths
-        .iter_mut()
-        .find(|entry| entry.path == canonical)
-    {
-        existing.recursive = existing.recursive || recursive;
-        return Ok(());
-    }
+        if let Some(existing) = allowed_paths
+            .iter_mut()
+            .find(|entry| entry.path == canonical)
+        {
+            existing.recursive = existing.recursive || recursive;
+            return Ok(());
+        }
 
-    allowed_paths.push(AllowedPathEntry {
-        path: canonical,
-        recursive,
-    });
+        allowed_paths.push(AllowedPathEntry {
+            path: canonical,
+            recursive,
+        });
 
-    Ok(())
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Failed to join path registration task: {}", e))?
 }
 
+/// Must stay `async`: deleting large directory trees blocks for the whole
+/// duration; on the main thread that freezes input handling for every window.
 #[tauri::command]
-fn delete_path_recursively(
-    path: String,
-    security_state: tauri::State<'_, SecurityState>,
-) -> Result<(), String> {
-    let canonical = canonicalize_existing_path(&path)?;
-    ensure_path_allowed(security_state.inner(), &canonical)?;
+async fn delete_path_recursively(path: String, app: tauri::AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let canonical = canonicalize_existing_path(&path)?;
+        ensure_path_allowed(app.state::<SecurityState>().inner(), &canonical)?;
 
-    if canonical.is_dir() {
-        fs::remove_dir_all(&canonical)
-            .map_err(|e| format!("Failed to delete directory {}: {}", canonical.display(), e))?;
-    } else {
-        fs::remove_file(&canonical)
-            .map_err(|e| format!("Failed to delete file {}: {}", canonical.display(), e))?;
-    }
+        if canonical.is_dir() {
+            fs::remove_dir_all(&canonical)
+                .map_err(|e| format!("Failed to delete directory {}: {}", canonical.display(), e))?;
+        } else {
+            fs::remove_file(&canonical)
+                .map_err(|e| format!("Failed to delete file {}: {}", canonical.display(), e))?;
+        }
 
-    Ok(())
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Failed to join delete task: {}", e))?
 }
 
+/// Must stay `async`: this waits for a child process (`open` / `explorer` /
+/// `xdg-open`) to exit, which can block indefinitely; on the main thread that
+/// freezes input handling for every window.
 #[tauri::command]
-fn reveal_in_explorer(
-    path: String,
-    security_state: tauri::State<'_, SecurityState>,
-) -> Result<(), String> {
-    let canonical = canonicalize_existing_path(&path)?;
-    ensure_path_allowed(security_state.inner(), &canonical)?;
+async fn reveal_in_explorer(path: String, app: tauri::AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || reveal_in_explorer_blocking(&app, &path))
+        .await
+        .map_err(|e| format!("Failed to join reveal task: {}", e))?
+}
+
+fn reveal_in_explorer_blocking(app: &tauri::AppHandle, path: &str) -> Result<(), String> {
+    let canonical = canonicalize_existing_path(path)?;
+    ensure_path_allowed(app.state::<SecurityState>().inner(), &canonical)?;
 
     #[cfg(target_os = "macos")]
     {
