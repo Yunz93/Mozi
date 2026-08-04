@@ -93,6 +93,10 @@ export default defineConfig(({ mode }) => {
               return "mermaid-vendor";
             }
 
+            if (id.includes("/@excalidraw/")) {
+              return "excalidraw-vendor";
+            }
+
             if (id.includes("/@google/genai/")) {
               return "ai-vendor";
             }

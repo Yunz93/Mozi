@@ -29,6 +29,7 @@ import {
   createPreviewHtmlContainer,
   createPreviewPdfContainer,
   hasUriScheme,
+  isExcalidrawAttachment,
   isHtmlDocument,
   isImageAttachment,
   isMarkdownNote,
@@ -37,6 +38,10 @@ import {
   normalizeExistingIframe,
   resolveExternalVideoEmbed,
 } from "./previewMedia";
+import {
+  createExcalidrawEmbedContainer,
+  renderExcalidrawEmbedSvg,
+} from "../../../utils/excalidrawEmbed";
 import { sanitizeHtmlPreview } from "./previewRenderCore";
 import {
   protectShikiPresInHtmlString,
@@ -550,6 +555,33 @@ export async function enhancePreviewHtml(
               htmlContainer.style.overflow = "auto";
             }
             replaceWikiEmbedNode(embed, htmlContainer);
+          } catch {
+            embed.className =
+              "preview-attachment-file preview-attachment-file-missing";
+            embed.textContent = `Failed to preview attachment: ${label || resolvedTarget.name}`;
+          }
+          return;
+        }
+
+        // Excalidraw drawing embed (static SVG preview)
+        if (isExcalidrawAttachment(resolvedTarget.name)) {
+          try {
+            const drawingContent = await readFile({
+              id: resolvedTarget.path,
+              name: resolvedTarget.name,
+              type: "file",
+              path: resolvedTarget.path,
+            });
+            const drawingContainer = createExcalidrawEmbedContainer(document, {
+              title: label || resolvedTarget.name,
+              path: resolvedTarget.path,
+              width: embedWidth,
+              height: embedHeight,
+            });
+            replaceWikiEmbedNode(embed, drawingContainer);
+            await renderExcalidrawEmbedSvg(drawingContainer, drawingContent, {
+              title: label || resolvedTarget.name,
+            });
           } catch {
             embed.className =
               "preview-attachment-file preview-attachment-file-missing";

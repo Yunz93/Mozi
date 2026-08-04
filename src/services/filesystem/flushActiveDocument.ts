@@ -3,7 +3,7 @@ import { getFileSystem } from "../../types/filesystem";
 import { flushActiveEditorPendingChanges } from "../../utils/editorSelectionBridge";
 import { clearDraftBackup } from "../../utils/draftBackup";
 import { findFileInTree } from "../../utils/fileTree";
-import { isMarkdownDocumentPath } from "../../utils/markdownFormat";
+import { isSavableDocumentPath } from "../../utils/markdownFormat";
 
 /**
  * Persist the currently open document if it has unsaved changes.
@@ -24,7 +24,7 @@ export async function flushActiveDocumentIfDirty(): Promise<boolean> {
     return false;
   }
 
-  if (!isMarkdownDocumentPath(node.path)) {
+  if (!isSavableDocumentPath(node.path)) {
     state.markAsSaved(tabId, tabContent);
     return true;
   }

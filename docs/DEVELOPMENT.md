@@ -12,6 +12,7 @@
 - 代码高亮: [Shiki](https://shiki.style/)
 - 数学公式: [KaTeX](https://katex.org/)
 - 图表: [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)（Mermaid 语法，常见类型）+ [Mermaid](https://mermaid.js.org/)（其余类型回退）
+- 画板: [Excalidraw](https://excalidraw.com/)（`.excalidraw` 文件编辑与笔记内嵌预览）
 - AI: [Google Gemini API](https://ai.google.dev/) / [OpenAI API](https://platform.openai.com/)
 
 ## 环境要求

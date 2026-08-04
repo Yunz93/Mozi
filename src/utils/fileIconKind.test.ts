@@ -14,6 +14,11 @@ describe("getFileIconKind", () => {
     expect(getFileIconKind("doc.pdf")).toBe("pdf");
   });
 
+  it("classifies excalidraw drawings", () => {
+    expect(getFileIconKind("board.excalidraw")).toBe("excalidraw");
+    expect(getFileIconKind("board.excalidraw.json")).toBe("excalidraw");
+  });
+
   it("classifies archives and media", () => {
     expect(getFileIconKind("b.zip")).toBe("archive");
     expect(getFileIconKind("c.mp3")).toBe("audio");
@@ -70,6 +75,11 @@ describe("getFileTypeBadge", () => {
     expect(getFileTypeBadge("note.md")).toBe("MD");
     expect(getFileTypeBadge("page.markdown")).toBe("MD");
     expect(getFileTypeBadge("x.mdx")).toBe("MD");
+  });
+
+  it("uses DRAW for excalidraw", () => {
+    expect(getFileTypeBadge("board.excalidraw")).toBe("DRAW");
+    expect(getFileTypeBadge("board.excalidraw.json")).toBe("DRAW");
   });
 
   it("uppercases common extensions", () => {

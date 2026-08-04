@@ -44,6 +44,7 @@ Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run
 
 - **Local vault**: Folder-based library with tabs, sidebar, and search; notes and assets stay on disk under your control.
 - **Source / Split / Reading**: Three view modes; preview renders Markdown plus common extensions (math, diagrams, highlighted code); outline for structure at a glance.
+- **Excalidraw drawings**: Open and edit `.excalidraw` files, create drawings from the sidebar, and embed static previews with `![[drawing.excalidraw]]` (click to edit).
 - **Knowledge-base Markdown**: Familiar wiki links and `![[embeds]]`, configurable YAML metadata and templates, images handled in the same reference flow.
 - **Knowledge layer (Beta)**: Backlinks and outgoing links panel, related-notes recommendations (local semantic search), Ask Vault Q&A with source citations; built-in local embedding with an optional privacy mode that blocks non-local endpoints.
 - **Export & publish**: PDF, HTML, and a single long-image share from the preview; toolbar publishing to **simple-blog** (GitHub + Vercel) or **WeChat Official Account drafts**.

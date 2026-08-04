@@ -316,3 +316,10 @@ html:not(.dark) .markdown-body:not(.preview-pane-document) {
   color: #c9d1d9;
   --color-canvas-default: transparent;
 }
+
+.excalidraw-pane,
+.excalidraw-pane .excalidraw {
+  height: 100%;
+  width: 100%;
+}
+

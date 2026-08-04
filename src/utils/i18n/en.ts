@@ -22,6 +22,7 @@ export default {
   app_newFile: "New File",
   app_fileName: "File name:",
   app_untitled: "Untitled",
+  app_untitledDrawing: "Untitled Drawing",
   app_untitledFolder: "Untitled Folder",
 
   toolbar_hideSidebar: "Hide sidebar",
@@ -274,6 +275,7 @@ export default {
   sidebar_cleanupUnusedAttachmentsConfirm:
     "Move {count} unreferenced attachment(s) to Trash. You can restore them from Trash later.",
   sidebar_newFileTitle: "New File",
+  sidebar_newDrawingTitle: "New Drawing",
   sidebar_renameTitle: "Rename",
   sidebar_newFolderTitle: "New Folder",
   sidebar_folderName: "Folder name:",
@@ -287,6 +289,7 @@ export default {
   context_restore: "Restore",
   context_deleteForever: "Delete Permanently",
   context_newFile: "New File",
+  context_newDrawing: "New Drawing",
   context_newFolder: "New Folder",
   context_rename: "Rename",
   context_copyRelativePath: "Copy Path",
@@ -983,4 +986,7 @@ export default {
   preview_imageAlt: "Preview image",
   preview_pdfTitle: "PDF preview",
   preview_unsupported: "Preview is not supported for this file type.",
+  excalidraw_loading: "Loading drawing…",
+  excalidraw_loadFailed: "Failed to load the Excalidraw editor",
+  excalidraw_invalidDocument: "Could not parse this Excalidraw file",
 } as const;

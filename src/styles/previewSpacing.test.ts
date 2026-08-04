@@ -89,6 +89,7 @@ describe("preview spacing CSS", () => {
     expect(css).toMatch(/\.preview-pane-properties\b/);
     expect(css).toMatch(/\.preview-attachment-pdf\b/);
     expect(css).toMatch(/\.preview-attachment-html\b/);
+    expect(css).toMatch(/\.preview-attachment-excalidraw\b/);
     expect(css).toMatch(/\.preview-attachment-video\b/);
     expect(css).toMatch(/\.preview-note-embed\b/);
     expect(css).toMatch(/\.preview-external-video-embed\b/);

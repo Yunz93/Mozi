@@ -4,7 +4,11 @@ import { findFileInTree } from "./appShellUtils";
 import type { FileNode } from "../types";
 import type { FileWatchEvent } from "../types/filesystem";
 import type { TranslationKey } from "../utils/i18n";
-import { isMarkdownFile, isPreviewOnlyFile } from "../utils/fileTypes";
+import {
+  isExcalidrawFile,
+  isMarkdownFile,
+  isPreviewOnlyFile,
+} from "../utils/fileTypes";
 
 interface UseActiveFileWatchOptions {
   activeTabId: string | null;
@@ -25,7 +29,11 @@ interface UseActiveFileWatchOptions {
 
 function shouldWatchTabContent(node: FileNode | undefined): boolean {
   if (!node || node.type !== "file") return false;
-  return isMarkdownFile(node.name) || isPreviewOnlyFile(node.name);
+  return (
+    isMarkdownFile(node.name) ||
+    isExcalidrawFile(node.name) ||
+    isPreviewOnlyFile(node.name)
+  );
 }
 
 async function reloadTabFromDisk(

@@ -9,6 +9,7 @@ export type FileIconKind =
   | "audio"
   | "video"
   | "code"
+  | "excalidraw"
   | "file";
 
 const MARKDOWN = new Set(["md", "markdown", "mdx"]);
@@ -141,6 +142,11 @@ export function getFileExtension(fileName: string): string | null {
 }
 
 export function getFileIconKind(fileName: string): FileIconKind {
+  const base = fileName.trim().toLowerCase();
+  if (base.endsWith(".excalidraw") || base.endsWith(".excalidraw.json")) {
+    return "excalidraw";
+  }
+
   const ext = getFileExtension(fileName);
   if (!ext) return "file";
 
@@ -164,6 +170,7 @@ export function getFileIconKind(fileName: string): FileIconKind {
 export function getFileTypeBadge(fileName: string): string | null {
   const kind = getFileIconKind(fileName);
   if (kind === "markdown") return "MD";
+  if (kind === "excalidraw") return "DRAW";
 
   const ext = getFileExtension(fileName);
   if (!ext) return null;

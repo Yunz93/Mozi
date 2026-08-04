@@ -14,6 +14,7 @@ import {
   isImageAttachment,
   isLocalPreviewLinkHref,
   isMarkdownNote,
+  isExcalidrawAttachment,
   isPdfAttachment,
   isVideoAttachment,
   normalizeExistingIframe,
@@ -238,6 +239,8 @@ describe("attachment type helpers", () => {
     expect(isPdfAttachment("paper.pdf")).toBe(true);
     expect(isMarkdownNote("note.markdown")).toBe(true);
     expect(isHtmlDocument("page.HTM")).toBe(true);
+    expect(isExcalidrawAttachment("board.excalidraw")).toBe(true);
+    expect(isExcalidrawAttachment("board.excalidraw.json")).toBe(true);
     expect(isImageAttachment("readme.txt")).toBe(false);
   });
 });

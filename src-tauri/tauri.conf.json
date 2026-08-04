@@ -46,6 +46,14 @@
         "role": "Editor",
         "rank": "Default",
         "contentTypes": ["net.daringfireball.markdown"]
+      },
+      {
+        "ext": ["excalidraw"],
+        "mimeType": "application/vnd.excalidraw+json",
+        "name": "Excalidraw Drawing",
+        "description": "Excalidraw drawing",
+        "role": "Editor",
+        "rank": "Alternate"
       }
     ],
     "icon": [

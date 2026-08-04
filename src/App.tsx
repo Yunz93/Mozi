@@ -43,7 +43,7 @@ import { getResolvedUiFontFamily } from "./utils/fontSettings";
 import { logEnvironment, assertDevReleaseParity } from "./utils/environment";
 import { useI18n } from "./hooks/useI18n";
 import { getPathBasename, findFileInTree } from "./app/appShellUtils";
-import { isPreviewOnlyFile } from "./utils/fileTypes";
+import { isExcalidrawFile, isPreviewOnlyFile } from "./utils/fileTypes";
 import { getResolvedEditorFontFamily } from "./utils/fontSettings";
 import { useAppBootstrap } from "./app/useAppBootstrap";
 import { useActiveFileWatch } from "./app/useActiveFileWatch";
@@ -270,6 +270,11 @@ const App: React.FC = () => {
   const isPreviewOnlyActiveFile = activeFile
     ? isPreviewOnlyFile(activeFile.name)
     : false;
+  const isExcalidrawActiveFile = activeFile
+    ? isExcalidrawFile(activeFile.name)
+    : false;
+  const isNonMarkdownWorkspaceFile =
+    isPreviewOnlyActiveFile || isExcalidrawActiveFile;
 
   // Global keyboard shortcuts
   useUiFontSizeKeyboardShortcuts();
@@ -331,7 +336,7 @@ const App: React.FC = () => {
       onExportPdf: () => {
         void handleExportToPdf();
       },
-      onToggleView: isPreviewOnlyActiveFile ? () => {} : undefined,
+      onToggleView: isNonMarkdownWorkspaceFile ? () => {} : undefined,
     },
   );
 
@@ -508,12 +513,12 @@ const App: React.FC = () => {
   }, [openDirectory, forceSave, showNotification, t]);
 
   const handleOpenPublishDialog = useCallback(() => {
-    if (isPreviewOnlyActiveFile) {
+    if (isNonMarkdownWorkspaceFile) {
       showNotification(t("notifications_exportMarkdownOnly"), "error");
       return;
     }
     setIsPublishTargetDialogOpen(true);
-  }, [isPreviewOnlyActiveFile, showNotification, t]);
+  }, [isNonMarkdownWorkspaceFile, showNotification, t]);
 
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
@@ -729,6 +734,9 @@ const App: React.FC = () => {
             onCreateFile={(folder, fileName) =>
               fileOps.handleCreateFile(folder, fileName)
             }
+            onCreateDrawing={(folder, fileName) =>
+              void fileOps.handleCreateDrawing(folder, fileName)
+            }
             onNewFolder={(folder, name) =>
               fileOps.handleNewFolder(folder, name)
             }
@@ -782,7 +790,7 @@ const App: React.FC = () => {
               onShareLongImage={() => {
                 setIsShareLongImageDialogOpen(true);
               }}
-              isPreviewOnlyFile={isPreviewOnlyActiveFile}
+              isPreviewOnlyFile={isNonMarkdownWorkspaceFile}
             />
 
             <div className="flex-1 min-w-0 flex overflow-hidden relative">

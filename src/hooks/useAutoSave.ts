@@ -14,6 +14,7 @@ import { findFileInTree } from "../utils/fileTree";
 import {
   formatMarkdownForSave,
   isMarkdownDocumentPath,
+  isSavableDocumentPath,
 } from "../utils/markdownFormat";
 
 interface UseAutoSaveOptions {
@@ -203,7 +204,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         return false;
       }
 
-      if (!isMarkdownDocumentPath(node.path)) {
+      if (!isSavableDocumentPath(node.path)) {
         return true;
       }
 
@@ -280,7 +281,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
       if (!savePath || !tabId) return false;
       if (resolvedNode && resolvedNode.id !== tabId) return false;
-      if (!isMarkdownDocumentPath(savePath)) return false;
+      if (!isSavableDocumentPath(savePath)) return false;
       if (!isTabContentLoaded(tabId)) return false;
 
       const shouldFormatBeforeSave =
@@ -331,7 +332,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
         const shouldRefreshFrontmatter =
           options?.trigger !== "auto" &&
-          settings.refreshFrontmatterOnSave !== false;
+          settings.refreshFrontmatterOnSave !== false &&
+          isMarkdownDocumentPath(savePath);
 
         contentToSave = shouldRefreshFrontmatter
           ? refreshDocumentUpdateTime(preparedContent)

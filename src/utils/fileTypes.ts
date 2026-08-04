@@ -1,4 +1,5 @@
 import type { FileNode } from "../types";
+import { isExcalidrawFileName } from "./excalidrawDocument";
 
 /**
  * Shared file-type predicates keyed off a file name (or path).
@@ -22,6 +23,17 @@ export function isMarkdownFile(name: string): boolean {
   return /\.(md|markdown)$/i.test(name);
 }
 
+export function isExcalidrawFile(name: string): boolean {
+  return isExcalidrawFileName(name);
+}
+
+/**
+ * Text documents persisted via the shared autosave / flush pipeline.
+ */
+export function isSavableDocumentFile(name: string): boolean {
+  return isMarkdownFile(name) || isExcalidrawFile(name);
+}
+
 /**
  * Files that can be displayed but not edited as markdown.
  */
@@ -30,12 +42,14 @@ export function isPreviewOnlyFile(name: string): boolean {
 }
 
 /**
- * A tree node that can be opened in a tab (markdown or preview-only file).
+ * A tree node that can be opened in a tab (markdown, drawing, or preview-only).
  */
 export function isOpenableFile(node: FileNode): boolean {
   return (
     node.type === "file" &&
-    (isMarkdownFile(node.name) || isPreviewOnlyFile(node.name))
+    (isMarkdownFile(node.name) ||
+      isExcalidrawFile(node.name) ||
+      isPreviewOnlyFile(node.name))
   );
 }
 
@@ -43,7 +57,7 @@ export function isOpenableFile(node: FileNode): boolean {
  * Whether initial file content should be read eagerly when opening a workspace.
  */
 export function shouldReadInitialFileContent(name: string): boolean {
-  return isMarkdownFile(name) || isHtmlFile(name);
+  return isMarkdownFile(name) || isHtmlFile(name) || isExcalidrawFile(name);
 }
 
 /**
@@ -53,6 +67,9 @@ export function shouldReadInitialFileContent(name: string): boolean {
 export function getRenameDialogDefaultValue(fileName: string): string {
   if (/\.(md|markdown)$/i.test(fileName)) {
     return fileName.replace(/\.(md|markdown)$/i, "");
+  }
+  if (isExcalidrawFile(fileName)) {
+    return fileName.replace(/\.excalidraw(?:\.json)?$/i, "");
   }
   return fileName;
 }
@@ -72,6 +89,12 @@ export function resolveRenamedFileName(
   if (isMarkdownFile(oldName)) {
     if (/\.(md|markdown)$/i.test(trimmed)) return trimmed;
     const oldExt = oldName.match(/\.(md|markdown)$/i)?.[0] ?? ".md";
+    return `${trimmed}${oldExt}`;
+  }
+
+  if (isExcalidrawFile(oldName)) {
+    if (/\.excalidraw(?:\.json)?$/i.test(trimmed)) return trimmed;
+    const oldExt = oldName.match(/\.excalidraw(?:\.json)?$/i)?.[0] ?? ".excalidraw";
     return `${trimmed}${oldExt}`;
   }
 

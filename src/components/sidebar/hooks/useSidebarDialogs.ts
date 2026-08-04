@@ -5,6 +5,7 @@ import { t } from '../../../utils/i18n';
 
 export type DialogType =
   | 'newFile'
+  | 'newDrawing'
   | 'rename'
   | 'newFolder'
   | 'delete'
@@ -19,6 +20,7 @@ export interface DialogState {
 
 export interface UseSidebarDialogsOptions {
   onCreateFile?: (folder: FileNode | undefined, name: string) => void;
+  onCreateDrawing?: (folder: FileNode | undefined, name: string) => void;
   onRename?: (file: FileNode, name: string) => void;
   onNewFolder?: (folder: FileNode | undefined, name: string) => void;
   onDelete?: (file: FileNode) => void;
@@ -29,12 +31,14 @@ export interface UseSidebarDialogsReturn {
   dialogState: DialogState;
   setDialogState: (state: DialogState) => void;
   openNewFileDialog: (folder?: FileNode, defaultValue?: string) => void;
+  openNewDrawingDialog: (folder?: FileNode, defaultValue?: string) => void;
   openRenameDialog: (file: FileNode, defaultValue?: string) => void;
   openNewFolderDialog: (folder?: FileNode) => void;
   openDeleteDialog: (file: FileNode) => void;
   openEmptyTrashDialog: () => void;
   closeDialog: () => void;
   handleNewFileConfirm: (folder: FileNode | undefined, value: string) => void;
+  handleNewDrawingConfirm: (folder: FileNode | undefined, value: string) => void;
   handleRenameConfirm: (file: FileNode | undefined, value: string) => void;
   handleNewFolderConfirm: (folder: FileNode | undefined, value: string) => void;
   handleDeleteConfirm: (file: FileNode | undefined) => void;
@@ -42,7 +46,14 @@ export interface UseSidebarDialogsReturn {
 }
 
 export function useSidebarDialogs(options: UseSidebarDialogsOptions): UseSidebarDialogsReturn {
-  const { onCreateFile, onRename, onNewFolder, onDelete, onEmptyTrash } = options;
+  const {
+    onCreateFile,
+    onCreateDrawing,
+    onRename,
+    onNewFolder,
+    onDelete,
+    onEmptyTrash,
+  } = options;
   const [dialogState, setDialogState] = useState<DialogState>({ type: null });
 
   const closeDialog = useCallback(() => {
@@ -51,6 +62,10 @@ export function useSidebarDialogs(options: UseSidebarDialogsOptions): UseSidebar
 
   const openNewFileDialog = useCallback((folder?: FileNode, defaultValue = t(useAppStore.getState().settings.language, 'app_untitled')) => {
     setDialogState({ type: 'newFile', file: folder, defaultValue });
+  }, []);
+
+  const openNewDrawingDialog = useCallback((folder?: FileNode, defaultValue = t(useAppStore.getState().settings.language, 'app_untitledDrawing')) => {
+    setDialogState({ type: 'newDrawing', file: folder, defaultValue });
   }, []);
 
   const openRenameDialog = useCallback((file: FileNode, defaultValue?: string) => {
@@ -77,6 +92,16 @@ export function useSidebarDialogs(options: UseSidebarDialogsOptions): UseSidebar
       closeDialog();
     },
     [onCreateFile, closeDialog]
+  );
+
+  const handleNewDrawingConfirm = useCallback(
+    (folder: FileNode | undefined, value: string) => {
+      if (onCreateDrawing && value.trim()) {
+        onCreateDrawing(folder, value.trim());
+      }
+      closeDialog();
+    },
+    [onCreateDrawing, closeDialog]
   );
 
   const handleRenameConfirm = useCallback(
@@ -123,12 +148,14 @@ export function useSidebarDialogs(options: UseSidebarDialogsOptions): UseSidebar
     dialogState,
     setDialogState,
     openNewFileDialog,
+    openNewDrawingDialog,
     openRenameDialog,
     openNewFolderDialog,
     openDeleteDialog,
     openEmptyTrashDialog,
     closeDialog,
     handleNewFileConfirm,
+    handleNewDrawingConfirm,
     handleRenameConfirm,
     handleNewFolderConfirm,
     handleDeleteConfirm,

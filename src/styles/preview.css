@@ -329,6 +329,49 @@
   box-sizing: border-box;
 }
 
+.preview-attachment-excalidraw,
+.preview-pane-document.markdown-body .preview-attachment-excalidraw {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 160px;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.2));
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.96);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.preview-attachment-excalidraw-status {
+  display: flex;
+  min-height: 120px;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.preview-attachment-excalidraw-figure {
+  margin: 0;
+}
+
+.preview-attachment-excalidraw-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+}
+
+.preview-attachment-excalidraw-caption {
+  margin-top: 0.5rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 .preview-pdfjs-pages {
   display: flex;
   flex-direction: column;
@@ -915,6 +958,18 @@
   border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.16));
   background: var(--mp-doc-code-bg, rgba(15, 23, 42, 0.82));
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
+}
+
+.dark .preview-attachment-excalidraw,
+.dark .preview-pane-document.markdown-body .preview-attachment-excalidraw {
+  border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.16));
+  background: var(--mp-doc-code-bg, rgba(15, 23, 42, 0.82));
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
+}
+
+.dark .preview-attachment-excalidraw-status,
+.dark .preview-attachment-excalidraw-caption {
+  color: var(--mp-doc-muted, #94a3b8);
 }
 
 .dark .preview-pdfjs-page {
