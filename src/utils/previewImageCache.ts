@@ -308,6 +308,45 @@ export function getCachedPreviewImageSrc(
   );
 }
 
+/**
+ * Drop cached preview URLs for a vault path (or all entries). Call when the
+ * filesystem revokes an object URL so we never reuse a dead `blob:` link.
+ */
+export function invalidateCachedPreviewImageSrc(path?: string): void {
+  if (!path) {
+    resolvedPreviewImageCache.clear();
+    previewImageLoadCache.clear();
+    return;
+  }
+
+  const needle = path.replace(/\\/g, "/");
+  for (const key of [...resolvedPreviewImageCache.keys()]) {
+    const separator = key.indexOf("::");
+    const cachedSrc = separator >= 0 ? key.slice(separator + 2) : key;
+    const normalizedCached = cachedSrc.replace(/\\/g, "/");
+    if (
+      normalizedCached === needle ||
+      normalizedCached.endsWith(`/${needle}`) ||
+      needle.endsWith(`/${normalizedCached}`)
+    ) {
+      resolvedPreviewImageCache.delete(key);
+    }
+  }
+
+  for (const key of [...previewImageLoadCache.keys()]) {
+    const separator = key.indexOf("::");
+    const cachedSrc = separator >= 0 ? key.slice(separator + 2) : key;
+    const normalizedCached = cachedSrc.replace(/\\/g, "/");
+    if (
+      normalizedCached === needle ||
+      normalizedCached.endsWith(`/${needle}`) ||
+      needle.endsWith(`/${normalizedCached}`)
+    ) {
+      previewImageLoadCache.delete(key);
+    }
+  }
+}
+
 export function hydrateCachedPreviewImageSources(
   html: string,
   sourceFilePath?: string,
@@ -495,7 +534,13 @@ export function mountLazyPreviewImageWarming(
   const pendingImages = container.querySelectorAll<HTMLImageElement>(
     'img[data-preview-warmed="pending"], img[data-preview-pending-src]',
   );
-  pendingImages.forEach((image) => observer.observe(image));
+  // Eagerly enqueue known pending images. IntersectionObserver alone is
+  // unreliable with `content-visibility: auto` / rapid preview re-enhance
+  // after paste (images stay on empty-src placeholders).
+  pendingImages.forEach((image) => {
+    observer.observe(image);
+    enqueue(image);
+  });
 
   return () => {
     cancelled = true;

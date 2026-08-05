@@ -84,6 +84,13 @@ export class TauriFileSystem implements IFileSystem {
       URL.revokeObjectURL(cached);
       this.objectUrls.delete(path);
     }
+    void import("../utils/previewImageCache")
+      .then(({ invalidateCachedPreviewImageSrc }) => {
+        invalidateCachedPreviewImageSrc(path);
+      })
+      .catch(() => {
+        // Preview cache module may be unavailable in non-UI contexts.
+      });
   }
 
   private async isDirectory(path: string): Promise<boolean> {

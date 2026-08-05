@@ -60,6 +60,13 @@ export class BrowserFileSystem implements IFileSystem {
       URL.revokeObjectURL(url);
       this.objectUrls.delete(cachedPath);
       this.objectUrlPromises.delete(cachedPath);
+      void import("../utils/previewImageCache")
+        .then(({ invalidateCachedPreviewImageSrc }) => {
+          invalidateCachedPreviewImageSrc(cachedPath);
+        })
+        .catch(() => {
+          // Preview cache module may be unavailable in non-UI contexts.
+        });
     }
   }
 
