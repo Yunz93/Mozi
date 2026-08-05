@@ -5,6 +5,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { tableLiveOverlay } from "./tableLiveOverlay";
+import { useAppStore } from "../../store/appStore";
 
 function createView(doc: string): EditorView {
   const parent = document.createElement("div");
@@ -18,31 +19,40 @@ function createView(doc: string): EditorView {
   });
 }
 
-function toolbarButton(
+function focusBodyCell(
   view: EditorView,
-  label: string,
-): HTMLButtonElement | null {
-  const buttons = Array.from(
-    view.dom.querySelectorAll<HTMLButtonElement>(".mp-live-table-tool-btn"),
-  );
-  return buttons.find((button) => button.textContent === label) ?? null;
-}
-
-function clickToolbar(view: EditorView, label: string): void {
-  const button = toolbarButton(view, label);
-  expect(button).not.toBeNull();
-  button!.dispatchEvent(
-    new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
-  );
-}
-
-function focusBodyCell(view: EditorView, row: number, col: number): void {
+  row: number,
+  col: number,
+): HTMLElement {
   const cell = view.dom.querySelector<HTMLElement>(
     `.mp-live-table-cell[data-row="${row}"][data-col="${col}"]`,
   );
   expect(cell).not.toBeNull();
   cell!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
   cell!.focus();
+  return cell!;
+}
+
+function openContextMenu(cell: HTMLElement): void {
+  cell.dispatchEvent(
+    new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 40,
+      clientY: 40,
+    }),
+  );
+}
+
+function clickContextMenuItem(label: string): void {
+  const items = Array.from(
+    document.querySelectorAll<HTMLButtonElement>(".mp-live-table-menu-item"),
+  );
+  const item = items.find((button) => button.textContent === label) ?? null;
+  expect(item).not.toBeNull();
+  item!.dispatchEvent(
+    new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+  );
 }
 
 describe("tableLiveOverlay", () => {
@@ -50,13 +60,16 @@ describe("tableLiveOverlay", () => {
     document.body.innerHTML = "";
   });
 
-  it("renders an editable HTML table over GFM pipe source", () => {
+  it("renders an editable HTML table over GFM pipe source without a toolbar", () => {
     const view = createView(
       ["| Name | Age |", "| --- | --- |", "| Ada | 36 |"].join("\n"),
     );
 
     const wrap = view.dom.querySelector(".mp-live-table-wrap");
     expect(wrap).not.toBeNull();
+    expect(view.dom.querySelector(".mp-live-table-toolbar")).toBeNull();
+    expect(view.dom.querySelector(".mp-live-table-tool-btn")).toBeNull();
+    expect(view.dom.querySelector(".mp-live-table-hint")).toBeNull();
     expect(view.dom.querySelectorAll(".mp-live-table-cell").length).toBe(4);
     expect(view.dom.textContent).toContain("Ada");
     expect(view.dom.textContent).toContain("36");
@@ -64,12 +77,17 @@ describe("tableLiveOverlay", () => {
     view.destroy();
   });
 
-  it("inserts a row via the toolbar button", () => {
+  it("inserts a row via the context menu", () => {
+    useAppStore.setState((state) => ({
+      settings: { ...state.settings, language: "en" },
+    }));
     const view = createView(
       ["| Name | Age |", "| --- | --- |", "| Ada | 36 |"].join("\n"),
     );
 
-    clickToolbar(view, "+R");
+    const cell = focusBodyCell(view, 1, 0);
+    openContextMenu(cell);
+    clickContextMenuItem("Insert row below");
 
     expect(view.state.doc.toString()).toContain("|  |  |");
     expect(view.dom.querySelectorAll(".mp-live-table tr").length).toBe(3);
@@ -77,34 +95,42 @@ describe("tableLiveOverlay", () => {
     view.destroy();
   });
 
-  it("inserts and deletes columns via toolbar buttons", () => {
+  it("inserts and deletes columns via the context menu", () => {
+    useAppStore.setState((state) => ({
+      settings: { ...state.settings, language: "en" },
+    }));
     const view = createView(
       ["| Name | Age |", "| --- | --- |", "| Ada | 36 |"].join("\n"),
     );
 
-    clickToolbar(view, "+C");
-    // +C inserts to the right of the default header cell (col 0)
+    const header = focusBodyCell(view, 0, 0);
+    openContextMenu(header);
+    clickContextMenuItem("Insert column right");
     expect(view.state.doc.toString().split("\n")[0]).toBe("| Name |  | Age |");
     expect(view.dom.querySelectorAll(".mp-live-table-cell").length).toBe(6);
 
-    // Widget rebuild resets activeCell; focus the empty column before −C
-    focusBodyCell(view, 0, 1);
-    clickToolbar(view, "−C");
+    const emptyCol = focusBodyCell(view, 0, 1);
+    openContextMenu(emptyCol);
+    clickContextMenuItem("Delete column");
     expect(view.state.doc.toString().split("\n")[0]).toBe("| Name | Age |");
     expect(view.dom.querySelectorAll(".mp-live-table-cell").length).toBe(4);
 
     view.destroy();
   });
 
-  it("deletes a body row via the toolbar after focusing that row", () => {
+  it("deletes a body row via the context menu after focusing that row", () => {
+    useAppStore.setState((state) => ({
+      settings: { ...state.settings, language: "en" },
+    }));
     const view = createView(
       ["| Name | Age |", "| --- | --- |", "| Ada | 36 |", "| Bob | 28 |"].join(
         "\n",
       ),
     );
 
-    focusBodyCell(view, 1, 0);
-    clickToolbar(view, "−R");
+    const cell = focusBodyCell(view, 1, 0);
+    openContextMenu(cell);
+    clickContextMenuItem("Delete row");
 
     const doc = view.state.doc.toString();
     expect(doc).not.toContain("Ada");

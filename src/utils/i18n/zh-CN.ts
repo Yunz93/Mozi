@@ -885,7 +885,6 @@ export default {
 
   editor_emptyState: "选择文件开始编辑",
   editor_placeholder: "开始输入...",
-  table_cellHint: "工具栏或右键可增删行列；Tab / Enter 导航单元格",
   table_insertRowAbove: "在上方插入行",
   table_insertRowBelow: "在下方插入行",
   table_deleteRow: "删除行",
