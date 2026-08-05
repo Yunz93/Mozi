@@ -1096,20 +1096,16 @@
   width: 100%;
   max-width: 100%;
   margin: 0.55em 0 0.85em;
-  padding: 0.45rem 0.55rem 0.55rem;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 10px;
-  background: color-mix(
-    in srgb,
-    var(--mp-doc-code-bg, #f8fafc) 72%,
-    transparent
-  );
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-sizing: border-box;
 }
 
 .dark .editor-pane-layout .mp-live-table-wrap {
-  border-color: rgba(148, 163, 184, 0.18);
-  background: color-mix(in srgb, rgba(15, 23, 42, 0.9) 80%, transparent);
+  border: 0;
+  background: transparent;
 }
 
 .editor-pane-layout .mp-live-table {
