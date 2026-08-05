@@ -263,20 +263,17 @@ describe("createPreviewPdfContainer", () => {
 });
 
 describe("createPreviewHtmlContainer", () => {
-  it("creates a plain-text HTML source host with metadata", () => {
-    const source = "<p>Hello <strong>HTML</strong></p>";
-    const container = createPreviewHtmlContainer(document, source, {
-      title: "Snippet",
-      path: "/vault/resources/page.html",
-    });
+  it("creates a sanitized HTML attachment host with metadata", () => {
+    const container = createPreviewHtmlContainer(
+      document,
+      "<p>Hello <strong>HTML</strong></p>",
+      { title: "Snippet", path: "/vault/resources/page.html" },
+    );
 
     expect(container.className).toContain("preview-attachment-html");
-    expect(container.className).toContain("preview-html-source");
+    expect(container.className).toContain("preview-html-document");
     expect(container.dataset.htmlPath).toBe("/vault/resources/page.html");
     expect(container.dataset.htmlTitle).toBe("Snippet");
-    const pre = container.querySelector("pre.preview-html-source-pre");
-    expect(pre?.textContent).toBe(source);
-    // Must not render markup as DOM — source stays escaped as text.
-    expect(container.querySelector("strong")).toBeNull();
+    expect(container.innerHTML).toContain("<strong>HTML</strong>");
   });
 });

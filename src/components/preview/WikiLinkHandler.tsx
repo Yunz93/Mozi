@@ -10,6 +10,7 @@ import {
   isMarkdownNote,
   isPdfAttachment,
 } from "./previewUtils";
+import { sanitizeHtmlPreview } from "../editor/preview/previewRenderCore";
 import {
   warmPreviewImage,
   resolvePreviewSource,
@@ -300,14 +301,15 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
     }
     return (
       <div
-        className="preview-attachment-html preview-html-source"
+        className="preview-attachment-html preview-html-document"
         data-html-path={resolved.path}
         data-html-title={resolved.title || resolved.name}
         title={resolved.title || resolved.name}
         style={htmlStyle}
-      >
-        <pre className="preview-html-source-pre">{resolved.content || ""}</pre>
-      </div>
+        dangerouslySetInnerHTML={{
+          __html: sanitizeHtmlPreview(resolved.content || "", true),
+        }}
+      />
     );
   }
 

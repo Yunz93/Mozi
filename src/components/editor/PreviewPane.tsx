@@ -1075,9 +1075,14 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
                   {t("preview_loading")}
                 </div>
               ) : previewFileType === "html" ? (
-                <pre className="preview-html-source preview-html-source-pre editor-pane-width-constrained mx-auto w-full">
-                  {previewContent}
-                </pre>
+                <div
+                  className="preview-html-document editor-pane-width-constrained mx-auto w-full"
+                  dangerouslySetInnerHTML={{
+                    __html: renderer.requiresAsyncEnhancement
+                      ? renderer.enhancedBodyHtml
+                      : renderer.sanitizedHtmlPreview,
+                  }}
+                />
               ) : previewFileType === "unsupported" ? (
                 <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
                   {t("preview_unsupported")}
