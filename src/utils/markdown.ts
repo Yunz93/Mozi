@@ -21,6 +21,7 @@ import {
   applyAlphaRomanListAttrs,
 } from "./markdownAlphaRomanList";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
+import { normalizeHttpUrlForHtmlAttribute } from "../components/editor/preview/previewMedia";
 
 interface MarkdownRenderOptions {
   highlighter?: ShikiHighlighter | null;
@@ -195,19 +196,6 @@ const createMarkdownIt = () => {
   initMermaid(md);
 
   /** Percent-encode spaces and non-ASCII in http(s) URLs for valid HTML attributes. */
-  const normalizeHttpUrlForHtmlAttribute = (url: string): string => {
-    if (!/^https?:\/\//i.test(url)) return url;
-    try {
-      return encodeURI(decodeURI(url));
-    } catch {
-      try {
-        return encodeURI(url);
-      } catch {
-        return url;
-      }
-    }
-  };
-
   const defaultImageRenderer = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
     const token = tokens[idx];

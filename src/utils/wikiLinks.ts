@@ -68,7 +68,9 @@ function normalizeWikiLinkTarget(target: string): string {
       .replace(/^\/+/, "")
       .replace(/^\.\//, "")
       .trim(),
-  ).toLowerCase();
+  )
+    .toLowerCase()
+    .normalize("NFC");
 }
 
 function getRelativePath(
@@ -299,8 +301,9 @@ export function resolveWikiLinkFile(
   const normalizedTarget = normalizeWikiLinkTarget(parsedReference.path);
   if (!normalizedTarget) return null;
 
-  const targetBasename =
-    normalizedTarget.split("/").filter(Boolean).pop() || normalizedTarget;
+  const targetBasename = (
+    normalizedTarget.split("/").filter(Boolean).pop() || normalizedTarget
+  ).normalize("NFC");
 
   const allFiles = flattenFiles(files);
   const currentRelativePath =
@@ -322,8 +325,12 @@ export function resolveWikiLinkFile(
   for (const file of allFiles) {
     const relativePath = stripMarkdownExtension(
       getRelativePath(file.path, rootFolderPath),
-    ).toLowerCase();
-    const basename = stripMarkdownExtension(file.name).toLowerCase();
+    )
+      .toLowerCase()
+      .normalize("NFC");
+    const basename = stripMarkdownExtension(file.name)
+      .toLowerCase()
+      .normalize("NFC");
 
     if (!exactPathMatch && relativePath === normalizedTarget) {
       exactPathMatch = file;
@@ -331,7 +338,7 @@ export function resolveWikiLinkFile(
 
     if (
       !relativePathMatch &&
-      relativePath === relativeCandidate.toLowerCase()
+      relativePath === relativeCandidate.toLowerCase().normalize("NFC")
     ) {
       relativePathMatch = file;
     } else if (relativePath.endsWith(`/${normalizedTarget}`)) {

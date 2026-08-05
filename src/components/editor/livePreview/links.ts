@@ -31,12 +31,17 @@ class MarkdownLinkWidget extends WidgetType {
   constructor(
     readonly label: string,
     readonly href: string,
+    readonly from: number,
   ) {
     super();
   }
 
   eq(other: MarkdownLinkWidget) {
-    return this.label === other.label && this.href === other.href;
+    return (
+      this.label === other.label &&
+      this.href === other.href &&
+      this.from === other.from
+    );
   }
 
   toDOM(view: EditorView) {
@@ -53,13 +58,21 @@ class MarkdownLinkWidget extends WidgetType {
     });
     el.addEventListener("mousedown", (event) => {
       // Keep selection from jumping into hidden source mid-click.
-      if (event.button === 0) event.preventDefault();
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pos = Math.max(0, Math.min(this.from, view.state.doc.length));
+      view.focus();
+      view.dispatch({
+        selection: { anchor: pos },
+        scrollIntoView: false,
+      });
     });
     return el;
   }
 
-  ignoreEvent(event: Event) {
-    return event.type !== "click" && event.type !== "mousedown";
+  ignoreEvent() {
+    return true;
   }
 }
 
@@ -120,7 +133,7 @@ export function buildLivePreviewLinkDecorations(
         from,
         to,
         Decoration.replace({
-          widget: new MarkdownLinkWidget(label, href),
+          widget: new MarkdownLinkWidget(label, href, from),
         }),
       );
     },

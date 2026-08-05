@@ -71,6 +71,7 @@ class WikiLinkWidget extends WidgetType {
     readonly label: string,
     readonly target: string,
     readonly resolved: boolean,
+    readonly from: number,
   ) {
     super();
   }
@@ -79,7 +80,8 @@ class WikiLinkWidget extends WidgetType {
     return (
       this.label === other.label &&
       this.target === other.target &&
-      this.resolved === other.resolved
+      this.resolved === other.resolved &&
+      this.from === other.from
     );
   }
 
@@ -92,7 +94,15 @@ class WikiLinkWidget extends WidgetType {
     el.setAttribute("contenteditable", "false");
     el.textContent = this.label;
     el.addEventListener("mousedown", (event) => {
-      if (event.button === 0) event.preventDefault();
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pos = Math.max(0, Math.min(this.from, view.state.doc.length));
+      view.focus();
+      view.dispatch({
+        selection: { anchor: pos },
+        scrollIntoView: false,
+      });
     });
     el.addEventListener("click", (event) => {
       event.preventDefault();
@@ -103,8 +113,8 @@ class WikiLinkWidget extends WidgetType {
     return el;
   }
 
-  ignoreEvent(event: Event) {
-    return event.type !== "click" && event.type !== "mousedown";
+  ignoreEvent() {
+    return true;
   }
 }
 
@@ -192,8 +202,8 @@ class WikiImageWidget extends WidgetType {
     return wrap;
   }
 
-  ignoreEvent(event: Event) {
-    return event.type !== "mousedown" && event.type !== "click";
+  ignoreEvent() {
+    return true;
   }
 }
 
@@ -596,6 +606,7 @@ export function buildWikiDecorations(
           parsed.displayText,
           parsed.target,
           Boolean(matched),
+          range.from,
         ),
       }),
     );

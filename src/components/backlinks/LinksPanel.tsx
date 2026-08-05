@@ -4,9 +4,9 @@ import { useI18n } from "../../hooks/useI18n";
 import {
   getBacklinks,
   getOutbounds,
-  getUnresolvedOutbounds,
 } from "../../services/vault/linkIndexService";
 import type { WikiOutboundLink } from "../../types/vaultIndex";
+import { resolveOutbounds } from "../../utils/wikiOutbound";
 import { Dialog } from "../ui/Dialog";
 
 function displayName(path: string): string {
@@ -218,15 +218,7 @@ const NeighborhoodGraph: React.FC<{
             <circle
               cx={point.x}
               cy={point.y}
-              r={
-                showLabels
-                  ? isCurrent
-                    ? 7
-                    : 5.5
-                  : isCurrent
-                    ? 5.5
-                    : 4.5
-              }
+              r={showLabels ? (isCurrent ? 7 : 5.5) : isCurrent ? 5.5 : 4.5}
               className={
                 isCurrent
                   ? "links-neighborhood-node is-current"
@@ -263,6 +255,8 @@ export const LinksPanel: React.FC<LinksPanelProps> = ({
   const { t } = useI18n();
   const currentFilePath = useAppStore((s) => s.currentFilePath);
   const linkIndex = useAppStore((s) => s.linkIndex);
+  const files = useAppStore((s) => s.files);
+  const rootFolderPath = useAppStore((s) => s.rootFolderPath);
   const progress = useAppStore((s) => s.linkIndexProgress);
   const [neighborhoodOpen, setNeighborhoodOpen] = useState(false);
 
@@ -270,13 +264,20 @@ export const LinksPanel: React.FC<LinksPanelProps> = ({
     () => getBacklinks(linkIndex, currentFilePath),
     [linkIndex, currentFilePath],
   );
-  const outbounds = useMemo(
-    () => getOutbounds(linkIndex, currentFilePath),
-    [linkIndex, currentFilePath],
-  );
+  // Re-resolve against the live file tree so newly added notes are not stuck
+  // in "unresolved" until the next full index rebuild.
+  const outbounds = useMemo(() => {
+    const stored = getOutbounds(linkIndex, currentFilePath);
+    if (stored.length === 0) return stored;
+    return resolveOutbounds(
+      stored.map(({ resolvedPath: _resolved, ...rest }) => rest),
+      files,
+      rootFolderPath,
+    );
+  }, [linkIndex, currentFilePath, files, rootFolderPath]);
   const unresolved = useMemo(
-    () => getUnresolvedOutbounds(linkIndex, currentFilePath),
-    [linkIndex, currentFilePath],
+    () => outbounds.filter((link) => link.resolvedPath === null),
+    [outbounds],
   );
   const resolvedOutbounds = useMemo(
     () => outbounds.filter((link) => link.resolvedPath !== null),
