@@ -12,6 +12,7 @@ import {
   getCachedPreviewImageSrc,
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
+  warmPreviewImage,
 } from "../../../utils/previewImageCache";
 import {
   parseWikiLinkReference,
@@ -67,9 +68,12 @@ function replaceWikiEmbedNode(embed: Element, replacement: Node): void {
 }
 
 /**
- * Attach a displayable image `src` without eagerly materializing every file
- * into a blob. Cached blob URLs are reused; browser-local files that need
- * object-URL creation are deferred to viewport warming.
+ * Attach a displayable image `src` during async enhance.
+ *
+ * Local vault files must be materialized to object URLs here (not left as
+ * empty-src "pending" placeholders). Deferring to IntersectionObserver made
+ * pasted/wiki images flash once then stick on gray filename placeholders when
+ * preview re-enhance cancelled the lazy warmer mid-flight.
  */
 async function configureResolvedPreviewImage(
   image: HTMLImageElement,
@@ -85,19 +89,17 @@ async function configureResolvedPreviewImage(
     return;
   }
 
-  if (previewSourceNeedsMaterialization(previewTarget)) {
-    configurePreviewImageElement(image, "", previewTarget, { warmed: false });
-    return;
-  }
-
   try {
-    const displaySrc = await resolvePreviewSource(
+    const displaySrc = previewSourceNeedsMaterialization(previewTarget)
+      ? await warmPreviewImage(previewTarget, sourceFilePath || undefined)
+      : await resolvePreviewSource(previewTarget, sourceFilePath || undefined);
+    configurePreviewImageElement(
+      image,
+      displaySrc || previewTarget,
       previewTarget,
-      sourceFilePath || undefined,
     );
-    configurePreviewImageElement(image, displaySrc, previewTarget);
   } catch {
-    configurePreviewImageElement(image, previewTarget, previewTarget, {
+    configurePreviewImageElement(image, "", previewTarget, {
       warmed: false,
     });
   }

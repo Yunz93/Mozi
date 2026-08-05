@@ -86,8 +86,11 @@ describe("usePreviewRenderer wiki embed integration", () => {
     cleanup();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { previewSourceNeedsMaterialization } =
+      await import("../../../utils/previewImageCache");
+    vi.mocked(previewSourceNeedsMaterialization).mockReturnValue(false);
     mockedResolvePreviewSource.mockImplementation(
       async (src: string) => `resolved:${src}`,
     );
@@ -122,6 +125,35 @@ describe("usePreviewRenderer wiki embed integration", () => {
         "/vault/99-Attachments/img/test.jpg",
       );
       expect(out.querySelector("[data-wiki-embed]")).toBeNull();
+    });
+  });
+
+  it("materializes local wiki images during enhance instead of empty pending src", async () => {
+    const { previewSourceNeedsMaterialization } =
+      await import("../../../utils/previewImageCache");
+    vi.mocked(previewSourceNeedsMaterialization).mockReturnValue(true);
+    mockedResolveAttachmentTarget.mockResolvedValue({
+      path: "/vault/resources/测试-123.png",
+      name: "测试-123.png",
+    });
+
+    render(
+      <MarkdownHarness
+        testId="wiki-image-materialize"
+        content="![[resources/测试-123.png]]"
+      />,
+    );
+
+    await waitFor(() => {
+      const out = queryOut("wiki-image-materialize");
+      const image = out.querySelector("img.preview-attachment-image");
+      expect(image).toBeTruthy();
+      expect(image?.getAttribute("src")).toBe(
+        "warmed:/vault/resources/测试-123.png",
+      );
+      expect(image?.getAttribute("data-preview-warmed")).toBe("true");
+      expect(image?.hasAttribute("data-preview-pending-src")).toBe(false);
+      expect(mockedWarmPreviewImage).toHaveBeenCalled();
     });
   });
 

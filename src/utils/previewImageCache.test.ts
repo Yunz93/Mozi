@@ -24,6 +24,7 @@ import {
   mountLazyPreviewImageWarming,
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
+  invalidateCachedPreviewImageSrc,
   warmPreviewImage,
 } from "./previewImageCache";
 
@@ -129,6 +130,35 @@ describe("warmPreviewImage", () => {
     expect(
       getCachedPreviewImageSrc("assets/remote.png", "/vault/notes/a.md"),
     ).toBe("blob:cached-image");
+
+    fetchSpy.mockRestore();
+    createObjectURL.mockRestore();
+  });
+
+  it("can drop cached entries when filesystem object urls are revoked", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(["image-bytes"], { type: "image/png" }),
+    } as Response);
+    const createObjectURL = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:to-revoke");
+
+    await warmPreviewImage("/vault/resources/pasted.png", "/vault/notes/a.md");
+    expect(
+      getCachedPreviewImageSrc(
+        "/vault/resources/pasted.png",
+        "/vault/notes/a.md",
+      ),
+    ).toBe("blob:to-revoke");
+
+    invalidateCachedPreviewImageSrc("/vault/resources/pasted.png");
+    expect(
+      getCachedPreviewImageSrc(
+        "/vault/resources/pasted.png",
+        "/vault/notes/a.md",
+      ),
+    ).toBeNull();
 
     fetchSpy.mockRestore();
     createObjectURL.mockRestore();
