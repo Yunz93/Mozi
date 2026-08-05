@@ -276,7 +276,7 @@ describe("PreviewPane", () => {
         path: "/vault/papers/paper.pdf",
         selector: ".preview-pdfjs[data-pdf-src]",
       },
-      { path: "/vault/page.html", selector: ".preview-html-document" },
+      { path: "/vault/page.html", selector: ".preview-html-source-pre" },
       {
         path: "/vault/readme.txt",
         text: "Preview is not supported for this file type.",
