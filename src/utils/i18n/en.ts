@@ -508,7 +508,7 @@ export default {
     "Convert HTML from web pages and similar sources to Markdown when pasting.",
   settings_defaultViewMode: "Default view mode",
   settings_defaultViewModeDesc:
-    "Initial view when the app starts. After you choose a mode, switching files keeps it.",
+    "Initial view when the app starts (Live preview or Reading). After you choose a mode, switching files keeps it.",
   settings_defaultViewModeEditor: "Source",
   settings_defaultViewModeLive: "Live preview",
   settings_defaultViewModePreview: "Reading",
@@ -971,6 +971,12 @@ export default {
 
   editor_emptyState: "Select a file to start editing",
   editor_placeholder: "Start writing...",
+  editor_livePreviewHeavyFileMode:
+    "Large-file optimization: tables, callouts, and Mermaid show placeholders.",
+  editor_livePreviewLargeFileMode:
+    "Very large file mode: math, images, and wiki Live widgets are off; source remains editable.",
+  table_cellHint:
+    "Right-click to add/delete rows or columns; Tab/Enter to navigate",
   table_insertRowAbove: "Insert row above",
   table_insertRowBelow: "Insert row below",
   table_deleteRow: "Delete row",

@@ -18,19 +18,19 @@ describe("normalizeTabSize", () => {
 });
 
 describe("normalizeDefaultViewMode", () => {
-  it("defaults unknown values to editor", () => {
-    expect(normalizeDefaultViewMode(undefined)).toBe(ViewMode.EDITOR);
-    expect(normalizeDefaultViewMode("nope")).toBe(ViewMode.EDITOR);
+  it("defaults unknown values to live", () => {
+    expect(normalizeDefaultViewMode(undefined)).toBe(ViewMode.LIVE);
+    expect(normalizeDefaultViewMode("nope")).toBe(ViewMode.LIVE);
   });
 
-  it("keeps editor/split/preview and maps legacy live to editor", () => {
-    expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.EDITOR);
-    expect(normalizeDefaultViewMode(ViewMode.EDITOR)).toBe(ViewMode.EDITOR);
+  it("keeps live/preview and maps legacy editor/split to live", () => {
+    expect(normalizeDefaultViewMode("LIVE")).toBe(ViewMode.LIVE);
+    expect(normalizeDefaultViewMode(ViewMode.LIVE)).toBe(ViewMode.LIVE);
     expect(normalizeDefaultViewMode(ViewMode.PREVIEW)).toBe(ViewMode.PREVIEW);
-    expect(normalizeDefaultViewMode("SPLIT")).toBe(ViewMode.SPLIT);
-    expect(normalizeDefaultViewMode(ViewMode.SPLIT)).toBe(ViewMode.SPLIT);
-    expect(normalizeDefaultViewMode("LIVE")).toBe(ViewMode.EDITOR);
-    expect(normalizeDefaultViewMode(ViewMode.LIVE)).toBe(ViewMode.EDITOR);
+    expect(normalizeDefaultViewMode("EDITOR")).toBe(ViewMode.LIVE);
+    expect(normalizeDefaultViewMode(ViewMode.EDITOR)).toBe(ViewMode.LIVE);
+    expect(normalizeDefaultViewMode("SPLIT")).toBe(ViewMode.LIVE);
+    expect(normalizeDefaultViewMode(ViewMode.SPLIT)).toBe(ViewMode.LIVE);
   });
 });
 

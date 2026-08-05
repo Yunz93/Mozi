@@ -1,10 +1,9 @@
 /**
- * Toolbar toggle: Source (edit) / Split / Reading (preview).
+ * Toolbar toggle: Live Preview / Reading.
  *
- * Icons use distinct silhouettes so the three modes stay readable at toolbar size:
- * - Source: code brackets (angular)
- * - Split: dual pane with left text lines + right filled preview
- * - Reading: open book with page lines (not a flat split rectangle)
+ * Icons use distinct silhouettes at toolbar size:
+ * - Live: pen on document (editable rendered surface)
+ * - Reading: open book with page lines
  */
 
 import React from "react";
@@ -62,44 +61,16 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
     >
       <button
         type="button"
-        onClick={() => onViewModeChange(ViewMode.EDITOR)}
+        onClick={() => onViewModeChange(ViewMode.LIVE)}
         disabled={previewOnly}
-        className={buttonClass(mode === ViewMode.EDITOR, previewOnly)}
-        title={t("view_editorOnly")}
-        aria-label={t("view_editorOnly")}
-        aria-pressed={mode === ViewMode.EDITOR}
+        className={buttonClass(mode === ViewMode.LIVE, previewOnly)}
+        title={t("view_livePreview")}
+        aria-label={t("view_livePreview")}
+        aria-pressed={mode === ViewMode.LIVE}
       >
         <ModeIcon>
-          <polyline points="16 18 22 12 16 6" />
-          <polyline points="8 6 2 12 8 18" />
-        </ModeIcon>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onViewModeChange(ViewMode.SPLIT)}
-        disabled={previewOnly}
-        className={buttonClass(mode === ViewMode.SPLIT, previewOnly)}
-        title={t("view_split")}
-        aria-label={t("view_split")}
-        aria-pressed={mode === ViewMode.SPLIT}
-      >
-        <ModeIcon>
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <line x1="12" y1="3" x2="12" y2="21" />
-          <line x1="5.5" y1="8" x2="9.5" y2="8" />
-          <line x1="5.5" y1="12" x2="9.5" y2="12" />
-          <line x1="5.5" y1="16" x2="8.5" y2="16" />
-          <rect
-            x="13.5"
-            y="7"
-            width="5.5"
-            height="10"
-            rx="1"
-            fill="currentColor"
-            stroke="none"
-            opacity="0.4"
-          />
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
         </ModeIcon>
       </button>
 

@@ -22,17 +22,19 @@ export function normalizeDefaultViewMode(value: unknown): ViewMode {
   if (value === ViewMode.PREVIEW || value === "PREVIEW") {
     return ViewMode.PREVIEW;
   }
-  if (value === ViewMode.EDITOR || value === "EDITOR") {
-    return ViewMode.EDITOR;
-  }
-  if (value === ViewMode.SPLIT || value === "SPLIT") {
-    return ViewMode.SPLIT;
-  }
-  // Legacy LIVE maps back to source edit (Live Preview is gated off the UI).
   if (value === ViewMode.LIVE || value === "LIVE") {
-    return ViewMode.EDITOR;
+    return ViewMode.LIVE;
   }
-  return ViewMode.EDITOR;
+  // Legacy EDITOR / SPLIT map onto Live edit.
+  if (
+    value === ViewMode.EDITOR ||
+    value === "EDITOR" ||
+    value === ViewMode.SPLIT ||
+    value === "SPLIT"
+  ) {
+    return ViewMode.LIVE;
+  }
+  return ViewMode.LIVE;
 }
 
 /** Indent string used by Tab / list nesting for the current settings. */

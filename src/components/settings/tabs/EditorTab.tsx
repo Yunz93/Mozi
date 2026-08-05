@@ -407,12 +407,8 @@ export const EditorTab: React.FC<EditorTabProps> = ({
                 value={normalizeDefaultViewMode(settings.defaultViewMode)}
                 options={[
                   {
-                    value: ViewMode.EDITOR,
-                    label: t("settings_defaultViewModeEditor"),
-                  },
-                  {
-                    value: ViewMode.SPLIT,
-                    label: t("settings_defaultViewModeSplit"),
+                    value: ViewMode.LIVE,
+                    label: t("settings_defaultViewModeLive"),
                   },
                   {
                     value: ViewMode.PREVIEW,

@@ -392,8 +392,8 @@ const App: React.FC = () => {
         });
       }
 
-      // Reading (and legacy split) show the HTML preview pane.
-      if (viewMode === ViewMode.PREVIEW || viewMode === ViewMode.SPLIT) {
+      // Reading shows the HTML preview pane.
+      if (viewMode === ViewMode.PREVIEW) {
         requestPreviewHeadingScroll(activeTabId, id, {
           alignMode: "center",
           behavior: "auto",

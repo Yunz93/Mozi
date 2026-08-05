@@ -356,7 +356,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
     const savedState = scrollPositionsRef.current[activeTabId] ?? {
       editor: 0,
       preview: 0,
-      lastViewMode: ViewMode.EDITOR,
+      lastViewMode: ViewMode.LIVE,
     };
     const anchorPercentage =
       savedState.lastViewMode === ViewMode.PREVIEW

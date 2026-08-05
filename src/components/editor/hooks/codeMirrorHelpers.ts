@@ -54,6 +54,17 @@ export function isLargeEditorState(state: EditorState): boolean {
   );
 }
 
+/**
+ * Softer gate for expensive Live Preview widgets (tables / callouts / mermaid).
+ * Hide-marks and light widgets can still run above this.
+ */
+export function isHeavyLivePreviewState(state: EditorState): boolean {
+  return (
+    state.doc.lines > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_LINE_COUNT ||
+    state.doc.length > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_CHAR_COUNT
+  );
+}
+
 export function getEditorTooltipSpace(view: Pick<EditorView, "dom">): Rect {
   const rect = view.dom.getBoundingClientRect();
   return {
