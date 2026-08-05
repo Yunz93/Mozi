@@ -1,6 +1,7 @@
 /**
- * Live GFM table overlay: render pipe tables as an editable HTML grid with
- * quick row/column insert & delete controls (source remains standard GFM).
+ * Live GFM table overlay: render pipe tables as an editable HTML grid.
+ * Row/column insert & delete via context menu (and keyboard shortcuts);
+ * source remains standard GFM.
  */
 
 import {
@@ -298,108 +299,6 @@ class TableWidget extends WidgetType {
       if (!result) return;
       replaceTableInView(view, table, result.table, result.focus);
     };
-
-    const toolbar = document.createElement("div");
-    toolbar.className = "mp-live-table-toolbar";
-    toolbar.setAttribute("role", "toolbar");
-    toolbar.setAttribute("aria-label", t(language, "table_cellHint"));
-
-    const toolbarActions: Array<{
-      label: string;
-      title: string;
-      run: () => void;
-    }> = [
-      {
-        label: "+R",
-        title: t(language, "table_insertRowBelow"),
-        run: () =>
-          mutate((table) => {
-            const next = insertRowBelow(table, activeCell.logicalRow);
-            return {
-              table: next,
-              focus: {
-                logicalRow: Math.min(
-                  activeCell.logicalRow + 1,
-                  logicalRowCount(next) - 1,
-                ),
-                col: activeCell.col,
-              },
-            };
-          }),
-      },
-      {
-        label: "−R",
-        title: t(language, "table_deleteRow"),
-        run: () =>
-          mutate((table) => {
-            if (activeCell.logicalRow <= 0 || table.body.length <= 1) {
-              return null;
-            }
-            const next = deleteRow(table, activeCell.logicalRow);
-            if (!next) return null;
-            return {
-              table: next,
-              focus: {
-                logicalRow: Math.min(
-                  activeCell.logicalRow,
-                  logicalRowCount(next) - 1,
-                ),
-                col: activeCell.col,
-              },
-            };
-          }),
-      },
-      {
-        label: "+C",
-        title: t(language, "table_insertColumnRight"),
-        run: () =>
-          mutate((table) => ({
-            table: insertColumn(table, activeCell.col, "right"),
-            focus: {
-              logicalRow: activeCell.logicalRow,
-              col: activeCell.col + 1,
-            },
-          })),
-      },
-      {
-        label: "−C",
-        title: t(language, "table_deleteColumn"),
-        run: () =>
-          mutate((table) => {
-            if (table.columnCount <= 1) return null;
-            const next = deleteColumn(table, activeCell.col);
-            if (!next) return null;
-            return {
-              table: next,
-              focus: {
-                logicalRow: activeCell.logicalRow,
-                col: Math.min(activeCell.col, next.columnCount - 1),
-              },
-            };
-          }),
-      },
-    ];
-
-    for (const action of toolbarActions) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "mp-live-table-tool-btn";
-      button.textContent = action.label;
-      button.title = action.title;
-      button.setAttribute("aria-label", action.title);
-      button.addEventListener("mousedown", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        action.run();
-      });
-      toolbar.appendChild(button);
-    }
-
-    const hint = document.createElement("span");
-    hint.className = "mp-live-table-hint";
-    hint.textContent = t(language, "table_cellHint");
-    toolbar.appendChild(hint);
-    wrap.appendChild(toolbar);
 
     const tableEl = document.createElement("table");
     tableEl.className = "mp-live-table";

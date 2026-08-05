@@ -1112,49 +1112,6 @@
   background: color-mix(in srgb, rgba(15, 23, 42, 0.9) 80%, transparent);
 }
 
-.editor-pane-layout .mp-live-table-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  margin-bottom: 0.45rem;
-}
-
-.editor-pane-layout .mp-live-table-tool-btn {
-  appearance: none;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(255, 255, 255, 0.78);
-  color: #334155;
-  border-radius: 6px;
-  padding: 0.15rem 0.45rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.4;
-  cursor: pointer;
-}
-
-.dark .editor-pane-layout .mp-live-table-tool-btn {
-  background: rgba(15, 23, 42, 0.85);
-  border-color: rgba(148, 163, 184, 0.28);
-  color: #e2e8f0;
-}
-
-.editor-pane-layout .mp-live-table-tool-btn:hover {
-  border-color: rgba(59, 130, 246, 0.55);
-  color: #1d4ed8;
-}
-
-.dark .editor-pane-layout .mp-live-table-tool-btn:hover {
-  color: #93c5fd;
-}
-
-.editor-pane-layout .mp-live-table-hint {
-  margin-left: 0.25rem;
-  font-size: 0.68rem;
-  color: #94a3b8;
-}
-
 .editor-pane-layout .mp-live-table {
   width: 100%;
   border-collapse: collapse;
