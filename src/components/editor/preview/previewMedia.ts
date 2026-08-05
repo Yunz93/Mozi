@@ -81,10 +81,32 @@ export function createPreviewHtmlContainer(
 
   const iframe = document.createElement("iframe");
   iframe.className = "preview-html-frame";
-  iframe.setAttribute("sandbox", "");
+  // allow-same-origin: measure/zoom + Mermaid in parent; still no scripts.
+  iframe.setAttribute("sandbox", "allow-same-origin");
   iframe.setAttribute("referrerpolicy", "no-referrer");
   iframe.title = options?.title || "HTML";
   iframe.srcdoc = sanitizedHtml;
+  iframe.addEventListener("load", () => {
+    const doc = iframe.contentDocument;
+    if (!doc?.body) return;
+    void import("./htmlPreviewEnhance").then(
+      ({
+        ensureHtmlPreviewMermaidStyles,
+        normalizeMermaidPlaceholdersInDocument,
+      }) => {
+        ensureHtmlPreviewMermaidStyles(doc);
+        normalizeMermaidPlaceholdersInDocument(doc);
+        const themeMode = document.documentElement.classList.contains("dark")
+          ? "dark"
+          : "light";
+        void import("../../../utils/markdown-extensions").then(
+          ({ renderMermaidDiagrams }) => {
+            void renderMermaidDiagrams(doc.body, { themeMode });
+          },
+        );
+      },
+    );
+  });
   container.appendChild(iframe);
   return container;
 }

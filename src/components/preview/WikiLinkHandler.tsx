@@ -310,9 +310,32 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
         <iframe
           className="preview-html-frame"
           title={resolved.title || resolved.name}
-          sandbox=""
+          sandbox="allow-same-origin"
           referrerPolicy="no-referrer"
           srcDoc={sanitizeHtmlPreview(resolved.content || "", true)}
+          onLoad={(event) => {
+            const doc = event.currentTarget.contentDocument;
+            if (!doc?.body) return;
+            void import("../editor/preview/htmlPreviewEnhance").then(
+              ({
+                ensureHtmlPreviewMermaidStyles,
+                normalizeMermaidPlaceholdersInDocument,
+              }) => {
+                ensureHtmlPreviewMermaidStyles(doc);
+                normalizeMermaidPlaceholdersInDocument(doc);
+                const themeMode = document.documentElement.classList.contains(
+                  "dark",
+                )
+                  ? "dark"
+                  : "light";
+                void import("../../utils/markdown-extensions").then(
+                  ({ renderMermaidDiagrams }) => {
+                    void renderMermaidDiagrams(doc.body, { themeMode });
+                  },
+                );
+              },
+            );
+          }}
         />
       </div>
     );
