@@ -42,7 +42,6 @@ import {
   createExcalidrawEmbedContainer,
   renderExcalidrawEmbedSvg,
 } from "../../../utils/excalidrawEmbed";
-import { sanitizeHtmlPreview } from "./previewRenderCore";
 import {
   protectShikiPresInHtmlString,
   restoreShikiPresFromSnapshots,
@@ -531,7 +530,7 @@ export async function enhancePreviewHtml(
           return;
         }
 
-        // HTML attachment embed (sanitized, same policy as HTML tab preview)
+        // HTML attachment embed — plain-text source, matching the HTML tab preview.
         if (isHtmlDocument(resolvedTarget.name)) {
           try {
             const htmlContent = await readFile({
@@ -542,7 +541,7 @@ export async function enhancePreviewHtml(
             });
             const htmlContainer = createPreviewHtmlContainer(
               document,
-              sanitizeHtmlPreview(htmlContent, true),
+              htmlContent,
               {
                 title: label || resolvedTarget.name,
                 path: resolvedTarget.path,
