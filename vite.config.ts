@@ -93,9 +93,11 @@ export default defineConfig(({ mode }) => {
               return "mermaid-vendor";
             }
 
-            if (id.includes("/@excalidraw/")) {
-              return "excalidraw-vendor";
-            }
+            // Do NOT force @excalidraw into a shared manual chunk.
+            // Putting the whole package in one sync-preloaded vendor chunk
+            // creates a circular init (TDZ: "Cannot access 'QA' before
+            // initialization") and whitescreens the app on boot. Leave it to
+            // dynamic import() so it stays a true async chunk.
 
             if (id.includes("/@google/genai/")) {
               return "ai-vendor";

@@ -1,4 +1,6 @@
 import React, {
+  Suspense,
+  lazy,
   useMemo,
   useState,
   useCallback,
@@ -15,8 +17,15 @@ import {
 } from "../../utils/viewMode";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 import { PreviewPane, type PreviewPaneHandle } from "./PreviewPane";
-import { ExcalidrawPane } from "./ExcalidrawPane";
 import { WritingStatsDisplay } from "../stats/WritingStatsDisplay";
+
+// Keep Excalidraw out of the boot graph. A static import here previously
+// caused Vite to modulepreload the excalidraw vendor chunk, which then
+// crashed on init (TDZ) and whitescreened the entire app.
+const ExcalidrawPane = lazy(async () => {
+  const mod = await import("./ExcalidrawPane");
+  return { default: mod.ExcalidrawPane };
+});
 import { throttle } from "../../utils/throttle";
 import type { PaneDensity } from "./paneLayout";
 import { useI18n } from "../../hooks/useI18n";
@@ -430,9 +439,17 @@ export const SplitView: React.FC<SplitViewProps> = ({
       <ErrorBoundary>
         <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
           <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
-            <ExcalidrawPane
-              onContentChange={(next) => onContentChange?.(next)}
-            />
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                  {t("excalidraw_loading")}
+                </div>
+              }
+            >
+              <ExcalidrawPane
+                onContentChange={(next) => onContentChange?.(next)}
+              />
+            </Suspense>
           </div>
         </div>
       </ErrorBoundary>
