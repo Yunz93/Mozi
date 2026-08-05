@@ -78,6 +78,7 @@ import {
 } from "./preview/previewPaneHelpers";
 import { useLargeDocDebouncedValue } from "./preview/useLargeDocDebouncedValue";
 import { usePreviewScrollSpy } from "./preview/usePreviewScrollSpy";
+import { HtmlPreviewFrame } from "./preview/HtmlPreviewFrame";
 
 interface PreviewPaneProps {
   highlighter?: ShikiHighlighter | null;
@@ -1075,18 +1076,14 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
                   {t("preview_loading")}
                 </div>
               ) : previewFileType === "html" ? (
-                <div className="preview-html-document preview-html-document-frame editor-pane-width-constrained mx-auto w-full h-full min-h-0">
-                  <iframe
-                    className="preview-html-frame"
-                    title={
-                      currentFilePath?.split(/[\\/]/).pop() ||
-                      t("preview_htmlTitle")
-                    }
-                    sandbox=""
-                    referrerPolicy="no-referrer"
-                    srcDoc={renderer.sanitizedHtmlPreview}
-                  />
-                </div>
+                <HtmlPreviewFrame
+                  srcDoc={renderer.sanitizedHtmlPreview}
+                  title={
+                    currentFilePath?.split(/[\\/]/).pop() ||
+                    t("preview_htmlTitle")
+                  }
+                  themeMode={settings.themeMode as "light" | "dark"}
+                />
               ) : previewFileType === "unsupported" ? (
                 <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
                   {t("preview_unsupported")}

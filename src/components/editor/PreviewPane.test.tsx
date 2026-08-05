@@ -278,7 +278,8 @@ describe("PreviewPane", () => {
       },
       {
         path: "/vault/page.html",
-        selector: ".preview-html-document iframe.preview-html-frame",
+        selector:
+          ".preview-html-document-frame iframe.preview-html-frame, .preview-html-document iframe.preview-html-frame",
       },
       {
         path: "/vault/readme.txt",

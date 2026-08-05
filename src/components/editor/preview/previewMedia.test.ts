@@ -277,7 +277,7 @@ describe("createPreviewHtmlContainer", () => {
     expect(container.dataset.htmlTitle).toBe("Snippet");
     const iframe = container.querySelector("iframe.preview-html-frame");
     expect(iframe).toBeTruthy();
-    expect(iframe?.getAttribute("sandbox")).toBe("");
+    expect(iframe?.getAttribute("sandbox")).toBe("allow-same-origin");
     expect(
       iframe?.getAttribute("srcdoc") ?? (iframe as HTMLIFrameElement).srcdoc,
     ).toContain("<strong>HTML</strong>");

@@ -138,6 +138,48 @@
   padding: var(--pane-content-top) var(--pane-content-px)
     var(--preview-content-bottom, var(--pane-content-bottom));
   min-height: 0;
+  gap: 0.5rem;
+}
+
+.preview-html-zoom-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.preview-html-zoom-btn {
+  appearance: none;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.88);
+  color: #334155;
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.preview-html-zoom-btn:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #1d4ed8;
+}
+
+.preview-html-zoom-percent {
+  min-width: 3.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .preview-html-zoom-btn {
+  background: rgba(15, 23, 42, 0.88);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+}
+
+.dark .preview-html-zoom-btn:hover {
+  color: #93c5fd;
 }
 
 .preview-html-frame {
