@@ -230,9 +230,14 @@ describe("AttachmentEmbed", () => {
       ) as HTMLElement | null;
       expect(html).toBeTruthy();
       expect(html?.dataset.htmlPath).toBe("/vault/resources/card.html");
-      expect(html?.textContent).toContain("Card");
-      expect(html?.textContent).toContain("Hello");
-      expect(html?.innerHTML).not.toContain("onerror");
+      const frame = html?.querySelector(
+        "iframe.preview-html-frame",
+      ) as HTMLIFrameElement | null;
+      expect(frame).toBeTruthy();
+      const srcdoc = frame?.getAttribute("srcdoc") ?? frame?.srcdoc ?? "";
+      expect(srcdoc).toContain("Card");
+      expect(srcdoc).toContain("Hello");
+      expect(srcdoc).not.toContain("onerror");
       expect(html?.style.width).toBe("360px");
       expect(html?.style.height).toBe("240px");
     });

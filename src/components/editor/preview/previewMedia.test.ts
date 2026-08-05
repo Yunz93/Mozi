@@ -241,6 +241,7 @@ describe("attachment type helpers", () => {
     expect(isHtmlDocument("page.HTM")).toBe(true);
     expect(isExcalidrawAttachment("board.excalidraw")).toBe(true);
     expect(isExcalidrawAttachment("board.excalidraw.json")).toBe(true);
+    expect(isExcalidrawAttachment("board.excalidraw.md")).toBe(true);
     expect(isImageAttachment("readme.txt")).toBe(false);
   });
 });
@@ -263,7 +264,7 @@ describe("createPreviewPdfContainer", () => {
 });
 
 describe("createPreviewHtmlContainer", () => {
-  it("creates a sanitized HTML attachment host with metadata", () => {
+  it("creates a sandboxed iframe host with srcdoc and metadata", () => {
     const container = createPreviewHtmlContainer(
       document,
       "<p>Hello <strong>HTML</strong></p>",
@@ -274,6 +275,11 @@ describe("createPreviewHtmlContainer", () => {
     expect(container.className).toContain("preview-html-document");
     expect(container.dataset.htmlPath).toBe("/vault/resources/page.html");
     expect(container.dataset.htmlTitle).toBe("Snippet");
-    expect(container.innerHTML).toContain("<strong>HTML</strong>");
+    const iframe = container.querySelector("iframe.preview-html-frame");
+    expect(iframe).toBeTruthy();
+    expect(iframe?.getAttribute("sandbox")).toBe("");
+    expect(
+      iframe?.getAttribute("srcdoc") ?? (iframe as HTMLIFrameElement).srcdoc,
+    ).toContain("<strong>HTML</strong>");
   });
 });

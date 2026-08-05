@@ -131,34 +131,31 @@
   word-break: break-word;
 }
 
-.preview-html-document img,
-.preview-html-document svg,
-.preview-html-document video,
-.preview-html-document canvas,
-.preview-html-document iframe {
-  max-width: 100%;
+/* Full-file HTML preview: host a sandboxed iframe so document CSS applies. */
+.preview-html-document-frame {
+  display: flex;
+  flex-direction: column;
+  padding: var(--pane-content-top) var(--pane-content-px)
+    var(--preview-content-bottom, var(--pane-content-bottom));
+  min-height: 0;
 }
 
-.preview-html-document iframe {
+.preview-html-frame {
+  display: block;
   width: 100%;
-  min-height: 320px;
+  flex: 1 1 auto;
+  min-height: min(70vh, 720px);
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
 }
 
-.preview-html-document pre {
-  overflow-x: auto;
-}
-
-.preview-html-document pre.shiki {
-  border-radius: 1rem !important;
-  overflow: hidden;
-}
-
-.preview-html-document pre.shiki code {
-  display: block;
-  overflow-x: auto;
+.preview-attachment-html .preview-html-frame {
+  min-height: 200px;
+  height: 100%;
+  border: none;
+  border-radius: 0.75rem;
+  background: #ffffff;
 }
 
 .preview-pane-document.markdown-body pre,
@@ -319,9 +316,9 @@
   max-width: 100%;
   min-height: 120px;
   max-height: 75vh;
-  overflow: auto;
+  overflow: hidden;
   margin: 1rem 0;
-  padding: 1rem 1.15rem;
+  padding: 0.65rem;
   border: 1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.2));
   border-radius: 1rem;
   background: rgba(248, 250, 252, 0.96);
@@ -1006,9 +1003,10 @@
   color: var(--mp-doc-text, #e2e8f0);
 }
 
-.dark .preview-html-document iframe {
+.dark .preview-html-frame,
+.dark .preview-attachment-html .preview-html-frame {
   border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.14));
-  background: rgba(15, 23, 42, 0.8);
+  background: #0f172a;
 }
 
 .dark .preview-pane-document.markdown-body code {

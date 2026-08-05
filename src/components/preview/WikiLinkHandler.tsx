@@ -306,10 +306,15 @@ export const AttachmentEmbed: React.FC<AttachmentEmbedProps> = ({
         data-html-title={resolved.title || resolved.name}
         title={resolved.title || resolved.name}
         style={htmlStyle}
-        dangerouslySetInnerHTML={{
-          __html: sanitizeHtmlPreview(resolved.content || "", true),
-        }}
-      />
+      >
+        <iframe
+          className="preview-html-frame"
+          title={resolved.title || resolved.name}
+          sandbox=""
+          referrerPolicy="no-referrer"
+          srcDoc={sanitizeHtmlPreview(resolved.content || "", true)}
+        />
+      </div>
     );
   }
 

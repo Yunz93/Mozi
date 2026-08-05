@@ -344,9 +344,14 @@ describe("usePreviewRenderer wiki embed integration", () => {
       ) as HTMLElement | null;
       expect(html).toBeTruthy();
       expect(html?.dataset.htmlPath).toBe("/vault/resources/card.html");
-      expect(html?.textContent).toContain("Card");
-      expect(html?.textContent).toContain("Body");
-      expect(html?.innerHTML).not.toContain("onerror");
+      const frame = html?.querySelector(
+        "iframe.preview-html-frame",
+      ) as HTMLIFrameElement | null;
+      expect(frame).toBeTruthy();
+      const srcdoc = frame?.getAttribute("srcdoc") ?? frame?.srcdoc ?? "";
+      expect(srcdoc).toContain("Card");
+      expect(srcdoc).toContain("Body");
+      expect(srcdoc).not.toContain("onerror");
       expect(html?.style.width).toBe("420px");
       expect(html?.parentElement?.tagName).not.toBe("P");
     });

@@ -985,6 +985,7 @@ export default {
   preview_properties: "Properties",
   preview_imageAlt: "Preview image",
   preview_pdfTitle: "PDF preview",
+  preview_htmlTitle: "HTML preview",
   preview_unsupported: "Preview is not supported for this file type.",
   excalidraw_loading: "Loading drawing…",
   excalidraw_loadFailed: "Failed to load the Excalidraw editor",

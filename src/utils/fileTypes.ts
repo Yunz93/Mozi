@@ -20,6 +20,8 @@ export function isHtmlFile(name: string): boolean {
 }
 
 export function isMarkdownFile(name: string): boolean {
+  // Obsidian drawings use `.excalidraw.md` — treat as Excalidraw, not notes.
+  if (isExcalidrawFileName(name)) return false;
   return /\.(md|markdown)$/i.test(name);
 }
 
@@ -65,11 +67,11 @@ export function shouldReadInitialFileContent(name: string): boolean {
  * the stem, but keep the full name (including extension) for other file types.
  */
 export function getRenameDialogDefaultValue(fileName: string): string {
+  if (isExcalidrawFile(fileName)) {
+    return fileName.replace(/\.excalidraw(?:\.json|\.md)?$/i, "");
+  }
   if (/\.(md|markdown)$/i.test(fileName)) {
     return fileName.replace(/\.(md|markdown)$/i, "");
-  }
-  if (isExcalidrawFile(fileName)) {
-    return fileName.replace(/\.excalidraw(?:\.json)?$/i, "");
   }
   return fileName;
 }
@@ -93,8 +95,9 @@ export function resolveRenamedFileName(
   }
 
   if (isExcalidrawFile(oldName)) {
-    if (/\.excalidraw(?:\.json)?$/i.test(trimmed)) return trimmed;
-    const oldExt = oldName.match(/\.excalidraw(?:\.json)?$/i)?.[0] ?? ".excalidraw";
+    if (/\.excalidraw(?:\.json|\.md)?$/i.test(trimmed)) return trimmed;
+    const oldExt =
+      oldName.match(/\.excalidraw(?:\.json|\.md)?$/i)?.[0] ?? ".excalidraw";
     return `${trimmed}${oldExt}`;
   }
 

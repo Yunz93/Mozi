@@ -9,9 +9,7 @@ import { requestEditorRangeFocus } from "../../../utils/editorSelectionBridge";
 import { retrieve } from "../../../services/vault/retrieveService";
 import { createEmbeddingProvider } from "../../../services/vault/embeddingProvider";
 import { getActiveVectorStore } from "../../../services/vault/semanticIndexRuntime";
-
-const isMarkdownFile = (fileName: string): boolean =>
-  /\.(md|markdown)$/i.test(fileName);
+import { isMarkdownFile } from "../../../utils/fileTypes";
 
 export interface SidebarSearchSnippet {
   line: number;

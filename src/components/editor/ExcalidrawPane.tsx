@@ -10,6 +10,7 @@ import { useI18n } from "../../hooks/useI18n";
 import {
   EXCALIDRAW_SOURCE,
   parseExcalidrawDocument,
+  serializeExcalidrawContent,
 } from "../../utils/excalidrawDocument";
 
 interface ExcalidrawPaneProps {
@@ -130,16 +131,22 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
           "local",
         );
 
-        let next = serialized;
+        let sceneJson = serialized;
         try {
           const json = JSON.parse(serialized) as Record<string, unknown>;
           if (!json.source) {
             json.source = EXCALIDRAW_SOURCE;
           }
-          next = `${JSON.stringify(json, null, 2)}\n`;
+          sceneJson = JSON.stringify(json, null, 2);
         } catch {
           // keep serializeAsJSON output
         }
+
+        // Preserve Obsidian `.excalidraw.md` wrappers (frontmatter / text sections).
+        const next = serializeExcalidrawContent(
+          sceneJson,
+          lastSerializedRef.current,
+        );
 
         if (next === lastSerializedRef.current) return;
         lastSerializedRef.current = next;

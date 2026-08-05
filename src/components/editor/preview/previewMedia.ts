@@ -63,7 +63,7 @@ export function createPreviewPdfContainer(
   return container;
 }
 
-/** Host for sanitized HTML attachment embeds (`![[page.html]]`). */
+/** Host for sanitized HTML attachment embeds (`![[page.html]]`) via sandboxed iframe. */
 export function createPreviewHtmlContainer(
   document: Document,
   sanitizedHtml: string,
@@ -78,7 +78,14 @@ export function createPreviewHtmlContainer(
     container.dataset.htmlTitle = options.title;
     container.title = options.title;
   }
-  container.innerHTML = sanitizedHtml;
+
+  const iframe = document.createElement("iframe");
+  iframe.className = "preview-html-frame";
+  iframe.setAttribute("sandbox", "");
+  iframe.setAttribute("referrerpolicy", "no-referrer");
+  iframe.title = options?.title || "HTML";
+  iframe.srcdoc = sanitizedHtml;
+  container.appendChild(iframe);
   return container;
 }
 
@@ -91,7 +98,7 @@ export function isHtmlDocument(fileName: string): boolean {
 }
 
 export function isExcalidrawAttachment(fileName: string): boolean {
-  return /\.excalidraw(?:\.json)?$/i.test(fileName);
+  return /\.excalidraw(?:\.json|\.md)?$/i.test(fileName);
 }
 
 export type PreviewFileType =
