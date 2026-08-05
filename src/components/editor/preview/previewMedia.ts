@@ -90,12 +90,17 @@ export function isHtmlDocument(fileName: string): boolean {
   return /\.html?$/i.test(fileName);
 }
 
+export function isExcalidrawAttachment(fileName: string): boolean {
+  return /\.excalidraw(?:\.json)?$/i.test(fileName);
+}
+
 export type PreviewFileType =
   | "markdown"
   | "image"
   | "video"
   | "pdf"
   | "html"
+  | "excalidraw"
   | "unsupported";
 
 export function getPreviewFileType(
@@ -106,6 +111,7 @@ export function getPreviewFileType(
   if (isVideoAttachment(filePath)) return "video";
   if (isPdfAttachment(filePath)) return "pdf";
   if (isHtmlDocument(filePath)) return "html";
+  if (isExcalidrawAttachment(filePath)) return "excalidraw";
   if (isMarkdownNote(filePath)) return "markdown";
   return "unsupported";
 }

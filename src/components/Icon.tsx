@@ -205,6 +205,26 @@ export const Icons = {
     </svg>
   ),
 
+  /** Sheet + freehand scribble cue for Excalidraw drawings */
+  FileExcalidraw: ({ size = 16, className = "" }: IconProps) => (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+      <polyline points="13 2 13 9 20 9" />
+      <path d="M8 16c1.5-2 2.5-3 4-3s2.5 1 4 3" />
+      <path d="M9 12h.01" />
+    </svg>
+  ),
+
   Folder: ({ size = 16, className = "" }: IconProps) => (
     <svg
       className={className}

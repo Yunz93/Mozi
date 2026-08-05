@@ -10,7 +10,15 @@ import { getFileSystem } from "../types/filesystem";
 import { t } from "../utils/i18n";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
 import { findFileInTree } from "../utils/fileTree";
-import { isMarkdownFile, isPreviewOnlyFile } from "../utils/fileTypes";
+import {
+  isExcalidrawFile,
+  isMarkdownFile,
+  isPreviewOnlyFile,
+} from "../utils/fileTypes";
+
+function isNonMarkdownExportFile(name: string): boolean {
+  return isPreviewOnlyFile(name) || isExcalidrawFile(name);
+}
 
 /**
  * Encapsulates export actions (PDF + long-image share payload).
@@ -44,7 +52,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       return;
     }
 
-    if (isPreviewOnlyFile(activeFile.name)) {
+    if (isNonMarkdownExportFile(activeFile.name)) {
       showNotification(
         t(settings.language, "notifications_exportMarkdownOnly"),
         "error",
@@ -143,7 +151,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     }
 
     if (
-      isPreviewOnlyFile(activeFile.name) ||
+      isNonMarkdownExportFile(activeFile.name) ||
       !isMarkdownFile(activeFile.name)
     ) {
       showNotification(
@@ -230,7 +238,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       }
 
       const activeFile = findFileInTree(files, activeTabId);
-      if (!activeFile || isPreviewOnlyFile(activeFile.name)) {
+      if (!activeFile || isNonMarkdownExportFile(activeFile.name)) {
         showNotification(
           t(settings.language, "notifications_exportMarkdownOnly"),
           "error",

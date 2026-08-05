@@ -41,6 +41,7 @@ export interface SidebarProps {
   activeFileId: string | null;
   onFileSelect: (file: FileNode) => void | Promise<void>;
   onCreateFile: (parentFolder?: FileNode, fileName?: string) => void;
+  onCreateDrawing: (parentFolder?: FileNode, fileName?: string) => void;
   onNewFolder: (parentFolder?: FileNode, name?: string) => void;
   onRename: (file: FileNode, newName: string) => void;
   onDelete: (file: FileNode) => void;
@@ -129,8 +130,9 @@ const RootContextMenu: React.FC<{
   y: number;
   onClose: () => void;
   onCreateFile: () => void;
+  onCreateDrawing: () => void;
   onCreateFolder: () => void;
-}> = ({ x, y, onClose, onCreateFile, onCreateFolder }) => {
+}> = ({ x, y, onClose, onCreateFile, onCreateDrawing, onCreateFolder }) => {
   const { t } = useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +181,22 @@ const RootContextMenu: React.FC<{
         {t("context_newFile")}
       </button>
       <button
+        onClick={onCreateDrawing}
+        className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group mx-1.5 w-[calc(100%-12px)]"
+      >
+        <svg
+          className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+        </svg>
+        {t("context_newDrawing")}
+      </button>
+      <button
         onClick={onCreateFolder}
         className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-2.5 transition-colors group mx-1.5 w-[calc(100%-12px)]"
       >
@@ -205,6 +223,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     activeFileId,
     onFileSelect,
     onCreateFile,
+    onCreateDrawing,
     onNewFolder,
     onRename,
     onDelete: _onDelete,
@@ -299,24 +318,34 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     const dialogOptions = useMemo(
       () => ({
         onCreateFile,
+        onCreateDrawing,
         onRename,
         onNewFolder,
         // Delete dialog is only opened for permanent trash deletion.
         onDelete: onDeleteForever,
         onEmptyTrash,
       }),
-      [onCreateFile, onRename, onNewFolder, onDeleteForever, onEmptyTrash],
+      [
+        onCreateFile,
+        onCreateDrawing,
+        onRename,
+        onNewFolder,
+        onDeleteForever,
+        onEmptyTrash,
+      ],
     );
 
     const {
       dialogState,
       openNewFileDialog,
+      openNewDrawingDialog,
       openRenameDialog,
       openNewFolderDialog,
       openDeleteDialog,
       openEmptyTrashDialog,
       closeDialog,
       handleNewFileConfirm,
+      handleNewDrawingConfirm,
       handleRenameConfirm,
       handleNewFolderConfirm,
       handleDeleteConfirm,
@@ -805,6 +834,14 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                 t("app_untitled"),
               )
             }
+            onCreateDrawing={() =>
+              openNewDrawingDialog(
+                contextMenu.node.type === "folder"
+                  ? contextMenu.node
+                  : undefined,
+                t("app_untitledDrawing"),
+              )
+            }
             onCreateFolder={() => openNewFolderDialog(contextMenu.node)}
             onMoveToTrash={() => onMoveToTrash(contextMenu.node)}
             onRestoreFromTrash={() => onRestoreFromTrash(contextMenu.node)}
@@ -822,6 +859,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                 openNewFileDialog(undefined, t("app_untitled"));
                 closeRootContextMenu();
               }}
+              onCreateDrawing={() => {
+                openNewDrawingDialog(undefined, t("app_untitledDrawing"));
+                closeRootContextMenu();
+              }}
               onCreateFolder={() => {
                 openNewFolderDialog(undefined);
                 closeRootContextMenu();
@@ -837,6 +878,22 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
           defaultValue={dialogState.defaultValue || t("app_untitled")}
           onSubmit={(value) =>
             handleNewFileConfirm(
+              dialogState.file?.type === "folder"
+                ? dialogState.file
+                : undefined,
+              value,
+            )
+          }
+          onClose={closeDialog}
+        />
+
+        <PromptDialog
+          isOpen={dialogState.type === "newDrawing"}
+          title={t("sidebar_newDrawingTitle")}
+          label={t("app_fileName")}
+          defaultValue={dialogState.defaultValue || t("app_untitledDrawing")}
+          onSubmit={(value) =>
+            handleNewDrawingConfirm(
               dialogState.file?.type === "folder"
                 ? dialogState.file
                 : undefined,

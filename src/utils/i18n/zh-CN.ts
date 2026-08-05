@@ -20,6 +20,7 @@ export default {
   app_newFile: "新建文件",
   app_fileName: "文件名：",
   app_untitled: "未命名",
+  app_untitledDrawing: "未命名画板",
   app_untitledFolder: "未命名文件夹",
 
   toolbar_hideSidebar: "隐藏侧边栏",
@@ -259,6 +260,7 @@ export default {
   sidebar_cleanupUnusedAttachmentsConfirm:
     "将把 {count} 个未被引用的附件移入回收站。此操作可从回收站还原。",
   sidebar_newFileTitle: "新建文件",
+  sidebar_newDrawingTitle: "新建画板",
   sidebar_renameTitle: "重命名",
   sidebar_newFolderTitle: "新建文件夹",
   sidebar_folderName: "文件夹名称：",
@@ -272,6 +274,7 @@ export default {
   context_restore: "还原",
   context_deleteForever: "永久删除",
   context_newFile: "新建文件",
+  context_newDrawing: "新建画板",
   context_newFolder: "新建文件夹",
   context_rename: "重命名",
   context_copyRelativePath: "复制路径",
@@ -896,4 +899,7 @@ export default {
   preview_imageAlt: "预览图片",
   preview_pdfTitle: "PDF 预览",
   preview_unsupported: "暂不支持预览这种文件类型。",
+  excalidraw_loading: "正在加载画板...",
+  excalidraw_loadFailed: "无法加载 Excalidraw 编辑器",
+  excalidraw_invalidDocument: "无法解析此 Excalidraw 文件",
 } as const;

@@ -15,6 +15,7 @@ import {
 } from "../../utils/viewMode";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 import { PreviewPane, type PreviewPaneHandle } from "./PreviewPane";
+import { ExcalidrawPane } from "./ExcalidrawPane";
 import { WritingStatsDisplay } from "../stats/WritingStatsDisplay";
 import { throttle } from "../../utils/throttle";
 import type { PaneDensity } from "./paneLayout";
@@ -25,6 +26,8 @@ import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
 import { getUiFontScale } from "../../utils/uiFontSize";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { isHeadingNavigationLocked } from "../../utils/previewNavigationBridge";
+import { findFileInTree } from "../../utils/fileTree";
+import { isExcalidrawFile } from "../../utils/fileTypes";
 
 const PANE_TRANSITION_MS = 200;
 const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
@@ -64,6 +67,13 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const MIN_SPLIT_PANE_WIDTH = 360 * uiFontScale;
   const viewMode = useAppStore((state) => state.viewMode);
   const activeTabId = useAppStore((state) => state.activeTabId);
+  const files = useAppStore((state) => state.files);
+  const activeFile = activeTabId
+    ? findFileInTree(files, activeTabId)
+    : undefined;
+  const isExcalidrawActive = Boolean(
+    activeFile && isExcalidrawFile(activeFile.name),
+  );
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -414,6 +424,20 @@ export const SplitView: React.FC<SplitViewProps> = ({
     transition: isResizing ? "none" : `${PANE_TRANSITION}, opacity 120ms ease`,
     willChange: isResizing ? "auto" : "width, opacity",
   };
+
+  if (isExcalidrawActive) {
+    return (
+      <ErrorBoundary>
+        <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
+          <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+            <ExcalidrawPane
+              onContentChange={(next) => onContentChange?.(next)}
+            />
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>

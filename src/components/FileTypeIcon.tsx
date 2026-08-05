@@ -20,6 +20,7 @@ const BY_KIND: Record<FileIconKind, React.FC<{ size?: number; className?: string
   audio: Icons.FileAudio,
   video: Icons.FileVideo,
   code: Icons.FileCode,
+  excalidraw: Icons.FileExcalidraw,
   file: Icons.File,
 };
 

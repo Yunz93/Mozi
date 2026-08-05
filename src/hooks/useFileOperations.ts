@@ -14,11 +14,16 @@ import {
   migrateDraftBackupKeys,
 } from "../utils/pathRemap";
 import {
+  isExcalidrawFile,
   isHtmlFile,
   isMarkdownFile,
   isPreviewOnlyFile,
   resolveRenamedFileName,
 } from "../utils/fileTypes";
+import {
+  createEmptyExcalidrawDocument,
+  resolveExcalidrawFileName,
+} from "../utils/excalidrawDocument";
 import { normalizeSlashes } from "../utils/pathHelpers";
 import { clearDraftBackup, readDraftBackup } from "../utils/draftBackup";
 import {
@@ -152,7 +157,11 @@ export function useFileOperations() {
       if (file.type === "folder") return;
 
       try {
-        if (!isMarkdownFile(file.name) && !isPreviewOnlyFile(file.name)) {
+        if (
+          !isMarkdownFile(file.name) &&
+          !isExcalidrawFile(file.name) &&
+          !isPreviewOnlyFile(file.name)
+        ) {
           showNotification(
             t(settings.language, "notifications_previewNotSupported", {
               name: file.name,
@@ -187,6 +196,19 @@ export function useFileOperations() {
             markAsSaved(file.id);
           }
           // View mode stays sticky; App forces PREVIEW only while this file is active.
+          return;
+        }
+
+        if (isExcalidrawFile(file.name)) {
+          const cachedDrawing =
+            previousId === file.id
+              ? useAppStore.getState().fileContents[file.id]
+              : undefined;
+          if (cachedDrawing === undefined) {
+            const text = await readFile(file);
+            updateTabContent(file.id, text);
+            markAsSaved(file.id);
+          }
           return;
         }
 
@@ -285,6 +307,52 @@ export function useFileOperations() {
     },
     [
       settings.metadataFields,
+      settings.newNoteLocation,
+      settings.newNoteFolder,
+      settings.language,
+      createFile,
+      addTab,
+      setCurrentFilePath,
+      showNotification,
+    ],
+  );
+
+  const handleCreateDrawing = useCallback(
+    async (parentFolder?: FileNode, fileName?: string) => {
+      const finalFileName = resolveExcalidrawFileName(
+        fileName?.trim() || `drawing-${Date.now()}`,
+      );
+      const initialContent = createEmptyExcalidrawDocument();
+
+      const storeState = useAppStore.getState();
+      const destinationFolderPath = resolveNewNoteFolderPath({
+        location: normalizeNewNoteLocation(settings.newNoteLocation),
+        rootFolderPath: storeState.rootFolderPath,
+        currentFilePath: storeState.currentFilePath,
+        explicitFolderPath: parentFolder?.path,
+        newNoteFolder: settings.newNoteFolder,
+      });
+
+      const flushed = await flushActiveDocumentIfDirty();
+      if (!flushed) {
+        showNotification(
+          t(settings.language, "tab_closeBlockedUnsaved"),
+          "error",
+        );
+        return;
+      }
+
+      const newFile = await createFile(
+        finalFileName,
+        initialContent,
+        destinationFolderPath,
+      );
+      if (newFile) {
+        addTab(newFile.id, initialContent);
+        setCurrentFilePath(newFile.path);
+      }
+    },
+    [
       settings.newNoteLocation,
       settings.newNoteFolder,
       settings.language,
@@ -784,6 +852,7 @@ export function useFileOperations() {
   return {
     handleFileSelect,
     handleCreateFile,
+    handleCreateDrawing,
     handleRename,
     handleMoveToTrash,
     handleRestoreFromTrash,

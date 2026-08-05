@@ -723,6 +723,26 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
           return;
         }
 
+        // Excalidraw embed click → open drawing for edit/preview
+        const excalidrawEmbed = target?.closest(
+          ".preview-attachment-excalidraw[data-attachment-path]",
+        ) as HTMLElement | null;
+        const excalidrawPath = excalidrawEmbed?.dataset.attachmentPath?.trim();
+        if (excalidrawPath) {
+          event.preventDefault();
+          await handleFileSelect({
+            id: excalidrawPath,
+            name:
+              excalidrawEmbed?.dataset.attachmentName?.trim() ||
+              excalidrawPath.split(/[/\\]/).pop() ||
+              excalidrawPath,
+            type: "file",
+            path: excalidrawPath,
+            isTrash: false,
+          });
+          return;
+        }
+
         // WikiLink click
         const wikilink = target?.closest(
           "a[data-wikilink]",

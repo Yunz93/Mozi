@@ -12,6 +12,7 @@
 - Syntax highlighting: [Shiki](https://shiki.style/)
 - Math rendering: [KaTeX](https://katex.org/)
 - Diagrams: [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) (common Mermaid syntax) + [Mermaid](https://mermaid.js.org/) (fallback for other types)
+- Drawings: [Excalidraw](https://excalidraw.com/) (`.excalidraw` editing and in-note embed preview)
 - AI: [Google Gemini API](https://ai.google.dev/) / [OpenAI API](https://platform.openai.com/)
 
 ## Requirements

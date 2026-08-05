@@ -726,6 +726,12 @@ export function isMarkdownDocumentPath(path: string | null | undefined): boolean
   return Boolean(path && MARKDOWN_FILE_REGEX.test(path));
 }
 
+export function isSavableDocumentPath(path: string | null | undefined): boolean {
+  if (!path) return false;
+  if (MARKDOWN_FILE_REGEX.test(path)) return true;
+  return /\.excalidraw(?:\.json)?$/i.test(path);
+}
+
 export function formatMarkdownForSave(content: string, options: MarkdownFormatOptions = {}): string {
   const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
   const normalized = content.replace(/\r\n/g, '\n');
