@@ -218,6 +218,14 @@ async function loadPipelineFromHub(
   env.useBrowserCache = true;
   env.remoteHost = remoteHost.endsWith("/") ? remoteHost : `${remoteHost}/`;
 
+  // Run ONNX session init + inference in onnxruntime-web's proxy worker.
+  // Without this, WASM inference executes on the UI thread and saturates it
+  // while the vault index embeds (e.g. right after app start), which shows up
+  // as the whole window freezing and ignoring clicks.
+  if (typeof Worker !== "undefined" && env.backends?.onnx?.wasm) {
+    env.backends.onnx.wasm.proxy = true;
+  }
+
   setStatus({
     phase: "loading",
     progress: 0.02,

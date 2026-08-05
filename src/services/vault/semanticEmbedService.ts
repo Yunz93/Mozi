@@ -143,6 +143,10 @@ export async function embedChunkIndex(options: {
         values: vectors[batchIndex]!,
       })),
     );
+    // Yield a macrotask between batches so pending input events are processed
+    // even when a provider computes on the calling thread. Keeps the UI
+    // clickable during long index embedding runs.
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
   options.onProgress?.(upsertChunks.length, upsertChunks.length);
   options.vectorStore.builtAt = Date.now();
