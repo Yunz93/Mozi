@@ -17,6 +17,7 @@ describe("getFileIconKind", () => {
   it("classifies excalidraw drawings", () => {
     expect(getFileIconKind("board.excalidraw")).toBe("excalidraw");
     expect(getFileIconKind("board.excalidraw.json")).toBe("excalidraw");
+    expect(getFileIconKind("board.excalidraw.md")).toBe("excalidraw");
   });
 
   it("classifies archives and media", () => {
@@ -80,6 +81,7 @@ describe("getFileTypeBadge", () => {
   it("uses DRAW for excalidraw", () => {
     expect(getFileTypeBadge("board.excalidraw")).toBe("DRAW");
     expect(getFileTypeBadge("board.excalidraw.json")).toBe("DRAW");
+    expect(getFileTypeBadge("board.excalidraw.md")).toBe("DRAW");
   });
 
   it("uppercases common extensions", () => {

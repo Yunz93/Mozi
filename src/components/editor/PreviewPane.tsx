@@ -1075,14 +1075,18 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
                   {t("preview_loading")}
                 </div>
               ) : previewFileType === "html" ? (
-                <div
-                  className="preview-html-document editor-pane-width-constrained mx-auto w-full"
-                  dangerouslySetInnerHTML={{
-                    __html: renderer.requiresAsyncEnhancement
-                      ? renderer.enhancedBodyHtml
-                      : renderer.sanitizedHtmlPreview,
-                  }}
-                />
+                <div className="preview-html-document preview-html-document-frame editor-pane-width-constrained mx-auto w-full h-full min-h-0">
+                  <iframe
+                    className="preview-html-frame"
+                    title={
+                      currentFilePath?.split(/[\\/]/).pop() ||
+                      t("preview_htmlTitle")
+                    }
+                    sandbox=""
+                    referrerPolicy="no-referrer"
+                    srcDoc={renderer.sanitizedHtmlPreview}
+                  />
+                </div>
               ) : previewFileType === "unsupported" ? (
                 <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-12 text-sm text-gray-500 dark:text-gray-400">
                   {t("preview_unsupported")}

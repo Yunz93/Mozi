@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getRenameDialogDefaultValue,
   isExcalidrawFile,
+  isMarkdownFile,
   isOpenableFile,
   isSavableDocumentFile,
   resolveRenamedFileName,
@@ -16,6 +17,7 @@ describe("rename name helpers", () => {
     expect(getRenameDialogDefaultValue("image.png")).toBe("image.png");
     expect(getRenameDialogDefaultValue("board.excalidraw")).toBe("board");
     expect(getRenameDialogDefaultValue("board.excalidraw.json")).toBe("board");
+    expect(getRenameDialogDefaultValue("board.excalidraw.md")).toBe("board");
   });
 
   it("preserves markdown extensions when resolving rename input", () => {
@@ -34,6 +36,9 @@ describe("rename name helpers", () => {
     );
     expect(resolveRenamedFileName("board.excalidraw.json", "sketch")).toBe(
       "sketch.excalidraw.json",
+    );
+    expect(resolveRenamedFileName("board.excalidraw.md", "sketch")).toBe(
+      "sketch.excalidraw.md",
     );
   });
 
@@ -56,6 +61,21 @@ describe("excalidraw file predicates", () => {
         name: "a.excalidraw",
         type: "file",
         path: "/a.excalidraw",
+      }),
+    ).toBe(true);
+  });
+
+  it("treats Obsidian .excalidraw.md as drawings, not markdown notes", () => {
+    expect(isExcalidrawFile("a.excalidraw.md")).toBe(true);
+    expect(isMarkdownFile("a.excalidraw.md")).toBe(false);
+    expect(isSavableDocumentFile("a.excalidraw.md")).toBe(true);
+    expect(shouldReadInitialFileContent("a.excalidraw.md")).toBe(true);
+    expect(
+      isOpenableFile({
+        id: "/a.excalidraw.md",
+        name: "a.excalidraw.md",
+        type: "file",
+        path: "/a.excalidraw.md",
       }),
     ).toBe(true);
   });

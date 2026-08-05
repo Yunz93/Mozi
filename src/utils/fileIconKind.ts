@@ -143,7 +143,11 @@ export function getFileExtension(fileName: string): string | null {
 
 export function getFileIconKind(fileName: string): FileIconKind {
   const base = fileName.trim().toLowerCase();
-  if (base.endsWith(".excalidraw") || base.endsWith(".excalidraw.json")) {
+  if (
+    base.endsWith(".excalidraw") ||
+    base.endsWith(".excalidraw.json") ||
+    base.endsWith(".excalidraw.md")
+  ) {
     return "excalidraw";
   }
 

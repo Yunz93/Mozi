@@ -898,6 +898,7 @@ export default {
   preview_properties: "属性",
   preview_imageAlt: "预览图片",
   preview_pdfTitle: "PDF 预览",
+  preview_htmlTitle: "HTML 预览",
   preview_unsupported: "暂不支持预览这种文件类型。",
   excalidraw_loading: "正在加载画板...",
   excalidraw_loadFailed: "无法加载 Excalidraw 编辑器",
