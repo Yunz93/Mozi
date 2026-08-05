@@ -43,6 +43,7 @@ import {
   getActiveVectorStore,
   setActiveChunkIndex,
 } from "../services/vault/semanticIndexRuntime";
+import { packVectorSnapshot } from "../services/vault/vectorStore";
 import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
@@ -489,7 +490,7 @@ export function useFileOperations() {
           void writeIndexJson(
             nextChunks.vaultRoot,
             VECTOR_INDEX_FILE,
-            vectorStore.toSnapshot(),
+            packVectorSnapshot(vectorStore.toSnapshot()),
           );
         }
       }

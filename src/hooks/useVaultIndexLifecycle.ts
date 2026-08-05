@@ -39,7 +39,10 @@ import {
   embedChunkIndex,
   isCompatibleVectorSnapshot,
 } from "../services/vault/semanticEmbedService";
-import type { VectorStoreSnapshot } from "../services/vault/vectorStore";
+import {
+  packVectorSnapshot,
+  unpackVectorSnapshot,
+} from "../services/vault/vectorStore";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -142,7 +145,7 @@ export function useVaultIndexLifecycle(): {
           await writeIndexJson(
             vaultRoot,
             VECTOR_INDEX_FILE,
-            store.toSnapshot(),
+            packVectorSnapshot(store.toSnapshot()),
           );
         }
         if (isCurrent()) syncSemanticStatus(store.size());
@@ -328,9 +331,8 @@ export function useVaultIndexLifecycle(): {
       vaultRoot,
       CHUNK_INDEX_FILE,
     );
-    const cachedVectors = await readIndexJson<VectorStoreSnapshot>(
-      vaultRoot,
-      VECTOR_INDEX_FILE,
+    const cachedVectors = unpackVectorSnapshot(
+      await readIndexJson<unknown>(vaultRoot, VECTOR_INDEX_FILE),
     );
 
     if (isValidLinkSnapshot(cached, vaultRoot)) {
