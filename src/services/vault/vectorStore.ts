@@ -13,6 +13,117 @@ export interface VectorStoreSnapshot {
   records: VectorRecord[];
 }
 
+/**
+ * Persisted on-disk form: Float32 values are base64-packed. Plain JSON number
+ * arrays serialize each dimension as ~19 characters, so a moderate vault
+ * produced a multi-megabyte file whose `JSON.parse` / `JSON.stringify` blocked
+ * the UI thread at startup and on every save. Packing shrinks the file ~10x
+ * and makes (de)serialization proportionally cheaper.
+ */
+export interface PackedVectorRecord {
+  id: string;
+  contentHash: string;
+  /** base64 of the little-endian Float32 vector */
+  v: string;
+}
+
+export interface PackedVectorStoreSnapshot {
+  version: 1;
+  encoding: "f32-b64";
+  vaultRoot: string;
+  model: string;
+  dims: number;
+  builtAt: number;
+  records: PackedVectorRecord[];
+}
+
+const BASE64_CHUNK_SIZE = 0x8000;
+
+function floatsToBase64(values: number[]): string {
+  const floats = Float32Array.from(values);
+  const bytes = new Uint8Array(floats.buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE));
+  }
+  return btoa(binary);
+}
+
+function base64ToFloats(encoded: string): number[] {
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return Array.from(new Float32Array(bytes.buffer));
+}
+
+export function packVectorSnapshot(
+  snapshot: VectorStoreSnapshot,
+): PackedVectorStoreSnapshot {
+  return {
+    version: 1,
+    encoding: "f32-b64",
+    vaultRoot: snapshot.vaultRoot,
+    model: snapshot.model,
+    dims: snapshot.dims,
+    builtAt: snapshot.builtAt,
+    records: snapshot.records.map((record) => ({
+      id: record.id,
+      contentHash: record.contentHash,
+      v: floatsToBase64(record.values),
+    })),
+  };
+}
+
+/**
+ * Accepts both the packed on-disk form and the legacy plain-array form.
+ * Returns null when the payload is not a recognizable vector snapshot.
+ */
+export function unpackVectorSnapshot(raw: unknown): VectorStoreSnapshot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const snapshot = raw as Partial<PackedVectorStoreSnapshot> &
+    Partial<VectorStoreSnapshot>;
+  if (snapshot.version !== 1 || !Array.isArray(snapshot.records)) return null;
+
+  try {
+    const records: VectorRecord[] = [];
+    for (const record of snapshot.records as Array<
+      Partial<PackedVectorRecord> & Partial<VectorRecord>
+    >) {
+      if (typeof record?.id !== "string") return null;
+      if (typeof record.v === "string") {
+        records.push({
+          id: record.id,
+          contentHash: record.contentHash ?? "",
+          values: base64ToFloats(record.v),
+        });
+        continue;
+      }
+      if (Array.isArray(record.values)) {
+        records.push({
+          id: record.id,
+          contentHash: record.contentHash ?? "",
+          values: record.values,
+        });
+        continue;
+      }
+      return null;
+    }
+
+    return {
+      version: 1,
+      vaultRoot: snapshot.vaultRoot ?? "",
+      model: snapshot.model ?? "",
+      dims: snapshot.dims ?? 0,
+      builtAt: snapshot.builtAt ?? 0,
+      records,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   const len = Math.min(a.length, b.length);
   let dot = 0;

@@ -8,7 +8,12 @@ import {
   VECTOR_INDEX_FILE,
   writeIndexJson,
 } from "./indexStorage";
-import type { VectorStore, VectorStoreSnapshot } from "./vectorStore";
+import {
+  packVectorSnapshot,
+  unpackVectorSnapshot,
+  type VectorStore,
+  type VectorStoreSnapshot,
+} from "./vectorStore";
 
 const EMBED_BATCH = 16;
 const BUILTIN_EMBED_BATCH = 4;
@@ -143,6 +148,10 @@ export async function embedChunkIndex(options: {
         values: vectors[batchIndex]!,
       })),
     );
+    // Yield a macrotask between batches so pending input events are processed
+    // even when a provider computes on the calling thread. Keeps the UI
+    // clickable during long index embedding runs.
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
   options.onProgress?.(upsertChunks.length, upsertChunks.length);
   options.vectorStore.builtAt = Date.now();
@@ -158,7 +167,7 @@ export async function persistSemanticIndexes(options: {
     await writeIndexJson(
       options.vaultRoot,
       VECTOR_INDEX_FILE,
-      options.vectorStore.toSnapshot(),
+      packVectorSnapshot(options.vectorStore.toSnapshot()),
     );
   }
 }
@@ -167,5 +176,6 @@ export async function loadVectorSnapshot(
   vaultRoot: string,
   read: <T>(vaultRoot: string, file: string) => Promise<T | null>,
 ): Promise<VectorStoreSnapshot | null> {
-  return read<VectorStoreSnapshot>(vaultRoot, VECTOR_INDEX_FILE);
+  const raw = await read<unknown>(vaultRoot, VECTOR_INDEX_FILE);
+  return unpackVectorSnapshot(raw);
 }
