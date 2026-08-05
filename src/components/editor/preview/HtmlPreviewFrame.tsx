@@ -26,6 +26,22 @@ export interface HtmlPreviewFrameProps {
 
 type ZoomMode = "fit" | "manual";
 
+function bindWheelZoomTarget(
+  target: EventTarget | null | undefined,
+  onWheel: (event: WheelEvent) => void,
+): (() => void) | null {
+  if (!target || typeof (target as Window).addEventListener !== "function") {
+    return null;
+  }
+  target.addEventListener("wheel", onWheel as EventListener, {
+    passive: false,
+    capture: true,
+  });
+  return () => {
+    target.removeEventListener("wheel", onWheel as EventListener, true);
+  };
+}
+
 export const HtmlPreviewFrame: React.FC<HtmlPreviewFrameProps> = ({
   srcDoc,
   title,
@@ -114,7 +130,6 @@ export const HtmlPreviewFrame: React.FC<HtmlPreviewFrameProps> = ({
   }, [displayZoom, ready, syncZoomIntoIframe]);
 
   const themeModeRef = useRef(themeMode);
-  // Theme toggles need a Mermaid re-pass inside the iframe document.
   useEffect(() => {
     const previousTheme = themeModeRef.current;
     themeModeRef.current = themeMode;
@@ -174,31 +189,76 @@ export const HtmlPreviewFrame: React.FC<HtmlPreviewFrameProps> = ({
     [syncZoomIntoIframe],
   );
 
-  // Native non-passive listeners so Cmd/Ctrl+wheel can preventDefault.
-  // Listen on both the shell and the iframe document (wheel does not bubble out).
+  /**
+   * While Cmd/Ctrl is held, make the iframe ignore pointer events so wheel
+   * reaches the parent shell. WKWebView often swallows meta+wheel inside
+   * nested documents before our iframe listeners can run.
+   */
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const setPassThrough = (enabled: boolean) => {
+      iframe.style.pointerEvents = enabled ? "none" : "";
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Meta" ||
+        event.key === "Control" ||
+        event.metaKey ||
+        event.ctrlKey
+      ) {
+        setPassThrough(true);
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Meta" || event.key === "Control") {
+        setPassThrough(false);
+        return;
+      }
+      if (!event.metaKey && !event.ctrlKey) {
+        setPassThrough(false);
+      }
+    };
+    const onBlur = () => setPassThrough(false);
+
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onBlur);
+      setPassThrough(false);
+    };
+  }, [ready, srcDoc]);
+
+  // Parent shell + iframe document/window (capture, non-passive).
   useEffect(() => {
     const shell = shellRef.current;
-    if (!shell) return;
+    const iframe = iframeRef.current;
+    const cleanups: Array<() => void> = [];
 
     const onWheel = (event: WheelEvent) => {
       applyWheelZoom(event);
     };
 
-    shell.addEventListener("wheel", onWheel, { passive: false });
-    return () => shell.removeEventListener("wheel", onWheel);
-  }, [applyWheelZoom]);
+    const shellCleanup = bindWheelZoomTarget(shell, onWheel);
+    if (shellCleanup) cleanups.push(shellCleanup);
 
-  useEffect(() => {
-    if (!ready) return;
-    const doc = iframeRef.current?.contentDocument;
-    if (!doc) return;
+    if (ready) {
+      const doc = iframe?.contentDocument;
+      const win = iframe?.contentWindow;
+      const docCleanup = bindWheelZoomTarget(doc, onWheel);
+      const winCleanup = bindWheelZoomTarget(win, onWheel);
+      if (docCleanup) cleanups.push(docCleanup);
+      if (winCleanup) cleanups.push(winCleanup);
+    }
 
-    const onWheel = (event: WheelEvent) => {
-      applyWheelZoom(event);
+    return () => {
+      for (const cleanup of cleanups) cleanup();
     };
-
-    doc.addEventListener("wheel", onWheel, { passive: false });
-    return () => doc.removeEventListener("wheel", onWheel);
   }, [applyWheelZoom, ready, srcDoc]);
 
   const zoomOut = () => {
@@ -244,46 +304,6 @@ export const HtmlPreviewFrame: React.FC<HtmlPreviewFrameProps> = ({
       ref={shellRef}
       className="preview-html-document preview-html-document-frame editor-pane-width-constrained mx-auto w-full h-full min-h-0"
     >
-      <div
-        className="preview-html-zoom-bar"
-        role="toolbar"
-        aria-label={t("preview_htmlZoomToolbar")}
-      >
-        <button
-          type="button"
-          className="preview-html-zoom-btn"
-          onClick={zoomFit}
-          title={t("preview_htmlZoomFit")}
-        >
-          {t("preview_htmlZoomFit")}
-        </button>
-        <button
-          type="button"
-          className="preview-html-zoom-btn"
-          onClick={zoomOut}
-          title={t("preview_htmlZoomOut")}
-          aria-label={t("preview_htmlZoomOut")}
-        >
-          −
-        </button>
-        <button
-          type="button"
-          className="preview-html-zoom-btn preview-html-zoom-percent"
-          onClick={zoomReset}
-          title={t("preview_htmlZoomReset")}
-        >
-          {percentLabel}
-        </button>
-        <button
-          type="button"
-          className="preview-html-zoom-btn"
-          onClick={zoomIn}
-          title={t("preview_htmlZoomIn")}
-          aria-label={t("preview_htmlZoomIn")}
-        >
-          +
-        </button>
-      </div>
       <iframe
         ref={iframeRef}
         className="preview-html-frame"
@@ -295,6 +315,42 @@ export const HtmlPreviewFrame: React.FC<HtmlPreviewFrameProps> = ({
           void enhanceIframeDocument();
         }}
       />
+      <div
+        className="preview-html-zoom-pill"
+        role="toolbar"
+        aria-label={t("preview_htmlZoomToolbar")}
+      >
+        <button
+          type="button"
+          className="preview-html-zoom-pill-btn"
+          onClick={zoomOut}
+          title={t("preview_htmlZoomOut")}
+          aria-label={t("preview_htmlZoomOut")}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="preview-html-zoom-pill-percent"
+          onClick={zoomReset}
+          onDoubleClick={(event) => {
+            event.preventDefault();
+            zoomFit();
+          }}
+          title={`${t("preview_htmlZoomReset")} / ${t("preview_htmlZoomFit")}`}
+        >
+          {percentLabel}
+        </button>
+        <button
+          type="button"
+          className="preview-html-zoom-pill-btn"
+          onClick={zoomIn}
+          title={t("preview_htmlZoomIn")}
+          aria-label={t("preview_htmlZoomIn")}
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 };
