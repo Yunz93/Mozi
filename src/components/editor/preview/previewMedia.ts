@@ -63,18 +63,14 @@ export function createPreviewPdfContainer(
   return container;
 }
 
-/**
- * Host for HTML attachment embeds (`![[page.html]]`).
- * Shows the file as plain-text source (not a rendered document) so scripts
- * never execute and the markup itself stays readable.
- */
+/** Host for sanitized HTML attachment embeds (`![[page.html]]`). */
 export function createPreviewHtmlContainer(
   document: Document,
-  htmlSource: string,
+  sanitizedHtml: string,
   options?: { title?: string; path?: string },
 ): HTMLDivElement {
   const container = document.createElement("div");
-  container.className = "preview-attachment-html preview-html-source";
+  container.className = "preview-attachment-html preview-html-document";
   if (options?.path) {
     container.dataset.htmlPath = options.path;
   }
@@ -82,10 +78,7 @@ export function createPreviewHtmlContainer(
     container.dataset.htmlTitle = options.title;
     container.title = options.title;
   }
-  const pre = document.createElement("pre");
-  pre.className = "preview-html-source-pre";
-  pre.textContent = htmlSource;
-  container.appendChild(pre);
+  container.innerHTML = sanitizedHtml;
   return container;
 }
 
