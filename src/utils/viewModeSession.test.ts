@@ -8,16 +8,16 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: false,
         isPreviewOnly: true,
-        currentViewMode: ViewMode.SPLIT,
+        currentViewMode: ViewMode.LIVE,
         viewModeBeforePreviewOnly: null,
       }),
     ).toEqual({
       nextViewMode: ViewMode.PREVIEW,
-      nextViewModeBeforePreviewOnly: ViewMode.SPLIT,
+      nextViewModeBeforePreviewOnly: ViewMode.LIVE,
     });
   });
 
-  it("preserves source mode when saving before preview-only", () => {
+  it("maps legacy editor/split onto live when saving before preview-only", () => {
     expect(
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: false,
@@ -27,7 +27,19 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
       }),
     ).toEqual({
       nextViewMode: ViewMode.PREVIEW,
-      nextViewModeBeforePreviewOnly: ViewMode.EDITOR,
+      nextViewModeBeforePreviewOnly: ViewMode.LIVE,
+    });
+
+    expect(
+      resolvePreviewOnlyViewModeTransition({
+        wasPreviewOnly: false,
+        isPreviewOnly: true,
+        currentViewMode: ViewMode.SPLIT,
+        viewModeBeforePreviewOnly: null,
+      }),
+    ).toEqual({
+      nextViewMode: ViewMode.PREVIEW,
+      nextViewModeBeforePreviewOnly: ViewMode.LIVE,
     });
   });
 
@@ -37,24 +49,24 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
         wasPreviewOnly: true,
         isPreviewOnly: false,
         currentViewMode: ViewMode.PREVIEW,
-        viewModeBeforePreviewOnly: ViewMode.EDITOR,
+        viewModeBeforePreviewOnly: ViewMode.LIVE,
       }),
     ).toEqual({
-      nextViewMode: ViewMode.EDITOR,
+      nextViewMode: ViewMode.LIVE,
       nextViewModeBeforePreviewOnly: null,
     });
   });
 
-  it("maps legacy live restore onto editor", () => {
+  it("maps legacy editor restore onto live", () => {
     expect(
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: true,
         isPreviewOnly: false,
         currentViewMode: ViewMode.PREVIEW,
-        viewModeBeforePreviewOnly: ViewMode.LIVE,
+        viewModeBeforePreviewOnly: ViewMode.EDITOR,
       }),
     ).toEqual({
-      nextViewMode: ViewMode.EDITOR,
+      nextViewMode: ViewMode.LIVE,
       nextViewModeBeforePreviewOnly: null,
     });
   });
@@ -78,7 +90,7 @@ describe("resolvePreviewOnlyViewModeTransition", () => {
       resolvePreviewOnlyViewModeTransition({
         wasPreviewOnly: false,
         isPreviewOnly: false,
-        currentViewMode: ViewMode.EDITOR,
+        currentViewMode: ViewMode.LIVE,
         viewModeBeforePreviewOnly: null,
       }),
     ).toEqual({});

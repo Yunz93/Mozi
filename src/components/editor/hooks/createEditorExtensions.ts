@@ -48,8 +48,13 @@ import {
   markdownListDecorations,
   markdownHighlightStyle,
 } from "../decorations";
-import { tableLiveOverlay } from "../tableLiveOverlay";
+import {
+  createLivePreviewContextExtension,
+  createLivePreviewPluginExtensions,
+} from "../livePreview";
+import type { LivePreviewContext } from "../livePreview";
 import { clearPendingEditorRangeFocus } from "../../../utils/editorSelectionBridge";
+import { cancelPendingLivePreviewReveals } from "../livePreview/shared";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
@@ -66,6 +71,8 @@ interface EditorCompartments {
   keymap: Compartment;
   darkTheme: Compartment;
   markdown: Compartment;
+  livePreview: Compartment;
+  livePreviewContext: Compartment;
 }
 
 export interface CreateEditorExtensionsContext {
@@ -74,6 +81,8 @@ export interface CreateEditorExtensionsContext {
   orderedListMode: OrderedListMode;
   wordWrap: boolean;
   placeholder: string;
+  livePreviewEnabled: boolean;
+  livePreviewContext: LivePreviewContext;
   preferences: EditorPreferenceOptions;
   compartments: EditorCompartments;
   preferenceCompartments: EditorPreferenceCompartments;
@@ -139,6 +148,8 @@ export function createEditorExtensions(
     orderedListMode,
     wordWrap,
     placeholder,
+    livePreviewEnabled,
+    livePreviewContext,
     preferences,
     compartments,
     preferenceCompartments,
@@ -196,14 +207,21 @@ export function createEditorExtensions(
     frontmatterDecorations,
     fencedCodeDecorations,
     markdownListDecorations,
-    tableLiveOverlay,
+    compartments.livePreview.of(
+      livePreviewEnabled ? createLivePreviewPluginExtensions() : [],
+    ),
+    compartments.livePreviewContext.of(
+      createLivePreviewContextExtension(livePreviewContext),
+    ),
     compartments.wrap.of(wordWrap ? EditorView.lineWrapping : []),
     syntaxHighlighting(markdownHighlightStyle),
     compartments.placeholder.of(cmPlaceholder(placeholder)),
     EditorView.domEventHandlers({
       mousedown: () => {
-        // User intent wins over stale outline/search focus requests.
+        // User intent wins over stale outline/search focus requests and
+        // deferred Live Preview image/wiki click-to-reveal selections.
         clearPendingEditorRangeFocus();
+        cancelPendingLivePreviewReveals();
         return false;
       },
       scroll: (() => {

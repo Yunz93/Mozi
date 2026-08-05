@@ -1090,99 +1090,160 @@
   }
 }
 
-/* Live markdown table overlay */
-.editor-pane-layout .mp-live-table-wrap {
-  display: block;
-  width: 100%;
+/* Live Preview: match Reading tokens, but keep CM line-box metrics stable.
+   Heading font-size is OK; do NOT set a tighter line-height than .cm-content
+   (that desyncs CodeMirror's height map → click/caret vertical offset). */
+.editor-pane-layout[data-live-preview="true"] .cm-content {
+  font-family: var(--preview-font-family, var(--editor-font-family));
+  font-size: var(--preview-font-size, var(--editor-font-size));
+  line-height: 1.95;
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-heading-1,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-heading-1 {
+  font-size: 1.6em;
+  font-weight: var(--mp-doc-heading-weight, 700);
+  line-height: inherit;
+  color: var(--mp-doc-heading-1, var(--mp-doc-accent, #7c3aed));
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-heading-2,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-heading-2 {
+  font-size: 1.35em;
+  font-weight: var(--mp-doc-heading-weight, 700);
+  line-height: inherit;
+  color: var(--mp-doc-heading-2, var(--mp-doc-accent, #7c3aed));
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-heading-3,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-heading-3 {
+  font-size: 1.2em;
+  font-weight: var(--mp-doc-heading-weight, 650);
+  line-height: inherit;
+  color: var(--mp-doc-heading-3, var(--mp-doc-accent, #7c3aed));
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-heading-4,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-heading-4 {
+  font-size: 1.05em;
+  font-weight: var(--mp-doc-heading-weight, 650);
+  line-height: inherit;
+  color: var(--mp-doc-heading-4, var(--mp-doc-accent, #7c3aed));
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-heading-5,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-heading-5 {
+  font-size: 0.95em;
+  font-weight: var(--mp-doc-heading-weight, 650);
+  line-height: inherit;
+  color: var(--mp-doc-heading-5, var(--mp-doc-accent, #7c3aed));
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-heading-6,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-heading-6 {
+  font-size: 0.9em;
+  font-weight: var(--mp-doc-heading-weight, 650);
+  line-height: inherit;
+  color: var(--mp-doc-heading-6, var(--mp-doc-accent, #7c3aed));
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-strong,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-strong {
+  font-weight: 700;
+  color: var(--mp-doc-strong, inherit);
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-emphasis,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-emphasis {
+  font-style: italic;
+  color: var(--mp-doc-em, inherit);
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-inline-code,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-inline-code {
+  font-family: var(--editor-code-font-family);
+  font-size: 0.92em;
+  background: var(
+    --mp-doc-code-bg,
+    color-mix(in srgb, var(--editor-code-block-bg) 80%, transparent)
+  );
+  color: var(--mp-doc-code-text, inherit);
+  border-radius: 0.3em;
+  padding: 0.08em 0.28em;
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-link,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-link {
+  color: var(--mp-doc-link, var(--mp-doc-accent, #2563eb));
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-image {
   max-width: 100%;
-  margin: 0.55em 0 0.85em;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-sizing: border-box;
 }
 
-.dark .editor-pane-layout .mp-live-table-wrap {
-  border: 0;
-  background: transparent;
+/* Live table: content-sized columns + CJK-friendly wrapping.
+   Scroll on the wrap; do not max-width the table or short CJK columns
+   get crushed and long cells clip without a scrollbar. */
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
+  overflow-x: auto;
 }
 
-.editor-pane-layout .mp-live-table {
-  width: 100%;
-  border-collapse: collapse;
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
+  width: max-content;
+  max-width: none;
   table-layout: auto;
-  font-size: inherit;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table td {
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  min-width: 3.5em;
+  max-width: 28em;
   line-height: 1.45;
 }
 
-.editor-pane-layout .mp-live-table-cell {
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 0.35rem 0.55rem;
-  min-width: 3.5rem;
-  vertical-align: top;
-  outline: none;
-  background: rgba(255, 255, 255, 0.72);
-  color: inherit;
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th {
+  white-space: nowrap;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-table-cell-editing {
+  outline-offset: 0;
   white-space: pre-wrap;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
-.dark .editor-pane-layout .mp-live-table-cell {
-  border-color: rgba(148, 163, 184, 0.22);
-  background: rgba(2, 6, 23, 0.35);
+.editor-pane-layout .live-preview-opt-banner {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--mp-doc-muted, #64748b);
+  background: color-mix(
+    in srgb,
+    var(--mp-doc-accent, #2563eb) 10%,
+    transparent
+  );
+  border-bottom: 1px solid
+    color-mix(
+      in srgb,
+      var(--mp-doc-border, rgba(148, 163, 184, 0.35)) 80%,
+      transparent
+    );
 }
 
-.editor-pane-layout .mp-live-table thead .mp-live-table-cell {
-  font-weight: 650;
-  background: rgba(241, 245, 249, 0.95);
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-math .katex {
+  font-size: 1.05em;
 }
 
-.dark .editor-pane-layout .mp-live-table thead .mp-live-table-cell {
-  background: rgba(30, 41, 59, 0.85);
-}
-
-.editor-pane-layout .mp-live-table-cell:focus {
-  border-color: rgba(59, 130, 246, 0.7);
-  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
-}
-
-.mp-live-table-menu {
-  position: fixed;
-  z-index: 180;
-  min-width: 180px;
-  padding: 0.35rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
-  backdrop-filter: blur(10px);
-}
-
-.dark .mp-live-table-menu {
-  border-color: rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.96);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-}
-
-.mp-live-table-menu-item {
-  display: block;
-  width: 100%;
-  appearance: none;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.65rem;
-  font-size: 0.85rem;
-  color: #334155;
-  cursor: pointer;
-}
-
-.dark .mp-live-table-menu-item {
-  color: #e2e8f0;
-}
-
-.mp-live-table-menu-item:hover {
-  background: rgba(148, 163, 184, 0.16);
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-math
+  .katex {
+  color: inherit;
 }

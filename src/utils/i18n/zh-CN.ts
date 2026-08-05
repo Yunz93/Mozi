@@ -474,7 +474,7 @@ export default {
   settings_convertHtmlOnPasteDesc: "从网页等来源粘贴时自动转换为 Markdown。",
   settings_defaultViewMode: "默认视图模式",
   settings_defaultViewModeDesc:
-    "应用启动时的默认视图。选定后切换文件会保持当前视图，不会随文件变化。",
+    "应用启动时的默认视图（实时预览或阅读）。选定后切换文件会保持当前视图，不会随文件变化。",
   settings_defaultViewModeEditor: "源码",
   settings_defaultViewModeLive: "实时预览",
   settings_defaultViewModePreview: "阅读",
@@ -885,6 +885,11 @@ export default {
 
   editor_emptyState: "选择文件开始编辑",
   editor_placeholder: "开始输入...",
+  editor_livePreviewHeavyFileMode:
+    "已进入大文件优化模式：表格 / Callout / Mermaid 显示占位，详情见组件提示。",
+  editor_livePreviewLargeFileMode:
+    "已进入超大文件优化模式：公式、图片、Wiki 等 Live 组件已关闭，源码仍可编辑。",
+  table_cellHint: "右键可增删行列；Tab / Enter 导航",
   table_insertRowAbove: "在上方插入行",
   table_insertRowBelow: "在下方插入行",
   table_deleteRow: "删除行",
