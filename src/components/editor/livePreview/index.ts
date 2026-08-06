@@ -16,6 +16,7 @@ import { livePreviewTables } from "./tables";
 import { livePreviewCallouts } from "./callouts";
 import { livePreviewMermaid } from "./mermaid";
 import {
+  livePreviewBlockquotes,
   livePreviewHighlights,
   livePreviewListMarkers,
 } from "./listAndHighlight";
@@ -48,6 +49,7 @@ export function createLivePreviewPluginExtensions(): Extension[] {
     livePreviewHideFormatting,
     livePreviewTaskCheckboxes,
     livePreviewListMarkers,
+    livePreviewBlockquotes,
     livePreviewImages,
     livePreviewLinks,
     livePreviewHighlights,
@@ -100,9 +102,11 @@ export {
 } from "./callouts";
 export { livePreviewMermaid } from "./mermaid";
 export {
+  buildLivePreviewBlockquoteDecorations,
   buildLivePreviewHighlightDecorations,
   buildLivePreviewListMarkerDecorations,
   findHighlightRanges,
+  livePreviewBlockquotes,
   livePreviewHighlights,
   livePreviewListMarkers,
 } from "./listAndHighlight";

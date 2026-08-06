@@ -723,6 +723,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           "--preview-font-family":
             viewMode === ViewMode.LIVE ? previewFontFamily : editorFontFamily,
           "--preview-font-size": `${scaledEditorFontSize}px`,
+          // Live inline/fenced code should match Reading preview code fonts.
+          "--preview-code-font-family": codeFontFamily,
+          "--preview-code-font-size": `${scaledCodeFontSize}px`,
           "--editor-code-font-family": codeFontFamily,
           "--editor-code-font-size": `${scaledCodeFontSize}px`,
           "--editor-line-height": String(EDITOR_LINE_HEIGHT),

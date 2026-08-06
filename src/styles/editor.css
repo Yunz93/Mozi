@@ -1097,6 +1097,14 @@
   font-family: var(--preview-font-family, var(--editor-font-family));
   font-size: var(--preview-font-size, var(--editor-font-size));
   line-height: 1.95;
+  color: var(--mp-doc-text, #312e81);
+  letter-spacing: 0.01em;
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-heading,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-heading {
+  letter-spacing: 0.01em;
+  background: var(--mp-doc-heading-bg, transparent);
 }
 
 .editor-pane-layout[data-live-preview="true"] .tok-heading-1,
@@ -1159,40 +1167,139 @@
   color: var(--mp-doc-em, inherit);
 }
 
+.editor-pane-layout[data-live-preview="true"] .tok-strong.tok-emphasis,
+.editor-pane-layout[data-live-preview="true"] .tok-strong .tok-emphasis,
+.editor-pane-layout[data-live-preview="true"] .tok-emphasis .tok-strong,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-strong.mp-tok-emphasis,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-strong .mp-tok-emphasis,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-emphasis .mp-tok-strong {
+  color: var(--mp-doc-strong-em, inherit);
+}
+
+.editor-pane-layout[data-live-preview="true"] .tok-strikethrough,
+.editor-pane-layout[data-live-preview="true"] .mp-tok-strikethrough {
+  color: var(--mp-doc-del, inherit);
+  text-decoration: line-through;
+}
+
 .editor-pane-layout[data-live-preview="true"] .tok-inline-code,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-inline-code {
-  font-family: var(--editor-code-font-family);
-  font-size: 0.92em;
+  font-family: var(--preview-code-font-family, var(--editor-code-font-family));
+  font-size: var(--preview-code-font-size, 0.92em);
   background: var(
     --mp-doc-code-bg,
-    color-mix(in srgb, var(--editor-code-block-bg) 80%, transparent)
+    var(--mp-doc-accent-soft, rgba(15, 23, 42, 0.06))
   );
   color: var(--mp-doc-code-text, inherit);
-  border-radius: 0.3em;
-  padding: 0.08em 0.28em;
+  border-radius: 0.45rem;
+  padding: 0.15rem 0.35rem;
+  /* Match Reading: do not inherit prose 1.95 line-height into the capsule. */
+  line-height: 1.35;
 }
 
 .editor-pane-layout[data-live-preview="true"] .tok-link,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-link {
-  color: var(--mp-doc-link, var(--mp-doc-accent, #2563eb));
+  color: var(--mp-doc-link, var(--mp-doc-accent, #0f9aa8));
   text-decoration: underline;
-  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.12em;
+}
+
+/* Plain `>` quotes: Reading blockquote chrome on CM lines. */
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-blockquote {
+  color: var(--mp-doc-quote-text, #5b21b6);
+  background: var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04));
+  box-shadow: inset 4px 0 0 var(--mp-doc-accent, rgba(124, 58, 237, 0.28));
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-blockquote
+  .mp-tok-muted {
+  color: var(--mp-doc-quote-text, #5b21b6);
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-blockquote-first {
+  border-top-right-radius: 14px;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-blockquote-last {
+  border-bottom-right-radius: 14px;
+}
+
+.dark .editor-pane-layout[data-live-preview="true"] .cm-content {
+  color: var(--mp-doc-text, #dbeafe);
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-blockquote {
+  color: var(--mp-doc-quote-text, #ddd6fe);
+  background: var(--mp-doc-quote-bg, rgba(192, 132, 252, 0.06));
+  box-shadow: inset 4px 0 0 var(--mp-doc-accent, rgba(192, 132, 252, 0.32));
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-blockquote
+  .mp-tok-muted {
+  color: var(--mp-doc-quote-text, #ddd6fe);
+}
+
+.dark .editor-pane-layout[data-live-preview="true"] .cm-live-preview-task {
+  background: rgba(15, 23, 42, 0.88);
+  border-color: var(--mp-doc-task-border, rgba(148, 163, 184, 0.68));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-task[data-checked="true"] {
+  border-color: var(--mp-doc-task-checked, var(--mp-doc-accent, #60a5fa));
+  background: var(--mp-doc-task-checked, var(--mp-doc-accent, #60a5fa));
+  box-shadow: none;
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-note-embed {
+  border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.14));
+  background: rgba(15, 23, 42, 0.8);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-note-embed-title {
+  border-bottom-color: var(--mp-doc-border, rgba(148, 163, 184, 0.14));
+  color: var(--mp-doc-muted, #cbd5e1);
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-note-embed-body.markdown-body {
+  color: var(--mp-doc-text, #dbeafe);
+}
+
+.dark .editor-pane-layout[data-live-preview="true"] .tok-inline-code,
+.dark .editor-pane-layout[data-live-preview="true"] .mp-tok-inline-code {
+  background: var(--mp-doc-accent-soft, rgba(255, 255, 255, 0.08));
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-image {
   max-width: 100%;
 }
 
-/* Live table: content-sized columns + CJK-friendly wrapping.
-   Scroll on the wrap; do not max-width the table or short CJK columns
-   get crushed and long cells clip without a scrollbar. */
+/* Live table: match Reading full-width layout + CJK-friendly wrapping. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
   overflow-x: auto;
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
-  width: max-content;
-  max-width: none;
+  width: 100%;
+  max-width: 100%;
   table-layout: auto;
 }
 
@@ -1202,12 +1309,15 @@
   word-break: keep-all;
   overflow-wrap: break-word;
   min-width: 3.5em;
-  max-width: 28em;
   line-height: 1.45;
+  border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.26));
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th {
   white-space: nowrap;
+  font-weight: 600;
+  background: var(--mp-doc-table-header-bg, rgba(241, 245, 249, 0.96));
+  color: var(--mp-doc-text, #334155);
 }
 
 .editor-pane-layout[data-live-preview="true"]

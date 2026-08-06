@@ -54,6 +54,10 @@ export const markdownHighlightStyle = HighlightStyle.define([
   { tag: tags.heading, class: "tok-heading mp-tok-heading" },
   { tag: tags.strong, class: "tok-strong mp-tok-strong" },
   { tag: tags.emphasis, class: "tok-emphasis mp-tok-emphasis" },
+  {
+    tag: tags.strikethrough,
+    class: "tok-strikethrough mp-tok-strikethrough",
+  },
   { tag: [tags.link, tags.url], class: "tok-link mp-tok-link" },
   { tag: [tags.quote, tags.list], class: "mp-tok-muted" },
   {
