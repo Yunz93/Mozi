@@ -66,8 +66,8 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
-/** Stable scatter positions — no edges. */
-function layoutScatterPoints(
+/** Stable scatter positions for the neighborhood graph. */
+export function layoutScatterPoints(
   ids: string[],
   width: number,
   height: number,
@@ -130,7 +130,35 @@ function layoutScatterPoints(
   return points;
 }
 
-const NeighborhoodGraph: React.FC<{
+/** Shorten a segment so strokes stop at node radii instead of under the dots. */
+export function shortenEdgeSegment(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  startInset: number,
+  endInset: number,
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= startInset + endInset + 0.5) return null;
+  const ux = dx / dist;
+  const uy = dy / dist;
+  return {
+    x1: x1 + ux * startInset,
+    y1: y1 + uy * startInset,
+    x2: x2 - ux * endInset,
+    y2: y2 - uy * endInset,
+  };
+}
+
+function nodeRadius(showLabels: boolean, isCurrent: boolean): number {
+  if (showLabels) return isCurrent ? 7 : 5.5;
+  return isCurrent ? 5.5 : 4.5;
+}
+
+export const NeighborhoodGraph: React.FC<{
   centerPath: string;
   nodes: Array<{ path: string; kind: "in" | "out" }>;
   onOpenPath?: (path: string) => void;
@@ -162,6 +190,18 @@ const NeighborhoodGraph: React.FC<{
       }),
     [ids, centerPath, width, height, showLabels],
   );
+  const pointById = useMemo(() => {
+    const map = new Map<string, { id: string; x: number; y: number }>();
+    for (const point of points) map.set(point.id, point);
+    return map;
+  }, [points]);
+  const kindByPath = useMemo(() => {
+    const map = new Map<string, "in" | "out">();
+    for (const node of nodes) map.set(node.path, node.kind);
+    return map;
+  }, [nodes]);
+  const centerPoint = pointById.get(centerPath);
+  const centerR = nodeRadius(showLabels, true);
 
   return (
     <svg
@@ -192,11 +232,49 @@ const NeighborhoodGraph: React.FC<{
       }
       style={onSurfaceClick ? { cursor: "pointer" } : undefined}
     >
+      {centerPoint
+        ? nodes.map((node) => {
+            const target = pointById.get(node.path);
+            if (!target) return null;
+            const neighborR = nodeRadius(showLabels, false);
+            const segment = shortenEdgeSegment(
+              centerPoint.x,
+              centerPoint.y,
+              target.x,
+              target.y,
+              centerR,
+              neighborR,
+            );
+            if (!segment) return null;
+            return (
+              <line
+                key={`edge:${node.path}`}
+                x1={segment.x1}
+                y1={segment.y1}
+                x2={segment.x2}
+                y2={segment.y2}
+                className={
+                  node.kind === "in"
+                    ? "links-neighborhood-edge is-in"
+                    : "links-neighborhood-edge is-out"
+                }
+              />
+            );
+          })
+        : null}
       {points.map((point) => {
         const isCurrent = point.id === centerPath;
+        const kind = kindByPath.get(point.id);
         const label = displayName(point.id);
         const labelY = point.y + (point.y > height * 0.78 ? -14 : 18);
         const canOpen = Boolean(onOpenPath) && !isCurrent && !onSurfaceClick;
+        const nodeClass = isCurrent
+          ? "links-neighborhood-node is-current"
+          : kind === "in"
+            ? "links-neighborhood-node is-in"
+            : kind === "out"
+              ? "links-neighborhood-node is-out"
+              : "links-neighborhood-node";
         return (
           <g
             key={point.id}
@@ -218,12 +296,8 @@ const NeighborhoodGraph: React.FC<{
             <circle
               cx={point.x}
               cy={point.y}
-              r={showLabels ? (isCurrent ? 7 : 5.5) : isCurrent ? 5.5 : 4.5}
-              className={
-                isCurrent
-                  ? "links-neighborhood-node is-current"
-                  : "links-neighborhood-node"
-              }
+              r={nodeRadius(showLabels, isCurrent)}
+              className={nodeClass}
             >
               <title>{label}</title>
             </circle>
