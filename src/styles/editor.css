@@ -1292,16 +1292,14 @@
   max-width: 100%;
 }
 
-/* Live table: content-sized columns + CJK-friendly wrapping.
-   Scroll on the wrap; do not max-width the table or short CJK columns
-   get crushed and long cells clip without a scrollbar. */
+/* Live table: match Reading full-width layout + CJK-friendly wrapping. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
   overflow-x: auto;
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
-  width: max-content;
-  max-width: none;
+  width: 100%;
+  max-width: 100%;
   table-layout: auto;
 }
 
@@ -1311,7 +1309,6 @@
   word-break: keep-all;
   overflow-wrap: break-word;
   min-width: 3.5em;
-  max-width: 28em;
   line-height: 1.45;
   border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.26));
 }

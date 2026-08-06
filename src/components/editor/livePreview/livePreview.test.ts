@@ -276,7 +276,7 @@ describe("live preview hide formatting", () => {
     expect(view.dom.querySelector(".cm-live-preview-table")).not.toBeNull();
   });
 
-  it("sizes CJK table columns to content instead of crushing short headers", () => {
+  it("spans full width like Reading while keeping CJK-friendly wrapping", () => {
     const doc = [
       "| 模块 | 需求 | 优先级 | 说明 |",
       "| --- | --- | --- | --- |",
@@ -298,21 +298,19 @@ describe("live preview hide formatting", () => {
     );
     expect(headerTexts).toEqual(["模块", "需求", "优先级", "说明"]);
 
-    // Theme must opt out of `.cm-lineWrapping { overflow-wrap: anywhere }`,
-    // which otherwise stacks CJK one glyph per line in squeezed columns.
-    // Scroll belongs on the wrap — table itself must not be max-width:100%.
+    // Match Reading full-width table; keep CJK wrap overrides so columns
+    // are not crushed into one-glyph-per-line stacks.
     const sheetText = Array.from(document.querySelectorAll("style"))
       .map((node) => node.textContent ?? "")
       .join("\n");
     expect(sheetText).toMatch(
       /cm-live-preview-table-wrap[^}]*overflow-x:\s*auto/,
     );
-    expect(sheetText).toMatch(/cm-live-preview-table[^}]*max-content/);
-    // Wide tables must be allowed to exceed the wrap so overflow-x can scroll.
-    expect(sheetText).toMatch(/cm-live-preview-table[^}]*max-width:\s*none/);
-    expect(sheetText).not.toMatch(
+    expect(sheetText).toMatch(/\.cm-live-preview-table\s*\{[^}]*width:\s*100%/);
+    expect(sheetText).toMatch(
       /\.cm-live-preview-table\s*\{[^}]*max-width:\s*100%/,
     );
+    expect(sheetText).not.toMatch(/cm-live-preview-table[^}]*max-content/);
     expect(sheetText).toMatch(/word-break:\s*keep-all/);
     expect(sheetText).toMatch(
       /cm-live-preview-table th\s*\{[^}]*white-space:\s*nowrap/,
