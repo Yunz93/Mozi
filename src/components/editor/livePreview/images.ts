@@ -11,13 +11,15 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
 } from "../../../utils/attachmentResolver";
-import { hasUriScheme } from "../preview/previewMedia";
+import {
+  hasUriScheme,
+  normalizeHttpUrlForHtmlAttribute,
+} from "../preview/previewMedia";
 import {
   getCachedPreviewImageSrc,
   resolvePreviewSource,
@@ -26,14 +28,12 @@ import { livePreviewImageQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import {
   collectVisibleWikiRanges,
-  ensureLivePreviewViewportTree,
   getLivePreviewDecorationRange,
   hasSkipAncestor,
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
   shouldRebuildLivePreviewDecorations,
-  maxVisibleParseTo,
   ViewportDecorationWindow,
   bindLivePreviewImageMeasure,
   scheduleLivePreviewMeasure,
@@ -48,6 +48,56 @@ const imageResolvedEffect = StateEffect.define<{
   failed?: boolean;
 }>();
 
+/** Persist natural size across widget remounts to limit scroll/layout thrash. */
+const imageNaturalSizeCache = new Map<string, number>();
+
+/**
+ * CommonMark ends bare destinations at the first space, so Lezer's Image node
+ * truncates URLs like `...(M 記.png)`. Scan the full `![alt](dest)` form instead.
+ */
+const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
+
+export interface MarkdownImageRange {
+  from: number;
+  to: number;
+  alt: string;
+  url: string;
+  urlFrom: number;
+  urlTo: number;
+}
+
+export function collectMarkdownImageRanges(
+  docText: string,
+  from = 0,
+  to = docText.length,
+): MarkdownImageRange[] {
+  const slice = docText.slice(from, to);
+  const results: MarkdownImageRange[] = [];
+  const re = new RegExp(MARKDOWN_IMAGE_RE.source, "g");
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(slice)) !== null) {
+    const full = match[0];
+    const alt = match[1] ?? "";
+    const destRaw = match[2] ?? "";
+    const fullFrom = from + match.index;
+    const fullTo = fullFrom + full.length;
+    const destOffsetInFull = full.indexOf(destRaw, full.indexOf("("));
+    if (destOffsetInFull < 0) continue;
+    const leading = destRaw.length - destRaw.trimStart().length;
+    let url = destRaw.trim();
+    let urlFrom = fullFrom + destOffsetInFull + leading;
+    let urlTo = urlFrom + url.length;
+    if (url.startsWith("<") && url.endsWith(">")) {
+      url = url.slice(1, -1).trim();
+      urlFrom += 1;
+      urlTo -= 1;
+    }
+    if (!url) continue;
+    results.push({ from: fullFrom, to: fullTo, alt, url, urlFrom, urlTo });
+  }
+  return results;
+}
+
 function isDirectDisplaySrc(url: string): boolean {
   return (
     hasUriScheme(url) || url.startsWith("data:") || url.startsWith("blob:")
@@ -56,6 +106,10 @@ function isDirectDisplaySrc(url: string): boolean {
 
 function cacheKeyFor(sourceFilePath: string | null, rawSrc: string): string {
   return `${sourceFilePath ?? ""}::${rawSrc}`;
+}
+
+function displaySrcFor(url: string): string {
+  return normalizeHttpUrlForHtmlAttribute(url);
 }
 
 class MarkdownImageWidget extends WidgetType {
@@ -86,7 +140,7 @@ class MarkdownImageWidget extends WidgetType {
   }
 
   get estimatedHeight() {
-    return 48;
+    return imageNaturalSizeCache.get(this.rawSrc) ?? 48;
   }
 
   toDOM(view: EditorView) {
@@ -99,10 +153,21 @@ class MarkdownImageWidget extends WidgetType {
     img.className = "cm-live-preview-image";
     img.alt = this.alt || this.rawSrc;
     img.draggable = false;
+    img.loading = "lazy";
+    img.decoding = "async";
+    const cachedH = imageNaturalSizeCache.get(this.rawSrc);
+    if (cachedH && cachedH > 0) {
+      img.style.maxHeight = "none";
+      // Hint layout before decode so remounts don't collapse then expand.
+      img.height = Math.min(cachedH, 2400);
+    }
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
       bindLivePreviewImageMeasure(view, img, () => {
         wrap.classList.remove("is-loading");
+        if (img.naturalHeight > 0) {
+          imageNaturalSizeCache.set(this.rawSrc, img.naturalHeight);
+        }
       });
       img.addEventListener("error", () => {
         wrap.classList.remove("is-loading");
@@ -163,49 +228,11 @@ class MarkdownImageWidget extends WidgetType {
     return wrap;
   }
 
-  ignoreEvent(event: Event) {
-    return event.type !== "mousedown" && event.type !== "click";
+  ignoreEvent() {
+    // Always handle events on the widget DOM so CM does not turn mousedown
+    // into an unexpected document-wide selection.
+    return true;
   }
-}
-
-function extractImageParts(
-  state: Parameters<typeof syntaxTree>[0],
-  imageFrom: number,
-  imageTo: number,
-): { alt: string; url: string; urlFrom: number; urlTo: number } {
-  const tree = syntaxTree(state);
-  let url = "";
-  let urlFrom = imageFrom;
-  let urlTo = imageFrom;
-
-  tree.iterate({
-    from: imageFrom,
-    to: imageTo,
-    enter: (node) => {
-      if (node.name === "URL") {
-        url = state.doc.sliceString(node.from, node.to);
-        urlFrom = node.from;
-        urlTo = node.to;
-      }
-    },
-  });
-
-  const full = state.doc.sliceString(imageFrom, imageTo);
-  const altMatch = full.match(/^!\[([^\]]*)\]/);
-  if (!url) {
-    const paren = full.match(/\(([^)]*)\)\s*$/);
-    if (paren) {
-      url = paren[1].trim();
-      urlFrom = imageFrom + (paren.index ?? 0) + 1;
-      urlTo = urlFrom + paren[1].length;
-    }
-  }
-  return {
-    alt: altMatch?.[1] ?? "",
-    url: url.trim(),
-    urlFrom,
-    urlTo,
-  };
 }
 
 export function buildLivePreviewImageDecorations(
@@ -221,60 +248,67 @@ export function buildLivePreviewImageDecorations(
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const ctx = state.facet(livePreviewContextFacet);
-  const parseTo = maxVisibleParseTo(view);
-  const tree = ensureLivePreviewViewportTree(view, parseTo);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
   const { from: viewportFrom, to: viewportTo } =
     getLivePreviewDecorationRange(view);
+  const docText = state.doc.sliceString(viewportFrom, viewportTo);
+  const images = collectMarkdownImageRanges(docText, 0, docText.length).map(
+    (image) => ({
+      ...image,
+      from: image.from + viewportFrom,
+      to: image.to + viewportFrom,
+      urlFrom: image.urlFrom + viewportFrom,
+      urlTo: image.urlTo + viewportFrom,
+    }),
+  );
 
-  tree.iterate({
-    from: viewportFrom,
-    to: viewportTo,
-    enter: (node) => {
-      if (node.name !== "Image") return;
-      const { from, to } = node;
-      if (from >= to) return;
-      if (hasSkipAncestor(state, from)) return;
-      if (selectionTouchesRange(state, from, to)) return;
-      if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
-        return;
-      }
+  images.sort((a, b) => a.from - b.from || a.to - b.to);
+  let lastTo = -1;
 
-      const { alt, url, urlFrom, urlTo } = extractImageParts(state, from, to);
-      if (!url) return;
+  for (const image of images) {
+    const { from, to, alt, url, urlFrom, urlTo } = image;
+    if (from < lastTo) continue;
+    if (from >= to) continue;
+    if (hasSkipAncestor(state, from)) continue;
+    if (selectionTouchesRange(state, from, to)) continue;
+    if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
+      continue;
+    }
 
-      const key = cacheKeyFor(ctx.sourceFilePath, url);
-      let resolvedSrc =
-        resolvedCache.get(key) ??
-        getCachedPreviewImageSrc(url, ctx.sourceFilePath ?? undefined) ??
-        null;
-      const failed = !resolvedSrc && failedCache.has(key);
+    const key = cacheKeyFor(ctx.sourceFilePath, url);
+    let resolvedSrc =
+      resolvedCache.get(key) ??
+      getCachedPreviewImageSrc(url, ctx.sourceFilePath ?? undefined) ??
+      null;
+    const failed = !resolvedSrc && failedCache.has(key);
 
-      if (!resolvedSrc && isDirectDisplaySrc(url)) {
-        resolvedSrc = url;
-        resolvedCache.set(key, url);
-      } else if (!resolvedSrc && !failed) {
-        scheduleResolve(key, url);
-      }
+    if (!resolvedSrc && isDirectDisplaySrc(url)) {
+      resolvedSrc = displaySrcFor(url);
+      resolvedCache.set(key, resolvedSrc);
+    } else if (!resolvedSrc && !failed) {
+      scheduleResolve(key, url);
+    } else if (resolvedSrc && isDirectDisplaySrc(url)) {
+      resolvedSrc = displaySrcFor(resolvedSrc);
+    }
 
-      builder.add(
-        from,
-        to,
-        Decoration.replace({
-          widget: new MarkdownImageWidget(
-            alt,
-            url,
-            resolvedSrc,
-            from,
-            to,
-            urlFrom,
-            urlTo,
-            failed,
-          ),
-        }),
-      );
-    },
-  });
+    builder.add(
+      from,
+      to,
+      Decoration.replace({
+        widget: new MarkdownImageWidget(
+          alt,
+          url,
+          resolvedSrc,
+          from,
+          to,
+          urlFrom,
+          urlTo,
+          failed,
+        ),
+      }),
+    );
+    lastTo = to;
+  }
 
   return builder.finish();
 }
@@ -318,13 +352,16 @@ export const livePreviewImages = ViewPlugin.fromClass(
             pathOrSrc,
             ctx.sourceFilePath ?? undefined,
           );
-          this.resolvedCache.set(cacheKey, displaySrc);
+          const finalSrc = isDirectDisplaySrc(displaySrc)
+            ? displaySrcFor(displaySrc)
+            : displaySrc;
+          this.resolvedCache.set(cacheKey, finalSrc);
           this.failedCache.delete(cacheKey);
           if (view.dom.isConnected) {
             view.dispatch({
               effects: imageResolvedEffect.of({
                 cacheKey,
-                src: displaySrc,
+                src: finalSrc,
               }),
             });
           }

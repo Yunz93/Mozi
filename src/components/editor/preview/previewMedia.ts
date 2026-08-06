@@ -8,6 +8,23 @@ export function hasUriScheme(value: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(value.trim());
 }
 
+/**
+ * Percent-encode spaces / non-ASCII in http(s) URLs so `<img src>` / `<a href>`
+ * stay valid. Leaves non-http paths unchanged (resolved via the attachment layer).
+ */
+export function normalizeHttpUrlForHtmlAttribute(url: string): string {
+  if (!/^https?:\/\//i.test(url)) return url;
+  try {
+    return encodeURI(decodeURI(url));
+  } catch {
+    try {
+      return encodeURI(url);
+    } catch {
+      return url.replace(/ /g, "%20");
+    }
+  }
+}
+
 export function isLocalPreviewLinkHref(href: string): boolean {
   const trimmed = href.trim();
   if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("//")) {

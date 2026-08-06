@@ -1247,3 +1247,65 @@
   .katex {
   color: inherit;
 }
+
+/* Live table context menu is portaled to document.body — keep styles global. */
+.cm-live-preview-table-menu {
+  position: fixed;
+  z-index: 10050;
+  min-width: 14rem;
+  padding: 0.3rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.35));
+  background: var(--mp-doc-surface, #fff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+  color: var(--mp-doc-text, #1f2937);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.dark .cm-live-preview-table-menu {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: #e2e8f0;
+}
+
+.cm-live-preview-table-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: 0.35rem;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cm-live-preview-table-menu-item:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--mp-doc-accent, #2563eb) 12%,
+    transparent
+  );
+}
+
+.cm-live-preview-table-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cm-live-preview-table-menu-kbd {
+  color: var(--mp-doc-muted, #94a3b8);
+  font-size: 0.75em;
+  white-space: nowrap;
+}
+
+.cm-live-preview-table-menu-sep {
+  height: 1px;
+  margin: 0.25rem 0.35rem;
+  background: color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent);
+}

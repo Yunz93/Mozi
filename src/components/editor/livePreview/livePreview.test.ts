@@ -163,8 +163,38 @@ describe("live preview hide formatting", () => {
     expect(doc.slice(widget!.urlFrom, widget!.urlTo)).toBe(
       "https://example.com/cat.png",
     );
-    expect(widget!.ignoreEvent(new MouseEvent("click"))).toBe(false);
-    expect(widget!.ignoreEvent(new MouseEvent("mousedown"))).toBe(false);
+    expect(widget!.ignoreEvent(new MouseEvent("click"))).toBe(true);
+    expect(widget!.ignoreEvent(new MouseEvent("mousedown"))).toBe(true);
+  });
+
+  it("previews markdown images whose URLs contain spaces", () => {
+    const doc =
+      "![M 記](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M 記-1.png)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewImageDecorations(
+      view,
+      new Map(),
+      () => undefined,
+    );
+    let widget: {
+      from: number;
+      to: number;
+      urlFrom: number;
+      urlTo: number;
+      resolvedSrc: string | null;
+      rawSrc: string;
+    } | null = null;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        widget = value.spec.widget as typeof widget;
+      }
+    });
+    expect(widget).not.toBeNull();
+    expect(doc.slice(widget!.from, widget!.to)).toBe(
+      "![M 記](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M 記-1.png)",
+    );
+    expect(widget!.rawSrc).toContain("M 記-1.png");
+    expect(widget!.resolvedSrc).toContain("M%20%E8%A8%98-1.png");
   });
 
   it("replaces inactive math with widgets", () => {
