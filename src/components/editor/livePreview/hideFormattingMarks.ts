@@ -376,18 +376,22 @@ export const livePreviewTheme = EditorView.baseTheme({
     wordBreak: "keep-all",
     overflowWrap: "break-word",
   },
+  // Keep fills translucent (like fenced-code) so cm-selectionBackground
+  // shows through evenly during full-document selection.
   ".cm-live-preview-table th": {
-    background: "var(--mp-doc-table-header-bg, rgba(241, 245, 249, 0.96))",
+    background:
+      "color-mix(in srgb, var(--mp-doc-table-header-bg, rgba(241, 245, 249, 0.96)) 55%, transparent)",
     color: "var(--mp-doc-text, #334155)",
     fontWeight: "600",
     whiteSpace: "nowrap",
   },
   ".cm-live-preview-table tbody tr:nth-child(even) td": {
-    background: "var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96))",
+    background:
+      "color-mix(in srgb, var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96)) 55%, transparent)",
   },
   ".cm-live-preview-table tbody tr:hover td": {
     background:
-      "var(--mp-doc-table-hover-bg, var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96)))",
+      "color-mix(in srgb, var(--mp-doc-table-hover-bg, var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96))) 55%, transparent)",
   },
   ".cm-live-preview-table-cell-editing": {
     outline: "2px solid var(--mp-doc-accent, #0f9aa8)",
@@ -454,7 +458,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     borderRadius: "0 14px 14px 0",
     borderInlineStart:
       "4px solid var(--mp-doc-accent, rgba(124, 58, 237, 0.28))",
-    background: "var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04))",
+    background:
+      "color-mix(in srgb, var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 70%, transparent)",
     color: "var(--mp-doc-quote-text, #5b21b6)",
   },
   ".cm-live-preview-callout-title": {
@@ -512,14 +517,14 @@ export const livePreviewTheme = EditorView.baseTheme({
     borderRadius: "8px",
     background: "rgba(128, 128, 128, 0.05)",
   },
-  // Match Reading `.preview-note-embed` card chrome.
+  // Match Reading `.preview-note-embed` card chrome (translucent for selection).
   ".cm-live-preview-note-embed": {
     display: "block",
     overflow: "hidden",
     padding: "0",
     borderRadius: "1rem",
     border: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.2))",
-    background: "rgba(255, 255, 255, 0.78)",
+    background: "color-mix(in srgb, #ffffff 55%, transparent)",
     boxShadow:
       "0 14px 32px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7)",
   },
