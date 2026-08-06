@@ -713,54 +713,66 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
 
           <div className="p-3 space-y-2">
             <div>
-              <button
-                onClick={() => setShowTrash(!showTrash)}
-                className="flex items-center justify-between w-full px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg transition-colors text-gray-500 dark:text-gray-400 text-xs font-medium"
-              >
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowTrash(!showTrash)}
+                  className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-black/[0.04] dark:text-gray-400 dark:hover:bg-white/[0.06]"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <svg
+                      className="h-4 w-4 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    <span className="truncate">
+                      {t("sidebar_trash", { count: trashItems.length })}
+                    </span>
+                  </div>
+                  {showTrash ? (
+                    <svg
+                      className="h-3.5 w-3.5 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="h-3.5 w-3.5 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  )}
+                </button>
+                {showTrash && trashItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => openEmptyTrashDialog()}
+                    className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-red-600/80 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400/80 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+                    title={t("context_emptyTrash")}
                   >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                  <span>
-                    {t("sidebar_trash", { count: trashItems.length })}
-                  </span>
-                </div>
-                {showTrash ? (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
+                    {t("context_emptyTrash")}
+                  </button>
                 )}
-              </button>
+              </div>
 
               {showTrash && (
                 <TrashView
                   trashItems={trashItems}
                   onRestore={onRestoreFromTrash}
                   onDeleteForever={(node) => openDeleteDialog(node)}
-                  onEmptyTrash={() => openEmptyTrashDialog()}
                   onContextMenu={openContextMenu}
                 />
               )}
