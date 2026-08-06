@@ -253,3 +253,101 @@ export const livePreviewHighlights = ViewPlugin.fromClass(
   },
   { decorations: (p) => p.decorations },
 );
+
+const blockquoteLineDeco = Decoration.line({
+  class: "cm-live-preview-blockquote",
+});
+const blockquoteFirstLineDeco = Decoration.line({
+  class: "cm-live-preview-blockquote cm-live-preview-blockquote-first",
+});
+const blockquoteLastLineDeco = Decoration.line({
+  class: "cm-live-preview-blockquote cm-live-preview-blockquote-last",
+});
+const blockquoteOnlyLineDeco = Decoration.line({
+  class:
+    "cm-live-preview-blockquote cm-live-preview-blockquote-first cm-live-preview-blockquote-last",
+});
+
+/** Style plain `>` blockquotes to match Reading mode quote chrome. */
+export function buildLivePreviewBlockquoteDecorations(
+  view: EditorView,
+): DecorationSet {
+  if (isLargeEditorState(view.state)) {
+    return Decoration.none;
+  }
+
+  const builder = new RangeSetBuilder<Decoration>();
+  const { state } = view;
+  const parseTo = maxVisibleParseTo(view);
+  const tree = ensureLivePreviewViewportTree(view, parseTo);
+  const { from: viewportFrom, to: viewportTo } =
+    getLivePreviewDecorationRange(view);
+  const lineFroms = new Set<number>();
+
+  tree.iterate({
+    from: viewportFrom,
+    to: viewportTo,
+    enter: (node) => {
+      if (node.name !== "Blockquote") return;
+      // Nested quotes re-enter; decorate leaf lines once.
+      let pos = Math.max(node.from, viewportFrom);
+      const end = Math.min(node.to, viewportTo);
+      if (pos > end) return;
+      while (pos <= end) {
+        const line = state.doc.lineAt(pos);
+        lineFroms.add(line.from);
+        if (line.to >= end) break;
+        pos = line.to + 1;
+      }
+    },
+  });
+
+  const sorted = Array.from(lineFroms).sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length; i += 1) {
+    const from = sorted[i]!;
+    const prev = sorted[i - 1];
+    const next = sorted[i + 1];
+    const line = state.doc.lineAt(from);
+    const prevIsAdjacent =
+      prev !== undefined && state.doc.lineAt(prev).to + 1 === line.from;
+    const nextIsAdjacent =
+      next !== undefined && line.to + 1 === state.doc.lineAt(next).from;
+    const isFirst = !prevIsAdjacent;
+    const isLast = !nextIsAdjacent;
+    const deco =
+      isFirst && isLast
+        ? blockquoteOnlyLineDeco
+        : isFirst
+          ? blockquoteFirstLineDeco
+          : isLast
+            ? blockquoteLastLineDeco
+            : blockquoteLineDeco;
+    builder.add(from, from, deco);
+  }
+
+  return builder.finish();
+}
+
+export const livePreviewBlockquotes = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    private readonly viewportWindow = new ViewportDecorationWindow();
+    constructor(view: EditorView) {
+      this.decorations = buildLivePreviewBlockquoteDecorations(view);
+      this.viewportWindow.mark(view);
+    }
+    update(update: ViewUpdate) {
+      if (
+        shouldRebuildLivePreviewDecorations(
+          update,
+          "marks",
+          this.viewportWindow,
+        )
+      ) {
+        this.decorations = buildLivePreviewBlockquoteDecorations(update.view);
+        this.viewportWindow.mark(update.view);
+      }
+    }
+  },
+  { decorations: (p) => p.decorations },
+);

@@ -15,7 +15,12 @@ import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
 import { buildLivePreviewWikiDecorations, livePreviewWiki } from "./wiki";
 import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
 import { findCalloutRanges, livePreviewCallouts } from "./callouts";
-import { findHighlightRanges, findCommentRanges } from "./listAndHighlight";
+import {
+  buildLivePreviewBlockquoteDecorations,
+  findHighlightRanges,
+  findCommentRanges,
+  livePreviewBlockquotes,
+} from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
 import { livePreviewMermaid } from "./mermaid";
 import { livePreviewMath } from "./math";
@@ -577,5 +582,27 @@ describe("callouts / highlight / comments", () => {
     expect(findCommentRanges("a %%hidden%% b", 0, 14)).toEqual([
       { from: 2, to: 12 },
     ]);
+  });
+
+  it("marks plain blockquote lines for Reading-matched chrome", () => {
+    const doc = "> quoted line\n> second\n\npara";
+    const view = createView(doc, doc.length - 1, [livePreviewBlockquotes]);
+    try {
+      const set = buildLivePreviewBlockquoteDecorations(view);
+      expect(set.size).toBeGreaterThanOrEqual(2);
+      const quoteLines = view.dom.querySelectorAll(
+        ".cm-live-preview-blockquote",
+      );
+      expect(quoteLines.length).toBeGreaterThanOrEqual(2);
+      expect(
+        view.dom.querySelector(".cm-live-preview-blockquote-first"),
+      ).not.toBeNull();
+      expect(
+        view.dom.querySelector(".cm-live-preview-blockquote-last"),
+      ).not.toBeNull();
+    } finally {
+      view.destroy();
+      view.dom.parentElement?.remove();
+    }
   });
 });

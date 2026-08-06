@@ -223,25 +223,27 @@ export const livePreviewHideFormatting = ViewPlugin.fromClass(
 );
 
 export const livePreviewTheme = EditorView.baseTheme({
+  // Match Reading `.task-list-item-checkbox` chrome.
   ".cm-live-preview-task": {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "1.05em",
-    height: "1.05em",
+    width: "1em",
+    height: "1em",
     marginInline: "0.1em 0.35em",
     verticalAlign: "middle",
     cursor: "pointer",
-    border:
-      "1.5px solid var(--mp-doc-task-border, var(--mp-doc-list-marker, #94a3b8))",
-    borderRadius: "0.25em",
-    background: "transparent",
+    border: "1.5px solid var(--mp-doc-task-border, #94a3b8)",
+    borderRadius: "0.28rem",
+    background: "#ffffff",
+    boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
     padding: 0,
     color: "inherit",
   },
   ".cm-live-preview-task[data-checked='true']": {
     background: "var(--mp-doc-task-checked, var(--mp-doc-accent, #2563eb))",
     borderColor: "var(--mp-doc-task-checked, var(--mp-doc-accent, #2563eb))",
+    boxShadow: "none",
   },
   ".cm-live-preview-task[data-checked='true']::after": {
     content: '""',
@@ -327,20 +329,23 @@ export const livePreviewTheme = EditorView.baseTheme({
     overflowX: "auto",
     textAlign: "center",
   },
+  // Link chrome matches Reading `a` / `.wiki-link` underline + accent fallback.
   ".cm-live-preview-wiki": {
-    color: "var(--mp-doc-link, var(--mp-doc-accent, #2563eb))",
+    color: "var(--mp-doc-link, var(--mp-doc-accent, #0f9aa8))",
     textDecoration: "underline",
-    textUnderlineOffset: "0.15em",
+    textDecorationThickness: "1.5px",
+    textUnderlineOffset: "0.12em",
     cursor: "pointer",
   },
   ".cm-live-preview-wiki.is-unresolved": {
-    color: "var(--mp-doc-link-unresolved, var(--mp-doc-muted, #94a3b8))",
+    color: "var(--mp-doc-link-unresolved, var(--mp-doc-accent, #0f9aa8))",
     textDecorationStyle: "dashed",
   },
   ".cm-live-preview-link": {
-    color: "var(--mp-doc-link, var(--mp-doc-accent, #2563eb))",
+    color: "var(--mp-doc-link, var(--mp-doc-accent, #0f9aa8))",
     textDecoration: "underline",
-    textUnderlineOffset: "0.15em",
+    textDecorationThickness: "1.5px",
+    textUnderlineOffset: "0.12em",
     cursor: "pointer",
   },
   ".cm-live-preview-table-wrap": {
@@ -359,38 +364,45 @@ export const livePreviewTheme = EditorView.baseTheme({
     maxWidth: "none",
     tableLayout: "auto",
     fontSize: "0.95em",
+    color: "var(--mp-doc-text, #1f2937)",
   },
   ".cm-live-preview-table th, .cm-live-preview-table td": {
-    border: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.35))",
+    border: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.26))",
     padding: "0.45em 0.75em",
     verticalAlign: "top",
     cursor: "text",
     minWidth: "3.5em",
     maxWidth: "28em",
     lineHeight: "1.45",
+    color: "inherit",
     // Override `.cm-lineWrapping { overflow-wrap: anywhere }` inheritance.
     whiteSpace: "normal",
     wordBreak: "keep-all",
     overflowWrap: "break-word",
   },
   ".cm-live-preview-table th": {
-    background: "var(--mp-doc-table-header-bg, rgba(148, 163, 184, 0.12))",
-    fontWeight: "650",
+    background: "var(--mp-doc-table-header-bg, rgba(241, 245, 249, 0.96))",
+    color: "var(--mp-doc-text, #334155)",
+    fontWeight: "600",
     whiteSpace: "nowrap",
   },
   ".cm-live-preview-table tbody tr:nth-child(even) td": {
-    background: "var(--mp-doc-table-row-alt-bg, transparent)",
+    background: "var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96))",
+  },
+  ".cm-live-preview-table tbody tr:hover td": {
+    background:
+      "var(--mp-doc-table-hover-bg, var(--mp-doc-table-row-alt-bg, rgba(248, 250, 252, 0.96)))",
   },
   ".cm-live-preview-table-cell-editing": {
-    outline: "2px solid var(--mp-doc-accent, #2563eb)",
+    outline: "2px solid var(--mp-doc-accent, #0f9aa8)",
     // Outside the cell so the ring does not cover wrapped descenders.
     outlineOffset: "0",
     background:
-      "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 8%, transparent)",
+      "color-mix(in srgb, var(--mp-doc-accent, #0f9aa8) 8%, transparent)",
     whiteSpace: "pre-wrap",
     wordBreak: "normal",
     overflowWrap: "anywhere",
-    caretColor: "var(--mp-doc-accent, #2563eb)",
+    caretColor: "var(--mp-doc-accent, #0f9aa8)",
   },
   ".cm-live-preview-table-menu": {
     position: "fixed",
@@ -421,7 +433,7 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-table-menu-item:hover:not(:disabled)": {
     background:
-      "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 12%, transparent)",
+      "color-mix(in srgb, var(--mp-doc-accent, #0f9aa8) 12%, transparent)",
   },
   ".cm-live-preview-table-menu-item:disabled": {
     opacity: "0.45",
@@ -438,20 +450,23 @@ export const livePreviewTheme = EditorView.baseTheme({
     background:
       "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent)",
   },
+  // Callouts echo Reading blockquote chrome + type accents.
   ".cm-live-preview-callout": {
     display: "block",
-    padding: "0.65em 0.85em",
-    paddingBlock: "0.85em",
-    borderRadius: "0.45rem",
-    borderInlineStart: "4px solid var(--mp-doc-accent, #2563eb)",
-    background:
-      "color-mix(in srgb, var(--mp-doc-accent, #2563eb) 8%, transparent)",
+    padding: "0.9em 1em",
+    paddingBlock: "0.9em",
+    borderRadius: "0 14px 14px 0",
+    borderInlineStart:
+      "4px solid var(--mp-doc-accent, rgba(124, 58, 237, 0.28))",
+    background: "var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04))",
+    color: "var(--mp-doc-quote-text, #5b21b6)",
   },
   ".cm-live-preview-callout-title": {
     fontWeight: "700",
     // Prefer padding — CM block height maps ignore vertical margins.
     paddingBottom: "0.35em",
     textTransform: "capitalize",
+    color: "var(--mp-doc-text, inherit)",
   },
   ".cm-live-preview-callout-body.markdown-body": {
     fontSize: "0.95em",
@@ -460,20 +475,22 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-callout-warning, .cm-live-preview-callout-caution": {
     borderInlineStartColor: "#d97706",
     background: "color-mix(in srgb, #d97706 10%, transparent)",
+    color: "inherit",
   },
   ".cm-live-preview-callout-error, .cm-live-preview-callout-danger, .cm-live-preview-callout-bug":
     {
       borderInlineStartColor: "#dc2626",
       background: "color-mix(in srgb, #dc2626 10%, transparent)",
+      color: "inherit",
     },
   ".cm-live-preview-callout-success, .cm-live-preview-callout-tip": {
     borderInlineStartColor: "#16a34a",
     background: "color-mix(in srgb, #16a34a 10%, transparent)",
+    color: "inherit",
   },
   ".cm-live-preview-hr": {
     border: "none",
-    borderTop:
-      "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 45%, transparent)",
+    borderTop: "1px solid var(--mp-doc-border, rgba(124, 58, 237, 0.18))",
     // Prefer padding — CM block height maps ignore vertical margins.
     paddingBlock: "1em",
   },
@@ -481,12 +498,11 @@ export const livePreviewTheme = EditorView.baseTheme({
     display: "inline-block",
     minWidth: "1.1em",
     marginInlineEnd: "0.35em",
-    color: "var(--mp-doc-list-marker, #94a3b8)",
+    color: "var(--mp-doc-list-marker, #8b5cf6)",
     textAlign: "right",
   },
   ".cm-live-preview-highlight": {
-    background:
-      "var(--mp-doc-mark-bg, color-mix(in srgb, #eab308 35%, transparent))",
+    background: "var(--mp-doc-mark-bg, rgba(235, 203, 139, 0.45))",
     color: "var(--mp-doc-mark-text, inherit)",
     borderRadius: "0.15em",
     paddingInline: "0.1em",
@@ -495,38 +511,41 @@ export const livePreviewTheme = EditorView.baseTheme({
     display: "block",
     width: "100%",
     overflowX: "auto",
-    padding: "0.5em",
-    paddingBlock: "0.75em",
-    borderRadius: "0.45rem",
-    background:
-      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 8%, transparent)",
+    padding: "1.5em",
+    paddingBlock: "1.5em",
+    borderRadius: "8px",
+    background: "rgba(128, 128, 128, 0.05)",
   },
+  // Match Reading `.preview-note-embed` card chrome.
   ".cm-live-preview-note-embed": {
     display: "block",
-    padding: "0.65em 0.85em",
-    paddingBlock: "0.85em",
-    borderRadius: "0.45rem",
-    border:
-      "1px solid color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 30%, transparent)",
-    background:
-      "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 6%, transparent)",
+    overflow: "hidden",
+    padding: "0",
+    borderRadius: "1rem",
+    border: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.2))",
+    background: "rgba(255, 255, 255, 0.78)",
+    boxShadow:
+      "0 14px 32px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7)",
   },
   ".cm-live-preview-note-embed-body.markdown-body": {
     fontSize: "0.95em",
-    lineHeight: "1.7",
+    lineHeight: "1.8",
+    padding: "1rem 1.05rem",
+    color: "var(--mp-doc-text, #312e81)",
   },
   ".cm-live-preview-note-embed-title": {
-    display: "inline-block",
-    fontWeight: "650",
-    color: "var(--mp-doc-accent, #2563eb)",
-    textDecoration: "underline",
-    textUnderlineOffset: "0.15em",
-    // Prefer padding — CM block height maps ignore vertical margins.
-    paddingBottom: "0.35em",
+    display: "block",
+    padding: "0.8rem 1rem",
+    borderBottom: "1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.18))",
+    fontSize: "0.9em",
+    fontWeight: "700",
+    letterSpacing: "0.01em",
+    color: "var(--mp-doc-muted, #475569)",
+    textDecoration: "none",
     cursor: "pointer",
   },
   ".cm-live-preview-note-embed-body": {
     fontSize: "0.95em",
-    opacity: "0.92",
+    opacity: "1",
   },
 });
