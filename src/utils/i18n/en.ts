@@ -991,7 +991,7 @@ export default {
   preview_pdfTitle: "PDF preview",
   preview_htmlTitle: "HTML preview",
   preview_htmlZoomToolbar: "HTML preview zoom",
-  preview_htmlZoomFit: "Fit",
+  preview_htmlZoomFit: "Fit width",
   preview_htmlZoomIn: "Zoom in",
   preview_htmlZoomOut: "Zoom out",
   preview_htmlZoomReset: "Reset to 100%",

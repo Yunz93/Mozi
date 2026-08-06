@@ -302,7 +302,7 @@ export const HtmlPreviewFrame: React.FC<HtmlPreviewFrameProps> = ({
   return (
     <div
       ref={shellRef}
-      className="preview-html-document preview-html-document-frame editor-pane-width-constrained mx-auto w-full h-full min-h-0"
+      className="preview-html-document preview-html-document-frame w-full h-full min-h-0"
     >
       <iframe
         ref={iframeRef}
