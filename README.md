@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/
 指定版本（可选）：
 
 ```bash
-RELEASE_TAG=v0.9.16 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `M記.app` 放入「应用程序」后执行：
@@ -42,13 +42,15 @@ xattr -cr /Applications/M記.app
 
 ## 功能亮点
 
-- **本地知识库**：以文件夹为仓库，多标签、侧边栏与搜索管理笔记与附件，数据留在本机。
-- **源码 / 分屏 / 阅读**：三种视图模式切换；预览侧完整呈现 Markdown 与常见扩展（公式、图表、代码高亮等），Outline 把握长文结构。
-- **Excalidraw 画板**：打开与编辑 `.excalidraw` 文件，支持侧边栏新建画板；笔记中可通过 `![[drawing.excalidraw]]` 嵌入静态预览，点击即可进入编辑。
-- **知识库式 Markdown**：兼容常用的双链、`![[嵌入]]` 等写法，YAML 元信息与新建模板可配置，图片与资源在同一条引用链路里管理。
-- **知识层（Beta）**：反向链接与出链面板、相关笔记推荐（本地语义检索）、Ask Vault 库级问答（带来源引用）；内置本地 embedding，可开启隐私模式禁止非本地端点。
-- **导出与发布**：PDF、HTML，以及将整篇预览合成为一张长图便于分享；可从工具栏发布到 **simple-blog**（GitHub + Vercel）或 **微信公众号草稿**。
-- **可选 AI 辅助**：在 Gemini 与 OpenAI 兼容接口之间切换，用于润色、摘要、标签与从选区生成词条等。
+- **本地知识库**：以文件夹为仓库；多标签、侧边栏、文件树与搜索管理笔记与附件，数据始终留在本机普通文件中。
+- **实时预览 / 阅读**：两种主视图切换。Live 在编辑时即时渲染标题、强调、链接、表格、任务列表、公式、Mermaid、Callout、嵌入等；Reading 专注阅读，与 Live 共享 Markdown 样式预设与排版。
+- **知识库式 Markdown**：兼容双链 `[[wiki]]`、`![[嵌入]]`、YAML frontmatter 与可配置新建模板；图片粘贴、本地资源目录与未引用附件清理在同一条引用链路里。
+- **Excalidraw 画板**：打开与编辑 `.excalidraw`，支持侧边栏新建；笔记中可用 `![[drawing.excalidraw]]` 嵌入静态预览，点击进入编辑。
+- **富媒体预览**：图片、PDF、HTML、视频等附件可在阅读侧预览；HTML 支持适应宽度与缩放。
+- **知识层（Beta）**：反向链接与出链面板、当前笔记邻域图、相关笔记推荐（本地语义检索）、Ask Vault 库级问答（带来源引用）；内置本地 embedding，可开启隐私模式禁止非本地端点。
+- **导出与发布**：PDF、HTML，以及将整篇预览合成为一张长图；工具栏可发布到 **simple-blog**（GitHub + Vercel）或 **微信公众号草稿**。
+- **可选 AI 辅助**：在 Gemini 与 OpenAI 兼容接口之间切换，用于润色、摘要、标签与从选区生成词条等；无 API Key 时基础写作完整可用。
+- **外观与桌面体验**：浅色 / 深色主题、多种 Markdown 样式预设、字体与字号、中英界面、可自定义快捷键；Windows 支持应用内检查更新。
 
 ## 常用快捷键
 
@@ -92,28 +94,61 @@ xattr -cr /Applications/M記.app
 
 ## 致谢
 
-M記 建立在以下开源项目与服务之上（排名不分先后）：
+M記 建立在大量优秀开源项目之上（排名不分先后）。下列为产品运行时直接依赖的主要组件；完整版本与传递依赖见仓库中的 `package.json` / `package-lock.json` 与 `src-tauri/Cargo.toml` / `Cargo.lock`。
 
-**桌面与界面**
+### 桌面与界面
 
-- [Tauri](https://tauri.app/) · [React](https://react.dev/) · [Zustand](https://github.com/pmndrs/zustand) · [Vite](https://vitejs.dev/) · [Tailwind CSS](https://tailwindcss.com/) · [Lucide](https://lucide.dev/)
+| 项目                                                                                    | 用途                           | 许可              |
+| --------------------------------------------------------------------------------------- | ------------------------------ | ----------------- |
+| [Tauri](https://tauri.app/)（含 API 与 dialog / fs / process / shell / updater 等插件） | 桌面壳、文件系统、对话框、更新 | Apache-2.0 OR MIT |
+| [React](https://react.dev/)                                                             | UI                             | MIT               |
+| [Zustand](https://github.com/pmndrs/zustand)                                            | 应用状态                       | MIT               |
+| [Vite](https://vitejs.dev/)                                                             | 前端构建                       | MIT               |
+| [Tailwind CSS](https://tailwindcss.com/)                                                | 样式                           | MIT               |
+| [Lucide](https://lucide.dev/)（`lucide-react`）                                         | 图标                           | ISC               |
 
-**编辑器**
+### 编辑器
 
-- [CodeMirror](https://codemirror.net/)
+| 项目                                                                                   | 用途                            | 许可 |
+| -------------------------------------------------------------------------------------- | ------------------------------- | ---- |
+| [CodeMirror 6](https://codemirror.net/)（`@codemirror/*`，含 Markdown / 多种代码语言） | Live 编辑、语法高亮、选区与装饰 | MIT  |
+| [Lezer Highlight](https://github.com/lezer-parser/highlight)                           | 语法高亮标签                    | MIT  |
+| [@replit/codemirror-lang-csharp](https://github.com/replit/codemirror-lang-csharp)     | C# 语言支持                     | MIT  |
 
-**Markdown 与预览**
+### Markdown、预览与画板
 
-- [markdown-it](https://github.com/markdown-it/markdown-it) · [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) · [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists) · [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) · [Mermaid](https://mermaid.js.org/) · [DOMPurify](https://github.com/cure53/DOMPurify)
+| 项目                                                                        | 用途                   | 许可                  |
+| --------------------------------------------------------------------------- | ---------------------- | --------------------- |
+| [markdown-it](https://github.com/markdown-it/markdown-it)                   | Markdown 解析          | MIT                   |
+| [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) | 脚注                   | MIT                   |
+| [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists)   | 任务列表               | ISC                   |
+| [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css)  | 预览基础样式           | MIT                   |
+| [Shiki](https://shiki.style/)                                               | 代码高亮               | MIT                   |
+| [KaTeX](https://katex.org/)                                                 | 数学公式               | MIT                   |
+| [Mermaid](https://mermaid.js.org/)                                          | 流程图等图表           | MIT                   |
+| [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)          | Mermaid 渲染辅助       | MIT                   |
+| [DOMPurify](https://github.com/cure53/DOMPurify)                            | HTML 消毒              | MPL-2.0 OR Apache-2.0 |
+| [Excalidraw](https://excalidraw.com/)（`@excalidraw/excalidraw`）           | 手绘白板编辑与嵌入预览 | MIT                   |
+| [Turndown](https://github.com/mixmark-io/turndown)                          | HTML → Markdown        | MIT                   |
+| [js-yaml](https://github.com/nodeca/js-yaml)                                | YAML frontmatter       | MIT                   |
 
-**导出与 PDF**
+### 导出、PDF 与文档渲染
 
-- [PDF.js](https://mozilla.github.io/pdf.js/) · [html2canvas](https://html2canvas.hertzen.com/) · [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/) · [jsPDF](https://github.com/parallax/jsPDF)
+| 项目                                                        | 用途       | 许可       |
+| ----------------------------------------------------------- | ---------- | ---------- |
+| [PDF.js](https://mozilla.github.io/pdf.js/)（`pdfjs-dist`） | PDF 预览   | Apache-2.0 |
+| [html2canvas](https://html2canvas.hertzen.com/)             | 预览光栅化 | MIT        |
+| [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/)     | HTML → PDF | MIT        |
+| [jsPDF](https://github.com/parallax/jsPDF)                  | PDF 生成   | MIT        |
 
-**其他**
+### 知识检索与可选 AI
 
-- [js-yaml](https://github.com/nodeca/js-yaml)
+| 项目 / 服务                                                                                                | 用途                            | 许可 / 说明    |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------- | -------------- |
+| [Hugging Face Transformers.js](https://huggingface.co/docs/transformers.js)（`@huggingface/transformers`） | 内置本地 embedding              | Apache-2.0     |
+| [Google Gen AI SDK](https://github.com/googleapis/js-genai)（`@google/genai`）                             | 可选 Gemini 调用                | Apache-2.0     |
+| [Google Gemini](https://ai.google.dev/) / [OpenAI](https://openai.com/) 兼容接口                           | 可选云端或本地（如 Ollama）模型 | 第三方服务条款 |
 
-**AI 服务（可选）**
+Rust 侧还依赖 [serde](https://serde.rs/)、[reqwest](https://github.com/seanmonstar/reqwest)、[uuid](https://github.com/uuid-rs/uuid) 以及加密封装相关 crate（如 `chacha20poly1305`、`hmac`、`sha2` 等），用于配置安全存储与网络请求等桌面能力。
 
-- [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)
+若发现致谢遗漏，欢迎提交 Issue 或 PR 补充。
