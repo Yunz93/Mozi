@@ -904,7 +904,7 @@ export default {
   preview_pdfTitle: "PDF 预览",
   preview_htmlTitle: "HTML 预览",
   preview_htmlZoomToolbar: "HTML 预览缩放",
-  preview_htmlZoomFit: "适应",
+  preview_htmlZoomFit: "适应宽度",
   preview_htmlZoomIn: "放大",
   preview_htmlZoomOut: "缩小",
   preview_htmlZoomReset: "重置为 100%",

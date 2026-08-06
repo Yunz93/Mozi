@@ -970,14 +970,20 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
         onScroll={handleScroll}
         onClick={handlePreviewClick}
         onDoubleClick={handlePreviewDoubleClick}
-        className={`editor-pane-layout preview-scroll-container h-full min-w-0 overflow-y-auto ${hasActiveFile ? "" : "preview-pane-empty-state"}`}
+        className={`editor-pane-layout preview-scroll-container h-full min-w-0 ${
+          previewFileType === "html" ? "overflow-hidden" : "overflow-y-auto"
+        } ${hasActiveFile ? "" : "preview-pane-empty-state"}`}
         style={{ pointerEvents: "auto", ...layoutStyle }}
       >
         <div
-          className={`editor-pane-backdrop min-h-full ${hasActiveFile ? "" : "h-full"}`}
+          className={`editor-pane-backdrop min-h-full ${
+            previewFileType === "html" ? "preview-pane-backdrop-html" : ""
+          } ${hasActiveFile && previewFileType !== "html" ? "" : "h-full"}`}
         >
           <div
-            className={`editor-pane-frame w-full ${hasActiveFile ? "" : "h-full"}`}
+            className={`editor-pane-frame w-full ${
+              previewFileType === "html" ? "preview-pane-frame-html" : ""
+            } ${hasActiveFile && previewFileType !== "html" ? "" : "h-full"}`}
           >
             {isMarkdownPreview && parsedFrontmatter && (
               <div className="preview-pane-properties editor-pane-width-constrained mx-auto mb-4 w-full rounded-xl overflow-hidden bg-gray-50/50 dark:bg-white/5 animate-fade-in group/metadata">
@@ -1032,7 +1038,13 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
             )}
 
             <div
-              className={`editor-pane-sheet preview-pane-sheet w-full ${hasActiveFile ? "" : "h-full min-h-0"}`}
+              className={`editor-pane-sheet preview-pane-sheet w-full ${
+                previewFileType === "html" ? "preview-pane-sheet-html" : ""
+              } ${
+                hasActiveFile && previewFileType !== "html"
+                  ? ""
+                  : "h-full min-h-0"
+              }`}
             >
               {previewFileType === "image" && assetPreviewSrc ? (
                 <div className="editor-pane-width-constrained mx-auto flex min-h-[320px] w-full items-center justify-center py-6">

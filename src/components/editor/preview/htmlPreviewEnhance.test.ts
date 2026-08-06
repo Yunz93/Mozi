@@ -23,10 +23,13 @@ describe("htmlPreviewEnhance zoom math", () => {
     expect(nextHtmlPreviewZoom(0.25, -1)).toBe(0.25);
   });
 
-  it("fits content into the viewport without upscaling past 100%", () => {
+  it("fits content width into the viewport without upscaling past 100%", () => {
     expect(computeHtmlPreviewFitZoom(800, 600, 400, 300)).toBe(0.5);
     expect(computeHtmlPreviewFitZoom(200, 100, 800, 600)).toBe(1);
     expect(computeHtmlPreviewFitZoom(0, 100, 800, 600)).toBe(1);
+    // Tall pages must not shrink to fit height — only width matters.
+    expect(computeHtmlPreviewFitZoom(800, 8000, 800, 600)).toBe(1);
+    expect(computeHtmlPreviewFitZoom(1600, 10000, 800, 600)).toBe(0.5);
   });
 
   it("treats meta or ctrl as zoom modifiers", () => {

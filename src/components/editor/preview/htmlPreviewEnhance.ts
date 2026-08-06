@@ -17,23 +17,20 @@ export function clampHtmlPreviewZoom(zoom: number): number {
 }
 
 /**
- * Scale that fits the full content into the viewport without upscaling past 100%.
+ * Scale that fits content width into the viewport without upscaling past 100%.
+ * Height is ignored so tall pages fill the pane width and scroll vertically
+ * instead of shrinking to a postage stamp (fit-to-page).
  */
 export function computeHtmlPreviewFitZoom(
   contentWidth: number,
-  contentHeight: number,
+  _contentHeight: number,
   viewWidth: number,
-  viewHeight: number,
+  _viewHeight: number,
 ): number {
-  if (
-    contentWidth <= 0 ||
-    contentHeight <= 0 ||
-    viewWidth <= 0 ||
-    viewHeight <= 0
-  ) {
+  if (contentWidth <= 0 || viewWidth <= 0) {
     return 1;
   }
-  const fit = Math.min(1, viewWidth / contentWidth, viewHeight / contentHeight);
+  const fit = Math.min(1, viewWidth / contentWidth);
   return clampHtmlPreviewZoom(fit);
 }
 
