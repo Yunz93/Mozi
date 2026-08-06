@@ -56,6 +56,24 @@ export function formatShortcutForDisplay(shortcut: string): string {
 }
 
 /**
+ * Format shortcuts for UI chips and drop Cmd/Ctrl duplicates that collapse to
+ * the same platform label (e.g. `Cmd+-` and `Ctrl+-` both become `Cmd+-` on macOS).
+ */
+export function uniqueFormattedShortcuts(
+  shortcuts: readonly string[],
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const shortcut of shortcuts) {
+    const label = formatShortcutForDisplay(shortcut);
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+    out.push(label);
+  }
+  return out;
+}
+
+/**
  * Maps a keydown to the non-modifier token used in stored shortcuts, aligned with
  * {@link ../hooks/useKeyboardShortcuts} matching rules.
  */
