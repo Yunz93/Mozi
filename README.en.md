@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/
 Pin a release (optional):
 
 ```bash
-RELEASE_TAG=v0.9.16 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **M記.app** into Applications. If Gatekeeper still blocks the app, run:
@@ -42,13 +42,15 @@ Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run
 
 ## Highlights
 
-- **Local vault**: Folder-based library with tabs, sidebar, and search; notes and assets stay on disk under your control.
-- **Source / Split / Reading**: Three view modes; preview renders Markdown plus common extensions (math, diagrams, highlighted code); outline for structure at a glance.
+- **Local vault**: Folder-based library with tabs, sidebar, file tree, and search; notes and assets stay as ordinary files on disk.
+- **Live Preview / Reading**: Two primary views. Live renders headings, emphasis, links, tables, tasks, math, Mermaid, callouts, embeds, and more while you type; Reading is for focused reading and shares Markdown style presets with Live.
+- **Knowledge-base Markdown**: Wiki links `[[wiki]]`, `![[embeds]]`, YAML frontmatter, and configurable note templates; paste images, manage a local asset folder, and clean unreferenced attachments in one reference flow.
 - **Excalidraw drawings**: Open and edit `.excalidraw` files, create drawings from the sidebar, and embed static previews with `![[drawing.excalidraw]]` (click to edit).
-- **Knowledge-base Markdown**: Familiar wiki links and `![[embeds]]`, configurable YAML metadata and templates, images handled in the same reference flow.
-- **Knowledge layer (Beta)**: Backlinks and outgoing links panel, related-notes recommendations (local semantic search), Ask Vault Q&A with source citations; built-in local embedding with an optional privacy mode that blocks non-local endpoints.
+- **Rich media preview**: Images, PDF, HTML, video, and other attachments preview in Reading; HTML supports fit-to-width and zoom.
+- **Knowledge layer (Beta)**: Backlinks and outgoing links, neighborhood graph for the current note, related-notes recommendations (local semantic search), Ask Vault Q&A with source citations; built-in local embedding with an optional privacy mode that blocks non-local endpoints.
 - **Export & publish**: PDF, HTML, and a single long-image share from the preview; toolbar publishing to **simple-blog** (GitHub + Vercel) or **WeChat Official Account drafts**.
-- **Optional AI assist**: Switch between Gemini and an OpenAI-compatible API for polish, summaries, tags, and generating entries from a selection.
+- **Optional AI assist**: Switch between Gemini and an OpenAI-compatible API for polish, summaries, tags, and generating entries from a selection; core writing works fully without an API key.
+- **Look & desktop polish**: Light / dark themes, Markdown style presets, fonts and sizes, Chinese / English UI, customizable shortcuts; Windows supports in-app update checks.
 
 ## Keyboard shortcuts
 
@@ -92,28 +94,61 @@ Same settings tab: **App ID** and **App Secret** (App Secret stays in secure loc
 
 ## Acknowledgements
 
-M記 is built on the following open-source projects and services (in no particular order):
+M記 is built on many excellent open-source projects (in no particular order). The tables below list the main runtime dependencies used by the product; full versions and transitive deps live in `package.json` / `package-lock.json` and `src-tauri/Cargo.toml` / `Cargo.lock`.
 
-**Desktop & UI**
+### Desktop & UI
 
-- [Tauri](https://tauri.app/) · [React](https://react.dev/) · [Zustand](https://github.com/pmndrs/zustand) · [Vite](https://vitejs.dev/) · [Tailwind CSS](https://tailwindcss.com/) · [Lucide](https://lucide.dev/)
+| Project                                                                                | Role                                        | License           |
+| -------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------- |
+| [Tauri](https://tauri.app/) (API plus dialog / fs / process / shell / updater plugins) | Desktop shell, filesystem, dialogs, updates | Apache-2.0 OR MIT |
+| [React](https://react.dev/)                                                            | UI                                          | MIT               |
+| [Zustand](https://github.com/pmndrs/zustand)                                           | App state                                   | MIT               |
+| [Vite](https://vitejs.dev/)                                                            | Frontend build                              | MIT               |
+| [Tailwind CSS](https://tailwindcss.com/)                                               | Styling                                     | MIT               |
+| [Lucide](https://lucide.dev/) (`lucide-react`)                                         | Icons                                       | ISC               |
 
-**Editor**
+### Editor
 
-- [CodeMirror](https://codemirror.net/)
+| Project                                                                                               | Role                                                | License |
+| ----------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------- |
+| [CodeMirror 6](https://codemirror.net/) (`@codemirror/*`, including Markdown and many code languages) | Live editing, highlighting, selection & decorations | MIT     |
+| [Lezer Highlight](https://github.com/lezer-parser/highlight)                                          | Highlight tags                                      | MIT     |
+| [@replit/codemirror-lang-csharp](https://github.com/replit/codemirror-lang-csharp)                    | C# language support                                 | MIT     |
 
-**Markdown & preview**
+### Markdown, preview & drawings
 
-- [markdown-it](https://github.com/markdown-it/markdown-it) · [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) · [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists) · [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css) · [Shiki](https://shiki.style/) · [KaTeX](https://katex.org/) · [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) · [Mermaid](https://mermaid.js.org/) · [DOMPurify](https://github.com/cure53/DOMPurify)
+| Project                                                                     | Role                                        | License               |
+| --------------------------------------------------------------------------- | ------------------------------------------- | --------------------- |
+| [markdown-it](https://github.com/markdown-it/markdown-it)                   | Markdown parsing                            | MIT                   |
+| [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) | Footnotes                                   | MIT                   |
+| [markdown-it-task-lists](https://github.com/revin/markdown-it-task-lists)   | Task lists                                  | ISC                   |
+| [GitHub Markdown CSS](https://github.com/sindresorhus/github-markdown-css)  | Preview base styles                         | MIT                   |
+| [Shiki](https://shiki.style/)                                               | Code highlighting                           | MIT                   |
+| [KaTeX](https://katex.org/)                                                 | Math                                        | MIT                   |
+| [Mermaid](https://mermaid.js.org/)                                          | Diagrams                                    | MIT                   |
+| [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)          | Mermaid rendering helpers                   | MIT                   |
+| [DOMPurify](https://github.com/cure53/DOMPurify)                            | HTML sanitization                           | MPL-2.0 OR Apache-2.0 |
+| [Excalidraw](https://excalidraw.com/) (`@excalidraw/excalidraw`)            | Freehand whiteboard editing & embed preview | MIT                   |
+| [Turndown](https://github.com/mixmark-io/turndown)                          | HTML → Markdown                             | MIT                   |
+| [js-yaml](https://github.com/nodeca/js-yaml)                                | YAML frontmatter                            | MIT                   |
 
-**Export & PDF**
+### Export, PDF & document rendering
 
-- [PDF.js](https://mozilla.github.io/pdf.js/) · [html2canvas](https://html2canvas.hertzen.com/) · [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/) · [jsPDF](https://github.com/parallax/jsPDF)
+| Project                                                    | Role                  | License    |
+| ---------------------------------------------------------- | --------------------- | ---------- |
+| [PDF.js](https://mozilla.github.io/pdf.js/) (`pdfjs-dist`) | PDF preview           | Apache-2.0 |
+| [html2canvas](https://html2canvas.hertzen.com/)            | Preview rasterization | MIT        |
+| [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/)    | HTML → PDF            | MIT        |
+| [jsPDF](https://github.com/parallax/jsPDF)                 | PDF generation        | MIT        |
 
-**Other**
+### Knowledge retrieval & optional AI
 
-- [js-yaml](https://github.com/nodeca/js-yaml)
+| Project / service                                                                                         | Role                                         | License / notes   |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------- |
+| [Hugging Face Transformers.js](https://huggingface.co/docs/transformers.js) (`@huggingface/transformers`) | Built-in local embedding                     | Apache-2.0        |
+| [Google Gen AI SDK](https://github.com/googleapis/js-genai) (`@google/genai`)                             | Optional Gemini client                       | Apache-2.0        |
+| [Google Gemini](https://ai.google.dev/) / [OpenAI](https://openai.com/)-compatible APIs                   | Optional cloud or local (e.g. Ollama) models | Third-party terms |
 
-**AI services (optional)**
+On the Rust side, M記 also uses [serde](https://serde.rs/), [reqwest](https://github.com/seanmonstar/reqwest), [uuid](https://github.com/uuid-rs/uuid), and crypto-related crates (such as `chacha20poly1305`, `hmac`, `sha2`) for secure local storage and desktop networking.
 
-- [Google Gemini](https://ai.google.dev/) · [OpenAI](https://openai.com/)
+If you spot a missing credit, please open an issue or PR.
