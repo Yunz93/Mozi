@@ -277,6 +277,20 @@ describe("live preview hide formatting", () => {
     expect(view.dom.querySelector(".cm-live-preview-table")).not.toBeNull();
   });
 
+  it("keeps table cell fills translucent so selection paints evenly", () => {
+    // Mount theme once so baseTheme rules are present.
+    mount("| a | b |\n| --- | --- |\n| 1 | 2 |\n", 0, [livePreviewTheme]);
+    const text = Array.from(document.querySelectorAll("style"))
+      .map((node) => node.textContent ?? "")
+      .join("\n");
+    expect(text).toMatch(
+      /cm-live-preview-table th\s*\{[^}]*color-mix\([\s\S]*?transparent/,
+    );
+    expect(text).toMatch(
+      /cm-live-preview-table tbody tr:nth-child\(even\) td\s*\{[^}]*color-mix\([\s\S]*?transparent/,
+    );
+  });
+
   it("spans full width like Reading while keeping CJK-friendly wrapping", () => {
     const doc = [
       "| 模块 | 需求 | 优先级 | 说明 |",
