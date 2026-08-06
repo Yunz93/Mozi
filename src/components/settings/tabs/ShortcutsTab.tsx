@@ -6,6 +6,7 @@ import {
   formatShortcutForDisplay,
   normalizeShortcutForPlatform,
   shortcutFromKeyboardEvent,
+  uniqueFormattedShortcuts,
 } from "../../../utils/shortcuts";
 import { setShortcutCaptureActive } from "../../../utils/shortcutCaptureGate";
 import type { SettingsTabProps } from "../types";
@@ -103,13 +104,14 @@ function getShortcutGroups(
           id: "zoomUiOut",
           label: t("settings_zoomUiOut"),
           description: t("settings_zoomUiOutDesc"),
-          shortcuts: ["Cmd+-", "Ctrl+-"],
+          // One chord is enough: Cmd/Ctrl are normalized for display.
+          shortcuts: ["Cmd+-"],
         },
         {
           id: "zoomUiReset",
           label: t("settings_zoomUiReset"),
           description: t("settings_zoomUiResetDesc"),
-          shortcuts: ["Cmd+Shift+0", "Ctrl+Shift+0"],
+          shortcuts: ["Cmd+Shift+0"],
         },
       ],
     },
@@ -215,7 +217,7 @@ function getShortcutGroups(
           id: "cleanupUnusedAttachments",
           label: t("settings_cleanupUnusedAttachments"),
           description: t("settings_cleanupUnusedAttachmentsDesc"),
-          shortcuts: ["Cmd+Shift+-", "Ctrl+Shift+-"],
+          shortcuts: ["Cmd+Shift+-"],
         },
       ],
     },
@@ -460,14 +462,16 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
                               </div>
                             ) : (
                               <div className="flex shrink-0 flex-wrap justify-end gap-1.5 max-w-[180px]">
-                                {itemShortcuts.map((shortcut) => (
-                                  <span
-                                    key={shortcut}
-                                    className="inline-flex items-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-[11px] font-mono text-gray-600 dark:text-gray-300"
-                                  >
-                                    {formatShortcutForDisplay(shortcut)}
-                                  </span>
-                                ))}
+                                {uniqueFormattedShortcuts(itemShortcuts).map(
+                                  (shortcut) => (
+                                    <span
+                                      key={shortcut}
+                                      className="inline-flex items-center rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-[11px] font-mono text-gray-600 dark:text-gray-300"
+                                    >
+                                      {shortcut}
+                                    </span>
+                                  ),
+                                )}
                               </div>
                             )}
                           </div>
