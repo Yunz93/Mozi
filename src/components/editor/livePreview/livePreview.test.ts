@@ -20,6 +20,7 @@ import {
   findHighlightRanges,
   findCommentRanges,
   livePreviewBlockquotes,
+  livePreviewHighlights,
 } from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
 import { livePreviewMermaid } from "./mermaid";
@@ -580,6 +581,24 @@ describe("callouts / highlight / comments", () => {
     expect(findCommentRanges("a %%hidden%% b", 0, 14)).toEqual([
       { from: 2, to: 12 },
     ]);
+  });
+
+  it("allows multi-line highlight/comment replaces via StateField without crashing", () => {
+    const docs = [
+      "before\n%%\nmulti\nline comment\n%%\nafter",
+      "before\n==hi\nthere==\nafter",
+    ];
+    for (const doc of docs) {
+      expect(() => {
+        const view = createView(doc, doc.length - 1, [livePreviewHighlights]);
+        try {
+          expect(view.dom.isConnected).toBe(true);
+        } finally {
+          view.destroy();
+          view.dom.parentElement?.remove();
+        }
+      }).not.toThrow();
+    }
   });
 
   it("marks plain blockquote lines for Reading-matched chrome", () => {
