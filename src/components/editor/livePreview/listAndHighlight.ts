@@ -1,9 +1,12 @@
 /**
  * Live Preview: hide list marks and show bullet/number widgets;
  * ==highlight== and %%comments%%.
+ *
+ * Highlights/comments may span line breaks, so their replace decorations are
+ * provided via StateField (CodeMirror forbids linebreak replaces from plugins).
  */
 
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, type EditorState } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -14,13 +17,17 @@ import {
 } from "@codemirror/view";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
+  defineLivePreviewBlockDecorationField,
   ensureLivePreviewViewportTree,
   getLivePreviewDecorationRange,
   hasSkipAncestor,
   maxVisibleParseTo,
+  mergeCoverageRanges,
   selectionTouchesRange,
   shouldRebuildLivePreviewDecorations,
   ViewportDecorationWindow,
+  type BlockDecorationBuild,
+  type CoverageRange,
 } from "./shared";
 
 class BulletWidget extends WidgetType {
@@ -157,42 +164,52 @@ export function buildLivePreviewListMarkerDecorations(
   return builder.finish();
 }
 
-export function buildLivePreviewHighlightDecorations(
-  view: EditorView,
-): DecorationSet {
-  if (isLargeEditorState(view.state)) {
-    return Decoration.none;
+function buildHighlightDecorationsInScanRanges(
+  state: EditorState,
+  scanRanges: readonly CoverageRange[],
+): BlockDecorationBuild {
+  if (isLargeEditorState(state) || scanRanges.length === 0) {
+    return { decorations: Decoration.none, coverage: [] };
   }
 
   const builder = new RangeSetBuilder<Decoration>();
-  const { state } = view;
   const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
-  const { from, to } = getLivePreviewDecorationRange(view);
-  const text = state.doc.sliceString(from, to);
-  for (const range of findHighlightRanges(text, 0, text.length)) {
-    const absFrom = from + range.from;
-    const absTo = from + range.to;
-    if (selectionTouchesRange(state, absFrom, absTo)) continue;
-    if (hasSkipAncestor(state, absFrom)) continue;
-    ranges.push({
-      from: absFrom,
-      to: absTo,
-      deco: Decoration.replace({
-        widget: new HighlightWidget(range.content),
-      }),
-    });
-  }
+  const coverage: CoverageRange[] = [];
 
-  for (const range of findCommentRanges(text, 0, text.length)) {
-    const absFrom = from + range.from;
-    const absTo = from + range.to;
-    if (selectionTouchesRange(state, absFrom, absTo)) continue;
-    if (hasSkipAncestor(state, absFrom)) continue;
-    ranges.push({
-      from: absFrom,
-      to: absTo,
-      deco: Decoration.replace({}),
-    });
+  for (const scan of mergeCoverageRanges(scanRanges)) {
+    const text = state.doc.sliceString(scan.from, scan.to);
+    for (const range of findHighlightRanges(text, 0, text.length)) {
+      const absFrom = scan.from + range.from;
+      const absTo = scan.from + range.to;
+      coverage.push({ from: absFrom, to: absTo });
+      if (selectionTouchesRange(state, absFrom, absTo)) continue;
+      if (hasSkipAncestor(state, absFrom)) continue;
+      const spansBreak = range.content.includes("\n");
+      ranges.push({
+        from: absFrom,
+        to: absTo,
+        deco: Decoration.replace({
+          widget: new HighlightWidget(range.content),
+          block: spansBreak,
+        }),
+      });
+    }
+
+    for (const range of findCommentRanges(text, 0, text.length)) {
+      const absFrom = scan.from + range.from;
+      const absTo = scan.from + range.to;
+      coverage.push({ from: absFrom, to: absTo });
+      if (selectionTouchesRange(state, absFrom, absTo)) continue;
+      if (hasSkipAncestor(state, absFrom)) continue;
+      const spansBreak = state.doc.sliceString(absFrom, absTo).includes("\n");
+      ranges.push({
+        from: absFrom,
+        to: absTo,
+        deco: Decoration.replace({
+          block: spansBreak,
+        }),
+      });
+    }
   }
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
@@ -203,7 +220,25 @@ export function buildLivePreviewHighlightDecorations(
     lastTo = range.to;
   }
 
-  return builder.finish();
+  return {
+    decorations: builder.finish(),
+    coverage: mergeCoverageRanges(coverage),
+  };
+}
+
+export function buildHighlightDecorations(
+  state: EditorState,
+): BlockDecorationBuild {
+  return buildHighlightDecorationsInScanRanges(state, [
+    { from: 0, to: state.doc.length },
+  ]);
+}
+
+/** @deprecated Prefer buildHighlightDecorations(state). */
+export function buildLivePreviewHighlightDecorations(
+  view: EditorView,
+): DecorationSet {
+  return buildHighlightDecorations(view.state).decorations;
 }
 
 export const livePreviewListMarkers = ViewPlugin.fromClass(
@@ -230,29 +265,11 @@ export const livePreviewListMarkers = ViewPlugin.fromClass(
   { decorations: (p) => p.decorations },
 );
 
-export const livePreviewHighlights = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    private readonly viewportWindow = new ViewportDecorationWindow();
-    constructor(view: EditorView) {
-      this.decorations = buildLivePreviewHighlightDecorations(view);
-      this.viewportWindow.mark(view);
-    }
-    update(update: ViewUpdate) {
-      if (
-        shouldRebuildLivePreviewDecorations(
-          update,
-          "marks",
-          this.viewportWindow,
-        )
-      ) {
-        this.decorations = buildLivePreviewHighlightDecorations(update.view);
-        this.viewportWindow.mark(update.view);
-      }
-    }
-  },
-  { decorations: (p) => p.decorations },
-);
+export const livePreviewHighlights = defineLivePreviewBlockDecorationField({
+  create: buildHighlightDecorations,
+  createInRanges: buildHighlightDecorationsInScanRanges,
+  rebuildOnContextChange: false,
+});
 
 const blockquoteLineDeco = Decoration.line({
   class: "cm-live-preview-blockquote",

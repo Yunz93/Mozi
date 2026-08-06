@@ -35,8 +35,8 @@ export function createLivePreviewContextExtension(
 
 /**
  * Stable Live Preview extensions, grouped into three pipelines:
- * 1) Viewport inline marks/widgets (hide marks, tasks, lists, highlights, links, images)
- * 2) Incremental block index (math, wiki, tables, callouts, mermaid StateFields)
+ * 1) Viewport inline marks/widgets (hide marks, tasks, lists, links, images)
+ * 2) Incremental block index (math, wiki, tables, callouts, mermaid, highlights StateFields)
  * 3) Async resource queues (image/wiki resolve plugins attached to those modules)
  *
  * Keep these in a separate compartment from context so file-tree / callback
@@ -52,7 +52,6 @@ export function createLivePreviewPluginExtensions(): Extension[] {
     livePreviewBlockquotes,
     livePreviewImages,
     livePreviewLinks,
-    livePreviewHighlights,
   ];
   const incrementalBlocks: Extension[] = [
     livePreviewMath,
@@ -60,6 +59,7 @@ export function createLivePreviewPluginExtensions(): Extension[] {
     livePreviewTables,
     livePreviewCallouts,
     livePreviewMermaid,
+    livePreviewHighlights,
   ];
   return [...viewportInline, ...incrementalBlocks];
 }
@@ -102,9 +102,11 @@ export {
 } from "./callouts";
 export { livePreviewMermaid } from "./mermaid";
 export {
+  buildHighlightDecorations,
   buildLivePreviewBlockquoteDecorations,
   buildLivePreviewHighlightDecorations,
   buildLivePreviewListMarkerDecorations,
+  findCommentRanges,
   findHighlightRanges,
   livePreviewBlockquotes,
   livePreviewHighlights,
