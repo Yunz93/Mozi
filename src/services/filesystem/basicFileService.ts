@@ -1,4 +1,4 @@
-import type { FileNode } from '../../types';
+import type { FileNode } from "../../types";
 
 interface BasicCapableFileSystem {
   createDirectory(path: string): Promise<void>;
@@ -11,15 +11,21 @@ interface BasicCapableFileSystem {
 
 type AsyncGuard = <T>(fn: () => Promise<T>, context: string) => Promise<T>;
 
-function isMarkdownFilePath(path: string): boolean {
-  return /\.(md|markdown)$/i.test(path);
+function isDocumentFilePath(path: string): boolean {
+  const normalized = path.replace(/\\/g, "/");
+  const name = normalized.split("/").pop() ?? normalized;
+  if (/\.excalidraw(?:\.json|\.md)?$/i.test(name)) return true;
+  return /\.(md|markdown)$/i.test(name);
 }
 
-function createStandaloneFileNode(path: string, getPathBasename: (path: string) => string): FileNode {
+function createStandaloneFileNode(
+  path: string,
+  getPathBasename: (path: string) => string,
+): FileNode {
   return {
     id: path,
     name: getPathBasename(path),
-    type: 'file',
+    type: "file",
     path,
     isTrash: false,
   };
@@ -28,14 +34,14 @@ function createStandaloneFileNode(path: string, getPathBasename: (path: string) 
 export async function openStandaloneFile(
   fs: BasicCapableFileSystem,
   getPathBasename: (path: string) => string,
-  withErrorHandling: AsyncGuard
+  withErrorHandling: AsyncGuard,
 ): Promise<{ file: FileNode; content: string } | null> {
   const path = await fs.openFile();
   if (!path) return null;
 
   const content = await withErrorHandling(
     () => fs.readFile(path),
-    'Failed to read file'
+    "Failed to read file",
   );
 
   return {
@@ -48,22 +54,24 @@ export async function openStandaloneFileByPath(
   fs: BasicCapableFileSystem,
   path: string,
   getPathBasename: (path: string) => string,
-  withErrorHandling: AsyncGuard
+  withErrorHandling: AsyncGuard,
 ): Promise<{ file: FileNode; content: string }> {
-  if (!isMarkdownFilePath(path)) {
-    throw new Error('Only Markdown files can be opened directly.');
+  if (!isDocumentFilePath(path)) {
+    throw new Error(
+      "Only Markdown or Excalidraw files can be opened directly.",
+    );
   }
 
   if (fs.registerAllowedPath) {
     await withErrorHandling(
       () => fs.registerAllowedPath!(path, false),
-      'Failed to authorize file'
+      "Failed to authorize file",
     );
   }
 
   const content = await withErrorHandling(
     () => fs.readFile(path),
-    'Failed to read file'
+    "Failed to read file",
   );
 
   return {
@@ -77,17 +85,17 @@ export async function createFileNode(
   fullPath: string,
   fileName: string,
   content: string,
-  withErrorHandling: AsyncGuard
+  withErrorHandling: AsyncGuard,
 ): Promise<FileNode> {
   await withErrorHandling(
     () => fs.createFile(fullPath, content),
-    'Failed to create file'
+    "Failed to create file",
   );
 
   return {
     id: fullPath,
     name: fileName,
-    type: 'file',
+    type: "file",
     path: fullPath,
     isTrash: false,
   };
@@ -97,17 +105,17 @@ export async function createFolderNode(
   fs: BasicCapableFileSystem,
   fullPath: string,
   folderName: string,
-  withErrorHandling: AsyncGuard
+  withErrorHandling: AsyncGuard,
 ): Promise<FileNode> {
   await withErrorHandling(
     () => fs.createDirectory(fullPath),
-    'Failed to create folder'
+    "Failed to create folder",
   );
 
   return {
     id: fullPath,
     name: folderName,
-    type: 'folder',
+    type: "folder",
     path: fullPath,
     children: [],
     isTrash: false,
@@ -117,16 +125,16 @@ export async function createFolderNode(
 export async function revealFileInExplorer(
   fs: BasicCapableFileSystem,
   path: string,
-  withErrorHandling: AsyncGuard
-): Promise<'revealed' | 'unsupported'> {
+  withErrorHandling: AsyncGuard,
+): Promise<"revealed" | "unsupported"> {
   if (!fs.revealInExplorer) {
-    return 'unsupported';
+    return "unsupported";
   }
 
   await withErrorHandling(
     () => fs.revealInExplorer!(path),
-    'Failed to reveal in explorer'
+    "Failed to reveal in explorer",
   );
 
-  return 'revealed';
+  return "revealed";
 }

@@ -6,6 +6,11 @@
     <link rel="icon" type="image/png" href="/src/app-icon.png" />
     <title>M記</title>
     <script>
+      // Self-host Excalidraw fonts under /fonts (see copyExcalidrawFontsPlugin).
+      // Must be set before the Excalidraw package registers font faces.
+      window.EXCALIDRAW_ASSET_PATH = "/";
+    </script>
+    <script>
       (function () {
         var root = document.documentElement;
         root.setAttribute('data-app-booting', 'true');

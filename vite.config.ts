@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
 import { cspDevPlugin } from "./src/utils/vitePlugins/cspDevPlugin";
+import { copyExcalidrawFontsPlugin } from "./src/utils/vitePlugins/copyExcalidrawFontsPlugin";
 
 export default defineConfig(({ mode }) => {
   const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
@@ -18,6 +19,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       cspDevPlugin(),
+      copyExcalidrawFontsPlugin(),
       analyzeBundle &&
         visualizer({
           filename: "dist/stats.html",

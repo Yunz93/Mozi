@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# Copied from @excalidraw/excalidraw by Vite (copyExcalidrawFontsPlugin)
+public/fonts
 coverage/
 coverage-test/
 coverage-test2/

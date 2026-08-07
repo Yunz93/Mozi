@@ -19,6 +19,7 @@ interface UseKeyboardShortcutsOptions {
   onToggleTheme?: () => void;
   onNewNote?: () => void;
   onNewFolder?: () => void;
+  onNewWindow?: () => void;
   onCloseTab?: () => void;
   onOpenKnowledgeBase?: () => void;
   onExportPdf?: () => void;
@@ -40,6 +41,7 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   "closeTab",
   "newNote",
   "newFolder",
+  "newWindow",
 ]);
 
 const SHORTCUT_ACTION_ALIASES: Partial<Record<keyof ShortcutConfig, string[]>> =
@@ -176,6 +178,7 @@ function useShortcutListener(
         toggleTheme: options.onToggleTheme,
         newNote: options.onNewNote,
         newFolder: options.onNewFolder,
+        newWindow: options.onNewWindow,
         closeTab: options.onCloseTab,
         openKnowledgeBase: options.onOpenKnowledgeBase,
         exportPdf: options.onExportPdf,
@@ -216,6 +219,7 @@ function useShortcutListener(
       options.onLocateCurrentFile,
       options.onNewFolder,
       options.onNewNote,
+      options.onNewWindow,
       options.onOpenKnowledgeBase,
       options.onOpenSettings,
       options.onSave,

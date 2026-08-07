@@ -190,5 +190,6 @@ describe("Tauri window config", () => {
 
     expect(capability.windows).toContain("main");
     expect(capability.windows).toContain("file-*");
+    expect(capability.windows).toContain("win-*");
   });
 });

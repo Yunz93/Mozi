@@ -71,6 +71,12 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KnowledgeBaseOnboarding } from "./components/KnowledgeBaseOnboarding";
 import { KnowledgeBaseLoadingScreen } from "./components/KnowledgeBaseLoadingScreen";
 import { AppDialogs } from "./components/AppDialogs";
+import {
+  getCurrentAppWindowLabel,
+  isPrimaryAppWindow,
+  openNewAppWindow,
+  openPathInNewAppWindow,
+} from "./utils/appWindow";
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
@@ -189,27 +195,70 @@ const App: React.FC = () => {
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
     useState(false);
 
-  const openFilePathForExternalOpen = useCallback(
-    async (
-      path: string,
-      options?: { silentSuccess?: boolean; suppressErrors?: boolean },
-    ) => {
-      // If a knowledge base is already open, open external files in a new window
-      // (matches macOS "double click file" expectations for library-style apps).
-      if (isTauriEnvironment() && rootFolderPath) {
-        const { invoke } = await import("@tauri-apps/api/core");
-        await invoke("open_file_in_new_window", { path });
-        return path;
+  const openRuntimeExternalPaths = useCallback(
+    async (paths: string[]) => {
+      for (const path of paths) {
+        try {
+          // Primary window with an open vault: OS / second-instance opens go to
+          // a new window. Secondary windows always open in-place.
+          if (isTauriEnvironment() && rootFolderPath) {
+            const label = await getCurrentAppWindowLabel();
+            if (isPrimaryAppWindow(label)) {
+              await openPathInNewAppWindow(path);
+              continue;
+            }
+          }
+          await openFilePath(path, {
+            silentSuccess: true,
+            suppressErrors: false,
+          });
+        } catch (error) {
+          console.warn("Failed to open runtime external file:", error);
+        }
       }
-      return openFilePath(path, options);
     },
     [openFilePath, rootFolderPath],
   );
 
   const externalFileOpen = useExternalFileOpen({
     settingsHydrated,
-    openFilePath: openFilePathForExternalOpen,
+    onRuntimePaths: openRuntimeExternalPaths,
   });
+
+  const openPathInNewWindowFromUi = useCallback(
+    async (path: string) => {
+      if (!isTauriEnvironment()) {
+        showNotification(t("notifications_newWindowDesktopOnly"), "error");
+        return;
+      }
+      try {
+        await openPathInNewAppWindow(path);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        showNotification(
+          t("notifications_openInNewWindowFailed", { error: detail }),
+          "error",
+        );
+      }
+    },
+    [showNotification, t],
+  );
+
+  const handleOpenNewWindow = useCallback(async () => {
+    if (!isTauriEnvironment()) {
+      showNotification(t("notifications_newWindowDesktopOnly"), "error");
+      return;
+    }
+    try {
+      await openNewAppWindow();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      showNotification(
+        t("notifications_openNewWindowFailed", { error: detail }),
+        "error",
+      );
+    }
+  }, [showNotification, t]);
   const {
     contentDensity,
     canShowOutlinePanel,
@@ -309,6 +358,9 @@ const App: React.FC = () => {
       onNewNote: () => setIsNewNoteDialogOpen(true),
       onNewFolder: () => {
         void fileOps.handleNewFolder(undefined, t("app_untitledFolder"));
+      },
+      onNewWindow: () => {
+        void handleOpenNewWindow();
       },
       onCloseTab: () => {
         if (!activeTabId) return;
@@ -612,47 +664,73 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!settingsHydrated) return;
     if (!externalFileOpen.hasCheckedExternalFiles) return;
-    if (externalFileOpen.hasHandledExternalFile) {
-      setHasResolvedStartupKnowledgeBase(true);
-      return;
-    }
-    if (rootFolderPath) {
-      setHasResolvedStartupKnowledgeBase(true);
-      return;
-    }
-    if (!isTauriEnvironment()) {
-      setHasResolvedStartupKnowledgeBase(true);
-      return;
-    }
-
-    const lastKnowledgeBasePath = settings.lastKnowledgeBasePath?.trim();
-    if (!lastKnowledgeBasePath) {
-      setHasResolvedStartupKnowledgeBase(true);
-      return;
-    }
+    if (hasResolvedStartupKnowledgeBase) return;
 
     let cancelled = false;
-    setIsRestoringStartupKnowledgeBase(true);
 
-    void (async () => {
-      const restoredPath = await openKnowledgeBase(lastKnowledgeBasePath, {
-        silentSuccess: true,
-        skipSampleNotes: true,
-        suppressErrors: true,
-        restoreLastOpenedFile: true,
-      });
-
-      if (cancelled) return;
-
-      if (!restoredPath) {
-        updateSettings({
-          lastKnowledgeBasePath: "",
-          lastOpenedFilePath: "",
+    const openPendingBootFiles = async () => {
+      const pending = externalFileOpen.pendingBootPaths;
+      if (pending.length === 0) return;
+      for (const path of pending) {
+        if (cancelled) return;
+        await openFilePath(path, {
+          silentSuccess: true,
+          suppressErrors: false,
         });
       }
+      if (!cancelled) {
+        externalFileOpen.clearPendingBootPaths();
+      }
+    };
 
-      setIsRestoringStartupKnowledgeBase(false);
-      setHasResolvedStartupKnowledgeBase(true);
+    void (async () => {
+      try {
+        if (rootFolderPath) {
+          await openPendingBootFiles();
+          if (!cancelled) setHasResolvedStartupKnowledgeBase(true);
+          return;
+        }
+
+        if (!isTauriEnvironment()) {
+          await openPendingBootFiles();
+          if (!cancelled) setHasResolvedStartupKnowledgeBase(true);
+          return;
+        }
+
+        const lastKnowledgeBasePath = settings.lastKnowledgeBasePath?.trim();
+        const pendingCount = externalFileOpen.pendingBootPaths.length;
+
+        if (!lastKnowledgeBasePath) {
+          await openPendingBootFiles();
+          if (!cancelled) setHasResolvedStartupKnowledgeBase(true);
+          return;
+        }
+
+        setIsRestoringStartupKnowledgeBase(true);
+        const restoredPath = await openKnowledgeBase(lastKnowledgeBasePath, {
+          silentSuccess: true,
+          skipSampleNotes: true,
+          suppressErrors: true,
+          // Prefer the boot openFile target over the previous session file.
+          restoreLastOpenedFile: pendingCount === 0,
+        });
+
+        if (cancelled) return;
+
+        if (!restoredPath) {
+          updateSettings({
+            lastKnowledgeBasePath: "",
+            lastOpenedFilePath: "",
+          });
+        }
+
+        await openPendingBootFiles();
+      } finally {
+        if (!cancelled) {
+          setIsRestoringStartupKnowledgeBase(false);
+          setHasResolvedStartupKnowledgeBase(true);
+        }
+      }
     })();
 
     return () => {
@@ -660,8 +738,11 @@ const App: React.FC = () => {
       setIsRestoringStartupKnowledgeBase(false);
     };
   }, [
+    externalFileOpen.clearPendingBootPaths,
     externalFileOpen.hasCheckedExternalFiles,
-    externalFileOpen.hasHandledExternalFile,
+    externalFileOpen.pendingBootPaths,
+    hasResolvedStartupKnowledgeBase,
+    openFilePath,
     openKnowledgeBase,
     rootFolderPath,
     settings.lastKnowledgeBasePath,
@@ -677,7 +758,6 @@ const App: React.FC = () => {
       isTauri: isTauriEnvironment(),
       lastKnowledgeBasePath: settings.lastKnowledgeBasePath ?? "",
       externalChecked: externalFileOpen.hasCheckedExternalFiles,
-      externalHandled: externalFileOpen.hasHandledExternalFile,
       isRestoringStartupKnowledgeBase,
       hasResolvedStartupKnowledgeBase,
     });
@@ -743,6 +823,9 @@ const App: React.FC = () => {
             onRename={fileOps.handleRename}
             onDelete={fileOps.handleDelete}
             onReveal={fileOps.handleRevealInExplorer}
+            onOpenInNewWindow={(path) => {
+              void openPathInNewWindowFromUi(path);
+            }}
             onMoveToTrash={fileOps.handleMoveToTrash}
             onRestoreFromTrash={fileOps.handleRestoreFromTrash}
             onDeleteForever={fileOps.handleDeleteForever}

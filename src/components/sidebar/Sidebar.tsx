@@ -33,6 +33,7 @@ import {
   highlightSearchText,
 } from "./utils";
 import { useI18n } from "../../hooks/useI18n";
+import { isSavableDocumentFile } from "../../utils/fileTypes";
 import { applyFixedMenuViewportFit } from "../../utils/fitFixedMenuToViewport";
 import { getRenameDialogDefaultValue } from "../../utils/fileTypes";
 
@@ -46,6 +47,7 @@ export interface SidebarProps {
   onRename: (file: FileNode, newName: string) => void;
   onDelete: (file: FileNode) => void;
   onReveal: (path: string) => void;
+  onOpenInNewWindow?: (path: string) => void;
   onMoveToTrash: (file: FileNode) => void;
   onRestoreFromTrash: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
@@ -228,6 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     onRename,
     onDelete: _onDelete,
     onReveal,
+    onOpenInNewWindow,
     onMoveToTrash,
     onRestoreFromTrash,
     onDeleteForever,
@@ -838,6 +841,13 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
               void handleCopyRelativePath(contextMenu.node);
             }}
             onReveal={() => onReveal(contextMenu.node.path)}
+            onOpenInNewWindow={
+              onOpenInNewWindow &&
+              contextMenu.node.type === "file" &&
+              isSavableDocumentFile(contextMenu.node.name)
+                ? () => onOpenInNewWindow(contextMenu.node.path)
+                : undefined
+            }
             onCreateFile={() =>
               openNewFileDialog(
                 contextMenu.node.type === "folder"

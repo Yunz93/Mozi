@@ -91,9 +91,25 @@ fn is_markdown_file_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+fn is_excalidraw_file_path(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    name.ends_with(".excalidraw")
+        || name.ends_with(".excalidraw.json")
+        || name.ends_with(".excalidraw.md")
+}
+
+/// Markdown notes and Excalidraw drawings can open in dedicated windows.
+fn is_document_file_path(path: &Path) -> bool {
+    is_excalidraw_file_path(path) || is_markdown_file_path(path)
+}
+
 fn normalize_opened_file_path(path: PathBuf) -> Option<String> {
     let canonical = fs::canonicalize(path).ok()?;
-    if !canonical.is_file() || !is_markdown_file_path(&canonical) {
+    if !canonical.is_file() || !is_document_file_path(&canonical) {
         return None;
     }
     Some(canonical.to_string_lossy().into_owned())
@@ -182,32 +198,23 @@ fn main_window_logical_size(app: &tauri::AppHandle) -> Option<(f64, f64)> {
     Some((size.width as f64 / scale, size.height as f64 / scale))
 }
 
-/// Must stay `async`: window-creating commands executed synchronously run on
-/// the main thread and can deadlock the whole app (all windows stop reacting
-/// to input) — see the Tauri docs on creating windows from commands.
-#[tauri::command]
-async fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    let normalized = tauri::async_runtime::spawn_blocking(move || {
-        normalize_opened_file_path(PathBuf::from(path))
-    })
-    .await
-    .map_err(|e| format!("Failed to join path normalization task: {}", e))?;
-    let Some(normalized) = normalized else {
-        return Err("Only existing Markdown files can be opened.".to_string());
-    };
-
+fn next_window_label(prefix: &str) -> Result<String, String> {
     let now_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| "Failed to read system time.".to_string())?
         .as_millis();
-    let label = format!("file-{}-{}", now_ms, uuid::Uuid::new_v4());
+    Ok(format!("{}-{}-{}", prefix, now_ms, uuid::Uuid::new_v4()))
+}
 
-    let encoded = urlencoding::encode(&normalized);
-    let url = tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into());
-    let (width, height) = resolve_file_window_size(main_window_logical_size(&app));
+fn build_secondary_window(
+    app: &tauri::AppHandle,
+    label: String,
+    url: tauri::WebviewUrl,
+) -> Result<tauri::WebviewWindow, String> {
+    let (width, height) = resolve_file_window_size(main_window_logical_size(app));
 
     // Match main window chrome. Overlay titlebar APIs are macOS-only.
-    let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
+    let mut builder = tauri::WebviewWindowBuilder::new(app, label, url)
         .title("")
         .inner_size(width, height)
         .min_inner_size(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
@@ -226,7 +233,36 @@ async fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<
 
     let _ = window.show();
     let _ = window.set_focus();
+    Ok(window)
+}
 
+/// Must stay `async`: window-creating commands executed synchronously run on
+/// the main thread and can deadlock the whole app (all windows stop reacting
+/// to input) — see the Tauri docs on creating windows from commands.
+#[tauri::command]
+async fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let normalized = tauri::async_runtime::spawn_blocking(move || {
+        normalize_opened_file_path(PathBuf::from(path))
+    })
+    .await
+    .map_err(|e| format!("Failed to join path normalization task: {}", e))?;
+    let Some(normalized) = normalized else {
+        return Err("Only existing Markdown or Excalidraw files can be opened.".to_string());
+    };
+
+    let label = next_window_label("file")?;
+    let encoded = urlencoding::encode(&normalized);
+    let url = tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into());
+    let _ = build_secondary_window(&app, label, url)?;
+    Ok(())
+}
+
+/// Open an empty secondary window (restores the last knowledge base on boot).
+#[tauri::command]
+async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
+    let label = next_window_label("win")?;
+    let url = tauri::WebviewUrl::App("index.html".into());
+    let _ = build_secondary_window(&app, label, url)?;
     Ok(())
 }
 
@@ -292,6 +328,7 @@ pub fn run() {
             ping,
             take_opened_files,
             open_file_in_new_window,
+            open_new_window,
             get_secure_settings,
             set_secure_secret,
             list_system_fonts,
