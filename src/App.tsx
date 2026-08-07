@@ -78,6 +78,7 @@ import {
   openPathInNewAppWindow,
 } from "./utils/appWindow";
 import { isStandaloneDocumentSession } from "./utils/standaloneDocumentSession";
+import { shouldRestoreVaultOnBoot } from "./utils/bootOpenFile";
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
@@ -162,6 +163,7 @@ const App: React.FC = () => {
     settings,
     settingsHydrated,
     currentFilePath,
+    rootFolderPath,
     updateSettings,
   });
   useAppUpdater({
@@ -233,7 +235,8 @@ const App: React.FC = () => {
         return;
       }
       try {
-        await openPathInNewAppWindow(path);
+        // Keep the vault tree in windows opened from the sidebar.
+        await openPathInNewAppWindow(path, { withVault: true });
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         showNotification(
@@ -719,8 +722,14 @@ const App: React.FC = () => {
 
         const lastKnowledgeBasePath = settings.lastKnowledgeBasePath?.trim();
         const pendingCount = externalFileOpen.pendingBootPaths.length;
+        const restoreVault = shouldRestoreVaultOnBoot({
+          pendingBootPathCount: pendingCount,
+          withVault: externalFileOpen.bootOpenWithVault,
+        });
 
-        if (!lastKnowledgeBasePath) {
+        // OS / system single-file launch: open only that file — do not restore
+        // the historical knowledge base (keeps "Open Knowledge Base" disabled).
+        if (!lastKnowledgeBasePath || !restoreVault) {
           await openPendingBootFiles();
           if (!cancelled) setHasResolvedStartupKnowledgeBase(true);
           return;
@@ -758,6 +767,7 @@ const App: React.FC = () => {
       setIsRestoringStartupKnowledgeBase(false);
     };
   }, [
+    externalFileOpen.bootOpenWithVault,
     externalFileOpen.clearPendingBootPaths,
     externalFileOpen.hasCheckedExternalFiles,
     externalFileOpen.pendingBootPaths,
@@ -770,23 +780,29 @@ const App: React.FC = () => {
     updateSettings,
   ]);
 
-  const { shouldShowKnowledgeBaseLoading, shouldShowKnowledgeBaseOnboarding } =
-    getStartupKnowledgeBaseGate({
-      settingsHydrated,
-      rootFolderPath,
-      filesLen: files.length,
-      isTauri: isTauriEnvironment(),
-      lastKnowledgeBasePath: settings.lastKnowledgeBasePath ?? "",
-      externalChecked: externalFileOpen.hasCheckedExternalFiles,
-      isRestoringStartupKnowledgeBase,
-      hasResolvedStartupKnowledgeBase,
-    });
+  const {
+    shouldShowKnowledgeBaseLoading,
+    shouldShowKnowledgeBaseOnboarding,
+    isStandaloneBootOpen,
+  } = getStartupKnowledgeBaseGate({
+    settingsHydrated,
+    rootFolderPath,
+    filesLen: files.length,
+    isTauri: isTauriEnvironment(),
+    lastKnowledgeBasePath: settings.lastKnowledgeBasePath ?? "",
+    externalChecked: externalFileOpen.hasCheckedExternalFiles,
+    isRestoringStartupKnowledgeBase,
+    hasResolvedStartupKnowledgeBase,
+    pendingBootPathCount: externalFileOpen.pendingBootPaths.length,
+    bootOpenWithVault: externalFileOpen.bootOpenWithVault,
+  });
 
   if (shouldShowKnowledgeBaseLoading) {
     return (
       <KnowledgeBaseLoadingScreen
         uiScaleStyle={uiScaleStyle}
         uiFontFamily={uiFontFamily}
+        standaloneDocument={isStandaloneBootOpen}
       />
     );
   }

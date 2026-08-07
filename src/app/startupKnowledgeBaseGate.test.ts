@@ -32,6 +32,7 @@ describe("getStartupKnowledgeBaseGate", () => {
 
     expect(result.shouldShowKnowledgeBaseLoading).toBe(true);
     expect(result.shouldShowKnowledgeBaseOnboarding).toBe(false);
+    expect(result.isStandaloneBootOpen).toBe(false);
   });
 
   it("shows onboarding only after startup knowledge base has been resolved and there is no root", () => {
@@ -66,7 +67,7 @@ describe("getStartupKnowledgeBaseGate", () => {
     expect(result.shouldShowKnowledgeBaseOnboarding).toBe(false);
   });
 
-  it("still attempts vault restore when a boot openFile is pending", () => {
+  it("does not restore vault loading for standalone OS boot openFile", () => {
     const result = getStartupKnowledgeBaseGate({
       settingsHydrated: true,
       rootFolderPath: null,
@@ -76,8 +77,30 @@ describe("getStartupKnowledgeBaseGate", () => {
       externalChecked: true,
       isRestoringStartupKnowledgeBase: false,
       hasResolvedStartupKnowledgeBase: false,
+      pendingBootPathCount: 1,
+      bootOpenWithVault: false,
+    });
+
+    // Still shows a brief file-open loading screen, but not vault restore.
+    expect(result.shouldShowKnowledgeBaseLoading).toBe(true);
+    expect(result.isStandaloneBootOpen).toBe(true);
+  });
+
+  it("still attempts vault restore when in-app new window requests withVault", () => {
+    const result = getStartupKnowledgeBaseGate({
+      settingsHydrated: true,
+      rootFolderPath: null,
+      filesLen: 0,
+      isTauri: true,
+      lastKnowledgeBasePath: "/kb",
+      externalChecked: true,
+      isRestoringStartupKnowledgeBase: false,
+      hasResolvedStartupKnowledgeBase: false,
+      pendingBootPathCount: 1,
+      bootOpenWithVault: true,
     });
 
     expect(result.shouldShowKnowledgeBaseLoading).toBe(true);
+    expect(result.isStandaloneBootOpen).toBe(false);
   });
 });

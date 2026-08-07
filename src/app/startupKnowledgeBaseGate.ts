@@ -1,3 +1,5 @@
+import { shouldRestoreVaultOnBoot } from "../utils/bootOpenFile";
+
 export function getStartupKnowledgeBaseGate(input: {
   settingsHydrated: boolean;
   rootFolderPath: string | null | undefined;
@@ -7,9 +9,15 @@ export function getStartupKnowledgeBaseGate(input: {
   externalChecked: boolean;
   isRestoringStartupKnowledgeBase: boolean;
   hasResolvedStartupKnowledgeBase: boolean;
+  /** Boot `?openFile=` / `take_opened_files` count. */
+  pendingBootPathCount?: number;
+  /** In-app new window sets true; OS launches leave false. */
+  bootOpenWithVault?: boolean;
 }): {
   shouldShowKnowledgeBaseLoading: boolean;
   shouldShowKnowledgeBaseOnboarding: boolean;
+  /** Standalone OS file open (loading message should not mention the vault). */
+  isStandaloneBootOpen: boolean;
 } {
   const {
     settingsHydrated,
@@ -20,9 +28,16 @@ export function getStartupKnowledgeBaseGate(input: {
     externalChecked,
     isRestoringStartupKnowledgeBase,
     hasResolvedStartupKnowledgeBase,
+    pendingBootPathCount = 0,
+    bootOpenWithVault = false,
   } = input;
 
   const hasLastKnowledgeBasePath = Boolean(lastKnowledgeBasePath.trim());
+  const restoreVaultOnBoot = shouldRestoreVaultOnBoot({
+    pendingBootPathCount,
+    withVault: bootOpenWithVault,
+  });
+  const isStandaloneBootOpen = pendingBootPathCount > 0 && !bootOpenWithVault;
 
   const shouldShowBootstrapLoading =
     isTauri && !rootFolderPath && (!settingsHydrated || !externalChecked);
@@ -32,7 +47,16 @@ export function getStartupKnowledgeBaseGate(input: {
     !rootFolderPath &&
     isTauri &&
     externalChecked &&
-    hasLastKnowledgeBasePath;
+    hasLastKnowledgeBasePath &&
+    restoreVaultOnBoot;
+
+  const shouldShowStandaloneFileLoading =
+    settingsHydrated &&
+    !rootFolderPath &&
+    isTauri &&
+    externalChecked &&
+    isStandaloneBootOpen &&
+    !hasResolvedStartupKnowledgeBase;
 
   // Important: `isRestoringStartupKnowledgeBase` flips to true in an effect.
   // Without this pre-emptive gate, the first render briefly shows the main UI
@@ -42,6 +66,7 @@ export function getStartupKnowledgeBaseGate(input: {
     !hasResolvedStartupKnowledgeBase &&
     (shouldShowBootstrapLoading ||
       shouldAttemptStartupRestore ||
+      shouldShowStandaloneFileLoading ||
       (settingsHydrated && isRestoringStartupKnowledgeBase));
 
   const shouldShowKnowledgeBaseOnboarding =
@@ -50,5 +75,9 @@ export function getStartupKnowledgeBaseGate(input: {
     filesLen === 0 &&
     hasResolvedStartupKnowledgeBase;
 
-  return { shouldShowKnowledgeBaseLoading, shouldShowKnowledgeBaseOnboarding };
+  return {
+    shouldShowKnowledgeBaseLoading,
+    shouldShowKnowledgeBaseOnboarding,
+    isStandaloneBootOpen,
+  };
 }

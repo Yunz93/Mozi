@@ -35,8 +35,20 @@ export async function openNewAppWindow(): Promise<void> {
   await invoke("open_new_window");
 }
 
+export interface OpenPathInNewAppWindowOptions {
+  /**
+   * When true, the new window restores the last knowledge base before opening
+   * the file (used by in-app "Open in New Window").
+   * OS / system launches omit this so the file opens alone.
+   */
+  withVault?: boolean;
+}
+
 /** Open a note/drawing path in a dedicated desktop window. */
-export async function openPathInNewAppWindow(path: string): Promise<void> {
+export async function openPathInNewAppWindow(
+  path: string,
+  options?: OpenPathInNewAppWindowOptions,
+): Promise<void> {
   if (!isTauriEnvironment()) {
     throw new Error("New windows are only available in the desktop app.");
   }
@@ -45,5 +57,8 @@ export async function openPathInNewAppWindow(path: string): Promise<void> {
     throw new Error("Missing file path.");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("open_file_in_new_window", { path: trimmed });
+  await invoke("open_file_in_new_window", {
+    path: trimmed,
+    withVault: options?.withVault === true,
+  });
 }

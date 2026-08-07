@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { isTauriEnvironment } from "../types/filesystem";
+import { takeBootOpenFileQuery } from "../utils/bootOpenFile";
 
 interface UseExternalFileOpenOptions {
   settingsHydrated: boolean;
@@ -12,8 +13,13 @@ interface UseExternalFileOpenOptions {
 
 export interface ExternalFileOpenState {
   hasCheckedExternalFiles: boolean;
-  /** Paths from `?openFile=` / `take_opened_files` to open after KB restore. */
+  /** Paths from `?openFile=` / `take_opened_files` to open after startup. */
   pendingBootPaths: string[];
+  /**
+   * When true, restore the last knowledge base before opening boot paths.
+   * OS / system launches leave this false; in-app "Open in New Window" sets it.
+   */
+  bootOpenWithVault: boolean;
   clearPendingBootPaths: () => void;
 }
 
@@ -29,27 +35,13 @@ function uniquePaths(paths: string[]): string[] {
   return Array.from(new Set(paths));
 }
 
-function takeFileFromQuery(): string | null {
-  try {
-    if (typeof window === "undefined") return null;
-    const url = new URL(window.location.href);
-    const openFile = url.searchParams.get("openFile")?.trim() ?? "";
-    if (!openFile) return null;
-
-    url.searchParams.delete("openFile");
-    window.history.replaceState({}, "", url.toString());
-    return openFile;
-  } catch {
-    return null;
-  }
-}
-
 export function useExternalFileOpen({
   settingsHydrated,
   onRuntimePaths,
 }: UseExternalFileOpenOptions): ExternalFileOpenState {
   const [hasCheckedExternalFiles, setHasCheckedExternalFiles] = useState(false);
   const [pendingBootPaths, setPendingBootPaths] = useState<string[]>([]);
+  const [bootOpenWithVault, setBootOpenWithVault] = useState(false);
 
   const clearPendingBootPaths = useCallback(() => {
     setPendingBootPaths([]);
@@ -79,16 +71,17 @@ export function useExternalFileOpen({
           void onRuntimePaths(paths);
         });
 
-        const queryPath = takeFileFromQuery();
+        const bootQuery = takeBootOpenFileQuery();
         const initialPaths = normalizeOpenedFilePayload(
           await invoke("take_opened_files"),
         );
-        const bootPaths = uniquePaths(
-          queryPath ? [queryPath, ...initialPaths] : initialPaths,
-        );
+        const bootPaths = uniquePaths([...bootQuery.paths, ...initialPaths]);
 
         if (!cancelled) {
           setPendingBootPaths(bootPaths);
+          // OS cold-start / second-instance paths never restore the vault.
+          // Only an explicit `withVault=1` query (in-app new window) does.
+          setBootOpenWithVault(bootQuery.withVault && bootPaths.length > 0);
         }
       } catch (error) {
         console.warn(
@@ -113,6 +106,7 @@ export function useExternalFileOpen({
   return {
     hasCheckedExternalFiles,
     pendingBootPaths,
+    bootOpenWithVault,
     clearPendingBootPaths,
   };
 }

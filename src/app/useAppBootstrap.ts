@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
-import type { AppSettings } from '../types';
-import { ensureDynamicFontFaces } from '../utils/fontSettings';
-import { hydrateSensitiveSettingsIntoStore } from '../services/secureSettingsService';
+import { useEffect } from "react";
+import type { AppSettings } from "../types";
+import { ensureDynamicFontFaces } from "../utils/fontSettings";
+import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
 
 interface UseAppBootstrapOptions {
   settings: AppSettings;
   settingsHydrated: boolean;
   currentFilePath: string | null;
+  /** Standalone OS file sessions must not overwrite vault last-opened history. */
+  rootFolderPath?: string | null;
   updateSettings: (patch: Partial<AppSettings>) => void;
 }
 
@@ -15,11 +17,12 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): void {
     settings,
     settingsHydrated,
     currentFilePath,
+    rootFolderPath,
     updateSettings,
   } = options;
 
   useEffect(() => {
-    if (!settingsHydrated || typeof window === 'undefined') return;
+    if (!settingsHydrated || typeof window === "undefined") return;
 
     let cancelled = false;
     const win = window;
@@ -27,12 +30,14 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): void {
     const warmSecureSettings = () => {
       if (cancelled) return;
       void hydrateSensitiveSettingsIntoStore().catch((error) => {
-        console.warn('Failed to warm secure settings:', error);
+        console.warn("Failed to warm secure settings:", error);
       });
     };
 
-    if ('requestIdleCallback' in win) {
-      const idleId = win.requestIdleCallback(warmSecureSettings, { timeout: 1500 });
+    if ("requestIdleCallback" in win) {
+      const idleId = win.requestIdleCallback(warmSecureSettings, {
+        timeout: 1500,
+      });
       return () => {
         cancelled = true;
         win.cancelIdleCallback(idleId);
@@ -49,19 +54,22 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): void {
   useEffect(() => {
     ensureDynamicFontFaces(settings)
       .then(() => {
-        if (typeof document !== 'undefined') {
-          document.documentElement.style.setProperty('--font-loaded-timestamp', Date.now().toString());
+        if (typeof document !== "undefined") {
+          document.documentElement.style.setProperty(
+            "--font-loaded-timestamp",
+            Date.now().toString(),
+          );
         }
       })
       .catch((error) => {
-        console.error('Failed to ensure dynamic font faces:', error);
+        console.error("Failed to ensure dynamic font faces:", error);
       });
   }, [settings]);
 
   useEffect(() => {
-    if (!settingsHydrated || typeof document === 'undefined') return;
+    if (!settingsHydrated || typeof document === "undefined") return;
     const frame = window.requestAnimationFrame(() => {
-      document.documentElement.removeAttribute('data-app-booting');
+      document.documentElement.removeAttribute("data-app-booting");
     });
 
     return () => window.cancelAnimationFrame(frame);
@@ -69,8 +77,16 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): void {
 
   useEffect(() => {
     if (!settingsHydrated || !currentFilePath) return;
+    // OS single-file launches have no vault — don't pollute lastOpenedFilePath.
+    if (!rootFolderPath?.trim()) return;
     if (settings.lastOpenedFilePath === currentFilePath) return;
 
     updateSettings({ lastOpenedFilePath: currentFilePath });
-  }, [settingsHydrated, currentFilePath, settings.lastOpenedFilePath, updateSettings]);
+  }, [
+    settingsHydrated,
+    currentFilePath,
+    rootFolderPath,
+    settings.lastOpenedFilePath,
+    updateSettings,
+  ]);
 }
