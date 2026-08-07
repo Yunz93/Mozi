@@ -5,7 +5,6 @@ export function getStartupKnowledgeBaseGate(input: {
   isTauri: boolean;
   lastKnowledgeBasePath: string;
   externalChecked: boolean;
-  externalHandled: boolean;
   isRestoringStartupKnowledgeBase: boolean;
   hasResolvedStartupKnowledgeBase: boolean;
 }): {
@@ -19,7 +18,6 @@ export function getStartupKnowledgeBaseGate(input: {
     isTauri,
     lastKnowledgeBasePath,
     externalChecked,
-    externalHandled,
     isRestoringStartupKnowledgeBase,
     hasResolvedStartupKnowledgeBase,
   } = input;
@@ -27,14 +25,13 @@ export function getStartupKnowledgeBaseGate(input: {
   const hasLastKnowledgeBasePath = Boolean(lastKnowledgeBasePath.trim());
 
   const shouldShowBootstrapLoading =
-    isTauri && !rootFolderPath && (!settingsHydrated || !externalChecked) && !externalHandled;
+    isTauri && !rootFolderPath && (!settingsHydrated || !externalChecked);
 
   const shouldAttemptStartupRestore =
     settingsHydrated &&
     !rootFolderPath &&
     isTauri &&
     externalChecked &&
-    !externalHandled &&
     hasLastKnowledgeBasePath;
 
   // Important: `isRestoringStartupKnowledgeBase` flips to true in an effect.
@@ -48,8 +45,10 @@ export function getStartupKnowledgeBaseGate(input: {
       (settingsHydrated && isRestoringStartupKnowledgeBase));
 
   const shouldShowKnowledgeBaseOnboarding =
-    settingsHydrated && !rootFolderPath && filesLen === 0 && hasResolvedStartupKnowledgeBase;
+    settingsHydrated &&
+    !rootFolderPath &&
+    filesLen === 0 &&
+    hasResolvedStartupKnowledgeBase;
 
   return { shouldShowKnowledgeBaseLoading, shouldShowKnowledgeBaseOnboarding };
 }
-

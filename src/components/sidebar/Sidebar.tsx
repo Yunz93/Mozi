@@ -33,6 +33,7 @@ import {
   highlightSearchText,
 } from "./utils";
 import { useI18n } from "../../hooks/useI18n";
+import { isSavableDocumentFile } from "../../utils/fileTypes";
 import { applyFixedMenuViewportFit } from "../../utils/fitFixedMenuToViewport";
 import { getRenameDialogDefaultValue } from "../../utils/fileTypes";
 
@@ -46,6 +47,7 @@ export interface SidebarProps {
   onRename: (file: FileNode, newName: string) => void;
   onDelete: (file: FileNode) => void;
   onReveal: (path: string) => void;
+  onOpenInNewWindow?: (path: string) => void;
   onMoveToTrash: (file: FileNode) => void;
   onRestoreFromTrash: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
@@ -55,6 +57,8 @@ export interface SidebarProps {
   currentKnowledgeBaseName?: string;
   currentKnowledgeBasePath?: string;
   onSwitchKnowledgeBase: () => void;
+  /** Disable open/switch vault when launched as a standalone OS file open. */
+  disableOpenKnowledgeBase?: boolean;
   isOpen: boolean;
   searchFocusRequestKey?: number;
   locateCurrentFileRequestKey?: number;
@@ -228,6 +232,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     onRename,
     onDelete: _onDelete,
     onReveal,
+    onOpenInNewWindow,
     onMoveToTrash,
     onRestoreFromTrash,
     onDeleteForever,
@@ -237,6 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     currentKnowledgeBaseName,
     currentKnowledgeBasePath,
     onSwitchKnowledgeBase,
+    disableOpenKnowledgeBase = false,
     isOpen,
     searchFocusRequestKey = 0,
     locateCurrentFileRequestKey = 0,
@@ -779,9 +785,20 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
             </div>
 
             <button
+              type="button"
               onClick={onSwitchKnowledgeBase}
-              className="flex items-center justify-between gap-2 w-full px-3 py-2.5 text-gray-700 dark:text-gray-200 rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/60 dark:bg-[#121923] hover:bg-white/90 dark:hover:bg-[#18212e] transition-colors"
-              title={currentKnowledgeBasePath || t("app_openKnowledgeBase")}
+              disabled={disableOpenKnowledgeBase}
+              aria-disabled={disableOpenKnowledgeBase}
+              className={`flex items-center justify-between gap-2 w-full px-3 py-2.5 rounded-xl border border-gray-200/70 dark:border-white/10 transition-colors ${
+                disableOpenKnowledgeBase
+                  ? "cursor-not-allowed bg-gray-100/70 text-gray-400 dark:bg-[#0f141c] dark:text-gray-600"
+                  : "bg-white/60 text-gray-700 hover:bg-white/90 dark:bg-[#121923] dark:text-gray-200 dark:hover:bg-[#18212e]"
+              }`}
+              title={
+                disableOpenKnowledgeBase
+                  ? t("sidebar_openKnowledgeBaseDisabledStandalone")
+                  : currentKnowledgeBasePath || t("app_openKnowledgeBase")
+              }
             >
               <div className="flex items-center gap-2 min-w-0">
                 <svg
@@ -838,6 +855,13 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
               void handleCopyRelativePath(contextMenu.node);
             }}
             onReveal={() => onReveal(contextMenu.node.path)}
+            onOpenInNewWindow={
+              onOpenInNewWindow &&
+              contextMenu.node.type === "file" &&
+              isSavableDocumentFile(contextMenu.node.name)
+                ? () => onOpenInNewWindow(contextMenu.node.path)
+                : undefined
+            }
             onCreateFile={() =>
               openNewFileDialog(
                 contextMenu.node.type === "folder"

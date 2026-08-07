@@ -211,6 +211,7 @@ export const defaultSettings: AppSettings = {
     toggleTheme: `${primaryShortcutModifier}+4`,
     newNote: `${primaryShortcutModifier}+N`,
     newFolder: `${primaryShortcutModifier}+Shift+N`,
+    newWindow: `${primaryShortcutModifier}+Shift+Alt+N`,
     closeTab: `${primaryShortcutModifier}+W`,
     openKnowledgeBase: "Cmd+Shift+K",
     exportPdf: "Cmd+Shift+H",

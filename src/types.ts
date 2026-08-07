@@ -76,6 +76,7 @@ export interface ShortcutConfig {
   toggleTheme: string;
   newNote: string;
   newFolder: string;
+  newWindow: string;
   closeTab: string;
   openKnowledgeBase: string;
   exportPdf: string;

@@ -261,6 +261,8 @@ export default {
   sidebar_noLocalFilesOpened: "No local files opened.",
   sidebar_openKnowledgeBaseHint:
     "Use the button below to open a knowledge base.",
+  sidebar_openKnowledgeBaseDisabledStandalone:
+    "This window was opened from a single file in the system file browser, so switching knowledge bases is disabled. Open a knowledge base from inside the app instead.",
   sidebar_searchingNotes: "Searching notes...",
   sidebar_noMatchingFiles: "No matching files",
   sidebar_tryAnotherKeyword: "Try another keyword.",
@@ -294,6 +296,7 @@ export default {
   context_rename: "Rename",
   context_copyRelativePath: "Copy Path",
   context_openInFinder: "Open in Finder",
+  context_openInNewWindow: "Open in New Window",
   context_delete: "Delete",
   context_emptyTrash: "Empty Trash",
 
@@ -521,6 +524,8 @@ export default {
   settings_attachmentLocationSubfolder: "In subfolder under current folder",
   settings_newFolder: "New Folder",
   settings_newFolderDesc: "Create a new folder in the knowledge base root.",
+  settings_newWindow: "New Window",
+  settings_newWindowDesc: "Open a new application window (desktop).",
   settings_closeTab: "Close File",
   settings_closeTabDesc: "Close the current file.",
   settings_aiEnhance: "AI Enhance",
@@ -952,6 +957,11 @@ export default {
   notifications_copyRelativePathFailed: "Failed to copy path.",
   notifications_deleted: "Deleted",
   notifications_fileOpenedSuccessfully: "File opened successfully",
+  notifications_newWindowDesktopOnly:
+    "New windows are only available in the desktop app",
+  notifications_openNewWindowFailed: "Could not open a new window: {{error}}",
+  notifications_openInNewWindowFailed:
+    "Could not open in a new window: {{error}}",
   notifications_sampleNotesSynced: "Sample notes synced to the knowledge base",
   notifications_knowledgeBaseOpenedSuccessfully:
     "Knowledge base opened successfully",

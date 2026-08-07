@@ -135,6 +135,13 @@ function getShortcutGroups(
           settingKey: "newFolder",
         },
         {
+          id: "newWindow",
+          label: t("settings_newWindow"),
+          description: t("settings_newWindowDesc"),
+          editable: true,
+          settingKey: "newWindow",
+        },
+        {
           id: "closeTab",
           label: t("settings_closeTab"),
           description: t("settings_closeTabDesc"),
@@ -240,6 +247,7 @@ function getShortcutLabels(
     toggleTheme: t("settings_toggleTheme"),
     newNote: t("settings_newNote"),
     newFolder: t("settings_newFolder"),
+    newWindow: t("settings_newWindow"),
     closeTab: t("settings_closeTab"),
     openKnowledgeBase: t("settings_openKnowledgeBase"),
     exportPdf: t("settings_exportPdf"),

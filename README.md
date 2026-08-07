@@ -66,6 +66,7 @@ xattr -cr /Applications/M記.app
 | `Cmd + Shift + K` / `L`                 | 打开知识库 / 定位当前文件                    |
 | `Cmd + Shift + H`                       | 导出 PDF                                     |
 | `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | 新建笔记 / 文件夹                            |
+| `Cmd/Ctrl + Shift + Alt + N`            | 新建窗口（桌面端）                           |
 | `Cmd/Ctrl + W`                          | 关闭标签                                     |
 | `Cmd/Ctrl + +` / `Cmd/Ctrl + -`         | 放大 / 缩小界面文字                          |
 | `Cmd/Ctrl + Shift + 0`                  | 重置界面文字大小                             |

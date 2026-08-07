@@ -66,6 +66,7 @@ Defaults below; the full list lives in **Settings → Shortcuts**.
 | `Cmd + Shift + K` / `L`                 | Open vault / locate current file                   |
 | `Cmd + Shift + H`                       | Export PDF                                         |
 | `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | New note / new folder                              |
+| `Cmd/Ctrl + Shift + Alt + N`            | New window (desktop)                               |
 | `Cmd/Ctrl + W`                          | Close tab                                          |
 | `Cmd/Ctrl + +` / `Cmd/Ctrl + -`         | Zoom UI text in / out                              |
 | `Cmd/Ctrl + Shift + 0`                  | Reset UI text size                                 |

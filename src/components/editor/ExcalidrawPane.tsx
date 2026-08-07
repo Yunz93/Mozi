@@ -12,6 +12,7 @@ import {
   parseExcalidrawDocument,
   serializeExcalidrawContent,
 } from "../../utils/excalidrawDocument";
+import { ensureExcalidrawAssetPath } from "../../utils/excalidrawAssetPath";
 
 interface ExcalidrawPaneProps {
   onContentChange?: (content: string) => void;
@@ -46,6 +47,7 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
 
   useEffect(() => {
     let cancelled = false;
+    ensureExcalidrawAssetPath();
     void import("@excalidraw/excalidraw")
       .then(async (mod) => {
         await import("@excalidraw/excalidraw/index.css");
