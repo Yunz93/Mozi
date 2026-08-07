@@ -1,10 +1,10 @@
 [package]
 name = "app"
 version = "1.0.5"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "M記 — local-first Markdown knowledge-base editor (markdown-press)"
+authors = ["Yunz93"]
+license = "MIT"
+repository = "https://github.com/Yunz93/markdown-press"
 edition = "2021"
 rust-version = "1.77.2"
 

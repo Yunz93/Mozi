@@ -135,6 +135,21 @@ npm run smoke:release
 - 默认字体为系统字体，内置中文字体提供仓耳今楷选项
 - 支持外部文件变更监听，如果文件在外部被修改且无未保存编辑，会自动重新加载
 
+## 测试与质量门禁
+
+```bash
+npm test                 # 全量单测
+npm run test:coverage    # 覆盖率（CI 硬门禁，见 vitest thresholds）
+npm run test:retrieval-eval  # 知识层关键词检索评测集
+```
+
+检索评测夹具位于 `docs/fixtures/retrieval-eval/`：
+
+- `vault/`：小型示例知识库（与 `src-tauri/resources/sample-notes` 对齐）
+- `queries.json`：query → 期望笔记 path；`minHitRate` 控制通过线
+
+扩展评测时优先补 query，避免改产品逻辑去「凑」命中率。
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。提交前建议至少执行：
@@ -143,6 +158,8 @@ npm run smoke:release
 npm run lint
 npm run typecheck
 npm test
+npm run test:coverage
+npm run test:retrieval-eval
 npm run build
 npm run smoke:release
 ```

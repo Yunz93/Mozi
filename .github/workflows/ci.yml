@@ -36,9 +36,11 @@ jobs:
       - name: Release workflow smoke gate
         run: npm run smoke:release-workflow
 
-      - name: Test with coverage
-        run: npx vitest run --coverage
-        continue-on-error: true
+      - name: Coverage gate
+        run: npm run test:coverage
+
+      - name: Retrieval eval gate
+        run: npm run test:retrieval-eval
 
       - name: Build
         run: npm run build

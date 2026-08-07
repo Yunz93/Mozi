@@ -17,5 +17,16 @@ export default defineConfig({
       ["src/styles/**", "happy-dom"],
       ["src/**", "node"],
     ],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "text-summary"],
+      // Floor against the current ~65% baseline; tighten as hotspots shrink.
+      thresholds: {
+        lines: 60,
+        statements: 60,
+        functions: 55,
+        branches: 50,
+      },
+    },
   },
 });

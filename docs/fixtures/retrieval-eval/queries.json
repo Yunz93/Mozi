@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "description": "Keyword retrieval regression set over sample-notes vault. Expected paths are relative to the eval vault root.",
+  "vault": "vault",
+  "mode": "keyword",
+  "topK": 5,
+  "minHitRate": 0.8,
+  "queries": [
+    {
+      "id": "q01",
+      "query": "本地文件夹当作知识库",
+      "expectAnyPath": ["00-快速上手.md"]
+    },
+    {
+      "id": "q02",
+      "query": "新建笔记 Cmd/Ctrl+N",
+      "expectAnyPath": ["00-快速上手.md"]
+    },
+    {
+      "id": "q03",
+      "query": "粘贴图片附件目录",
+      "expectAnyPath": ["00-快速上手.md"]
+    },
+    {
+      "id": "q04",
+      "query": "Markdown 粗体 斜体 删除线",
+      "expectAnyPath": ["01-Markdown-语法示例.md"]
+    },
+    {
+      "id": "q05",
+      "query": "脚注正文 fn-demo",
+      "expectAnyPath": ["01-Markdown-语法示例.md"]
+    },
+    {
+      "id": "q06",
+      "query": "相对路径 快速上手",
+      "expectAnyPath": ["01-Markdown-语法示例.md"]
+    },
+    {
+      "id": "q07",
+      "query": "Wiki 双链 显示别名",
+      "expectAnyPath": ["02-Obsidian-内联语法示例.md"]
+    },
+    {
+      "id": "q08",
+      "query": "嵌入图片 lbxx",
+      "expectAnyPath": ["02-Obsidian-内联语法示例.md"]
+    },
+    {
+      "id": "q09",
+      "query": "从 Obsidian 知识库迁过来",
+      "expectAnyPath": ["02-Obsidian-内联语法示例.md"]
+    },
+    {
+      "id": "q10",
+      "query": "代码高亮 表格 任务列表",
+      "expectAnyPath": ["01-Markdown-语法示例.md"]
+    }
+  ]
+}

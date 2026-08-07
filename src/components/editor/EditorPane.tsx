@@ -59,8 +59,6 @@ import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
 import type { WikiLinkPreviewData } from "./hooks";
 import { throttle } from "../../utils/throttle";
 import { decodeUserFacingPath } from "../../utils/pathHelpers";
-import { findOpenWikiLinkAt } from "../../utils/wikiLinkEditor";
-import { parseMarkdownDestination } from "../../utils/markdownDestination";
 import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
 import {
@@ -74,6 +72,13 @@ import {
 } from "../../utils/attachmentResolver";
 import { buildWikiPreviewMarkup } from "../../utils/wikiPreviewMarkup";
 import { countLines, LARGE_FILE_THRESHOLDS } from "../../utils/performance";
+import {
+  findLocalImageAtPos,
+  findWikiLinkNearPosition,
+  isPreviewModifierKey,
+  isPreviewModifierPressed,
+  type LocalImageMatch,
+} from "./editorPaneHelpers";
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -99,105 +104,7 @@ export interface EditorPaneHandle {
 
 const EDITOR_LINE_HEIGHT = 1.95;
 
-function isMacPlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Mac|iPhone|iPad|iPod/i.test(
-    navigator.platform || navigator.userAgent,
-  );
-}
-
-function isPreviewModifierPressed(
-  event: Pick<KeyboardEvent | MouseEvent, "metaKey" | "ctrlKey">,
-): boolean {
-  return isMacPlatform() ? event.metaKey : event.ctrlKey;
-}
-
-function isPreviewModifierKey(key: string): boolean {
-  return key === "Meta" || key === "Control";
-}
-
-// buildWikiPreviewMarkup moved to `src/utils/wikiPreviewMarkup.ts` (shared markup + style domains).
-
-function findWikiLinkNearPosition(text: string, pos: number) {
-  const offsets = [0, -1, 1, -2, 2];
-  for (const offset of offsets) {
-    // Use dynamic import to avoid circular dependency
-    const match = findOpenWikiLinkAt(text, pos + offset);
-    if (match) return match;
-  }
-  return null;
-}
-
-interface LocalImageMatch {
-  src: string;
-  alt: string;
-  from: number;
-  to: number;
-}
-
-const STANDARD_IMAGE_RE = /!\[([^\]]*)\]\((<[^>\n]+>|[^)\n]+)\)/g;
-const OBSIDIAN_IMAGE_RE = /!\[\[([^\]|]+?)(?:\|([^\]]*?))?\]\]/g;
-const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
-
-function isRemoteUrl(src: string): boolean {
-  return /^(https?:|data:|blob:)/i.test(src) || src.startsWith("//");
-}
-
-function findLocalImageAtPos(
-  lineFrom: number,
-  lineText: string,
-  pos: number,
-): LocalImageMatch | null {
-  let match: RegExpExecArray | null;
-
-  STANDARD_IMAGE_RE.lastIndex = 0;
-  while ((match = STANDARD_IMAGE_RE.exec(lineText)) !== null) {
-    const mFrom = lineFrom + match.index;
-    const mTo = mFrom + match[0].length;
-    if (pos >= mFrom && pos <= mTo) {
-      const src = parseMarkdownDestination(match[2]).path.trim();
-      if (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src)) {
-        return {
-          src,
-          alt:
-            match[1] ||
-            src
-              .split("/")
-              .pop()
-              ?.replace(/\.[^.]+$/, "") ||
-            "image",
-          from: mFrom,
-          to: mTo,
-        };
-      }
-    }
-  }
-
-  OBSIDIAN_IMAGE_RE.lastIndex = 0;
-  while ((match = OBSIDIAN_IMAGE_RE.exec(lineText)) !== null) {
-    const mFrom = lineFrom + match.index;
-    const mTo = mFrom + match[0].length;
-    if (pos >= mFrom && pos <= mTo) {
-      const src = match[1].trim();
-      if (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src)) {
-        return {
-          src,
-          alt:
-            match[2] ||
-            src
-              .split("/")
-              .pop()
-              ?.replace(/\.[^.]+$/, "") ||
-            "image",
-          from: mFrom,
-          to: mTo,
-        };
-      }
-    }
-  }
-
-  return null;
-}
+// Preview modifier / local-image / wiki caret helpers live in `editorPaneHelpers.ts`.
 
 interface HoverPreviewState {
   preview: WikiLinkPreviewData;
