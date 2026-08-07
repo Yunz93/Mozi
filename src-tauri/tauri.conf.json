@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "M記",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "identifier": "com.bxyz.markdown-press",
   "build": {
     "frontendDist": "../dist",
