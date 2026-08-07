@@ -14,6 +14,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:retrieval-eval": "vitest run src/services/vault/retrievalEval.test.ts",
     "typecheck": "tsc --noEmit",
     "release:sync-version": "node scripts/sync-version-from-tag.mjs",
     "smoke:release": "node scripts/release-smoke-check.mjs --app",

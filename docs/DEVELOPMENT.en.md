@@ -135,6 +135,21 @@ See [RELEASE_SMOKE_TEST.md](./RELEASE_SMOKE_TEST.md) for the manual checklist.
 - The default font is the system font, with 仓耳今楷 available as a bundled Chinese font option
 - External file change watch: if a file is modified outside the app with no unsaved edits, it reloads automatically
 
+## Tests and quality gates
+
+```bash
+npm test                     # full unit suite
+npm run test:coverage        # coverage floor (CI hard gate; see vitest thresholds)
+npm run test:retrieval-eval  # knowledge-layer keyword retrieval eval set
+```
+
+Retrieval fixtures live under `docs/fixtures/retrieval-eval/`:
+
+- `vault/` — small sample knowledge base (aligned with `src-tauri/resources/sample-notes`)
+- `queries.json` — query → expected note path; `minHitRate` is the pass line
+
+Prefer adding queries when extending the set; do not bend product logic just to hit the rate.
+
 ## Contributing
 
 Issues and pull requests are welcome. Before submitting changes, run:
@@ -143,6 +158,8 @@ Issues and pull requests are welcome. Before submitting changes, run:
 npm run lint
 npm run typecheck
 npm test
+npm run test:coverage
+npm run test:retrieval-eval
 npm run build
 npm run smoke:release
 ```
