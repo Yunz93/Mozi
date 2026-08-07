@@ -246,6 +246,8 @@ export default {
   sidebar_newNote: "新建笔记",
   sidebar_noLocalFilesOpened: "还没有打开本地文件。",
   sidebar_openKnowledgeBaseHint: "可以点下面的按钮先打开一套知识库。",
+  sidebar_openKnowledgeBaseDisabledStandalone:
+    "当前是通过系统打开单个文件启动的，无法切换知识库。请从应用内打开知识库。",
   sidebar_searchingNotes: "正在搜索笔记...",
   sidebar_noMatchingFiles: "没有找到匹配的文件",
   sidebar_tryAnotherKeyword: "换个关键词试试。",

@@ -261,6 +261,8 @@ export default {
   sidebar_noLocalFilesOpened: "No local files opened.",
   sidebar_openKnowledgeBaseHint:
     "Use the button below to open a knowledge base.",
+  sidebar_openKnowledgeBaseDisabledStandalone:
+    "This window was opened from a single file in the system file browser, so switching knowledge bases is disabled. Open a knowledge base from inside the app instead.",
   sidebar_searchingNotes: "Searching notes...",
   sidebar_noMatchingFiles: "No matching files",
   sidebar_tryAnotherKeyword: "Try another keyword.",

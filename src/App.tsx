@@ -77,6 +77,7 @@ import {
   openNewAppWindow,
   openPathInNewAppWindow,
 } from "./utils/appWindow";
+import { isStandaloneDocumentSession } from "./utils/standaloneDocumentSession";
 
 // Layout constants moved to src/config/layout.ts
 // Using centralized configuration for better maintainability
@@ -548,7 +549,19 @@ const App: React.FC = () => {
     setOutlineWidth(nextWidth);
   }, []);
 
+  const standaloneDocumentSession = isStandaloneDocumentSession(
+    rootFolderPath,
+    files.length,
+  );
+
   const handleSwitchKnowledgeBase = useCallback(async () => {
+    if (isStandaloneDocumentSession(rootFolderPath, files.length)) {
+      showNotification(
+        t("sidebar_openKnowledgeBaseDisabledStandalone"),
+        "error",
+      );
+      return;
+    }
     const state = useAppStore.getState();
     const tabId = state.activeTabId;
     if (tabId && state.hasUnsavedChanges(tabId)) {
@@ -562,7 +575,14 @@ const App: React.FC = () => {
       }
     }
     await openDirectory();
-  }, [openDirectory, forceSave, showNotification, t]);
+  }, [
+    files.length,
+    forceSave,
+    openDirectory,
+    rootFolderPath,
+    showNotification,
+    t,
+  ]);
 
   const handleOpenPublishDialog = useCallback(() => {
     if (isNonMarkdownWorkspaceFile) {
@@ -835,6 +855,7 @@ const App: React.FC = () => {
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
+            disableOpenKnowledgeBase={standaloneDocumentSession}
             isOpen={isSidebarOpen}
             searchFocusRequestKey={sidebarSearchRequestKey}
             locateCurrentFileRequestKey={sidebarLocateRequestKey}
