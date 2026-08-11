@@ -15,7 +15,7 @@ const appBundlePath = join(
   "release",
   "bundle",
   "macos",
-  "M記.app",
+  "墨记.app",
 );
 
 const shouldBuildApp = process.argv.includes("--app");
@@ -139,7 +139,7 @@ function assertReleaseWorkflowConfig() {
   }
 
   const releaseAssetPattern =
-    "assetNamePattern: MarkdownPress_[version]_[arch][setup][ext]";
+    "assetNamePattern: Moji_[version]_[arch][setup][ext]";
   const patternCount = workflow.split(releaseAssetPattern).length - 1;
 
   if (patternCount !== 2) {

@@ -10,9 +10,9 @@ describe("install-macos.sh", () => {
 
   it("targets the latest GitHub Release dmg for the current Mac architecture", () => {
     expect(script).toContain('readonly REPO="Yunz93/markdown-press"');
-    expect(script).toContain('readonly APP_NAME="M記"');
+    expect(script).toContain('readonly APP_NAME="墨记"');
     expect(script).toContain("releases/latest");
-    expect(script).toContain("MarkdownPress_");
+    expect(script).toContain("Moji_");
     expect(script).not.toContain("api.github.com");
     expect(script).toContain('ASSET_ARCH="aarch64"');
     expect(script).toContain('ASSET_ARCH="x64"');

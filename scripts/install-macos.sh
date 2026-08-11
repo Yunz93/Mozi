@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly REPO="Yunz93/markdown-press"
-readonly APP_NAME="M記"
+readonly APP_NAME="墨记"
 readonly INSTALL_DIR="/Applications"
 readonly APP_PATH="${INSTALL_DIR}/${APP_NAME}.app"
 readonly RAW_SCRIPT_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/install-macos.sh"
@@ -70,7 +70,7 @@ normalize_release_tag() {
 build_asset_url() {
   local tag="$1"
   local version="${tag#v}"
-  printf 'https://github.com/%s/releases/download/%s/MarkdownPress_%s_%s.dmg' \
+  printf 'https://github.com/%s/releases/download/%s/Moji_%s_%s.dmg' \
     "${REPO}" "${tag}" "${version}" "${ASSET_ARCH}"
 }
 

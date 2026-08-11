@@ -11,7 +11,7 @@ is_publish: false
 
 # Obsidian 内联语法示例
 
-M記 支持常用的 Wiki 双链与嵌入写法，方便从 Obsidian 知识库迁过来继续写。入门见 [[00-快速上手]]，通用 Markdown 见 [[01-Markdown-语法示例]]。
+墨记 支持常用的 Wiki 双链与嵌入写法，方便从 Obsidian 知识库迁过来继续写。入门见 [[00-快速上手]]，通用 Markdown 见 [[01-Markdown-语法示例]]。
 
 ## Wiki 链接
 
