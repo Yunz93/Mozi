@@ -4,6 +4,7 @@ import { focusEditorRangeByOffset } from "../../utils/editorSelectionBridge";
 import { useI18n } from "../../hooks/useI18n";
 import { isLargeFile } from "../../utils/performance";
 import { ViewMode } from "../../types";
+import { isImeComposingEvent, isPlainEnterKey } from "../../utils/imeKeyboard";
 
 interface ContentSearchProps {
   onClose: () => void;
@@ -196,9 +197,10 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (isImeComposingEvent(e)) return;
       if (e.key === "Escape") {
         onClose();
-      } else if (e.key === "Enter") {
+      } else if (isPlainEnterKey(e)) {
         if (e.shiftKey) {
           goToPrevMatch();
         } else {

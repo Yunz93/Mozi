@@ -18,6 +18,7 @@ import {
 } from "../../services/vault/askVaultService";
 import { hydrateSensitiveSettingsIntoStore } from "../../services/secureSettingsService";
 import { localizeKnownError } from "../../utils/i18n";
+import { isImeComposingEvent } from "../../utils/imeKeyboard";
 import { renderMarkdown } from "../../utils/markdown";
 import {
   normalizeAskVaultCitationMarkers,
@@ -740,6 +741,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
               placeholder={t("askVault_placeholder")}
               rows={3}
               onKeyDown={(event) => {
+                if (isImeComposingEvent(event)) return;
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                   event.preventDefault();
                   void handleAsk();

@@ -9,6 +9,7 @@ import {
   uniqueFormattedShortcuts,
 } from "../../../utils/shortcuts";
 import { setShortcutCaptureActive } from "../../../utils/shortcutCaptureGate";
+import { isImeComposingEvent } from "../../../utils/imeKeyboard";
 import type { SettingsTabProps } from "../types";
 
 type ShortcutGroupId = "workspace" | "editing" | "search" | "panels";
@@ -293,6 +294,9 @@ export const ShortcutsTab: React.FC<SettingsTabProps> = ({
     const capturedSettingKey = recordingKey;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // Ignore IME composition keys so confirming candidates is not captured.
+      if (isImeComposingEvent(event)) return;
+
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
