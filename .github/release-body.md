@@ -19,13 +19,13 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/
 已配置 Apple 开发者证书与公证凭据的 Release 也可直接拖入 Applications 打开。若仍提示无法验证开发者，请执行：
 
 ```
-xattr -cr /Applications/M記.app
+xattr -cr /Applications/墨知.app
 ```
 
 > 若应用仍在 Downloads 文件夹，请改用：
 >
 > ```
-> xattr -cr ~/Downloads/M記.app
+> xattr -cr ~/Downloads/墨知.app
 > ```
 
 ### Windows 安装说明

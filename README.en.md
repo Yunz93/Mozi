@@ -1,4 +1,6 @@
-# M記
+# Mozi
+
+Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
@@ -6,7 +8,7 @@ A local-first Markdown editor for knowledge-base writing: tight editor–preview
 
 > Goal: a focused Markdown writing flow—lighter than Obsidian, smoother day-to-day than Typora for many writers.
 
-![M記 preview](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M%20%E8%A8%98-1776170252301.png)
+![Mozi preview](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M%20%E8%A8%98-1776170252301.png)
 
 ## Download
 
@@ -26,13 +28,13 @@ Pin a release (optional):
 RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
-Signed and notarized GitHub Releases should also open normally after you drag **M記.app** into Applications. If Gatekeeper still blocks the app, run:
+Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:
 
 ```bash
-xattr -cr /Applications/M記.app
+xattr -cr /Applications/墨知.app
 ```
 
-If it is still in Downloads, use `~/Downloads/M記.app` instead.
+If it is still in Downloads, use `~/Downloads/墨知.app` instead.
 
 See [Development guide — macOS signing & notarization](./docs/DEVELOPMENT.en.md#macos-signing--notarization) for the CI secret setup.
 
@@ -95,7 +97,7 @@ Same settings tab: **App ID** and **App Secret** (App Secret stays in secure loc
 
 ## Acknowledgements
 
-M記 is built on many excellent open-source projects (in no particular order). The tables below list the main runtime dependencies used by the product; full versions and transitive deps live in `package.json` / `package-lock.json` and `src-tauri/Cargo.toml` / `Cargo.lock`.
+Mozi is built on many excellent open-source projects (in no particular order). The tables below list the main runtime dependencies used by the product; full versions and transitive deps live in `package.json` / `package-lock.json` and `src-tauri/Cargo.toml` / `Cargo.lock`.
 
 ### Desktop & UI
 
@@ -150,6 +152,6 @@ M記 is built on many excellent open-source projects (in no particular order). T
 | [Google Gen AI SDK](https://github.com/googleapis/js-genai) (`@google/genai`)                             | Optional Gemini client                       | Apache-2.0        |
 | [Google Gemini](https://ai.google.dev/) / [OpenAI](https://openai.com/)-compatible APIs                   | Optional cloud or local (e.g. Ollama) models | Third-party terms |
 
-On the Rust side, M記 also uses [serde](https://serde.rs/), [reqwest](https://github.com/seanmonstar/reqwest), [uuid](https://github.com/uuid-rs/uuid), and crypto-related crates (such as `chacha20poly1305`, `hmac`, `sha2`) for secure local storage and desktop networking.
+On the Rust side, Mozi also uses [serde](https://serde.rs/), [reqwest](https://github.com/seanmonstar/reqwest), [uuid](https://github.com/uuid-rs/uuid), and crypto-related crates (such as `chacha20poly1305`, `hmac`, `sha2`) for secure local storage and desktop networking.
 
 If you spot a missing credit, please open an issue or PR.

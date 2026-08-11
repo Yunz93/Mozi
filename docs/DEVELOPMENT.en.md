@@ -1,4 +1,4 @@
-# M記 Development Guide
+# Mozi Development Guide
 
 [中文](./DEVELOPMENT.md) · [Back to README](../README.en.md)
 

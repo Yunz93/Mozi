@@ -1,7 +1,7 @@
-import type { AppLanguage } from '../types';
+import type { AppLanguage } from "../types";
 
 export const DEFAULT_AI_SYSTEM_PROMPT = `
-你是 Markdown Press 内置的 AI 助手。
+你是 墨知 内置的 AI 助手。
 
 严格遵循当前任务给出的用户指令。
 除非任务明确要求修改，否则保持 Markdown 结构、代码块、链接和 frontmatter 不变。
@@ -15,7 +15,7 @@ export const DEFAULT_AI_SYSTEM_PROMPT = `
 `.trim();
 
 export const DEFAULT_AI_SYSTEM_PROMPT_EN = `
-You are the built-in AI assistant for Markdown Press.
+You are the built-in AI assistant for Mozi.
 
 Follow the task-specific user instructions exactly.
 Keep Markdown structure, code blocks, links, and frontmatter intact unless the task explicitly requires changing them.
@@ -80,37 +80,45 @@ Requirements:
 15. Keep the scope tight. Generate an objective wiki entry for the selected entity itself and avoid speculative or tangential expansion.
 `.trim();
 
-type PromptResolverInput = string | {
-  language?: AppLanguage;
-  zhCN?: string;
-  en?: string;
-  legacy?: string;
-};
+type PromptResolverInput =
+  | string
+  | {
+      language?: AppLanguage;
+      zhCN?: string;
+      en?: string;
+      legacy?: string;
+    };
 
 export function resolveAISystemPrompt(input?: PromptResolverInput): string {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     return input.trim() || DEFAULT_AI_SYSTEM_PROMPT;
   }
 
-  const language = input?.language === 'en' ? 'en' : 'zh-CN';
-  const languagePrompt = language === 'en' ? input?.en?.trim() : input?.zhCN?.trim();
+  const language = input?.language === "en" ? "en" : "zh-CN";
+  const languagePrompt =
+    language === "en" ? input?.en?.trim() : input?.zhCN?.trim();
   const legacyPrompt = input?.legacy?.trim();
 
   if (languagePrompt) return languagePrompt;
   if (legacyPrompt) return legacyPrompt;
-  return language === 'en' ? DEFAULT_AI_SYSTEM_PROMPT_EN : DEFAULT_AI_SYSTEM_PROMPT;
+  return language === "en"
+    ? DEFAULT_AI_SYSTEM_PROMPT_EN
+    : DEFAULT_AI_SYSTEM_PROMPT;
 }
 
 export function resolveWikiPromptTemplate(input?: PromptResolverInput): string {
-  if (typeof input === 'string') {
+  if (typeof input === "string") {
     return input.trim() || DEFAULT_WIKI_PROMPT_TEMPLATE;
   }
 
-  const language = input?.language === 'en' ? 'en' : 'zh-CN';
-  const languagePrompt = language === 'en' ? input?.en?.trim() : input?.zhCN?.trim();
+  const language = input?.language === "en" ? "en" : "zh-CN";
+  const languagePrompt =
+    language === "en" ? input?.en?.trim() : input?.zhCN?.trim();
   const legacyPrompt = input?.legacy?.trim();
 
   if (languagePrompt) return languagePrompt;
   if (legacyPrompt) return legacyPrompt;
-  return language === 'en' ? DEFAULT_WIKI_PROMPT_TEMPLATE_EN : DEFAULT_WIKI_PROMPT_TEMPLATE;
+  return language === "en"
+    ? DEFAULT_WIKI_PROMPT_TEMPLATE_EN
+    : DEFAULT_WIKI_PROMPT_TEMPLATE;
 }
