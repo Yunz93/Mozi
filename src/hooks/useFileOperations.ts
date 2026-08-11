@@ -46,6 +46,9 @@ import {
 import { packVectorSnapshot } from "../services/vault/vectorStore";
 import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
 
+/** Prevent overlapping create calls for the same destination path. */
+const createDocumentInFlight = new Set<string>();
+
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
   const normalizedParent = parentPath.replace(/\\/g, "/");
@@ -286,24 +289,33 @@ export function useFileOperations() {
         explicitFolderPath: parentFolder?.path,
         newNoteFolder: settings.newNoteFolder,
       });
-
-      const flushed = await flushActiveDocumentIfDirty();
-      if (!flushed) {
-        showNotification(
-          t(settings.language, "tab_closeBlockedUnsaved"),
-          "error",
-        );
+      const createKey = `${destinationFolderPath ?? storeState.rootFolderPath ?? ""}/${finalFileName}`;
+      if (createDocumentInFlight.has(createKey)) {
         return;
       }
+      createDocumentInFlight.add(createKey);
 
-      const newFile = await createFile(
-        finalFileName,
-        initialContent,
-        destinationFolderPath,
-      );
-      if (newFile) {
-        addTab(newFile.id, initialContent);
-        setCurrentFilePath(newFile.path);
+      try {
+        const flushed = await flushActiveDocumentIfDirty();
+        if (!flushed) {
+          showNotification(
+            t(settings.language, "tab_closeBlockedUnsaved"),
+            "error",
+          );
+          return;
+        }
+
+        const newFile = await createFile(
+          finalFileName,
+          initialContent,
+          destinationFolderPath,
+        );
+        if (newFile) {
+          addTab(newFile.id, initialContent);
+          setCurrentFilePath(newFile.path);
+        }
+      } finally {
+        createDocumentInFlight.delete(createKey);
       }
     },
     [
@@ -333,24 +345,33 @@ export function useFileOperations() {
         explicitFolderPath: parentFolder?.path,
         newNoteFolder: settings.newNoteFolder,
       });
-
-      const flushed = await flushActiveDocumentIfDirty();
-      if (!flushed) {
-        showNotification(
-          t(settings.language, "tab_closeBlockedUnsaved"),
-          "error",
-        );
+      const createKey = `${destinationFolderPath ?? storeState.rootFolderPath ?? ""}/${finalFileName}`;
+      if (createDocumentInFlight.has(createKey)) {
         return;
       }
+      createDocumentInFlight.add(createKey);
 
-      const newFile = await createFile(
-        finalFileName,
-        initialContent,
-        destinationFolderPath,
-      );
-      if (newFile) {
-        addTab(newFile.id, initialContent);
-        setCurrentFilePath(newFile.path);
+      try {
+        const flushed = await flushActiveDocumentIfDirty();
+        if (!flushed) {
+          showNotification(
+            t(settings.language, "tab_closeBlockedUnsaved"),
+            "error",
+          );
+          return;
+        }
+
+        const newFile = await createFile(
+          finalFileName,
+          initialContent,
+          destinationFolderPath,
+        );
+        if (newFile) {
+          addTab(newFile.id, initialContent);
+          setCurrentFilePath(newFile.path);
+        }
+      } finally {
+        createDocumentInFlight.delete(createKey);
       }
     },
     [

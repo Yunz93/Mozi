@@ -263,7 +263,9 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const resolvedSubmitText = submitText ?? t("common_confirm");
   const resolvedCancelText = cancelText ?? t("common_cancel");
   const [value, setValue] = React.useState(defaultValue);
+  const [hasSubmitted, setHasSubmitted] = React.useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittedRef = useRef(false);
   const {
     isComposing: isImeComposing,
     onCompositionStart,
@@ -274,6 +276,8 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   useEffect(() => {
     if (isOpen) {
       setValue(defaultValue);
+      setHasSubmitted(false);
+      submittedRef.current = false;
       // Focus input after dialog opens
       requestAnimationFrame(() => {
         inputRef.current?.focus();
@@ -283,6 +287,9 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   }, [isOpen, defaultValue]);
 
   const handleSubmit = useCallback(() => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setHasSubmitted(true);
     onSubmit(value);
     onClose();
   }, [value, onSubmit, onClose]);
@@ -339,7 +346,8 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         </button>
         <button
           onClick={handleSubmit}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+          disabled={hasSubmitted}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-black dark:bg-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-60 disabled:pointer-events-none"
         >
           <svg
             className="w-4 h-4"
