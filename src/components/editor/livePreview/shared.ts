@@ -15,6 +15,7 @@ import {
 } from "@codemirror/view";
 import { WIKI_LINK_REGEX } from "../../../utils/markdownLinkUtils";
 import { LRUCache } from "../../../utils/performance";
+import { isWithinFrontmatterBlock } from "../behavior/core";
 import { livePreviewContextFacet } from "./context";
 import type { LivePreviewContext } from "./context";
 
@@ -41,7 +42,15 @@ export function selectionTouchesRange(
   return false;
 }
 
+/**
+ * Skip Live Preview widgets inside constructs that must stay as source text.
+ * Also protects YAML frontmatter (including fence lines) so `---` is not
+ * replaced by HR widgets and list markers inside tags stay plain YAML.
+ */
 export function hasSkipAncestor(state: EditorState, pos: number): boolean {
+  if (isWithinFrontmatterBlock(state, pos)) {
+    return true;
+  }
   let node = syntaxTree(state).resolveInner(pos, 1);
   for (let depth = 0; depth < 12 && node; depth += 1) {
     if (SKIP_ANCESTOR_NODES.has(node.name)) return true;

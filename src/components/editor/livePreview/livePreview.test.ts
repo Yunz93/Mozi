@@ -14,9 +14,14 @@ import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
 import { buildLivePreviewWikiDecorations, livePreviewWiki } from "./wiki";
 import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
-import { findCalloutRanges, livePreviewCallouts } from "./callouts";
+import {
+  buildCalloutDecorations,
+  findCalloutRanges,
+  livePreviewCallouts,
+} from "./callouts";
 import {
   buildLivePreviewBlockquoteDecorations,
+  buildLivePreviewListMarkerDecorations,
   findHighlightRanges,
   findCommentRanges,
   livePreviewBlockquotes,
@@ -548,6 +553,74 @@ describe("live preview hide formatting", () => {
       if (value.spec.widget) widgetCount += 1;
     });
     expect(widgetCount).toBe(1);
+  });
+
+  it("does not replace frontmatter fences with HR widgets", () => {
+    const doc = [
+      "---",
+      "category:",
+      "tags:",
+      "status: draft",
+      "---",
+      "",
+      "body",
+      "",
+      "---",
+      "",
+      "away",
+    ].join("\n");
+    const view = mount(doc, doc.length - 1, [livePreviewCallouts]);
+    const { decorations } = buildCalloutDecorations(view.state);
+    const replaced: Array<{ from: number; to: number; text: string }> = [];
+    decorations.between(0, view.state.doc.length, (from, to, value) => {
+      if (value.spec.widget) {
+        replaced.push({
+          from,
+          to,
+          text: view.state.doc.sliceString(from, to).trim(),
+        });
+      }
+    });
+    // Opening/closing YAML fences must stay as source text.
+    expect(replaced.some((item) => item.from === 0)).toBe(false);
+    expect(
+      replaced.some((item) => {
+        const line = view.state.doc.lineAt(item.from);
+        return (
+          line.number === 5 && line.text.trim() === "---" && item.text === "---"
+        );
+      }),
+    ).toBe(false);
+    // A thematic break in the body should still become an HR widget.
+    expect(replaced.some((item) => item.text === "---")).toBe(true);
+    expect(view.dom.querySelectorAll(".cm-live-preview-hr").length).toBe(1);
+  });
+
+  it("does not turn frontmatter YAML list items into live bullets", () => {
+    const doc = [
+      "---",
+      "tags:",
+      "- alpha",
+      "- beta",
+      "status: draft",
+      "---",
+      "",
+      "- body item",
+      "",
+      "away",
+    ].join("\n");
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewListMarkerDecorations(view);
+    const widgetRanges: Array<[number, number]> = [];
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      if (value.spec.widget) widgetRanges.push([from, to]);
+    });
+    expect(widgetRanges).toHaveLength(1);
+    expect(
+      view.state.doc.sliceString(widgetRanges[0][0], widgetRanges[0][1]),
+    ).toMatch(/^-\s?$/);
+    const bodyLine = view.state.doc.line(8);
+    expect(widgetRanges[0][0]).toBe(bodyLine.from);
   });
 });
 
