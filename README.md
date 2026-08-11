@@ -1,6 +1,6 @@
-# 墨记
+# 墨知
 
-英文名：**Moji**。
+英文名：**Mozi**。
 
 [English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
 
@@ -8,7 +8,7 @@
 
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
-![墨记-1776329034274](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M%20%E8%A8%98-1776170252301.png)
+![墨知-1776329034274](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M%20%E8%A8%98-1776170252301.png)
 
 ## 下载安装
 
@@ -28,13 +28,13 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/
 RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
 ```
 
-已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨记.app` 放入「应用程序」后执行：
+已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
 
 ```bash
-xattr -cr /Applications/墨记.app
+xattr -cr /Applications/墨知.app
 ```
 
-若仍在「下载」中，把路径换成 `~/Downloads/墨记.app`。
+若仍在「下载」中，把路径换成 `~/Downloads/墨知.app`。
 
 证书与公证配置见 [开发文档 - macOS 签名公证](./docs/DEVELOPMENT.md#macos-签名与公证)。
 
@@ -97,7 +97,7 @@ xattr -cr /Applications/墨记.app
 
 ## 致谢
 
-墨记 建立在大量优秀开源项目之上（排名不分先后）。下列为产品运行时直接依赖的主要组件；完整版本与传递依赖见仓库中的 `package.json` / `package-lock.json` 与 `src-tauri/Cargo.toml` / `Cargo.lock`。
+墨知 建立在大量优秀开源项目之上（排名不分先后）。下列为产品运行时直接依赖的主要组件；完整版本与传递依赖见仓库中的 `package.json` / `package-lock.json` 与 `src-tauri/Cargo.toml` / `Cargo.lock`。
 
 ### 桌面与界面
 

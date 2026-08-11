@@ -1,7 +1,7 @@
 [package]
 name = "app"
 version = "1.0.8"
-description = "墨记 / Moji — local-first Markdown knowledge-base editor (markdown-press)"
+description = "墨知 / Mozi — local-first Markdown knowledge-base editor (markdown-press)"
 authors = ["Yunz93"]
 license = "MIT"
 repository = "https://github.com/Yunz93/markdown-press"

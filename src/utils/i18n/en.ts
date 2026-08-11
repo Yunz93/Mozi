@@ -441,7 +441,7 @@ export default {
     "Restore the default UI text size (Cmd/Ctrl+Shift+0; Cmd/Ctrl+0 still opens Settings).",
   settings_uiFontCurrentOption: "Current custom stack",
   settings_uiFontPreview:
-    "UI font preview: Moji settings, sidebar, and toolbar",
+    "UI font preview: Mozi settings, sidebar, and toolbar",
   settings_editorFont: "Editor font",
   settings_editorFontDesc:
     "Controls editor body typography without splitting Chinese and English.",
@@ -455,7 +455,7 @@ export default {
   settings_codeFont: "Code font",
   settings_codeFontDesc:
     "Controls code blocks in the editor, preview, and exported PDF.",
-  settings_codeFontPreview: 'const note = "Moji";',
+  settings_codeFontPreview: 'const note = "Mozi";',
 
   settings_workspace: "Workspace",
   settings_workspaceDesc: "Core app actions and view switching.",
@@ -635,13 +635,13 @@ export default {
   settings_englishFontDefaultOption: "Default English font (system)",
   settings_englishFontBundledOption: "Bundled English font (Tsanger JinKai)",
   settings_englishFontDesc: "Used for Latin letters, numbers, and symbols.",
-  settings_englishFontPreview: "English font preview: Moji toolbar and sidebar",
+  settings_englishFontPreview: "English font preview: Mozi toolbar and sidebar",
   settings_chineseFont: "Chinese font",
   settings_chineseFontDefaultOption: "Default Chinese font (system)",
   settings_chineseFontBundledOption: "Bundled Chinese font (Tsanger JinKai)",
   settings_chineseFontDesc:
     "Defaults to the system Chinese font, with the bundled Tsanger JinKai available as an option.",
-  settings_chineseFontPreview: "Chinese font preview: Moji toolbar and sidebar",
+  settings_chineseFontPreview: "Chinese font preview: Mozi toolbar and sidebar",
   settings_wordWrap: "Word wrap",
   settings_attachments: "Attachments",
   settings_resourceFolder: "Resource folder",

@@ -114,7 +114,7 @@ jobs:
           releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
           prerelease: false
-          assetNamePattern: Moji_[version]_[arch][setup][ext]
+          assetNamePattern: Mozi_[version]_[arch][setup][ext]
           args: --bundles app,dmg
 
   build-windows:
@@ -200,5 +200,5 @@ jobs:
           releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
           prerelease: false
-          assetNamePattern: Moji_[version]_[arch][setup][ext]
+          assetNamePattern: Mozi_[version]_[arch][setup][ext]
           args: --bundles nsis

@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "墨记",
+  "productName": "墨知",
   "version": "1.0.8",
   "identifier": "com.bxyz.markdown-press",
   "build": {

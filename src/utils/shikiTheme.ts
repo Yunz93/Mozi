@@ -32,7 +32,7 @@ function toDisplayName(
   preset: MarkdownStylePreset,
   themeMode: ThemeMode,
 ): string {
-  return `Moji ${preset.charAt(0).toUpperCase()}${preset.slice(1)} ${themeMode.charAt(0).toUpperCase()}${themeMode.slice(1)}`;
+  return `Mozi ${preset.charAt(0).toUpperCase()}${preset.slice(1)} ${themeMode.charAt(0).toUpperCase()}${themeMode.slice(1)}`;
 }
 
 function createTheme(

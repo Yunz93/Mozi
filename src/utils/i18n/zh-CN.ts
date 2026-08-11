@@ -417,7 +417,7 @@ export default {
   settings_zoomUiResetDesc:
     "将界面文字大小恢复为默认值（Cmd/Ctrl+Shift+0；Cmd/Ctrl+0 仍用于打开设置）。",
   settings_uiFontCurrentOption: "当前自定义配置",
-  settings_uiFontPreview: "界面字体预览：墨记 设置、侧边栏与工具栏",
+  settings_uiFontPreview: "界面字体预览：墨知 设置、侧边栏与工具栏",
   settings_editorFont: "编辑区字体",
   settings_editorFontDesc: "控制编辑区正文排版，不再区分中英文。",
   settings_editorFontSize: "编辑区字号",
@@ -428,7 +428,7 @@ export default {
   settings_codeFont: "代码字体",
   settings_codeFontDesc:
     "控制编辑区代码块、预览区代码块以及导出 PDF 的代码字体。",
-  settings_codeFontPreview: 'const note = "墨记";',
+  settings_codeFontPreview: 'const note = "墨知";',
 
   settings_workspace: "工作区",
   settings_workspaceDesc: "应用的常用操作和视图切换。",
@@ -595,12 +595,12 @@ export default {
   settings_englishFontDefaultOption: "默认英文字体（系统字体）",
   settings_englishFontBundledOption: "内置英文字体（仓耳今楷）",
   settings_englishFontDesc: "主要用于拉丁字母、数字和符号。",
-  settings_englishFontPreview: "English font preview: Moji toolbar and sidebar",
+  settings_englishFontPreview: "English font preview: Mozi toolbar and sidebar",
   settings_chineseFont: "中文字体",
   settings_chineseFontDefaultOption: "默认中文字体（系统字体）",
   settings_chineseFontBundledOption: "内置中文字体（仓耳今楷）",
   settings_chineseFontDesc: "默认使用系统中文字体，也可切换到内置的仓耳今楷。",
-  settings_chineseFontPreview: "中文字体预览：墨记 工具栏与侧边栏",
+  settings_chineseFontPreview: "中文字体预览：墨知 工具栏与侧边栏",
   settings_attachments: "附件",
   settings_resourceFolder: "资源文件夹",
   settings_resourceFolderPlaceholder: "resources（资源文件夹名称）",

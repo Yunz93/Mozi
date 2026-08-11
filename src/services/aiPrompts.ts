@@ -1,7 +1,7 @@
 import type { AppLanguage } from "../types";
 
 export const DEFAULT_AI_SYSTEM_PROMPT = `
-你是 墨记 内置的 AI 助手。
+你是 墨知 内置的 AI 助手。
 
 严格遵循当前任务给出的用户指令。
 除非任务明确要求修改，否则保持 Markdown 结构、代码块、链接和 frontmatter 不变。
@@ -15,7 +15,7 @@ export const DEFAULT_AI_SYSTEM_PROMPT = `
 `.trim();
 
 export const DEFAULT_AI_SYSTEM_PROMPT_EN = `
-You are the built-in AI assistant for Moji.
+You are the built-in AI assistant for Mozi.
 
 Follow the task-specific user instructions exactly.
 Keep Markdown structure, code blocks, links, and frontmatter intact unless the task explicitly requires changing them.
