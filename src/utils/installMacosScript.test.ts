@@ -13,6 +13,9 @@ describe("install-macos.sh", () => {
     expect(script).toContain('readonly APP_NAME="墨知"');
     expect(script).toContain("releases/latest");
     expect(script).toContain("Mozi_");
+    expect(script).toContain('DMG_PATH="${TMP_DIR}/Mozi.dmg"');
+    expect(script).toContain("User-Agent: Mozi-installer");
+    expect(script).not.toContain("markdown-press");
     expect(script).not.toContain("api.github.com");
     expect(script).toContain('ASSET_ARCH="aarch64"');
     expect(script).toContain('ASSET_ARCH="x64"');
