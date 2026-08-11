@@ -267,6 +267,18 @@ export function isInsideFrontmatter(
   return lineNumber > 1 && lineNumber < range.closingLineNumber;
 }
 
+/** True for any position in the YAML block, including the opening/closing `---` lines. */
+export function isWithinFrontmatterBlock(
+  state: EditorState,
+  position: number,
+): boolean {
+  const range = getFrontmatterRange(state);
+  if (!range) {
+    return false;
+  }
+  return position >= range.from && position <= range.to;
+}
+
 // ==================== 列映射工具 ====================
 
 export function mapColumnAfterLineUpdate(
