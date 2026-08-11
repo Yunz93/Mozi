@@ -38,8 +38,8 @@ xcode-select --install
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Yunz93/markdown-press.git
-cd markdown-press
+git clone https://github.com/Yunz93/Mozi.git
+cd Mozi
 ```
 
 ### 2. Install dependencies

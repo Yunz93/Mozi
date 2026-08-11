@@ -9,8 +9,7 @@ import { isTauriEnvironment } from "../types/filesystem";
 import { isWindowsPlatform } from "../utils/platform";
 import { areUpdaterArtifactsEnabled } from "./updaterCapabilities";
 
-export const RELEASES_PAGE_URL =
-  "https://github.com/Yunz93/markdown-press/releases";
+export const RELEASES_PAGE_URL = "https://github.com/Yunz93/Mozi/releases";
 export {
   areUpdaterArtifactsEnabled,
   UPDATER_ARTIFACTS_ENABLED,

@@ -12,20 +12,20 @@
 
 ## 下载安装
 
-在 [GitHub Releases](https://github.com/Yunz93/markdown-press/releases) 获取当前平台的安装包。
+在 [GitHub Releases](https://github.com/Yunz93/Mozi/releases) 获取当前平台的安装包。
 
 ### macOS
 
 **推荐：一键安装**（自动下载、移除隔离标记并安装到「应用程序」）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
 ```
 
 指定版本（可选）：
 
 ```bash
-RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：

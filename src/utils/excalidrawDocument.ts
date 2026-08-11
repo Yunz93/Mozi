@@ -4,7 +4,7 @@
  * file-type routing and unit tests stay lightweight.
  */
 
-export const EXCALIDRAW_SOURCE = "https://github.com/Yunz93/markdown-press";
+export const EXCALIDRAW_SOURCE = "https://github.com/Yunz93/Mozi";
 
 /** Standalone `.excalidraw` / `.excalidraw.json`, or Obsidian `.excalidraw.md`. */
 export const EXCALIDRAW_FILE_REGEX = /\.excalidraw(?:\.json|\.md)?$/i;

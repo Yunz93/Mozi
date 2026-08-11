@@ -11,7 +11,7 @@ Release notes for this tag are tracked in the repository history and pull reques
 **推荐：一键安装**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
 ```
 
 脚本会自动下载对应架构的 `.dmg`、移除隔离标记并安装到「应用程序」。

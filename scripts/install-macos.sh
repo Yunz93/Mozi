@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly REPO="Yunz93/markdown-press"
+readonly REPO="Yunz93/Mozi"
 readonly APP_NAME="墨知"
 readonly INSTALL_DIR="/Applications"
 readonly APP_PATH="${INSTALL_DIR}/${APP_NAME}.app"
@@ -79,7 +79,7 @@ asset_url_exists() {
   local status
   status="$(
     curl -fsS -o /dev/null -w '%{http_code}' -L -I \
-      -H "User-Agent: markdown-press-installer" \
+      -H "User-Agent: Mozi-installer" \
       "${url}" 2>/dev/null || true
   )"
   [[ "${status}" == "200" || "${status}" == "302" ]]
@@ -102,9 +102,9 @@ if ! ASSET_URL="$(resolve_asset_url)"; then
   die "未找到可用的 macOS 安装包。可尝试手动下载: https://github.com/${REPO}/releases/latest"
 fi
 
-DMG_PATH="${TMP_DIR}/markdown-press.dmg"
+DMG_PATH="${TMP_DIR}/Mozi.dmg"
 log "正在下载: ${ASSET_URL}"
-curl -fsSL -o "${DMG_PATH}" -H "User-Agent: markdown-press-installer" "${ASSET_URL}"
+curl -fsSL -o "${DMG_PATH}" -H "User-Agent: Mozi-installer" "${ASSET_URL}"
 
 log "正在移除下载隔离标记..."
 xattr -cr "${DMG_PATH}" 2>/dev/null || true
