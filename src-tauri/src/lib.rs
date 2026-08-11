@@ -240,7 +240,11 @@ fn build_secondary_window(
 /// the main thread and can deadlock the whole app (all windows stop reacting
 /// to input) — see the Tauri docs on creating windows from commands.
 #[tauri::command]
-async fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
+async fn open_file_in_new_window(
+    app: tauri::AppHandle,
+    path: String,
+    with_vault: Option<bool>,
+) -> Result<(), String> {
     let normalized = tauri::async_runtime::spawn_blocking(move || {
         normalize_opened_file_path(PathBuf::from(path))
     })
@@ -252,7 +256,15 @@ async fn open_file_in_new_window(app: tauri::AppHandle, path: String) -> Result<
 
     let label = next_window_label("file")?;
     let encoded = urlencoding::encode(&normalized);
-    let url = tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into());
+    // `with_vault=1` is set by in-app "Open in New Window". OS / system file
+    // launches omit it so the window opens the document alone (no vault restore).
+    let url = if with_vault.unwrap_or(false) {
+        tauri::WebviewUrl::App(
+            format!("index.html?openFile={}&withVault=1", encoded).into(),
+        )
+    } else {
+        tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into())
+    };
     let _ = build_secondary_window(&app, label, url)?;
     Ok(())
 }

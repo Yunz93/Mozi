@@ -14,6 +14,9 @@ export default {
   app_restoringWorkspaceDesc:
     "Opening your last knowledge base and restoring the workspace.",
   app_openingKnowledgeBase: "Opening knowledge base...",
+  app_openingDocument: "Opening Document",
+  app_openingDocumentDesc: "Opening the selected file.",
+  app_openingDocumentStatus: "Opening file...",
   app_chooseKnowledgeBase: "Choose Your Knowledge Base",
   app_chooseKnowledgeBaseDesc:
     "Open a folder as your knowledge base to start writing.",

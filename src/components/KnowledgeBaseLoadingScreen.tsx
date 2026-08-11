@@ -4,7 +4,9 @@ import { useI18n } from "../hooks/useI18n";
 export const KnowledgeBaseLoadingScreen: React.FC<{
   uiScaleStyle: React.CSSProperties;
   uiFontFamily: string;
-}> = ({ uiScaleStyle, uiFontFamily }) => {
+  /** Standalone OS file launch — do not mention restoring a knowledge base. */
+  standaloneDocument?: boolean;
+}> = ({ uiScaleStyle, uiFontFamily, standaloneDocument = false }) => {
   const { t } = useI18n();
 
   return (
@@ -19,17 +21,23 @@ export const KnowledgeBaseLoadingScreen: React.FC<{
           </div>
           <div>
             <h1 className="text-xl font-semibold">
-              {t("app_restoringWorkspace")}
+              {standaloneDocument
+                ? t("app_openingDocument")
+                : t("app_restoringWorkspace")}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t("app_restoringWorkspaceDesc")}
+              {standaloneDocument
+                ? t("app_openingDocumentDesc")
+                : t("app_restoringWorkspaceDesc")}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/80 dark:bg-black/30 px-4 py-3">
           <div className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-black dark:border-gray-700 dark:border-t-white animate-spin" />
           <span className="text-sm text-gray-600 dark:text-gray-300">
-            {t("app_openingKnowledgeBase")}
+            {standaloneDocument
+              ? t("app_openingDocumentStatus")
+              : t("app_openingKnowledgeBase")}
           </span>
         </div>
       </div>
