@@ -38,6 +38,7 @@ import {
 } from "../../../utils/markdownTable";
 import { renderMarkdown } from "../../../utils/markdown";
 import { useAppStore } from "../../../store/appStore";
+import { isImeComposingEvent } from "../../../utils/imeKeyboard";
 import { t } from "../../../utils/i18n";
 import {
   defineLivePreviewBlockDecorationField,
@@ -569,7 +570,7 @@ class TableWidget extends WidgetType {
     col: number,
     event: KeyboardEvent,
   ) {
-    if (event.isComposing) return;
+    if (isImeComposingEvent(event)) return;
     const value = readEditingCellValue(cell);
     const mod = isMod(event);
 

@@ -8,6 +8,7 @@ import {
 import type { WikiOutboundLink } from "../../types/vaultIndex";
 import { resolveOutbounds } from "../../utils/wikiOutbound";
 import { Dialog } from "../ui/Dialog";
+import { isImeComposingEvent } from "../../utils/imeKeyboard";
 
 function displayName(path: string): string {
   const normalized = path.replace(/\\/g, "/");
@@ -223,6 +224,7 @@ export const NeighborhoodGraph: React.FC<{
       onKeyDown={
         onSurfaceClick
           ? (event) => {
+              if (isImeComposingEvent(event)) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 onSurfaceClick();

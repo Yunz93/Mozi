@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useAppStore, defaultSettings } from "../../store/appStore";
 import { getResolvedUiFontFamily } from "../../utils/fontSettings";
 import { useI18n } from "../../hooks/useI18n";
+import { useImeCompositionGate } from "../../hooks/useImeCompositionGate";
+import { isPlainEnterKey } from "../../utils/imeKeyboard";
 
 interface DialogProps {
   isOpen: boolean;
@@ -262,6 +264,11 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const resolvedCancelText = cancelText ?? t("common_cancel");
   const [value, setValue] = React.useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);
+  const {
+    isComposing: isImeComposing,
+    onCompositionStart,
+    onCompositionEnd,
+  } = useImeCompositionGate();
 
   // Reset value when dialog opens
   useEffect(() => {
@@ -282,12 +289,12 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        handleSubmit();
-      }
+      // IME candidate confirm (Enter) must not submit an incomplete filename.
+      if (isImeComposing(e) || !isPlainEnterKey(e)) return;
+      e.preventDefault();
+      handleSubmit();
     },
-    [handleSubmit],
+    [handleSubmit, isImeComposing],
   );
 
   return (
@@ -307,6 +314,8 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
