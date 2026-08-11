@@ -350,15 +350,22 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-table-wrap": {
     display: "block",
+    boxSizing: "border-box",
+    // Match `.cm-line` horizontal inset so the table stays in the text column.
     width: "100%",
-    overflowX: "auto",
+    maxWidth: "100%",
     paddingBlock: "0.75em",
+    paddingInline: "var(--pane-content-px)",
+    // Wide tables scroll inside the wrap instead of expanding the editor.
+    overflowX: "auto",
+    contain: "inline-size",
   },
   ".cm-live-preview-table": {
     borderCollapse: "collapse",
-    // Match Reading: span the content column; wide cells wrap inside.
-    width: "100%",
-    maxWidth: "100%",
+    // Fill the column when narrow; grow for wide content (wrap scrolls).
+    width: "max-content",
+    minWidth: "100%",
+    maxWidth: "none",
     tableLayout: "auto",
     fontSize: "0.95em",
     color: "var(--mp-doc-text, #1f2937)",
@@ -374,7 +381,7 @@ export const livePreviewTheme = EditorView.baseTheme({
     // Override `.cm-lineWrapping { overflow-wrap: anywhere }` inheritance.
     whiteSpace: "normal",
     wordBreak: "keep-all",
-    overflowWrap: "break-word",
+    overflowWrap: "anywhere",
   },
   // Keep fills translucent (like fenced-code) so cm-selectionBackground
   // shows through evenly during full-document selection.
@@ -383,7 +390,7 @@ export const livePreviewTheme = EditorView.baseTheme({
       "color-mix(in srgb, var(--mp-doc-table-header-bg, rgba(241, 245, 249, 0.96)) 55%, transparent)",
     color: "var(--mp-doc-text, #334155)",
     fontWeight: "600",
-    whiteSpace: "nowrap",
+    whiteSpace: "normal",
   },
   ".cm-live-preview-table tbody tr:nth-child(even) td": {
     background:
