@@ -399,7 +399,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       autoPairBrackets: settings.autoPairBrackets,
       autoPairMarkdown: settings.autoPairMarkdown,
       showLineNumbers: settings.showLineNumbers,
-      enableFolding: settings.enableFolding,
+      // Live Preview renders fenced code as source lines; fold gutters there
+      // only collapse raw fences and are more noise than help.
+      enableFolding: settings.enableFolding && viewMode !== ViewMode.LIVE,
       tabSize: settings.tabSize,
       useTabs: settings.useTabs,
       showIndentationGuides: settings.showIndentationGuides,
@@ -864,7 +866,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       <div
         ref={layoutRef}
         className={`editor-pane-layout h-full min-w-0 flex flex-col relative${
-          settings.showLineNumbers || settings.enableFolding
+          settings.showLineNumbers ||
+          (settings.enableFolding && viewMode !== ViewMode.LIVE)
             ? " show-editor-gutters"
             : ""
         }`}

@@ -313,22 +313,25 @@ describe("live preview hide formatting", () => {
     );
     expect(headerTexts).toEqual(["模块", "需求", "优先级", "说明"]);
 
-    // Match Reading full-width table; keep CJK wrap overrides so columns
-    // are not crushed into one-glyph-per-line stacks.
+    // Wide tables scroll inside the wrap; CJK keep-all avoids one-glyph columns.
     const sheetText = Array.from(document.querySelectorAll("style"))
       .map((node) => node.textContent ?? "")
       .join("\n");
     expect(sheetText).toMatch(
       /cm-live-preview-table-wrap[^}]*overflow-x:\s*auto/,
     );
-    expect(sheetText).toMatch(/\.cm-live-preview-table\s*\{[^}]*width:\s*100%/);
     expect(sheetText).toMatch(
-      /\.cm-live-preview-table\s*\{[^}]*max-width:\s*100%/,
+      /cm-live-preview-table-wrap[^}]*contain:\s*inline-size/,
     );
-    expect(sheetText).not.toMatch(/cm-live-preview-table[^}]*max-content/);
+    expect(sheetText).toMatch(
+      /\.cm-live-preview-table\s*\{[^}]*width:\s*max-content/,
+    );
+    expect(sheetText).toMatch(
+      /\.cm-live-preview-table\s*\{[^}]*min-width:\s*100%/,
+    );
     expect(sheetText).toMatch(/word-break:\s*keep-all/);
     expect(sheetText).toMatch(
-      /cm-live-preview-table th\s*\{[^}]*white-space:\s*nowrap/,
+      /cm-live-preview-table th\s*\{[^}]*white-space:\s*normal/,
     );
   });
 

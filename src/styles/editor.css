@@ -1317,14 +1317,20 @@
   max-width: 100%;
 }
 
-/* Live table: match Reading full-width layout + CJK-friendly wrapping. */
+/* Live table: stay in the text column; scroll wide tables inside the wrap. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding-inline: var(--pane-content-px);
   overflow-x: auto;
+  contain: inline-size;
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
-  width: 100%;
-  max-width: 100%;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
   table-layout: auto;
 }
 
@@ -1332,14 +1338,14 @@
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table td {
   white-space: normal;
   word-break: keep-all;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   min-width: 3.5em;
   line-height: 1.45;
   border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.26));
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th {
-  white-space: nowrap;
+  white-space: normal;
   font-weight: 600;
   background: color-mix(
     in srgb,
