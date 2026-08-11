@@ -9,7 +9,7 @@ describe("install-macos.sh", () => {
   const script = readFileSync(installScriptPath, "utf8");
 
   it("targets the latest GitHub Release dmg for the current Mac architecture", () => {
-    expect(script).toContain('readonly REPO="Yunz93/markdown-press"');
+    expect(script).toContain('readonly REPO="Yunz93/Mozi"');
     expect(script).toContain('readonly APP_NAME="墨知"');
     expect(script).toContain("releases/latest");
     expect(script).toContain("Mozi_");

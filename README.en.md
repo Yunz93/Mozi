@@ -12,20 +12,20 @@ A local-first Markdown editor for knowledge-base writing: tight editor–preview
 
 ## Download
 
-Grab the installer for your platform from [GitHub Releases](https://github.com/Yunz93/markdown-press/releases).
+Grab the installer for your platform from [GitHub Releases](https://github.com/Yunz93/Mozi/releases).
 
 ### macOS
 
 **Recommended: one-line install** (downloads, clears quarantine, and copies to Applications):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
 ```
 
 Pin a release (optional):
 
 ```bash
-RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/markdown-press/main/scripts/install-macos.sh | bash
+RELEASE_TAG=v1.0.4 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:

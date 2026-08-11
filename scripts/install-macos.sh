@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly REPO="Yunz93/markdown-press"
+readonly REPO="Yunz93/Mozi"
 readonly APP_NAME="墨知"
 readonly INSTALL_DIR="/Applications"
 readonly APP_PATH="${INSTALL_DIR}/${APP_NAME}.app"
