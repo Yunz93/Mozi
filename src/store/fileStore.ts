@@ -1,4 +1,5 @@
 import type { FileNode } from "../types";
+import { findFileInTree } from "../utils/fileTree";
 import { remapPathBoundarySafe } from "../utils/pathRemap";
 
 /**
@@ -51,6 +52,13 @@ export function createFileSlice(
 
     addFile: (file) => {
       set((state) => {
+        // Guard against optimistic insert racing a directory watcher refresh
+        // (or a double-submit create) that already put this path in the tree.
+        // Duplicate ids select together in the sidebar and look like one file.
+        if (findFileInTree(state.files, file.id)) {
+          return state;
+        }
+
         const parentPath = file.path.substring(
           0,
           file.path.lastIndexOf(file.name) - 1,
@@ -73,16 +81,9 @@ export function createFileSlice(
             return node;
           });
 
-        if (!parentPath || parentPath === state.rootFolderPath) {
-          return { files: [...state.files, file] };
-        }
-
         const nextFiles = addToTree(state.files);
         if (!parentFound) {
-          const alreadyPresent = state.files.some(
-            (node) => node.id === file.id,
-          );
-          return alreadyPresent ? state : { files: [...state.files, file] };
+          return { files: [...state.files, file] };
         }
         return { files: nextFiles };
       });
