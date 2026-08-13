@@ -47,7 +47,7 @@ Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run
 - **Local vault**: Folder-based library with tabs, sidebar, file tree, and search; notes and assets stay as ordinary files on disk.
 - **Live Preview / Reading**: Two primary views. Live renders headings, emphasis, links, tables, tasks, math, Mermaid, callouts, embeds, and more while you type; Reading is for focused reading and shares Markdown style presets with Live.
 - **Knowledge-base Markdown**: Wiki links `[[wiki]]`, `![[embeds]]`, YAML frontmatter, and configurable note templates; paste images, manage a local asset folder, and clean unreferenced attachments in one reference flow.
-- **Excalidraw drawings**: Open and edit `.excalidraw` files, create drawings from the sidebar, and embed static previews with `![[drawing.excalidraw]]` (click to edit).
+- **Excalidraw drawings**: Open and edit `.excalidraw` files and Obsidian Excalidraw `.excalidraw.md` drawings (including the default `compressed-json` format), create drawings from the sidebar, and embed static previews with `![[drawing.excalidraw]]` / `![[drawing.excalidraw.md]]` (click to edit).
 - **Rich media preview**: Images, PDF, HTML, video, and other attachments preview in Reading; HTML supports fit-to-width and zoom.
 - **Knowledge layer (Beta)**: Backlinks and outgoing links, neighborhood graph for the current note, related-notes recommendations (local semantic search), Ask Vault Q&A with source citations; built-in local embedding with an optional privacy mode that blocks non-local endpoints.
 - **Export & publish**: PDF, HTML, and a single long-image share from the preview; toolbar publishing to **simple-blog** (GitHub + Vercel) or **WeChat Official Account drafts**.

@@ -8,7 +8,7 @@ import React, {
   useLayoutEffect,
   useRef,
 } from "react";
-import { useAppStore } from "../../store/appStore";
+import { useAppStore, selectContent } from "../../store/appStore";
 import { ViewMode } from "../../types";
 import {
   isEditorSoloMode,
@@ -36,7 +36,7 @@ import { getUiFontScale } from "../../utils/uiFontSize";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { isHeadingNavigationLocked } from "../../utils/previewNavigationBridge";
 import { findFileInTree } from "../../utils/fileTree";
-import { isExcalidrawFile } from "../../utils/fileTypes";
+import { isExcalidrawWorkspaceFile } from "../../utils/fileTypes";
 
 const PANE_TRANSITION_MS = 200;
 const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
@@ -77,11 +77,12 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const viewMode = useAppStore((state) => state.viewMode);
   const activeTabId = useAppStore((state) => state.activeTabId);
   const files = useAppStore((state) => state.files);
+  const content = useAppStore(selectContent);
   const activeFile = activeTabId
     ? findFileInTree(files, activeTabId)
     : undefined;
   const isExcalidrawActive = Boolean(
-    activeFile && isExcalidrawFile(activeFile.name),
+    activeFile && isExcalidrawWorkspaceFile(activeFile.name, content),
   );
   const [splitRatio, setSplitRatio] = useState(50);
   const [isResizing, setIsResizing] = useState(false);

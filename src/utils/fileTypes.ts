@@ -1,5 +1,10 @@
 import type { FileNode } from "../types";
-import { isExcalidrawFileName } from "./excalidrawDocument";
+import {
+  isExcalidrawFileName,
+  isExcalidrawWorkspaceFile,
+} from "./excalidrawDocument";
+
+export { isExcalidrawWorkspaceFile };
 
 /**
  * Shared file-type predicates keyed off a file name (or path).

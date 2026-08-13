@@ -7,6 +7,7 @@ export function isImageAttachment(fileName: string): boolean {
 }
 
 export function isMarkdownNote(fileName: string): boolean {
+  if (/\.excalidraw(?:\.json|\.md)?$/i.test(fileName)) return false;
   return /\.(md|markdown)$/i.test(fileName);
 }
 
@@ -29,7 +30,7 @@ export function isExternalLink(href: string): boolean {
 export function isValidExternalUrl(href: string): boolean {
   try {
     const url = new URL(href);
-    return url.protocol === 'https:' || url.protocol === 'http:';
+    return url.protocol === "https:" || url.protocol === "http:";
   } catch {
     return false;
   }

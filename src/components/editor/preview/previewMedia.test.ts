@@ -242,6 +242,8 @@ describe("attachment type helpers", () => {
     expect(isExcalidrawAttachment("board.excalidraw")).toBe(true);
     expect(isExcalidrawAttachment("board.excalidraw.json")).toBe(true);
     expect(isExcalidrawAttachment("board.excalidraw.md")).toBe(true);
+    expect(isMarkdownNote("board.excalidraw.md")).toBe(false);
+    expect(isMarkdownNote("note.md")).toBe(true);
     expect(isImageAttachment("readme.txt")).toBe(false);
   });
 });
