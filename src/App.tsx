@@ -43,7 +43,10 @@ import { getResolvedUiFontFamily } from "./utils/fontSettings";
 import { logEnvironment, assertDevReleaseParity } from "./utils/environment";
 import { useI18n } from "./hooks/useI18n";
 import { getPathBasename, findFileInTree } from "./app/appShellUtils";
-import { isExcalidrawFile, isPreviewOnlyFile } from "./utils/fileTypes";
+import {
+  isExcalidrawWorkspaceFile,
+  isPreviewOnlyFile,
+} from "./utils/fileTypes";
 import { getResolvedEditorFontFamily } from "./utils/fontSettings";
 import { useAppBootstrap } from "./app/useAppBootstrap";
 import { useActiveFileWatch } from "./app/useActiveFileWatch";
@@ -324,7 +327,7 @@ const App: React.FC = () => {
     ? isPreviewOnlyFile(activeFile.name)
     : false;
   const isExcalidrawActiveFile = activeFile
-    ? isExcalidrawFile(activeFile.name)
+    ? isExcalidrawWorkspaceFile(activeFile.name, content)
     : false;
   const isNonMarkdownWorkspaceFile =
     isPreviewOnlyActiveFile || isExcalidrawActiveFile;

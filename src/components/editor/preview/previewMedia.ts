@@ -55,6 +55,8 @@ export function isImageAttachment(fileName: string): boolean {
 }
 
 export function isMarkdownNote(fileName: string): boolean {
+  // Obsidian drawings use `.excalidraw.md` — treat as Excalidraw, not notes.
+  if (isExcalidrawAttachment(fileName)) return false;
   return /\.(md|markdown)$/i.test(fileName);
 }
 

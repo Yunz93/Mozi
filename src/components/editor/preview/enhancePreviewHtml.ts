@@ -43,6 +43,7 @@ import {
   createExcalidrawEmbedContainer,
   renderExcalidrawEmbedSvg,
 } from "../../../utils/excalidrawEmbed";
+import { isObsidianExcalidrawMarkdown } from "../../../utils/excalidrawDocument";
 import { sanitizeHtmlPreview } from "./previewRenderCore";
 import {
   protectShikiPresInHtmlString,
@@ -53,6 +54,24 @@ import {
  * Replace a wiki-embed node, unwrapping a sole parent `<p>` when the
  * replacement is a block element (avoids invalid `<p><div>…</div></p>`).
  */
+async function mountExcalidrawWikiEmbed(
+  document: Document,
+  embed: Element,
+  drawingContent: string,
+  options: {
+    title: string;
+    path: string;
+    width?: number;
+    height?: number;
+  },
+): Promise<void> {
+  const drawingContainer = createExcalidrawEmbedContainer(document, options);
+  replaceWikiEmbedNode(embed, drawingContainer);
+  await renderExcalidrawEmbedSvg(drawingContainer, drawingContent, {
+    title: options.title,
+  });
+}
+
 function replaceWikiEmbedNode(embed: Element, replacement: Node): void {
   const parent = embed.parentElement;
   if (
@@ -362,6 +381,30 @@ export async function enhancePreviewHtml(
           return;
         }
 
+        // Excalidraw drawing embed (static SVG preview). Check before
+        // markdown: `.excalidraw.md` also matches a `.md` suffix.
+        if (isExcalidrawAttachment(resolvedTarget.name)) {
+          try {
+            const drawingContent = await readFile({
+              id: resolvedTarget.path,
+              name: resolvedTarget.name,
+              type: "file",
+              path: resolvedTarget.path,
+            });
+            await mountExcalidrawWikiEmbed(document, embed, drawingContent, {
+              title: label || resolvedTarget.name,
+              path: resolvedTarget.path,
+              width: embedWidth,
+              height: embedHeight,
+            });
+          } catch {
+            embed.className =
+              "preview-attachment-file preview-attachment-file-missing";
+            embed.textContent = `Failed to preview attachment: ${label || resolvedTarget.name}`;
+          }
+          return;
+        }
+
         // Markdown note embed
         if (isMarkdownNote(resolvedTarget.name)) {
           if (
@@ -390,6 +433,23 @@ export async function enhancePreviewHtml(
             embed.className =
               "preview-attachment-file preview-attachment-file-missing";
             embed.textContent = `Failed to read: ${label || target}`;
+            return;
+          }
+
+          // Logseq / Obsidian `.md` drawings (excalidraw-plugin frontmatter).
+          if (isObsidianExcalidrawMarkdown(sourceContent)) {
+            try {
+              await mountExcalidrawWikiEmbed(document, embed, sourceContent, {
+                title: label || resolvedTarget.name,
+                path: resolvedTarget.path,
+                width: embedWidth,
+                height: embedHeight,
+              });
+            } catch {
+              embed.className =
+                "preview-attachment-file preview-attachment-file-missing";
+              embed.textContent = `Failed to preview attachment: ${label || resolvedTarget.name}`;
+            }
             return;
           }
 
@@ -557,33 +617,6 @@ export async function enhancePreviewHtml(
               htmlContainer.style.overflow = "auto";
             }
             replaceWikiEmbedNode(embed, htmlContainer);
-          } catch {
-            embed.className =
-              "preview-attachment-file preview-attachment-file-missing";
-            embed.textContent = `Failed to preview attachment: ${label || resolvedTarget.name}`;
-          }
-          return;
-        }
-
-        // Excalidraw drawing embed (static SVG preview)
-        if (isExcalidrawAttachment(resolvedTarget.name)) {
-          try {
-            const drawingContent = await readFile({
-              id: resolvedTarget.path,
-              name: resolvedTarget.name,
-              type: "file",
-              path: resolvedTarget.path,
-            });
-            const drawingContainer = createExcalidrawEmbedContainer(document, {
-              title: label || resolvedTarget.name,
-              path: resolvedTarget.path,
-              width: embedWidth,
-              height: embedHeight,
-            });
-            replaceWikiEmbedNode(embed, drawingContainer);
-            await renderExcalidrawEmbedSvg(drawingContainer, drawingContent, {
-              title: label || resolvedTarget.name,
-            });
           } catch {
             embed.className =
               "preview-attachment-file preview-attachment-file-missing";

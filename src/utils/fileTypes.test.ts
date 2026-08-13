@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getRenameDialogDefaultValue,
   isExcalidrawFile,
+  isExcalidrawWorkspaceFile,
   isMarkdownFile,
   isOpenableFile,
   isSavableDocumentFile,
@@ -78,5 +79,22 @@ describe("excalidraw file predicates", () => {
         path: "/a.excalidraw.md",
       }),
     ).toBe(true);
+  });
+
+  it("treats Logseq-style .md drawings as workspace Excalidraw files", () => {
+    const drawing = `---
+excalidraw-plugin: parsed
+---
+
+# Excalidraw Data
+
+## Drawing
+\`\`\`json
+{"type":"excalidraw","elements":[]}
+\`\`\`
+`;
+    expect(isExcalidrawWorkspaceFile("board.md", drawing)).toBe(true);
+    expect(isExcalidrawWorkspaceFile("board.md", "# note\n")).toBe(false);
+    expect(isMarkdownFile("board.md")).toBe(true);
   });
 });

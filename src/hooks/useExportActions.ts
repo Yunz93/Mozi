@@ -11,13 +11,16 @@ import { t } from "../utils/i18n";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
 import { findFileInTree } from "../utils/fileTree";
 import {
-  isExcalidrawFile,
+  isExcalidrawWorkspaceFile,
   isMarkdownFile,
   isPreviewOnlyFile,
 } from "../utils/fileTypes";
 
-function isNonMarkdownExportFile(name: string): boolean {
-  return isPreviewOnlyFile(name) || isExcalidrawFile(name);
+function isNonMarkdownExportFile(
+  name: string,
+  content?: string | null,
+): boolean {
+  return isPreviewOnlyFile(name) || isExcalidrawWorkspaceFile(name, content);
 }
 
 /**
@@ -52,7 +55,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       return;
     }
 
-    if (isNonMarkdownExportFile(activeFile.name)) {
+    if (isNonMarkdownExportFile(activeFile.name, content)) {
       showNotification(
         t(settings.language, "notifications_exportMarkdownOnly"),
         "error",
@@ -151,7 +154,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     }
 
     if (
-      isNonMarkdownExportFile(activeFile.name) ||
+      isNonMarkdownExportFile(activeFile.name, content) ||
       !isMarkdownFile(activeFile.name)
     ) {
       showNotification(
@@ -238,7 +241,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       }
 
       const activeFile = findFileInTree(files, activeTabId);
-      if (!activeFile || isNonMarkdownExportFile(activeFile.name)) {
+      if (!activeFile || isNonMarkdownExportFile(activeFile.name, content)) {
         showNotification(
           t(settings.language, "notifications_exportMarkdownOnly"),
           "error",
