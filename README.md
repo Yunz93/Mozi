@@ -132,6 +132,7 @@ xattr -cr /Applications/墨知.app
 | [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)          | Mermaid 渲染辅助       | MIT                   |
 | [DOMPurify](https://github.com/cure53/DOMPurify)                            | HTML 消毒              | MPL-2.0 OR Apache-2.0 |
 | [Excalidraw](https://excalidraw.com/)（`@excalidraw/excalidraw`）           | 手绘白板编辑与嵌入预览 | MIT                   |
+| [lz-string](https://github.com/pieroxy/lz-string)                           | Obsidian 图纸压缩格式  | MIT                   |
 | [Turndown](https://github.com/mixmark-io/turndown)                          | HTML → Markdown        | MIT                   |
 | [js-yaml](https://github.com/nodeca/js-yaml)                                | YAML frontmatter       | MIT                   |
 
