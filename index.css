@@ -323,3 +323,21 @@ html:not(.dark) .markdown-body:not(.preview-pane-document) {
   width: 100%;
 }
 
+/*
+ * The app shell uses Tailwind `text-sm` plus a UI `font-family`. Those inherit
+ * into Excalidraw's bound-text wysiwyg `<textarea>` (wrap=off, overflow:hidden).
+ * In WKWebView the editor then shows a single clipped line — often only the
+ * last CJK glyph — instead of the wrapped label.
+ */
+.excalidraw-pane {
+  font-size: 16px;
+  line-height: normal;
+  font-family: sans-serif;
+}
+
+.excalidraw-pane textarea.excalidraw-wysiwyg,
+.excalidraw-pane textarea[data-type="wysiwyg"] {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}

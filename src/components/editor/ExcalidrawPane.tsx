@@ -94,24 +94,37 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
     };
   }, []);
 
-  const initialData = useMemo(() => {
-    const parsed = parseExcalidrawDocument(sceneContentRef.current);
-    if (!parsed) return null;
-    return {
-      type: "excalidraw" as const,
-      version: parsed.version,
-      source: parsed.source,
-      elements: parsed.elements as never[],
-      appState: {
-        ...parsed.appState,
-        collaborators: undefined,
-      },
-      files: parsed.files as never,
-      scrollToContent: true,
-    };
+  const parsedDocument = useMemo(() => {
+    return parseExcalidrawDocument(sceneContentRef.current);
   }, [sceneKey]);
 
-  const parseError = initialData === null;
+  const initialData = useMemo(() => {
+    if (!parsedDocument || !excalidrawModule) return null;
+    const restored = excalidrawModule.restore(
+      {
+        elements: parsedDocument.elements as never,
+        appState: parsedDocument.appState as never,
+        files: parsedDocument.files as never,
+      },
+      null,
+      null,
+      { repairBindings: true },
+    );
+    return {
+      type: "excalidraw" as const,
+      version: parsedDocument.version,
+      source: parsedDocument.source,
+      elements: restored.elements,
+      appState: {
+        ...restored.appState,
+        collaborators: undefined,
+      },
+      files: restored.files,
+      scrollToContent: true,
+    };
+  }, [parsedDocument, excalidrawModule]);
+
+  const parseError = parsedDocument === null;
 
   const handleChange = useCallback(
     (
@@ -187,6 +200,7 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
         initialData={initialData}
         theme={resolveUiTheme(themeMode)}
         langCode={language === "zh-CN" ? "zh-CN" : "en"}
+        showDeprecatedFonts
         UIOptions={{
           canvasActions: {
             loadScene: false,

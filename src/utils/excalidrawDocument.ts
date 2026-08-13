@@ -101,10 +101,57 @@ function documentFromParsedJson(parsed: unknown): ExcalidrawDocument | null {
       typeof record.source === "string" && record.source.trim()
         ? record.source
         : EXCALIDRAW_SOURCE,
-    elements,
+    elements: normalizeExcalidrawTextElements(elements),
     appState,
     files,
   };
+}
+
+function asNonEmptyString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function strippedTextLength(value: string): number {
+  return value.replace(/\r\n/g, "\n").replace(/\n/g, "").length;
+}
+
+/**
+ * Obsidian's wysiwyg source of truth is `rawText`; vanilla Excalidraw edits
+ * `originalText`. If `originalText` is missing or shorter, the in-shape editor
+ * clips CJK/ASCII labels down to the last glyph.
+ */
+export function normalizeExcalidrawTextElements(
+  elements: unknown[],
+): unknown[] {
+  return elements.map((element) => {
+    if (!element || typeof element !== "object" || Array.isArray(element)) {
+      return element;
+    }
+    const record = element as Record<string, unknown>;
+    if (record.type !== "text") return element;
+
+    const text = asNonEmptyString(record.text);
+    const originalText = asNonEmptyString(record.originalText);
+    const rawText = asNonEmptyString(record.rawText);
+    const candidates = [rawText, originalText, text].filter(
+      (value) => value.length > 0,
+    );
+    if (candidates.length === 0) return element;
+
+    const nextOriginal = candidates.reduce((best, candidate) =>
+      strippedTextLength(candidate) > strippedTextLength(best)
+        ? candidate
+        : best,
+    );
+    const nextText = text || nextOriginal;
+    if (nextOriginal === originalText && nextText === text) return element;
+
+    return {
+      ...record,
+      text: nextText,
+      originalText: nextOriginal,
+    };
+  });
 }
 
 function looksLikeExcalidrawScene(parsed: unknown): boolean {
