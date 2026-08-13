@@ -132,6 +132,7 @@ Mozi is built on many excellent open-source projects (in no particular order). T
 | [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)          | Mermaid rendering helpers                   | MIT                   |
 | [DOMPurify](https://github.com/cure53/DOMPurify)                            | HTML sanitization                           | MPL-2.0 OR Apache-2.0 |
 | [Excalidraw](https://excalidraw.com/) (`@excalidraw/excalidraw`)            | Freehand whiteboard editing & embed preview | MIT                   |
+| [lz-string](https://github.com/pieroxy/lz-string)                           | Obsidian drawing compression                | MIT                   |
 | [Turndown](https://github.com/mixmark-io/turndown)                          | HTML → Markdown                             | MIT                   |
 | [js-yaml](https://github.com/nodeca/js-yaml)                                | YAML frontmatter                            | MIT                   |
 
