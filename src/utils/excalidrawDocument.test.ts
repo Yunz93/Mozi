@@ -7,6 +7,7 @@ import {
   isExcalidrawFileName,
   isExcalidrawWorkspaceFile,
   isObsidianExcalidrawMarkdown,
+  normalizeExcalidrawTextElements,
   parseExcalidrawDocument,
   resolveExcalidrawFileName,
   serializeExcalidrawContent,
@@ -103,6 +104,25 @@ describe("parseExcalidrawDocument", () => {
     expect(doc?.elements).toHaveLength(1);
     expect(doc?.appState.viewBackgroundColor).toBe("#ffffff");
     expect(doc?.files).toEqual({});
+  });
+
+  it("promotes Obsidian rawText onto originalText when parsing", () => {
+    const doc = parseExcalidrawDocument(
+      JSON.stringify({
+        type: "excalidraw",
+        elements: [
+          {
+            type: "text",
+            text: "期",
+            rawText: "LingBot-VLA 2.0 闭源版商用授权-3年期",
+          },
+        ],
+      }),
+    );
+    expect(doc?.elements[0]).toMatchObject({
+      originalText: "LingBot-VLA 2.0 闭源版商用授权-3年期",
+      text: "期",
+    });
   });
 
   it("parses Obsidian .excalidraw.md wrappers", () => {
@@ -203,6 +223,39 @@ describe("serializeExcalidrawContent", () => {
   it("writes plain JSON for standalone .excalidraw files", () => {
     const json = '{\n  "type": "excalidraw",\n  "elements": []\n}';
     expect(serializeExcalidrawContent(json, json)).toBe(`${json}\n`);
+  });
+});
+
+describe("normalizeExcalidrawTextElements", () => {
+  it("copies Obsidian rawText into originalText for the wysiwyg editor", () => {
+    const full = "LingBot-VLA 2.0 闭源版商用授权-3年期\nLBM-VLA-V20-COM-3Y-CN";
+    const normalized = normalizeExcalidrawTextElements([
+      {
+        id: "t1",
+        type: "text",
+        text: "期\nLBM-VLA-V20-COM-3Y-CN",
+        originalText: "期",
+        rawText: full,
+        containerId: "rect1",
+      },
+      { id: "rect1", type: "rectangle" },
+    ]);
+    const textEl = normalized[0] as {
+      text: string;
+      originalText: string;
+    };
+    expect(textEl.originalText).toBe(full);
+    expect(textEl.text).toBe("期\nLBM-VLA-V20-COM-3Y-CN");
+  });
+
+  it("fills originalText from text when Obsidian fields are absent", () => {
+    const normalized = normalizeExcalidrawTextElements([
+      { type: "text", text: "完整标题" },
+    ]);
+    expect(normalized[0]).toMatchObject({
+      text: "完整标题",
+      originalText: "完整标题",
+    });
   });
 });
 
