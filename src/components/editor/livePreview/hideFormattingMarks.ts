@@ -331,12 +331,21 @@ export const livePreviewTheme = EditorView.baseTheme({
     display: "inline-block",
     verticalAlign: "middle",
   },
-  ".cm-live-preview-math-display": {
+  // Widget class is `cm-live-preview-math is-display`; keep the older
+  // `cm-live-preview-math-display` alias in sync.
+  ".cm-live-preview-math.is-display, .cm-live-preview-math-display": {
     display: "block",
-    width: "100%",
-    paddingBlock: "0.65em",
+    boxSizing: "border-box",
+    width: "auto",
+    marginInline: "var(--pane-content-px)",
+    paddingBlock: "0.5em",
     overflowX: "auto",
     textAlign: "center",
+  },
+  // Match Reading: do not let CM line wrapping split KaTeX glyphs.
+  ".cm-live-preview-math .katex, .cm-live-preview-math .katex *": {
+    wordBreak: "normal",
+    overflowWrap: "normal",
   },
   // Link chrome matches Reading `a` / `.wiki-link` underline + accent fallback.
   ".cm-live-preview-wiki": {
@@ -376,7 +385,6 @@ export const livePreviewTheme = EditorView.baseTheme({
     width: "100%",
     maxWidth: "100%",
     tableLayout: "fixed",
-    fontSize: "0.95em",
     color: "var(--mp-doc-text, #1f2937)",
   },
   ".cm-live-preview-table th, .cm-live-preview-table td": {
@@ -469,8 +477,12 @@ export const livePreviewTheme = EditorView.baseTheme({
       "color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent)",
   },
   // Callouts echo Reading blockquote chrome + type accents.
+  // Block widgets sit beside `.cm-line` (no horizontal padding on `.cm-content`);
+  // margin-inline matches the text column used in Reading.
   ".cm-live-preview-callout": {
     display: "block",
+    boxSizing: "border-box",
+    marginInline: "var(--pane-content-px)",
     padding: "0.9em 1em",
     paddingBlock: "0.9em",
     borderRadius: "0 14px 14px 0",
@@ -510,6 +522,7 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-hr": {
     border: "none",
     borderTop: "1px solid var(--mp-doc-border, rgba(124, 58, 237, 0.18))",
+    marginInline: "var(--pane-content-px)",
     // Prefer padding — CM block height maps ignore vertical margins.
     paddingBlock: "1em",
   },
@@ -528,16 +541,21 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-mermaid": {
     display: "block",
-    width: "100%",
+    boxSizing: "border-box",
+    width: "auto",
+    marginInline: "var(--pane-content-px)",
     overflowX: "auto",
     padding: "1.5em",
     paddingBlock: "1.5em",
     borderRadius: "8px",
     background: "rgba(128, 128, 128, 0.05)",
+    textAlign: "center",
   },
   // Match Reading `.preview-note-embed` card chrome (translucent for selection).
   ".cm-live-preview-note-embed": {
     display: "block",
+    boxSizing: "border-box",
+    marginInline: "var(--pane-content-px)",
     overflow: "hidden",
     padding: "0",
     borderRadius: "1rem",

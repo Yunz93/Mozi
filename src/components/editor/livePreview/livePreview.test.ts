@@ -228,6 +228,45 @@ describe("live preview hide formatting", () => {
     expect(widgetCount).toBe(1);
   });
 
+  it("marks display math as a Reading-matched block widget", () => {
+    const doc = "$$E=mc^2$$\n\naway";
+    const view = mount(doc, doc.length - 1, [livePreviewMath]);
+    const el = view.dom.querySelector(
+      ".cm-live-preview-math",
+    ) as HTMLElement | null;
+    expect(el).not.toBeNull();
+    expect(el!.classList.contains("is-display")).toBe(true);
+    expect(el!.classList.contains("cm-live-preview-math-display")).toBe(true);
+  });
+
+  it("insets live block widgets to the Reading text column", () => {
+    mount("x", 0, [livePreviewTheme]);
+    const sheetText = Array.from(document.querySelectorAll("style"))
+      .map((node) => node.textContent ?? "")
+      .join("\n");
+    expect(sheetText).toMatch(
+      /cm-live-preview-callout[^}]*margin-inline:\s*var\(--pane-content-px\)/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-mermaid[^}]*margin-inline:\s*var\(--pane-content-px\)/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-note-embed[^}]*margin-inline:\s*var\(--pane-content-px\)/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-hr[^}]*margin-inline:\s*var\(--pane-content-px\)/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-math-display[^}]*margin-inline:\s*var\(--pane-content-px\)/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-math-display[^}]*text-align:\s*center/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-mermaid[^}]*text-align:\s*center/,
+    );
+  });
+
   it("allows block decorations via StateField extensions without crashing", () => {
     const doc = [
       "$$E=mc^2$$",
