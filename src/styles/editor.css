@@ -156,11 +156,31 @@
 
 .editor-pane-layout .cm-fenced-code-line {
   /* Selection is drawn behind line backgrounds; keep fill translucent so it stays visible. */
-  background: color-mix(in srgb, var(--editor-code-block-bg) 55%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--editor-code-block-bg) 55%,
+    transparent
+  );
+  background-image:
+    linear-gradient(
+      var(--editor-code-block-border),
+      var(--editor-code-block-border)
+    ),
+    linear-gradient(
+      var(--editor-code-block-border),
+      var(--editor-code-block-border)
+    );
+  background-repeat: no-repeat;
+  background-position:
+    var(--pane-content-px) 0,
+    calc(100% - var(--pane-content-px) - 1px) 0;
+  background-size: 1px 100%;
+  /* Chrome is painted on the full `.cm-line`; clip to the text column so the
+     block matches headings/paragraphs instead of bleeding into pane padding. */
+  -webkit-clip-path: inset(0 var(--pane-content-px));
+  clip-path: inset(0 var(--pane-content-px));
   color: var(--editor-code-fg);
-  box-shadow:
-    inset 1px 0 0 var(--editor-code-block-border),
-    inset -1px 0 0 var(--editor-code-block-border);
+  box-shadow: none;
   font-family: var(--editor-code-font-family);
   font-size: var(--editor-code-font-size);
   line-height: 1.75;
@@ -174,10 +194,9 @@
   border-top-left-radius: 1rem;
   border-top-right-radius: 1rem;
   padding-top: 1rem !important;
-  box-shadow:
-    inset 1px 0 0 var(--editor-code-block-border),
-    inset -1px 0 0 var(--editor-code-block-border),
-    var(--editor-code-block-shadow);
+  box-shadow: var(--editor-code-block-shadow);
+  -webkit-clip-path: inset(0 var(--pane-content-px) round 1rem 1rem 0 0);
+  clip-path: inset(0 var(--pane-content-px) round 1rem 1rem 0 0);
 }
 
 .editor-pane-layout .cm-fenced-code-line-end {
@@ -185,6 +204,13 @@
   border-bottom-left-radius: 1rem;
   border-bottom-right-radius: 1rem;
   padding-bottom: 1rem !important;
+  -webkit-clip-path: inset(0 var(--pane-content-px) round 0 0 1rem 1rem);
+  clip-path: inset(0 var(--pane-content-px) round 0 0 1rem 1rem);
+}
+
+.editor-pane-layout .cm-fenced-code-line-start.cm-fenced-code-line-end {
+  -webkit-clip-path: inset(0 var(--pane-content-px) round 1rem);
+  clip-path: inset(0 var(--pane-content-px) round 1rem);
 }
 
 .editor-pane-layout .cm-fenced-code-line-body {
