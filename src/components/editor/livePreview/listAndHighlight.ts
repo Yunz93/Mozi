@@ -57,6 +57,44 @@ class BulletWidget extends WidgetType {
   }
 }
 
+const MAX_LIVE_LIST_LEVEL = 6;
+
+const livePreviewListLineDecos = Array.from(
+  { length: MAX_LIVE_LIST_LEVEL },
+  (_, index) => {
+    const level = index + 1;
+    const nested = level > 1 ? " is-nested" : "";
+    return Decoration.line({
+      class: `cm-live-preview-list-line cm-live-preview-list-level-${level}${nested}`,
+    });
+  },
+);
+
+/** Leading indent immediately before a ListMark, not quote/fence prefixes. */
+export function livePreviewListMarkerReplaceFrom(
+  lineFrom: number,
+  markFrom: number,
+  textBeforeMark: string,
+): number {
+  const indent = textBeforeMark.match(/[ \t]+$/);
+  return indent ? markFrom - indent[0].length : markFrom;
+}
+
+/** 1 = top-level list, 2 = nested, … */
+export function livePreviewListNestLevel(node: {
+  parent: { name: string; parent: unknown } | null;
+}): number {
+  let level = 0;
+  let current: { name: string; parent: unknown } | null = node.parent;
+  while (current) {
+    if (current.name === "BulletList" || current.name === "OrderedList") {
+      level += 1;
+    }
+    current = current.parent as { name: string; parent: unknown } | null;
+  }
+  return Math.max(1, Math.min(level || 1, MAX_LIVE_LIST_LEVEL));
+}
+
 class HighlightWidget extends WidgetType {
   constructor(readonly text: string) {
     super();
@@ -128,6 +166,8 @@ export function buildLivePreviewListMarkerDecorations(
   const tree = ensureLivePreviewViewportTree(view, parseTo);
   const { from: viewportFrom, to: viewportTo } =
     getLivePreviewDecorationRange(view);
+  const ranges: Array<{ from: number; to: number; deco: Decoration }> = [];
+  const decoratedLines = new Set<number>();
 
   tree.iterate({
     from: viewportFrom,
@@ -150,16 +190,38 @@ export function buildLivePreviewListMarkerDecorations(
       // Include trailing space after marker when present.
       let end = to;
       if (state.doc.sliceString(to, to + 1) === " ") end = to + 1;
-
-      builder.add(
+      // Nested items keep source indent (`  - `). Replace that prefix too so
+      // inactive second-level lines don't stay as raw markdown hyphens.
+      const replaceFrom = livePreviewListMarkerReplaceFrom(
+        line.from,
         from,
-        end,
-        Decoration.replace({
+        state.doc.sliceString(line.from, from),
+      );
+      const level = livePreviewListNestLevel(node.node);
+
+      if (!decoratedLines.has(line.from)) {
+        decoratedLines.add(line.from);
+        ranges.push({
+          from: line.from,
+          to: line.from,
+          deco: livePreviewListLineDecos[level - 1]!,
+        });
+      }
+
+      ranges.push({
+        from: replaceFrom,
+        to: end,
+        deco: Decoration.replace({
           widget: new BulletWidget(ordered, label),
         }),
-      );
+      });
     },
   });
+
+  ranges.sort((a, b) => a.from - b.from || a.to - b.to);
+  for (const range of ranges) {
+    builder.add(range.from, range.to, range.deco);
+  }
 
   return builder.finish();
 }

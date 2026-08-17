@@ -58,4 +58,13 @@ describe("live preview / reading visual parity", () => {
       /\[data-live-preview="true"\]\s+\.cm-live-preview-math\s+\.katex\s+\*\s*\{[^}]*word-break:\s*normal\s*!important/s,
     );
   });
+
+  it("indents inactive nested live list lines beyond the parent marker", () => {
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-list-level-2\s*\{[^}]*padding-left:\s*calc\(\s*var\(--pane-content-px\)\s*\+\s*var\(--mp-live-list-step\)/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-list-line\.is-nested::before\s*\{[^}]*background:\s*var\(--mp-doc-border/s,
+    );
+  });
 });

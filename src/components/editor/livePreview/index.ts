@@ -110,7 +110,9 @@ export {
   findHighlightRanges,
   livePreviewBlockquotes,
   livePreviewHighlights,
+  livePreviewListMarkerReplaceFrom,
   livePreviewListMarkers,
+  livePreviewListNestLevel,
 } from "./listAndHighlight";
 export { buildLivePreviewLinkDecorations, livePreviewLinks } from "./links";
 export {
