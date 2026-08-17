@@ -26,6 +26,18 @@ describe("live preview / reading visual parity", () => {
     );
   });
 
+  it("clips fenced code chrome to the text column", () => {
+    expect(editorCss).toMatch(
+      /\.cm-fenced-code-line\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s*\)/s,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-fenced-code-line-start\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s+round\s+1rem\s+1rem\s+0\s+0\s*\)/s,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-fenced-code-line-end\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s+round\s+0\s+0\s+1rem\s+1rem\s*\)/s,
+    );
+  });
+
   it("uses the same heading weight as Reading for h3–h6", () => {
     for (const level of [3, 4, 5, 6]) {
       expect(editorCss).toMatch(

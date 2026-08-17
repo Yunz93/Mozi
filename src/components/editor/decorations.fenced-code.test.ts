@@ -109,6 +109,9 @@ describe("editor fenced-code selection styles", () => {
       /\.editor-pane-layout\s+\.cm-fenced-code-line\s*\{[^}]*color-mix\([^)]*var\(--editor-code-block-bg\)[^)]*transparent/s,
     );
     expect(css).toMatch(
+      /\.editor-pane-layout\s+\.cm-fenced-code-line\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s*\)/s,
+    );
+    expect(css).toMatch(
       /\.editor-pane-layout\s+\.cm-content\s*\{[^}]*padding:\s*var\(--pane-content-top\)\s+0/s,
     );
     expect(css).toMatch(
