@@ -558,7 +558,15 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-mermaid .mermaid > svg": {
     display: "block",
+    maxWidth: "none",
+    width: "auto",
+    height: "auto",
     marginInline: "auto",
+  },
+  ".cm-live-preview-mermaid .mermaid svg svg": {
+    maxWidth: "none",
+    width: "auto",
+    height: "auto",
   },
   // Match Reading `.preview-note-embed` card chrome (translucent for selection).
   ".cm-live-preview-note-embed": {

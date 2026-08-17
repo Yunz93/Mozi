@@ -245,6 +245,9 @@ describe("buildExportStyles", () => {
     expect(lightCss).toMatch(
       /\.export-document \.markdown-body \.mermaid svg svg\s*\{[^}]*width:\s*auto !important/m,
     );
+    expect(lightCss).toMatch(
+      /\.export-document \.markdown-body \.mermaid > svg\s*\{[^}]*max-width:\s*100% !important/m,
+    );
   });
 
   it("aligns hr color with the preview border token", () => {

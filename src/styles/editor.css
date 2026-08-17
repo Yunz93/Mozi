@@ -1482,6 +1482,7 @@
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-mermaid {
   width: fit-content;
   max-width: calc(100% - 2 * var(--pane-content-px));
+  overflow-x: auto;
   text-align: center;
 }
 
@@ -1492,21 +1493,17 @@
   justify-content: center;
 }
 
-/* Match Reading: root diagram is a block SVG, so text-align cannot center it. */
+/* Match Reading: root diagram is a block SVG, so text-align cannot center it.
+   Keep natural width so wide flowcharts stay readable; the card scrolls. */
 .editor-pane-layout[data-live-preview="true"]
   .cm-live-preview-mermaid
   .mermaid
   > svg {
   display: block;
+  width: auto;
   height: auto;
-  margin-inline: auto;
-}
-
-.editor-pane-layout[data-live-preview="true"]
-  .cm-live-preview-mermaid
-  .mermaid
-  svg {
   max-width: none !important;
+  margin-inline: auto;
 }
 
 .editor-pane-layout[data-live-preview="true"]

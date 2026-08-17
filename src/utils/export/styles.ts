@@ -765,6 +765,7 @@ ${exportDelStrikeBlock}
       display: block;
       width: auto;
       height: auto;
+      max-width: 100% !important;
       margin: 0 auto;
     }
 
