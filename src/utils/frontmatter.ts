@@ -1,5 +1,5 @@
-import yaml from 'js-yaml';
-import type { Frontmatter, ParsedMarkdown } from '../types';
+import yaml from "js-yaml";
+import type { Frontmatter, ParsedMarkdown } from "../types";
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 
@@ -17,7 +17,7 @@ export function replaceFrontmatterInner(
   }
 
   const inner = match[1];
-  const lineEnding = /\r\n/.test(inner) ? '\r\n' : '\n';
+  const lineEnding = /\r\n/.test(match[0]) ? "\r\n" : "\n";
   const replacementInner = replacer(inner, { lineEnding });
   if (replacementInner === null) {
     return null;
@@ -35,15 +35,19 @@ export function replaceFrontmatterInner(
 
 function shouldQuoteYamlString(value: string): boolean {
   const trimmed = value.trim();
-  return /^\s|\s$/.test(value)
-    || /[\n\r]/.test(value)
-    || /^(true|false|null|~)$/i.test(trimmed)
-    || /^[+-]?\d+(?:\.\d+)?$/.test(trimmed)
-    || /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/.test(trimmed)
-    || /^[-?:@`!&*|>%{\[]/.test(trimmed)
-    || /:\s/.test(value)
-    || /^#/.test(trimmed)
-    || /\s#$/.test(value);
+  return (
+    /^\s|\s$/.test(value) ||
+    /[\n\r]/.test(value) ||
+    /^(true|false|null|~)$/i.test(trimmed) ||
+    /^[+-]?\d+(?:\.\d+)?$/.test(trimmed) ||
+    /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/.test(
+      trimmed,
+    ) ||
+    /^[-?:@`!&*|>%{\[]/.test(trimmed) ||
+    /:\s/.test(value) ||
+    /^#/.test(trimmed) ||
+    /\s#$/.test(value)
+  );
 }
 
 function formatYamlKey(key: string): string {
@@ -52,27 +56,27 @@ function formatYamlKey(key: string): string {
 
 /** String scalars as written after `key:` in YAML — matches generateFrontmatter / updateFrontmatter. */
 export function formatYamlStringScalar(value: string): string {
-  if (value === '') {
-    return '';
+  if (value === "") {
+    return "";
   }
   return shouldQuoteYamlString(value) ? JSON.stringify(value) : value;
 }
 
 function formatYamlScalar(value: unknown): string {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return formatYamlStringScalar(value);
   }
 
-  if (typeof value === 'number' || typeof value === 'boolean') {
+  if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
 
   if (value === null) {
-    return '';
+    return "";
   }
 
   if (value === undefined) {
-    return '';
+    return "";
   }
 
   return JSON.stringify(value);
@@ -81,7 +85,7 @@ function formatYamlScalar(value: unknown): string {
 function renderYamlValue(value: unknown): string[] {
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return ['- '];
+      return ["- "];
     }
 
     return value.flatMap((item) => {
@@ -90,14 +94,17 @@ function renderYamlValue(value: unknown): string[] {
         return [`- ${rendered[0]}`];
       }
 
-      return [`- ${rendered[0]}`, ...rendered.slice(1).map((line) => `  ${line}`)];
+      return [
+        `- ${rendered[0]}`,
+        ...rendered.slice(1).map((line) => `  ${line}`),
+      ];
     });
   }
 
-  if (value && typeof value === 'object') {
+  if (value && typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) {
-      return [''];
+      return [""];
     }
 
     return entries.flatMap(([key, nestedValue]) => {
@@ -125,9 +132,11 @@ function normalizeFrontmatterValue(value: unknown): unknown {
     return value.map((item) => normalizeFrontmatterValue(item));
   }
 
-  if (value && typeof value === 'object') {
+  if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [key, normalizeFrontmatterValue(nestedValue)])
+      Object.entries(value as Record<string, unknown>).map(
+        ([key, nestedValue]) => [key, normalizeFrontmatterValue(nestedValue)],
+      ),
     );
   }
 
@@ -139,7 +148,7 @@ function normalizeFrontmatterValue(value: unknown): unknown {
  */
 export function parseFrontmatter(content: string): ParsedMarkdown {
   if (!content) {
-    return { frontmatter: null, body: '' };
+    return { frontmatter: null, body: "" };
   }
 
   const match = content.match(FRONTMATTER_REGEX);
@@ -154,7 +163,7 @@ export function parseFrontmatter(content: string): ParsedMarkdown {
     const body = content.substring(match[0].length).trim();
     return { frontmatter, body };
   } catch (error) {
-    console.error('Frontmatter parsing error:', error);
+    console.error("Frontmatter parsing error:", error);
     // Return content without frontmatter if parsing fails
     return { frontmatter: null, body: content };
   }
@@ -165,15 +174,20 @@ export function parseFrontmatter(content: string): ParsedMarkdown {
  */
 export function generateFrontmatter(frontmatter: Frontmatter): string {
   try {
-    const entries = Object.entries(frontmatter).filter(([, value]) => value !== undefined);
+    const entries = Object.entries(frontmatter).filter(
+      ([, value]) => value !== undefined,
+    );
     if (entries.length === 0) {
-      return '';
+      return "";
     }
 
     const yamlLines = entries.flatMap(([key, value]) => {
       const rendered = renderYamlValue(value);
       if (Array.isArray(value)) {
-        return [`${formatYamlKey(key)}:`, ...rendered.map((line) => `  ${line}`)];
+        return [
+          `${formatYamlKey(key)}:`,
+          ...rendered.map((line) => `  ${line}`),
+        ];
       }
 
       if (rendered.length === 1) {
@@ -183,10 +197,10 @@ export function generateFrontmatter(frontmatter: Frontmatter): string {
       return [`${formatYamlKey(key)}:`, ...rendered.map((line) => `  ${line}`)];
     });
 
-    return `---\n${yamlLines.join('\n')}\n---\n\n`;
+    return `---\n${yamlLines.join("\n")}\n---\n\n`;
   } catch (error) {
-    console.error('Frontmatter generation error:', error);
-    return '';
+    console.error("Frontmatter generation error:", error);
+    return "";
   }
 }
 
@@ -195,7 +209,7 @@ export function generateFrontmatter(frontmatter: Frontmatter): string {
  */
 export function updateFrontmatter(
   content: string,
-  newFrontmatter: Frontmatter
+  newFrontmatter: Frontmatter,
 ): string {
   const parsed = parseFrontmatter(content);
   const mergedFrontmatter = { ...parsed.frontmatter, ...newFrontmatter };
@@ -204,8 +218,8 @@ export function updateFrontmatter(
   if (frontmatterBlock) {
     const match = content.match(FRONTMATTER_REGEX);
     const rawBody = match
-      ? content.slice(match[0].length).replace(/^\r?\n/, '')
-      : content.replace(/^\r?\n/, '');
+      ? content.slice(match[0].length).replace(/^\r?\n/, "")
+      : content.replace(/^\r?\n/, "");
 
     return frontmatterBlock + rawBody;
   }
@@ -226,7 +240,7 @@ export function removeFrontmatter(content: string): string {
  */
 export function getFrontmatterValue(
   content: string,
-  key: string
+  key: string,
 ): Frontmatter[keyof Frontmatter] | null {
   const parsed = parseFrontmatter(content);
   return parsed.frontmatter?.[key] ?? null;
@@ -238,7 +252,7 @@ export function getFrontmatterValue(
 export function setFrontmatterValue(
   content: string,
   key: string,
-  value: string | string[]
+  value: string | string[],
 ): string {
   const parsed = parseFrontmatter(content);
   const updatedFrontmatter = {

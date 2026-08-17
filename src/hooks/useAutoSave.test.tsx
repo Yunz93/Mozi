@@ -3,7 +3,7 @@
 import React from "react";
 import { render, act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useAppStore } from "../store/appStore";
+import { useAppStore, defaultSettings } from "../store/appStore";
 import { useAutoSave } from "./useAutoSave";
 
 const { writeFile } = vi.hoisted(() => ({
@@ -17,7 +17,6 @@ vi.mock("../types/filesystem", () => ({
 const NOTE_ID = "/vault/note.md";
 
 function setupStore(autoSaveInterval: number) {
-  const base = useAppStore.getState();
   useAppStore.setState({
     files: [],
     openTabs: [NOTE_ID],
@@ -25,7 +24,11 @@ function setupStore(autoSaveInterval: number) {
     currentFilePath: NOTE_ID,
     fileContents: { [NOTE_ID]: "original" },
     lastSavedContent: { [NOTE_ID]: "original" },
-    settings: { ...base.settings, autoSaveInterval },
+    settings: {
+      ...defaultSettings,
+      autoSaveInterval,
+      fillMissingFrontmatterOnSave: false,
+    },
   });
 }
 
@@ -43,7 +46,6 @@ function setupDocumentWithUpdateTime() {
     "Body",
   ].join("\n");
 
-  const base = useAppStore.getState();
   useAppStore.setState({
     files: [],
     openTabs: [NOTE_ID],
@@ -53,7 +55,7 @@ function setupDocumentWithUpdateTime() {
     lastSavedContent: { [NOTE_ID]: doc },
     isSaving: false,
     settings: {
-      ...base.settings,
+      ...defaultSettings,
       autoSaveInterval: 60_000,
       fillMissingFrontmatterOnSave: false,
     },
@@ -81,6 +83,7 @@ afterEach(() => {
     fileContents: {},
     lastSavedContent: {},
     isSaving: false,
+    settings: defaultSettings,
   });
 });
 
@@ -275,7 +278,10 @@ describe("useAutoSave", () => {
     });
 
     expect(writeFile).toHaveBeenCalledWith(NOTE_ID, `${doc}\n\nEdited`);
-    expect(writeFile.mock.calls[0]?.[1]).not.toContain("slug:");
+    const savedWithoutSlug = (
+      writeFile.mock.calls[0] as unknown as [string, string]
+    )[1];
+    expect(savedWithoutSlug).not.toContain("slug:");
   });
 
   it("does not fill missing frontmatter fields during auto-save", async () => {
@@ -311,7 +317,10 @@ describe("useAutoSave", () => {
     });
 
     expect(writeFile).toHaveBeenCalledWith(NOTE_ID, `${doc}\n\nEdited`);
-    expect(writeFile.mock.calls[0]?.[1]).not.toContain("slug:");
+    const savedWithoutSlug = (
+      writeFile.mock.calls[0] as unknown as [string, string]
+    )[1];
+    expect(savedWithoutSlug).not.toContain("slug:");
   });
 
   it("queues a single auto follow-up save when the user edits during manual save", async () => {
