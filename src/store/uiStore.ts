@@ -150,6 +150,7 @@ export const defaultSettings: AppSettings = {
   fontSize: 16,
   wordWrap: true,
   formatMarkdownOnManualSave: false,
+  fillMissingFrontmatterOnSave: true,
   refreshFrontmatterOnSave: true,
   autoPairBrackets: true,
   autoPairMarkdown: true,

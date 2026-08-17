@@ -676,7 +676,10 @@ export default {
   settings_seconds: "{count} s",
   settings_minutes: "{count} min",
 
-  settings_refreshFrontmatterOnSave: "Auto-fill on save",
+  settings_fillMissingFrontmatterOnSave: "Auto-fill on save",
+  settings_fillMissingFrontmatterOnSaveDesc:
+    "On manual save, fill missing frontmatter fields from the metadata template. Existing fields are not overwritten. Auto-save does not trigger this.",
+  settings_refreshFrontmatterOnSave: "Update modified time on save",
   settings_refreshFrontmatterOnSaveDesc:
     "On manual save, automatically refresh frontmatter update-time fields (such as date modified / update_time). Auto-save does not trigger this.",
   settings_metadataTemplate: "Metadata Template",

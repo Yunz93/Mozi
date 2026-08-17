@@ -1,6 +1,7 @@
 import type { Frontmatter, MetadataField } from "../types";
 import {
   formatYamlStringScalar,
+  generateFrontmatter,
   parseFrontmatter,
   replaceFrontmatterInner,
   updateFrontmatter,
@@ -432,4 +433,86 @@ export function refreshDocumentUpdateTime(content: string): string {
   }
 
   return legacyRefreshDocumentUpdateTime(content, frontmatter);
+}
+
+function collectMissingFrontmatterFields(
+  existing: Frontmatter,
+  fields: MetadataField[],
+): Frontmatter {
+  const existingLower = new Set(
+    Object.keys(existing).map((key) => key.trim().toLowerCase()),
+  );
+  const additions: Frontmatter = {};
+  const seenTemplateLower = new Set<string>();
+
+  for (const field of fields) {
+    const key = field.key.trim();
+    if (!key) continue;
+
+    const keyLower = key.toLowerCase();
+    if (seenTemplateLower.has(keyLower)) continue;
+    seenTemplateLower.add(keyLower);
+    if (existingLower.has(keyLower)) continue;
+
+    additions[key] = parseMetadataTemplateValue(field.defaultValue);
+  }
+
+  return additions;
+}
+
+/**
+ * Add metadata-template keys that are missing from frontmatter.
+ * Existing keys are left unchanged (including empty values). Auto-save callers
+ * should skip this; parse errors with `---` fences are left untouched.
+ */
+export function fillMissingFrontmatterFields(
+  content: string,
+  fields: MetadataField[],
+): string {
+  if (fields.length === 0) {
+    return content;
+  }
+
+  const { frontmatter, body } = parseFrontmatter(content);
+  const fenceProbe = replaceFrontmatterInner(content, (inner) => inner);
+  const hasFrontmatterFences = fenceProbe !== null;
+
+  if (hasFrontmatterFences && frontmatter === null && body === content) {
+    return content;
+  }
+
+  const additions = collectMissingFrontmatterFields(frontmatter ?? {}, fields);
+  if (Object.keys(additions).length === 0) {
+    return content;
+  }
+
+  if (!hasFrontmatterFences) {
+    return `${generateFrontmatter(additions)}${content}`;
+  }
+
+  const surgical = replaceFrontmatterInner(content, (inner, { lineEnding }) => {
+    const generated = generateFrontmatter(additions);
+    const generatedMatch = generated.match(/^---\n([\s\S]*?)\n---\n\n$/);
+    if (!generatedMatch) {
+      return null;
+    }
+
+    const additionInner = generatedMatch[1].split("\n").join(lineEnding);
+    if (!additionInner) {
+      return null;
+    }
+
+    const innerTrimEnd = inner.replace(/(?:\r?\n)+$/, "");
+    if (innerTrimEnd.length === 0) {
+      return additionInner;
+    }
+
+    return `${innerTrimEnd}${lineEnding}${additionInner}`;
+  });
+
+  if (surgical !== null) {
+    return surgical;
+  }
+
+  return updateFrontmatter(content, additions);
 }

@@ -8,7 +8,10 @@ import {
 } from "../utils/draftBackup";
 import { getFileSystem } from "../types/filesystem";
 import { withErrorHandling, FileSystemError } from "../utils/errorHandler";
-import { refreshDocumentUpdateTime } from "../utils/metadataFields";
+import {
+  fillMissingFrontmatterFields,
+  refreshDocumentUpdateTime,
+} from "../utils/metadataFields";
 import { t } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
 import {
@@ -330,14 +333,27 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
             })
           : currentContent;
 
-        const shouldRefreshFrontmatter =
-          options?.trigger !== "auto" &&
-          settings.refreshFrontmatterOnSave !== false &&
-          isMarkdownDocumentPath(savePath);
+        const shouldApplyFrontmatterOnSave =
+          options?.trigger !== "auto" && isMarkdownDocumentPath(savePath);
 
-        contentToSave = shouldRefreshFrontmatter
-          ? refreshDocumentUpdateTime(preparedContent)
-          : preparedContent;
+        contentToSave = preparedContent;
+
+        if (
+          shouldApplyFrontmatterOnSave &&
+          settings.fillMissingFrontmatterOnSave !== false
+        ) {
+          contentToSave = fillMissingFrontmatterFields(
+            contentToSave,
+            settings.metadataFields,
+          );
+        }
+
+        if (
+          shouldApplyFrontmatterOnSave &&
+          settings.refreshFrontmatterOnSave !== false
+        ) {
+          contentToSave = refreshDocumentUpdateTime(contentToSave);
+        }
 
         // Check if content has changed (compare post-transform payload for manual saves)
         if (contentToSave === lastSavedContentRef.current) {
@@ -477,6 +493,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       retryDelayMs,
       settings.orderedListMode,
       settings.language,
+      settings.fillMissingFrontmatterOnSave,
+      settings.metadataFields,
       settings.refreshFrontmatterOnSave,
     ],
   );

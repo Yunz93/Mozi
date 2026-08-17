@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   refreshDocumentUpdateTime,
+  fillMissingFrontmatterFields,
   parseMetadataTemplateValue,
   normalizeMetadataFields,
   DEFAULT_METADATA_FIELDS,
@@ -812,5 +813,108 @@ describe("normalizeMetadataFields", () => {
     expect(result).toEqual([
       { key: "title", defaultValue: "draft", description: "" },
     ]);
+  });
+});
+
+describe("fillMissingFrontmatterFields", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-11T12:34:56.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const fields = [
+    { key: "status", defaultValue: "draft", description: "" },
+    { key: "slug", defaultValue: "from-template", description: "" },
+    { key: "date modified", defaultValue: "{now:datetime}", description: "" },
+  ];
+
+  it("appends missing keys without rewriting existing frontmatter layout", () => {
+    const doc = [
+      "---",
+      "status: published",
+      "",
+      "# keep me",
+      "---",
+      "",
+      "Hello body",
+    ].join("\n");
+
+    const next = fillMissingFrontmatterFields(doc, fields);
+
+    expect(next).toContain("status: published");
+    expect(next).toContain("\n\n# keep me\n");
+    expect(next).toContain("slug: from-template");
+    expect(next).toMatch(
+      /date modified: "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"/,
+    );
+    expect(next.endsWith("\n\nHello body")).toBe(true);
+  });
+
+  it("does not overwrite existing keys, including empty values", () => {
+    const doc = ["---", "status: published", "slug:", "---", "", "Body"].join(
+      "\n",
+    );
+
+    const next = fillMissingFrontmatterFields(doc, fields);
+
+    expect(next).toContain("status: published");
+    expect(next).toMatch(/^slug:\s*$/m);
+    expect(next).not.toContain("slug: from-template");
+    expect(next).toContain("date modified:");
+  });
+
+  it("matches existing keys case-insensitively and skips duplicate template keys", () => {
+    const doc = ["---", "Status: published", "---", "", "Body"].join("\n");
+    const next = fillMissingFrontmatterFields(doc, [
+      { key: "status", defaultValue: "draft", description: "" },
+      { key: "Status", defaultValue: "other", description: "" },
+      { key: "slug", defaultValue: "hello", description: "" },
+    ]);
+
+    expect(next).toContain("Status: published");
+    expect(next).not.toContain("status: draft");
+    expect(next).not.toContain("Status: other");
+    expect(next).toContain("slug: hello");
+  });
+
+  it("prepends a frontmatter block when the document has none", () => {
+    const doc = "Hello world\n";
+    const next = fillMissingFrontmatterFields(doc, [
+      { key: "status", defaultValue: "draft", description: "" },
+    ]);
+
+    expect(next.startsWith("---\n")).toBe(true);
+    expect(next).toContain("status: draft");
+    expect(next.endsWith("Hello world\n")).toBe(true);
+  });
+
+  it("leaves invalid frontmatter unchanged", () => {
+    const doc = ["---", "status: [", "---", "", "Body"].join("\n");
+    expect(fillMissingFrontmatterFields(doc, fields)).toBe(doc);
+  });
+
+  it("skips empty template keys and no-ops on an empty template", () => {
+    const doc = ["---", "title: keep", "---", "", "Body"].join("\n");
+    expect(fillMissingFrontmatterFields(doc, [])).toBe(doc);
+    expect(
+      fillMissingFrontmatterFields(doc, [
+        { key: "   ", defaultValue: "nope", description: "" },
+      ]),
+    ).toBe(doc);
+  });
+
+  it("preserves CRLF line endings when appending missing keys", () => {
+    const doc = "---\r\nstatus: published\r\n---\r\n\r\nBody";
+    const next = fillMissingFrontmatterFields(doc, [
+      { key: "slug", defaultValue: "hello", description: "" },
+    ]);
+
+    expect(next.startsWith("---\r\n")).toBe(true);
+    expect(next).toContain("\r\nslug: hello\r\n");
+    expect(next.endsWith("\r\n\r\nBody")).toBe(true);
   });
 });

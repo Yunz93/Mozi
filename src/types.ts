@@ -191,6 +191,8 @@ export interface AppSettings {
   fontSize: number;
   wordWrap: boolean;
   formatMarkdownOnManualSave: boolean;
+  /** When true, manual/system saves fill missing frontmatter keys from the metadata template. */
+  fillMissingFrontmatterOnSave: boolean;
   /** When true, manual/system saves refresh frontmatter update-time fields. */
   refreshFrontmatterOnSave: boolean;
   autoPairBrackets: boolean;
