@@ -76,6 +76,8 @@ describe("defaultSettings", () => {
     expect(defaultSettings.tabSize).toBe(4);
     expect(defaultSettings.readableLineLength).toBe(true);
     expect(defaultSettings.convertHtmlOnPaste).toBe(true);
+    expect(defaultSettings.fillMissingFrontmatterOnSave).toBe(true);
+    expect(defaultSettings.refreshFrontmatterOnSave).toBe(true);
   });
 });
 

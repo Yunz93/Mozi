@@ -52,7 +52,11 @@ function setupDocumentWithUpdateTime() {
     fileContents: { [NOTE_ID]: doc },
     lastSavedContent: { [NOTE_ID]: doc },
     isSaving: false,
-    settings: { ...base.settings, autoSaveInterval: 60_000 },
+    settings: {
+      ...base.settings,
+      autoSaveInterval: 60_000,
+      fillMissingFrontmatterOnSave: false,
+    },
   });
 
   return doc;
@@ -187,6 +191,127 @@ describe("useAutoSave", () => {
     expect(edited).toContain("date modified: 2020-01-01 00:00:00");
     expect(useAppStore.getState().fileContents[NOTE_ID]).toBe(edited);
     expect(useAppStore.getState().isSaving).toBe(false);
+  });
+
+  it("fills missing frontmatter fields from the metadata template on manual save", async () => {
+    const doc = ["---", "status: published", "---", "", "Body"].join("\n");
+    const base = useAppStore.getState();
+    useAppStore.setState({
+      files: [],
+      openTabs: [NOTE_ID],
+      activeTabId: NOTE_ID,
+      currentFilePath: NOTE_ID,
+      fileContents: { [NOTE_ID]: doc },
+      lastSavedContent: { [NOTE_ID]: doc },
+      isSaving: false,
+      settings: {
+        ...base.settings,
+        autoSaveInterval: 60_000,
+        fillMissingFrontmatterOnSave: true,
+        refreshFrontmatterOnSave: false,
+        metadataFields: [
+          { key: "status", defaultValue: "draft", description: "" },
+          { key: "slug", defaultValue: "from-template", description: "" },
+        ],
+      },
+    });
+
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+    writeFile.mockClear();
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "manual" });
+    });
+
+    const savedContent = (
+      writeFile.mock.calls[0] as unknown as [string, string]
+    )[1];
+    expect(savedContent).toContain("status: published");
+    expect(savedContent).toContain("slug: from-template");
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBe(savedContent);
+  });
+
+  it("skips filling missing frontmatter fields when fillMissingFrontmatterOnSave is off", async () => {
+    const doc = ["---", "status: published", "---", "", "Body"].join("\n");
+    const base = useAppStore.getState();
+    useAppStore.setState({
+      files: [],
+      openTabs: [NOTE_ID],
+      activeTabId: NOTE_ID,
+      currentFilePath: NOTE_ID,
+      fileContents: { [NOTE_ID]: `${doc}\n\nEdited` },
+      lastSavedContent: { [NOTE_ID]: doc },
+      isSaving: false,
+      settings: {
+        ...base.settings,
+        autoSaveInterval: 60_000,
+        fillMissingFrontmatterOnSave: false,
+        refreshFrontmatterOnSave: false,
+        metadataFields: [
+          { key: "slug", defaultValue: "from-template", description: "" },
+        ],
+      },
+    });
+
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+    writeFile.mockClear();
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "manual" });
+    });
+
+    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, `${doc}\n\nEdited`);
+    expect(writeFile.mock.calls[0]?.[1]).not.toContain("slug:");
+  });
+
+  it("does not fill missing frontmatter fields during auto-save", async () => {
+    const doc = ["---", "status: published", "---", "", "Body"].join("\n");
+    const base = useAppStore.getState();
+    useAppStore.setState({
+      files: [],
+      openTabs: [NOTE_ID],
+      activeTabId: NOTE_ID,
+      currentFilePath: NOTE_ID,
+      fileContents: { [NOTE_ID]: doc },
+      lastSavedContent: { [NOTE_ID]: doc },
+      isSaving: false,
+      settings: {
+        ...base.settings,
+        autoSaveInterval: 300,
+        fillMissingFrontmatterOnSave: true,
+        refreshFrontmatterOnSave: true,
+        metadataFields: [
+          { key: "slug", defaultValue: "from-template", description: "" },
+        ],
+      },
+    });
+
+    render(<Harness debounceMs={300} />);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, `${doc}\n\nEdited`);
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, `${doc}\n\nEdited`);
+    expect(writeFile.mock.calls[0]?.[1]).not.toContain("slug:");
   });
 
   it("queues a single auto follow-up save when the user edits during manual save", async () => {

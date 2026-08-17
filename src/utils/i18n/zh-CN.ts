@@ -630,7 +630,10 @@ export default {
   settings_seconds: "{count} 秒",
   settings_minutes: "{count} 分钟",
 
-  settings_refreshFrontmatterOnSave: "保存时自动填充",
+  settings_fillMissingFrontmatterOnSave: "保存时自动填充",
+  settings_fillMissingFrontmatterOnSaveDesc:
+    "手动保存时按元数据模板补全 frontmatter 中缺失的字段。已有字段不会被覆盖。自动保存不会触发。",
+  settings_refreshFrontmatterOnSave: "自动更新时间字段",
   settings_refreshFrontmatterOnSaveDesc:
     "手动保存时自动更新 frontmatter 中的修改时间字段（如 date modified / update_time）。自动保存不会触发。",
   settings_metadataTemplate: "元数据模板",
