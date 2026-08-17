@@ -1317,7 +1317,7 @@
   max-width: 100%;
 }
 
-/* Live table: stay in the text column; scroll wide tables inside the wrap. */
+/* Live table: same column width as headings/paragraphs; wrap cells inside. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
   box-sizing: border-box;
   width: 100%;
@@ -1328,19 +1328,19 @@
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
-  width: max-content;
-  min-width: 100%;
-  max-width: none;
-  table-layout: auto;
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th,
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table td {
   white-space: normal;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-  min-width: 3.5em;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
   line-height: 1.45;
+  text-align: left;
   border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.26));
 }
 

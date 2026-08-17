@@ -863,7 +863,7 @@
   width: 100%;
   max-width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
   color: var(--mp-doc-text, #1f2937);
 }
 
@@ -893,6 +893,10 @@
 .preview-pane-document.markdown-body table td {
   border: 1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.26));
   color: inherit;
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .preview-pane-document.markdown-body ul,

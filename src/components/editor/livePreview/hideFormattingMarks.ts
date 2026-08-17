@@ -167,7 +167,16 @@ export function buildLivePreviewHideDecorations(
           return;
         }
         if (shouldRevealMark(state, name, from, to)) return;
-        ranges.push({ from, to, deco: hideMarkDecoration });
+        let hideTo = to;
+        // ATX HeaderMark is just the hashes; the following space would otherwise
+        // indent heading text relative to paragraphs and tables.
+        if (name === "HeaderMark") {
+          const line = state.doc.lineAt(from);
+          const rest = state.doc.sliceString(to, line.to);
+          const spaces = rest.match(/^[ \t]+/);
+          if (spaces) hideTo = to + spaces[0].length;
+        }
+        ranges.push({ from, to: hideTo, deco: hideMarkDecoration });
         return;
       }
 
@@ -362,11 +371,11 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-table": {
     borderCollapse: "collapse",
-    // Fill the column when narrow; grow for wide content (wrap scrolls).
-    width: "max-content",
-    minWidth: "100%",
-    maxWidth: "none",
-    tableLayout: "auto",
+    // Same width as headings/paragraphs; wrap cells instead of shrinking
+    // the table into a narrower block (行宽不统一).
+    width: "100%",
+    maxWidth: "100%",
+    tableLayout: "fixed",
     fontSize: "0.95em",
     color: "var(--mp-doc-text, #1f2937)",
   },
@@ -375,13 +384,15 @@ export const livePreviewTheme = EditorView.baseTheme({
     padding: "0.45em 0.75em",
     verticalAlign: "top",
     cursor: "text",
-    minWidth: "3.5em",
+    minWidth: 0,
     lineHeight: "1.45",
     color: "inherit",
+    // UA default is center on <th> and left on <td> — unify unless GFM align is set.
+    textAlign: "left",
     // Override `.cm-lineWrapping { overflow-wrap: anywhere }` inheritance.
     whiteSpace: "normal",
-    wordBreak: "keep-all",
-    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
   },
   // Keep fills translucent (like fenced-code) so cm-selectionBackground
   // shows through evenly during full-document selection.

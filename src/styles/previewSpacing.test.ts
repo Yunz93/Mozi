@@ -148,8 +148,14 @@ describe("preview spacing CSS", () => {
     expect(css).toMatch(
       /\.preview-pane-document\.markdown-body table\s*\{[^}]*display:\s*table;[^}]*width:\s*100%;[^}]*max-width:\s*100%;/m,
     );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body table\s*\{[^}]*table-layout:\s*fixed;/m,
+    );
     expect(css).not.toMatch(
       /\.preview-pane-document\.markdown-body table\s*\{[^}]*width:\s*max-content;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body table th,\s*\n\.preview-pane-document\.markdown-body table td\s*\{[^}]*text-align:\s*left;/m,
     );
   });
 });

@@ -114,10 +114,11 @@ function renderInlineCell(text: string): string {
 
 function alignStyle(alignments: ColumnAlignment[], index: number): string {
   const a = alignments[index];
-  if (a === "left" || a === "center" || a === "right") {
+  if (a === "center" || a === "right") {
     return `text-align:${a}`;
   }
-  return "";
+  // GFM `| --- |` ("none") and `:---` ("left"): keep header and body aligned.
+  return "text-align:left";
 }
 
 function tableAtDocPos(

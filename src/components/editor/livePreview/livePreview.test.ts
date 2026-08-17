@@ -112,6 +112,16 @@ describe("live preview hide formatting", () => {
     expect(hiddenTexts.some((text) => text.includes("#"))).toBe(true);
   });
 
+  it("hides the space after ATX hashes so heading text lines up with body text", () => {
+    const view = mount("## 需求列表\n\n正文", 10);
+    const deco = buildLivePreviewHideDecorations(view);
+    const hiddenTexts: string[] = [];
+    deco.between(0, view.state.doc.length, (from, to) => {
+      hiddenTexts.push(view.state.doc.sliceString(from, to));
+    });
+    expect(hiddenTexts).toContain("## ");
+  });
+
   it("replaces task markers with widgets when inactive", () => {
     const view = mount("- [ ] todo\n\naway", 14);
     const deco = buildLivePreviewTaskDecorations(view);
@@ -318,7 +328,8 @@ describe("live preview hide formatting", () => {
     );
     expect(headerTexts).toEqual(["模块", "需求", "优先级", "说明"]);
 
-    // Wide tables scroll inside the wrap; CJK keep-all avoids one-glyph columns.
+    // Same column width as headings/paragraphs; cells wrap instead of
+    // shrinking the table. Header/body share left alignment by default.
     const sheetText = Array.from(document.querySelectorAll("style"))
       .map((node) => node.textContent ?? "")
       .join("\n");
@@ -328,16 +339,55 @@ describe("live preview hide formatting", () => {
     expect(sheetText).toMatch(
       /cm-live-preview-table-wrap[^}]*contain:\s*inline-size/,
     );
+    expect(sheetText).toMatch(/\.cm-live-preview-table\s*\{[^}]*width:\s*100%/);
     expect(sheetText).toMatch(
+      /\.cm-live-preview-table\s*\{[^}]*max-width:\s*100%/,
+    );
+    expect(sheetText).toMatch(
+      /\.cm-live-preview-table\s*\{[^}]*table-layout:\s*fixed/,
+    );
+    expect(sheetText).not.toMatch(
       /\.cm-live-preview-table\s*\{[^}]*width:\s*max-content/,
     );
+    expect(sheetText).toMatch(/word-break:\s*break-word/);
     expect(sheetText).toMatch(
-      /\.cm-live-preview-table\s*\{[^}]*min-width:\s*100%/,
+      /cm-live-preview-table td[^}]*text-align:\s*left/,
     );
-    expect(sheetText).toMatch(/word-break:\s*keep-all/);
     expect(sheetText).toMatch(
       /cm-live-preview-table th\s*\{[^}]*white-space:\s*normal/,
     );
+
+    const firstHeader = table!.querySelector("th") as HTMLElement | null;
+    const firstBody = table!.querySelector("td") as HTMLElement | null;
+    expect(firstHeader?.style.textAlign).toBe("left");
+    expect(firstBody?.style.textAlign).toBe("left");
+  });
+
+  it("honors GFM column alignment on live table cells", () => {
+    const doc = [
+      "| left | mid | right |",
+      "| :--- | :---: | ---: |",
+      "| a | b | c |",
+      "",
+      "away",
+    ].join("\n");
+    const view = mount(doc, doc.length - 1, [livePreviewTables]);
+    const table = view.dom.querySelector(
+      ".cm-live-preview-table",
+    ) as HTMLTableElement | null;
+    expect(table).not.toBeNull();
+    const headers = Array.from(table!.querySelectorAll("th")) as HTMLElement[];
+    expect(headers.map((cell) => cell.style.textAlign)).toEqual([
+      "left",
+      "center",
+      "right",
+    ]);
+    const body = Array.from(table!.querySelectorAll("td")) as HTMLElement[];
+    expect(body.map((cell) => cell.style.textAlign)).toEqual([
+      "left",
+      "center",
+      "right",
+    ]);
   });
 
   it("escapes pipes and newlines when committing a live table cell", async () => {
