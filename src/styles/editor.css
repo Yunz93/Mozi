@@ -1227,16 +1227,31 @@
 }
 
 /* Plain `>` quotes: Reading blockquote chrome on CM lines.
-   Fill is clipped to the content box (after `.cm-line` padding) so the quote
-   sits in the same column as headings; the bar is painted at that inset. */
+   Extra inline padding keeps wrapped / lazy-continuation text off the bar.
+   Fill is painted from `--pane-content-px` so it stays in the text column
+   (not full-bleed into the pane gutter) while covering that inner pad. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-blockquote {
+  --mp-live-quote-inline-pad: 1rem;
   color: var(--mp-doc-quote-text, #5b21b6);
-  background: color-mix(
-    in srgb,
-    var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 70%,
-    transparent
+  padding-left: calc(var(--pane-content-px) + var(--mp-live-quote-inline-pad));
+  background-color: transparent;
+  background-image: linear-gradient(
+    color-mix(
+      in srgb,
+      var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 70%,
+      transparent
+    ),
+    color-mix(
+      in srgb,
+      var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 70%,
+      transparent
+    )
   );
-  background-clip: content-box;
+  background-repeat: no-repeat;
+  background-origin: padding-box;
+  background-clip: padding-box;
+  background-position: var(--pane-content-px) 0;
+  background-size: calc(100% - (2 * var(--pane-content-px))) 100%;
   box-shadow: none;
 }
 
@@ -1248,6 +1263,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
+  pointer-events: none;
   background: var(--mp-doc-accent, rgba(124, 58, 237, 0.28));
 }
 
@@ -1274,8 +1290,10 @@
   .editor-pane-layout[data-live-preview="true"]
   .cm-live-preview-blockquote {
   color: var(--mp-doc-quote-text, #ddd6fe);
-  background: var(--mp-doc-quote-bg, rgba(192, 132, 252, 0.06));
-  background-clip: content-box;
+  background-image: linear-gradient(
+    var(--mp-doc-quote-bg, rgba(192, 132, 252, 0.06)),
+    var(--mp-doc-quote-bg, rgba(192, 132, 252, 0.06))
+  );
   box-shadow: none;
 }
 

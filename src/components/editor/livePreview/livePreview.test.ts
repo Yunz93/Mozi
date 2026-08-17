@@ -122,6 +122,17 @@ describe("live preview hide formatting", () => {
     expect(hiddenTexts).toContain("## ");
   });
 
+  it("hides the space after quote marks so wrapped quote text stays off the bar", () => {
+    const doc = "> quoted line\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewHideDecorations(view);
+    const hiddenTexts: string[] = [];
+    deco.between(0, view.state.doc.length, (from, to) => {
+      hiddenTexts.push(view.state.doc.sliceString(from, to));
+    });
+    expect(hiddenTexts).toContain("> ");
+  });
+
   it("replaces task markers with widgets when inactive", () => {
     const view = mount("- [ ] todo\n\naway", 14);
     const deco = buildLivePreviewTaskDecorations(view);

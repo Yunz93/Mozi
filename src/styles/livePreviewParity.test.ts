@@ -16,7 +16,10 @@ describe("live preview / reading visual parity", () => {
 
   it("clips blockquote fill to the text column instead of full-bleed inset shadow", () => {
     expect(editorCss).toMatch(
-      /\[data-live-preview="true"\]\s+\.cm-live-preview-blockquote\s*\{[^}]*background-clip:\s*content-box/s,
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-blockquote\s*\{[^}]*padding-left:\s*calc\(\s*var\(--pane-content-px\)\s*\+\s*var\(--mp-live-quote-inline-pad\)\)/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-blockquote\s*\{[^}]*background-position:\s*var\(--pane-content-px\)/s,
     );
     expect(editorCss).toMatch(
       /\.cm-live-preview-blockquote::before\s*\{[^}]*left:\s*var\(--pane-content-px\)/s,
