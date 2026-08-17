@@ -542,7 +542,7 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-mermaid": {
     display: "block",
     boxSizing: "border-box",
-    width: "calc(100% - 2 * var(--pane-content-px))",
+    width: "fit-content",
     maxWidth: "calc(100% - 2 * var(--pane-content-px))",
     marginInline: "var(--pane-content-px)",
     overflowX: "auto",

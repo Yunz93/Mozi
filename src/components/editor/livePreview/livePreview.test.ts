@@ -262,6 +262,9 @@ describe("live preview hide formatting", () => {
       /cm-live-preview-mermaid[^}]*margin-inline:\s*var\(--pane-content-px\)/,
     );
     expect(sheetText).toMatch(
+      /cm-live-preview-mermaid[^}]*width:\s*fit-content/,
+    );
+    expect(sheetText).toMatch(
       /cm-live-preview-note-embed[^}]*margin-inline:\s*var\(--pane-content-px\)/,
     );
     expect(sheetText).toMatch(

@@ -26,21 +26,22 @@ describe("live preview / reading visual parity", () => {
     );
   });
 
-  it("clips fenced code chrome to the text column", () => {
+  it("paints fenced code chrome in the text column instead of clipping the line", () => {
     expect(editorCss).toMatch(
-      /\.cm-fenced-code-line\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s*\)/s,
+      /\.cm-fenced-code-line::before\s*\{[^}]*left:\s*var\(--pane-content-px\)/s,
     );
     expect(editorCss).toMatch(
-      /\.cm-fenced-code-line-start\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s+round\s+1rem\s+1rem\s+0\s+0\s*\)/s,
+      /\.cm-fenced-code-line::before\s*\{[^}]*right:\s*var\(--pane-content-px\)/s,
     );
-    expect(editorCss).toMatch(
-      /\.cm-fenced-code-line-end\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s+round\s+0\s+0\s+1rem\s+1rem\s*\)/s,
-    );
+    expect(editorCss).not.toMatch(/\.cm-fenced-code-line\s*\{[^}]*clip-path:/s);
   });
 
   it("centers live mermaid diagrams in the text column", () => {
     expect(editorCss).toMatch(
-      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s*\{[^}]*width:\s*calc\(100% - 2 \* var\(--pane-content-px\)\)/s,
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s*\{[^}]*width:\s*fit-content/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s*\{[^}]*max-width:\s*calc\(100% - 2 \* var\(--pane-content-px\)\)/s,
     );
     expect(editorCss).toMatch(
       /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s+\.mermaid\s*\{[^}]*justify-content:\s*center/s,
