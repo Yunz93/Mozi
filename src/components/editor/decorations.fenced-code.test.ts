@@ -106,10 +106,10 @@ describe("editor fenced-code selection styles", () => {
     );
 
     expect(css).toMatch(
-      /\.editor-pane-layout\s+\.cm-fenced-code-line\s*\{[^}]*color-mix\([^)]*var\(--editor-code-block-bg\)[^)]*transparent/s,
+      /\.editor-pane-layout\s+\.cm-fenced-code-line::before\s*\{[^}]*color-mix\([^)]*var\(--editor-code-block-bg\)[^)]*transparent/s,
     );
     expect(css).toMatch(
-      /\.editor-pane-layout\s+\.cm-fenced-code-line\s*\{[^}]*clip-path:\s*inset\(\s*0\s+var\(--pane-content-px\)\s*\)/s,
+      /\.editor-pane-layout\s+\.cm-fenced-code-line::before\s*\{[^}]*left:\s*var\(--pane-content-px\)/s,
     );
     expect(css).toMatch(
       /\.editor-pane-layout\s+\.cm-content\s*\{[^}]*padding:\s*var\(--pane-content-top\)\s+0/s,

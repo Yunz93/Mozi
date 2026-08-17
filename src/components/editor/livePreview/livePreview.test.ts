@@ -273,6 +273,9 @@ describe("live preview hide formatting", () => {
       /cm-live-preview-mermaid[^}]*margin-inline:\s*var\(--pane-content-px\)/,
     );
     expect(sheetText).toMatch(
+      /cm-live-preview-mermaid[^}]*width:\s*fit-content/,
+    );
+    expect(sheetText).toMatch(
       /cm-live-preview-note-embed[^}]*margin-inline:\s*var\(--pane-content-px\)/,
     );
     expect(sheetText).toMatch(
@@ -286,6 +289,12 @@ describe("live preview hide formatting", () => {
     );
     expect(sheetText).toMatch(
       /cm-live-preview-mermaid[^}]*text-align:\s*center/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-mermaid \.mermaid\s*\{[^}]*justify-content:\s*center/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-mermaid \.mermaid > svg\s*\{[^}]*margin-inline:\s*auto/,
     );
   });
 

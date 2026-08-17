@@ -542,7 +542,8 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-mermaid": {
     display: "block",
     boxSizing: "border-box",
-    width: "auto",
+    width: "fit-content",
+    maxWidth: "calc(100% - 2 * var(--pane-content-px))",
     marginInline: "var(--pane-content-px)",
     overflowX: "auto",
     padding: "1.5em",
@@ -550,6 +551,14 @@ export const livePreviewTheme = EditorView.baseTheme({
     borderRadius: "8px",
     background: "rgba(128, 128, 128, 0.05)",
     textAlign: "center",
+  },
+  ".cm-live-preview-mermaid .mermaid": {
+    display: "flex",
+    justifyContent: "center",
+  },
+  ".cm-live-preview-mermaid .mermaid > svg": {
+    display: "block",
+    marginInline: "auto",
   },
   // Match Reading `.preview-note-embed` card chrome (translucent for selection).
   ".cm-live-preview-note-embed": {
