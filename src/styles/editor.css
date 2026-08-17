@@ -1148,6 +1148,93 @@
   letter-spacing: 0.01em;
 }
 
+/* Nested lists: hide source indent/`-` (replaced by widgets) and indent by
+   nest level like Reading `ul ul { padding-left: 2rem }`. !important beats
+   source-mode hang-indent inline padding so inactive nested items don't sit
+   on the same column as the parent bullet. */
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-line {
+  --mp-live-list-step: 1.5em;
+  --mp-live-list-marker-em: 1.15em;
+  text-indent: calc(-1 * var(--mp-live-list-marker-em));
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-level-1 {
+  padding-left: calc(
+    var(--pane-content-px) + var(--mp-live-list-marker-em)
+  ) !important;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-level-2 {
+  padding-left: calc(
+    var(--pane-content-px) + var(--mp-live-list-step) +
+      var(--mp-live-list-marker-em)
+  ) !important;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-level-3 {
+  padding-left: calc(
+    var(--pane-content-px) + (2 * var(--mp-live-list-step)) +
+      var(--mp-live-list-marker-em)
+  ) !important;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-level-4 {
+  padding-left: calc(
+    var(--pane-content-px) + (3 * var(--mp-live-list-step)) +
+      var(--mp-live-list-marker-em)
+  ) !important;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-level-5 {
+  padding-left: calc(
+    var(--pane-content-px) + (4 * var(--mp-live-list-step)) +
+      var(--mp-live-list-marker-em)
+  ) !important;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-level-6 {
+  padding-left: calc(
+    var(--pane-content-px) + (5 * var(--mp-live-list-step)) +
+      var(--mp-live-list-marker-em)
+  ) !important;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-list-line.is-nested::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  background: var(--mp-doc-border, rgba(148, 163, 184, 0.28));
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-list-level-2.is-nested::before {
+  left: var(--pane-content-px);
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-list-level-3.is-nested::before {
+  left: calc(var(--pane-content-px) + var(--mp-live-list-step));
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-list-level-4.is-nested::before {
+  left: calc(var(--pane-content-px) + (2 * var(--mp-live-list-step)));
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-list-level-5.is-nested::before {
+  left: calc(var(--pane-content-px) + (3 * var(--mp-live-list-step)));
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-list-level-6.is-nested::before {
+  left: calc(var(--pane-content-px) + (4 * var(--mp-live-list-step)));
+}
+
 .editor-pane-layout[data-live-preview="true"] .tok-heading,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading {
   letter-spacing: 0.01em;

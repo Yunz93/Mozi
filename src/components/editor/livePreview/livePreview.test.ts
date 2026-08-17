@@ -26,6 +26,8 @@ import {
   findCommentRanges,
   livePreviewBlockquotes,
   livePreviewHighlights,
+  livePreviewListMarkerReplaceFrom,
+  livePreviewListMarkers,
 } from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
 import { livePreviewMermaid } from "./mermaid";
@@ -55,6 +57,15 @@ function createView(
   const view = new EditorView({ state, parent });
   return view;
 }
+
+describe("livePreviewListMarkerReplaceFrom", () => {
+  it("includes nested indent but not blockquote prefixes", () => {
+    expect(livePreviewListMarkerReplaceFrom(0, 0, "")).toBe(0);
+    expect(livePreviewListMarkerReplaceFrom(10, 14, "    ")).toBe(10);
+    expect(livePreviewListMarkerReplaceFrom(0, 2, "  ")).toBe(0);
+    expect(livePreviewListMarkerReplaceFrom(0, 4, ">   ")).toBe(1);
+  });
+});
 
 describe("live preview hide formatting", () => {
   const views: EditorView[] = [];
@@ -721,6 +732,102 @@ describe("live preview hide formatting", () => {
     ).toMatch(/^-\s?$/);
     const bodyLine = view.state.doc.line(8);
     expect(widgetRanges[0][0]).toBe(bodyLine.from);
+  });
+
+  it("replaces nested list indent and markers with bullets when the cursor is away", () => {
+    const doc = [
+      "- 新增只读「机器人构型」字段",
+      "  - 测试",
+      "  - 测试",
+      "    - 更深",
+      "",
+      "away",
+    ].join("\n");
+    const view = mount(doc, doc.length - 1, [livePreviewListMarkers]);
+    const deco = buildLivePreviewListMarkerDecorations(view);
+    const widgetSlices: string[] = [];
+    const lineClasses: string[] = [];
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      if (value.spec.widget) {
+        widgetSlices.push(view.state.doc.sliceString(from, to));
+      }
+      const className = value.spec.class as string | undefined;
+      if (className?.includes("cm-live-preview-list-line")) {
+        lineClasses.push(className);
+      }
+    });
+    expect(widgetSlices).toEqual(["- ", "  - ", "  - ", "    - "]);
+    expect(
+      lineClasses.some((cls) => cls.includes("cm-live-preview-list-level-2")),
+    ).toBe(true);
+    expect(
+      lineClasses.some((cls) => cls.includes("cm-live-preview-list-level-3")),
+    ).toBe(true);
+
+    const nestedLines = Array.from(view.dom.querySelectorAll(".cm-line")).slice(
+      1,
+      4,
+    );
+    for (const line of nestedLines) {
+      expect(line.textContent ?? "").not.toMatch(/^\s*-/);
+      expect(
+        line.querySelector(".cm-live-preview-list-marker.is-bullet"),
+      ).not.toBeNull();
+    }
+    expect(
+      view.dom.querySelectorAll(".cm-live-preview-list-marker"),
+    ).toHaveLength(4);
+  });
+
+  it("keeps sibling nested bullets when the cursor is on one nested item", () => {
+    const doc = ["- parent", "  - 测试", "  - 测试", "  - "].join("\n");
+    const lastLine = doc.split("\n")[3]!;
+    const cursor = doc.length - lastLine.length + 2;
+    const view = mount(doc, cursor, [livePreviewListMarkers]);
+    const deco = buildLivePreviewListMarkerDecorations(view);
+    const widgetSlices: string[] = [];
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      if (value.spec.widget) {
+        widgetSlices.push(view.state.doc.sliceString(from, to));
+      }
+    });
+    expect(widgetSlices).toEqual(["- ", "  - ", "  - "]);
+    const lines = Array.from(view.dom.querySelectorAll(".cm-line"));
+    expect(lines[1]?.textContent ?? "").not.toMatch(/-/);
+    expect(lines[2]?.textContent ?? "").not.toMatch(/-/);
+    expect(lines[3]?.textContent ?? "").toMatch(/-/);
+  });
+
+  it("replaces four-space nested markers used by Tab indent", () => {
+    const doc = "- parent\n    - child\n    - child2\n\naway";
+    const view = mount(doc, doc.length - 1, [livePreviewListMarkers]);
+    const deco = buildLivePreviewListMarkerDecorations(view);
+    const widgetSlices: string[] = [];
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      if (value.spec.widget) {
+        widgetSlices.push(view.state.doc.sliceString(from, to));
+      }
+    });
+    expect(widgetSlices).toEqual(["- ", "    - ", "    - "]);
+    const childLine = Array.from(view.dom.querySelectorAll(".cm-line"))[1];
+    expect(childLine?.textContent ?? "").not.toMatch(/-/);
+    expect(
+      childLine?.querySelector(".cm-live-preview-list-marker.is-bullet"),
+    ).not.toBeNull();
+  });
+
+  it("does not eat blockquote marks when replacing nested quote lists", () => {
+    const doc = "> - parent\n>   - child\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewListMarkerDecorations(view);
+    const widgetSlices: string[] = [];
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      if (value.spec.widget) {
+        widgetSlices.push(view.state.doc.sliceString(from, to));
+      }
+    });
+    expect(widgetSlices.every((slice) => !slice.includes(">"))).toBe(true);
+    expect(widgetSlices.some((slice) => slice.includes("-"))).toBe(true);
   });
 });
 
