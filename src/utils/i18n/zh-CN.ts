@@ -363,7 +363,6 @@ export default {
   search_wholeWord: "全字匹配",
   search_prevMatch: "上一个匹配 (Shift+Enter)",
   search_nextMatch: "下一个匹配 (Enter)",
-  search_hideReplace: "隐藏",
   search_replace: "替换",
   search_replaceAll: "全部替换",
   search_searching: "搜索中...",

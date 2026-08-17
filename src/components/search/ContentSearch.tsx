@@ -230,34 +230,30 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
       <div className="p-3">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t("search_find")}
-            </span>
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowReplace(!showReplace)}
-              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              type="button"
+              onClick={() => setShowReplace(false)}
+              aria-pressed={!showReplace}
+              className={`text-sm font-medium transition-colors ${
+                showReplace
+                  ? "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  : "text-gray-900 dark:text-white"
+              }`}
             >
-              <svg
-                className="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                {showReplace ? (
-                  <>
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </>
-                )}
-              </svg>
-              {showReplace ? t("search_hideReplace") : t("search_replace")}
+              {t("search_find")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReplace(true)}
+              aria-pressed={showReplace}
+              className={`text-sm font-medium transition-colors ${
+                showReplace
+                  ? "text-gray-900 dark:text-white"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              }`}
+            >
+              {t("search_replace")}
             </button>
           </div>
           <button
