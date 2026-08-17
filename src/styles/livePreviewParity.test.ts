@@ -38,6 +38,18 @@ describe("live preview / reading visual parity", () => {
     );
   });
 
+  it("centers live mermaid diagrams in the text column", () => {
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s*\{[^}]*width:\s*calc\(100% - 2 \* var\(--pane-content-px\)\)/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s+\.mermaid\s*\{[^}]*justify-content:\s*center/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s+\.mermaid\s+>\s+svg\s*\{[^}]*margin-inline:\s*auto/s,
+    );
+  });
+
   it("uses the same heading weight as Reading for h3–h6", () => {
     for (const level of [3, 4, 5, 6]) {
       expect(editorCss).toMatch(

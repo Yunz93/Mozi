@@ -276,6 +276,12 @@ describe("live preview hide formatting", () => {
     expect(sheetText).toMatch(
       /cm-live-preview-mermaid[^}]*text-align:\s*center/,
     );
+    expect(sheetText).toMatch(
+      /cm-live-preview-mermaid \.mermaid\s*\{[^}]*justify-content:\s*center/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-mermaid \.mermaid > svg\s*\{[^}]*margin-inline:\s*auto/,
+    );
   });
 
   it("allows block decorations via StateField extensions without crashing", () => {
