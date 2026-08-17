@@ -383,7 +383,6 @@ export default {
   search_wholeWord: "Whole word",
   search_prevMatch: "Previous match (Shift+Enter)",
   search_nextMatch: "Next match (Enter)",
-  search_hideReplace: "Hide",
   search_replace: "Replace",
   search_replaceAll: "Replace all",
   search_searching: "Searching...",
