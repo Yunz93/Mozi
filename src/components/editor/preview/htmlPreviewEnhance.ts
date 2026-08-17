@@ -81,7 +81,7 @@ export function ensureHtmlPreviewMermaidStyles(doc: Document): void {
   margin: 1rem 0;
 }
 .mermaid svg {
-  max-width: 100%;
+  max-width: none;
   height: auto;
 }
 .mermaid-error {

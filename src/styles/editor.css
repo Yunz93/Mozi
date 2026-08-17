@@ -1396,7 +1396,29 @@
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-mermaid {
   width: auto;
   max-width: none;
+  overflow-x: auto;
   text-align: center;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-mermaid
+  .mermaid
+  > svg {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: none !important;
+  margin-inline: auto;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-mermaid
+  .mermaid
+  svg
+  svg {
+  max-width: none !important;
+  width: auto !important;
+  height: auto !important;
 }
 
 .dark .editor-pane-layout[data-live-preview="true"] .cm-live-preview-mermaid {

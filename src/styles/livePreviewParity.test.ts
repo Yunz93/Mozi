@@ -58,4 +58,13 @@ describe("live preview / reading visual parity", () => {
       /\[data-live-preview="true"\]\s+\.cm-live-preview-math\s+\.katex\s+\*\s*\{[^}]*word-break:\s*normal\s*!important/s,
     );
   });
+
+  it("does not shrink live mermaid diagrams to the text column", () => {
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s*\{[^}]*overflow-x:\s*auto/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\][\s\S]*?\.cm-live-preview-mermaid[\s\S]*?\.mermaid\s*>\s*svg\s*\{[^}]*max-width:\s*none !important/s,
+    );
+  });
 });

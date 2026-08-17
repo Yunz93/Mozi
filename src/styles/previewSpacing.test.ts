@@ -109,6 +109,9 @@ describe("preview spacing CSS", () => {
       /\.preview-pane-document\.markdown-body \.mermaid svg svg\s*\{[^}]*max-width:\s*none !important;/m,
     );
     expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.mermaid > svg\s*\{[^}]*max-width:\s*none !important;/m,
+    );
+    expect(css).toMatch(
       /\.preview-pane-document\.markdown-body \.preview-note-embed-body\.markdown-body\s*\{[^}]*color:\s*var\(--mp-doc-text,\s*#312e81\) !important;/m,
     );
   });

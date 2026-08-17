@@ -195,8 +195,11 @@ async function ensureOfficialMermaidConfigured(themeMode: "light" | "dark") {
     fontFamily: '"Trebuchet MS", Verdana, Arial, sans-serif',
     flowchart: {
       htmlLabels: false,
-      useMaxWidth: true,
+      useMaxWidth: false,
     },
+    sequence: { useMaxWidth: false },
+    gantt: { useMaxWidth: false },
+    pie: { useMaxWidth: false },
   });
   lastOfficialMermaidThemeMode = themeMode;
   return mermaid;
@@ -452,15 +455,18 @@ export function normalizeMermaidSvg(el: HTMLElement): void {
   removeSvgLengthAttribute(svg, "height");
   svg.setAttribute("preserveAspectRatio", "xMidYMin meet");
 
+  // Keep the diagram's natural pixel size. `min(100%, …)` scaled wide
+  // `flowchart LR` graphs into a thin unreadable strip. The mermaid card
+  // already scrolls horizontally when the SVG is wider than the column.
   if (naturalWidth && naturalHeight) {
-    svg.style.width = `min(100%, ${naturalWidth}px)`;
+    svg.style.width = `${naturalWidth}px`;
     svg.style.height = "auto";
     svg.style.maxWidth = "none";
     svg.style.aspectRatio = `${naturalWidth} / ${naturalHeight}`;
   } else {
     svg.style.removeProperty("width");
     svg.style.height = "auto";
-    svg.style.maxWidth = "100%";
+    svg.style.maxWidth = "none";
     svg.style.removeProperty("aspect-ratio");
   }
 }

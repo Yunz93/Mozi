@@ -1285,6 +1285,7 @@ html[data-katex-render-mode="mathml"]
   display: block;
   width: auto;
   height: auto;
+  max-width: none !important;
   margin: 0 auto;
 }
 

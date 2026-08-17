@@ -311,6 +311,11 @@ describe("renderMermaidDiagrams", () => {
     expect(run).toHaveBeenCalledTimes(1);
     expect(el.dataset.mermaidEngine).toBe("official");
     expect(el.dataset.mermaidRendered).toBe("true");
+    expect(initialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flowchart: expect.objectContaining({ useMaxWidth: false }),
+      }),
+    );
   });
 });
 
@@ -877,9 +882,22 @@ describe("normalizeMermaidSvg", () => {
 
     normalizeMermaidSvg(el);
     expect(svg.style.aspectRatio).toBe("100 / 200");
+    expect(svg.style.width).toBe("100px");
+    expect(svg.style.maxWidth).toBe("none");
     expect(svg.style.height).toBe("auto");
-    // happy-dom does not support CSS min() in style.width, just check it was set
     expect(svg.getAttribute("preserveAspectRatio")).toBe("xMidYMin meet");
+  });
+
+  it("keeps wide flowcharts at natural width instead of shrinking to the column", () => {
+    const el = document.createElement("div");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 2400 140");
+    el.appendChild(svg);
+
+    normalizeMermaidSvg(el);
+    expect(svg.style.width).toBe("2400px");
+    expect(svg.style.maxWidth).toBe("none");
+    expect(svg.style.width).not.toContain("min(");
   });
 
   it("falls back to width/height attributes when no viewBox", () => {
@@ -903,7 +921,7 @@ describe("normalizeMermaidSvg", () => {
     normalizeMermaidSvg(el);
     expect(svg.style.width).toBe("");
     expect(svg.style.height).toBe("auto");
-    expect(svg.style.maxWidth).toBe("100%");
+    expect(svg.style.maxWidth).toBe("none");
     expect(svg.style.aspectRatio).toBe("");
   });
 
