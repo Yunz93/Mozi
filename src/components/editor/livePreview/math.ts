@@ -126,7 +126,7 @@ class MathWidget extends WidgetType {
   toDOM(view: EditorView) {
     const wrap = document.createElement(this.displayMode ? "div" : "span");
     wrap.className = this.displayMode
-      ? "cm-live-preview-math is-display"
+      ? "cm-live-preview-math cm-live-preview-math-display is-display"
       : "cm-live-preview-math is-inline";
     wrap.setAttribute("contenteditable", "false");
     wrap.innerHTML = this.html;

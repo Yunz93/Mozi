@@ -1147,7 +1147,7 @@
 .editor-pane-layout[data-live-preview="true"] .tok-heading-3,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-3 {
   font-size: 1.2em;
-  font-weight: var(--mp-doc-heading-weight, 650);
+  font-weight: var(--mp-doc-heading-weight, 700);
   line-height: inherit;
   color: var(--mp-doc-heading-3, var(--mp-doc-accent, #7c3aed));
 }
@@ -1155,7 +1155,7 @@
 .editor-pane-layout[data-live-preview="true"] .tok-heading-4,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-4 {
   font-size: 1.05em;
-  font-weight: var(--mp-doc-heading-weight, 650);
+  font-weight: var(--mp-doc-heading-weight, 700);
   line-height: inherit;
   color: var(--mp-doc-heading-4, var(--mp-doc-accent, #7c3aed));
 }
@@ -1163,7 +1163,7 @@
 .editor-pane-layout[data-live-preview="true"] .tok-heading-5,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-5 {
   font-size: 0.95em;
-  font-weight: var(--mp-doc-heading-weight, 650);
+  font-weight: var(--mp-doc-heading-weight, 700);
   line-height: inherit;
   color: var(--mp-doc-heading-5, var(--mp-doc-accent, #7c3aed));
 }
@@ -1171,7 +1171,7 @@
 .editor-pane-layout[data-live-preview="true"] .tok-heading-6,
 .editor-pane-layout[data-live-preview="true"] .mp-tok-heading-6 {
   font-size: 0.9em;
-  font-weight: var(--mp-doc-heading-weight, 650);
+  font-weight: var(--mp-doc-heading-weight, 700);
   line-height: inherit;
   color: var(--mp-doc-heading-6, var(--mp-doc-accent, #7c3aed));
 }
@@ -1226,7 +1226,9 @@
   text-underline-offset: 0.12em;
 }
 
-/* Plain `>` quotes: Reading blockquote chrome on CM lines. */
+/* Plain `>` quotes: Reading blockquote chrome on CM lines.
+   Fill is clipped to the content box (after `.cm-line` padding) so the quote
+   sits in the same column as headings; the bar is painted at that inset. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-blockquote {
   color: var(--mp-doc-quote-text, #5b21b6);
   background: color-mix(
@@ -1234,7 +1236,19 @@
     var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 70%,
     transparent
   );
-  box-shadow: inset 4px 0 0 var(--mp-doc-accent, rgba(124, 58, 237, 0.28));
+  background-clip: content-box;
+  box-shadow: none;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-blockquote::before {
+  content: "";
+  position: absolute;
+  left: var(--pane-content-px);
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--mp-doc-accent, rgba(124, 58, 237, 0.28));
 }
 
 .editor-pane-layout[data-live-preview="true"]
@@ -1261,7 +1275,14 @@
   .cm-live-preview-blockquote {
   color: var(--mp-doc-quote-text, #ddd6fe);
   background: var(--mp-doc-quote-bg, rgba(192, 132, 252, 0.06));
-  box-shadow: inset 4px 0 0 var(--mp-doc-accent, rgba(192, 132, 252, 0.32));
+  background-clip: content-box;
+  box-shadow: none;
+}
+
+.dark
+  .editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-blockquote::before {
+  background: var(--mp-doc-accent, rgba(192, 132, 252, 0.32));
 }
 
 .dark
@@ -1317,7 +1338,49 @@
   max-width: 100%;
 }
 
-/* Live table: stay in the text column; scroll wide tables inside the wrap. */
+/* Block widgets are siblings of `.cm-line`; inset them to the text column. */
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-callout,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-mermaid,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-note-embed,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-hr,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-math.is-display,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-math-display {
+  box-sizing: border-box;
+  margin-inline: var(--pane-content-px);
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-mermaid {
+  width: auto;
+  max-width: none;
+  text-align: center;
+}
+
+.dark .editor-pane-layout[data-live-preview="true"] .cm-live-preview-mermaid {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Nested markdown-it HTML inside callouts / note embeds. */
+.editor-pane-layout[data-live-preview="true"] .markdown-body table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.editor-pane-layout[data-live-preview="true"] .markdown-body table th,
+.editor-pane-layout[data-live-preview="true"] .markdown-body table td {
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-fenced-code-line {
+  font-family: var(--preview-code-font-family, var(--editor-code-font-family));
+  font-size: var(--preview-code-font-size, var(--editor-code-font-size));
+}
+
+/* Live table: same column width as headings/paragraphs; wrap cells inside. */
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table-wrap {
   box-sizing: border-box;
   width: 100%;
@@ -1328,19 +1391,19 @@
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table {
-  width: max-content;
-  min-width: 100%;
-  max-width: none;
-  table-layout: auto;
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table th,
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-table td {
   white-space: normal;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-  min-width: 3.5em;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
   line-height: 1.45;
+  text-align: left;
   border-color: var(--mp-doc-border, rgba(148, 163, 184, 0.26));
 }
 
@@ -1412,6 +1475,13 @@
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-math .katex {
   font-size: 1.05em;
+  line-height: 1.2;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-math .katex,
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-math .katex * {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
 }
 
 .dark

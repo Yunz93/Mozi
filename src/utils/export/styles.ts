@@ -702,9 +702,19 @@ ${exportDelStrikeBlock}
       line-height: 1.75;
     }
 
+    .export-document .markdown-body table {
+      width: 100%;
+      max-width: 100%;
+      table-layout: fixed;
+    }
+
     .export-document .markdown-body table th,
     .export-document .markdown-body table td {
       border-color: var(--border-color);
+      text-align: left;
+      min-width: 0;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
 
     .export-document .markdown-body table tr {
