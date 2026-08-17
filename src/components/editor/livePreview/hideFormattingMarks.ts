@@ -168,9 +168,9 @@ export function buildLivePreviewHideDecorations(
         }
         if (shouldRevealMark(state, name, from, to)) return;
         let hideTo = to;
-        // ATX HeaderMark is just the hashes; the following space would otherwise
-        // indent heading text relative to paragraphs and tables.
-        if (name === "HeaderMark") {
+        // ATX hashes / `>` marks are just the sigil; the following space would
+        // indent the first visual line while wrapped lines sit under the chrome.
+        if (name === "HeaderMark" || name === "QuoteMark") {
           const line = state.doc.lineAt(from);
           const rest = state.doc.sliceString(to, line.to);
           const spaces = rest.match(/^[ \t]+/);
