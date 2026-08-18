@@ -4,7 +4,9 @@
  */
 
 import type { KeyBinding } from "@codemirror/view";
+import { insertNewlineAndIndent } from "@codemirror/commands";
 import type { OrderedListMode } from "../../../types";
+import { wrapImeConfirmCommand, wrapImePassthroughCommand } from "./imeGuard";
 
 // Re-export core utilities
 export {
@@ -188,17 +190,40 @@ export function createMarkdownKeyBindings(
   orderedListMode: OrderedListMode,
 ): KeyBinding[] {
   return [
-    { key: "Enter", run: handleSmartEnter },
-    { key: "Backspace", run: createHandleSmartBackspace(orderedListMode) },
-    { key: "Shift-Tab", run: createHandleSmartShiftTab(orderedListMode) },
-    { key: "Tab", run: createHandleSmartTab(orderedListMode) },
+    { key: "Enter", run: wrapImeConfirmCommand(handleSmartEnter) },
+    {
+      key: "Shift-Enter",
+      run: wrapImeConfirmCommand(insertNewlineAndIndent),
+    },
+    {
+      key: "Backspace",
+      run: wrapImePassthroughCommand(
+        createHandleSmartBackspace(orderedListMode),
+      ),
+    },
+    {
+      key: "Shift-Tab",
+      run: wrapImePassthroughCommand(
+        createHandleSmartShiftTab(orderedListMode),
+      ),
+    },
+    {
+      key: "Tab",
+      run: wrapImePassthroughCommand(createHandleSmartTab(orderedListMode)),
+    },
     { key: "Mod-b", run: toggleBold },
     { key: "Mod-i", run: toggleItalic },
     { key: "Mod-k", run: insertLink },
     { key: "Mod-Shift-k", run: insertCodeBlock },
     { key: "Mod-Shift-t", run: insertTable },
-    { key: "Mod-Shift-Enter", run: insertTableRowBelow },
-    { key: "Alt-Shift-Enter", run: insertTableRowAbove },
+    {
+      key: "Mod-Shift-Enter",
+      run: wrapImeConfirmCommand(insertTableRowBelow),
+    },
+    {
+      key: "Alt-Shift-Enter",
+      run: wrapImeConfirmCommand(insertTableRowAbove),
+    },
     { key: "Alt-Mod-ArrowLeft", run: insertTableColumnLeft },
     { key: "Alt-Mod-ArrowRight", run: insertTableColumnRight },
     { key: "Mod-Shift-Backspace", run: deleteTableRow },

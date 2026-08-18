@@ -3,6 +3,7 @@ import {
   getPathSeparator,
   joinFsPath,
   normalizeSlashes,
+  canonicalizePath,
   sanitizeResourceFolder,
   getPathBasename,
   getRelativePath,
@@ -56,6 +57,15 @@ describe("normalizeSlashes", () => {
 
   it("handles already normalized paths", () => {
     expect(normalizeSlashes("/home/user/file.md")).toBe("/home/user/file.md");
+  });
+});
+
+describe("canonicalizePath", () => {
+  it("NFC-normalizes Unicode filenames so NFD matches NFC", () => {
+    const nfc = "截图 café.png";
+    const nfd = nfc.normalize("NFD");
+    expect(nfd).not.toBe(nfc);
+    expect(canonicalizePath(`/vault/${nfd}`)).toBe(`/vault/${nfc}`);
   });
 });
 

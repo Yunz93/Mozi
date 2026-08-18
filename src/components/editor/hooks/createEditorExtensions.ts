@@ -30,7 +30,7 @@ import {
   tooltips,
   type ViewUpdate,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import { resolveEditorCodeLanguage } from "../../../utils/editorCodeLanguages";
@@ -39,6 +39,10 @@ import {
   createMarkdownKeyBindings,
   getStrictOrderedListNormalizationChanges,
 } from "../behavior";
+import {
+  defaultKeymapWithoutEnter,
+  editorImeGuardPlugin,
+} from "../behavior/imeGuard";
 import { handleStructuredPaste } from "../behavior/input";
 import { markdownFenceLanguageCompletion } from "../behavior/fenceLanguageCompletion";
 import { markdownFencedCodeInputHandler } from "../behavior/fencedCodeInput";
@@ -181,7 +185,12 @@ export function createEditorExtensions(
     compartments.darkTheme.of(EditorView.darkTheme.of(themeMode === "dark")),
     editorAutocompletePanelBaseTheme,
     EditorView.inputHandler.of(markdownFencedCodeInputHandler),
-    keymap.of([...completionKeymap, ...defaultKeymap, ...historyKeymap]),
+    editorImeGuardPlugin,
+    keymap.of([
+      ...completionKeymap,
+      ...defaultKeymapWithoutEnter(),
+      ...historyKeymap,
+    ]),
     compartments.keymap.of(
       Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
     ),

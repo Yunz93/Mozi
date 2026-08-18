@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 /** Documents at or above this size get a debounced preview pipeline. */
-export const LARGE_PREVIEW_CONTENT_LENGTH = 100_000;
+export const LARGE_PREVIEW_CONTENT_LENGTH = 40_000;
 export const LARGE_PREVIEW_DEBOUNCE_MS = 250;
 
 /**
