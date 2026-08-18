@@ -10,11 +10,14 @@ import { useI18n } from "../../hooks/useI18n";
 import {
   answerAskVaultFromHits,
   appendAskVaultHistory,
-  estimateLineOffset,
-  hitsToPreviewSnippets,
+  citationEditorRange,
+  hitsToPreviewItems,
   loadAskVaultHistory,
+  previewItemToCitation,
   retrieveAskVaultHits,
+  shouldConfirmAskVaultSend,
   type AskVaultHistoryItem,
+  type AskVaultPreviewSnippet,
 } from "../../services/vault/askVaultService";
 import { hydrateSensitiveSettingsIntoStore } from "../../services/secureSettingsService";
 import { localizeKnownError } from "../../utils/i18n";
@@ -110,7 +113,12 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   const [retrieving, setRetrieving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [pendingHits, setPendingHits] = useState<RetrieveHit[]>([]);
-  const [previewSnippets, setPreviewSnippets] = useState<string[]>([]);
+  const [previewItems, setPreviewItems] = useState<AskVaultPreviewSnippet[]>(
+    [],
+  );
+  const [lastPreviewedQuestion, setLastPreviewedQuestion] = useState<
+    string | null
+  >(null);
   const [answerMarkdown, setAnswerMarkdown] = useState("");
   const [citations, setCitations] = useState<AskVaultCitation[]>([]);
   const [history, setHistory] = useState<AskVaultHistoryItem[]>([]);
@@ -141,6 +149,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     !retrieving &&
     !generating;
 
+  const canConfirmSend = shouldConfirmAskVaultSend({
+    question,
+    lastPreviewedQuestion,
+    pendingHitCount: pendingHits.length,
+  });
   const scopeNeedsFile = scope === "folder" || scope === "files";
   const scopeBlocked = scopeNeedsFile && !currentFilePath;
   const showReadinessDetail = blocked || readinessExpanded || keywordOnly;
@@ -279,7 +292,8 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
 
       const hits = await retrieveAskVaultHits(buildRequest(activeSettings));
       setPendingHits(hits);
-      setPreviewSnippets(hitsToPreviewSnippets(hits));
+      setPreviewItems(hitsToPreviewItems(hits));
+      setLastPreviewedQuestion(trimmed);
       setSecondaryTab("sources");
       if (hits.length === 0) {
         showNotification(t("askVault_noHits"), "info");
@@ -310,81 +324,78 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   ]);
 
   /**
-   * One-click ask: always retrieve fresh snippets, then generate.
-   * Use「仅检索」when you only want to preview sources first.
+   * First click retrieves snippets for review. Confirming the same question
+   * then sends those snippets to the model.
    */
+  const handleGenerateFromHits = useCallback(
+    async (hits: RetrieveHit[], trimmed: string) => {
+      if (!rootFolderPath) return;
+      setGenerating(true);
+      setPrimaryTab("ask");
+      try {
+        const activeSettings = await resolveHydratedSettings();
+        if (!(await ensureAskConfig(activeSettings))) return;
+        const result = await answerAskVaultFromHits(
+          trimmed,
+          hits,
+          activeSettings,
+        );
+        setAnswerMarkdown(
+          normalizeAskVaultCitationMarkers(result.answerMarkdown),
+        );
+        setCitations(result.citations);
+        setSecondaryTab("answer");
+
+        const historyItem: AskVaultHistoryItem = {
+          id: `${Date.now()}`,
+          question: trimmed,
+          answer: result,
+          at: Date.now(),
+        };
+        await appendAskVaultHistory(rootFolderPath, historyItem);
+        setHistory((prev) => [historyItem, ...prev].slice(0, 50));
+      } catch (error) {
+        showNotification(
+          error instanceof Error
+            ? localizeKnownError(language, error.message)
+            : t("askVault_failed"),
+          "error",
+        );
+        setSettingsOpen(true, "ai");
+      } finally {
+        setGenerating(false);
+      }
+    },
+    [
+      rootFolderPath,
+      resolveHydratedSettings,
+      ensureAskConfig,
+      language,
+      showNotification,
+      setSettingsOpen,
+      t,
+    ],
+  );
+
   const handleAsk = useCallback(async () => {
     const trimmed = question.trim();
     if (!trimmed || !rootFolderPath || !canAsk || scopeBlocked) return;
 
-    setPrimaryTab("ask");
-    setGenerating(true);
-    setRetrieving(true);
-    setAnswerMarkdown("");
-    setCitations([]);
-
-    try {
-      const activeSettings = await resolveHydratedSettings();
-      if (!(await ensureAskConfig(activeSettings))) return;
-
-      let hits: RetrieveHit[] = [];
-      try {
-        hits = await retrieveAskVaultHits(buildRequest(activeSettings));
-        setPendingHits(hits);
-        setPreviewSnippets(hitsToPreviewSnippets(hits));
-      } finally {
-        setRetrieving(false);
-      }
-
-      if (hits.length === 0) {
-        setSecondaryTab("sources");
-        showNotification(t("askVault_noHits"), "info");
-        return;
-      }
-
-      const result = await answerAskVaultFromHits(
-        trimmed,
-        hits,
-        activeSettings,
-      );
-      setAnswerMarkdown(
-        normalizeAskVaultCitationMarkers(result.answerMarkdown),
-      );
-      setCitations(result.citations);
-      setSecondaryTab("answer");
-
-      const historyItem: AskVaultHistoryItem = {
-        id: `${Date.now()}`,
-        question: trimmed,
-        answer: result,
-        at: Date.now(),
-      };
-      await appendAskVaultHistory(rootFolderPath, historyItem);
-      setHistory((prev) => [historyItem, ...prev].slice(0, 50));
-    } catch (error) {
-      showNotification(
-        error instanceof Error
-          ? localizeKnownError(language, error.message)
-          : t("askVault_failed"),
-        "error",
-      );
-      setSettingsOpen(true, "ai");
-    } finally {
-      setRetrieving(false);
-      setGenerating(false);
+    if (canConfirmSend) {
+      await handleGenerateFromHits(pendingHits, trimmed);
+      return;
     }
+
+    await handleRetrieve();
   }, [
     question,
     rootFolderPath,
     canAsk,
     scopeBlocked,
-    resolveHydratedSettings,
-    ensureAskConfig,
-    buildRequest,
-    language,
-    showNotification,
-    setSettingsOpen,
-    t,
+    canConfirmSend,
+    pendingHits,
+    handleGenerateFromHits,
+    handleRetrieve,
   ]);
 
   const handleOpenCitation = useCallback(
@@ -398,16 +409,14 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       await onOpenFile(file);
       try {
         const content = fileContents[citation.path] ?? (await readFile(file));
-        const start = estimateLineOffset(content, citation.startLine);
-        const end = estimateLineOffset(content, citation.endLine + 1);
-        requestEditorRangeFocus(
-          citation.path,
-          start,
-          Math.max(start + 1, end),
-          {
-            alignTopRatio: 0.25,
-          },
+        const range = citationEditorRange(
+          content,
+          citation.startLine,
+          citation.endLine,
         );
+        requestEditorRangeFocus(citation.path, range.start, range.end, {
+          alignTopRatio: 0.25,
+        });
         if (citation.headingAnchor) {
           requestPreviewHeadingScroll(citation.path, citation.headingAnchor);
         }
@@ -463,11 +472,19 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       normalizeAskVaultCitationMarkers(item.answer.answerMarkdown),
     );
     setCitations(item.answer.citations);
-    setPreviewSnippets(
-      item.answer.citations.map(
-        (c) => `[${c.index}] ${c.relPath}\n${c.snippet}`,
-      ),
+    setPreviewItems(
+      item.answer.citations.map((citation) => ({
+        index: citation.index,
+        path: citation.path,
+        relPath: citation.relPath,
+        titlePath: citation.titlePath,
+        headingAnchor: citation.headingAnchor,
+        startLine: citation.startLine,
+        endLine: citation.endLine,
+        snippet: citation.snippet,
+      })),
     );
+    setLastPreviewedQuestion(item.question);
     setPendingHits([]);
     setPrimaryTab("ask");
     setSecondaryTab("answer");
@@ -640,9 +657,9 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                 onClick={() => setSecondaryTab("sources")}
               >
                 {t("askVault_sourcesTab")}
-                {previewSnippets.length > 0 ? (
+                {previewItems.length > 0 ? (
                   <span className="ask-vault-tab-count" aria-hidden>
-                    {previewSnippets.length}
+                    {previewItems.length}
                   </span>
                 ) : null}
               </button>
@@ -694,15 +711,32 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                 ) : (
                   <p className="ask-vault-empty">{t("askVault_answerEmpty")}</p>
                 )
-              ) : previewSnippets.length > 0 ? (
+              ) : previewItems.length > 0 ? (
                 <div className="ask-vault-sources-preview">
-                  <p className="ask-vault-sources-hint">
-                    {t("askVault_sourcesHint")}
-                  </p>
-                  {previewSnippets.map((snippet, index) => (
-                    <pre key={`${index}-${snippet.slice(0, 12)}`}>
-                      {snippet}
-                    </pre>
+                  {canConfirmSend ? (
+                    <p className="ask-vault-confirm-banner">
+                      {t("askVault_confirmSendHint", {
+                        count: previewItems.length,
+                      })}
+                    </p>
+                  ) : (
+                    <p className="ask-vault-sources-hint">
+                      {t("askVault_sourcesHint")}
+                    </p>
+                  )}
+                  {previewItems.map((item) => (
+                    <button
+                      key={`${item.index}-${item.path}-${item.startLine}`}
+                      type="button"
+                      className="ask-vault-source-item"
+                      onClick={() =>
+                        void handleOpenCitation(previewItemToCitation(item))
+                      }
+                    >
+                      <strong>[{item.index}]</strong> {item.relPath}
+                      {"\n"}
+                      {item.snippet}
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -759,7 +793,9 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                   ? t("askVault_retrieving")
                   : generating
                     ? t("askVault_asking")
-                    : t("askVault_ask")}
+                    : canConfirmSend
+                      ? t("askVault_confirmSend")
+                      : t("askVault_ask")}
               </button>
               <button
                 type="button"

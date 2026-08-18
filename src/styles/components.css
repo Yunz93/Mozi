@@ -830,8 +830,48 @@
   color: inherit;
 }
 
+.ask-vault-source-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.04);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ask-vault-source-item:hover {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(15, 23, 42, 0.07);
+}
+
+.ask-vault-confirm-banner {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.12);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .dark .ask-vault-sources-preview pre {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .ask-vault-source-item {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .ask-vault-source-item:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .ask-vault-citation {
@@ -926,6 +966,62 @@
   font-size: 12px;
   line-height: 1.4;
   opacity: 0.8;
+}
+
+.wechat-draft-layout {
+  display: grid;
+  gap: 1rem;
+  min-height: 0;
+  overflow: auto;
+}
+
+@media (min-width: 880px) {
+  .wechat-draft-layout {
+    grid-template-columns: minmax(0, 1fr) 375px;
+    align-items: start;
+  }
+}
+
+.wechat-draft-preview-pane {
+  min-width: 0;
+}
+
+.wechat-phone-frame {
+  width: 375px;
+  max-width: 100%;
+  max-height: 560px;
+  overflow: auto;
+  border-radius: 1.25rem;
+  background: #f7f7f7;
+  box-shadow:
+    inset 0 0 0 1px rgba(15, 23, 42, 0.08),
+    0 16px 40px rgba(15, 23, 42, 0.1);
+}
+
+.dark .wechat-phone-frame {
+  background: #111827;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.wechat-phone-preview {
+  background: #ffffff;
+  color: #222;
+  padding: 20px 16px 28px;
+}
+
+.wechat-phone-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.wechat-phone-empty {
+  margin: 0;
+  padding: 2rem 1.25rem;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 /* Writing Stats Styles */

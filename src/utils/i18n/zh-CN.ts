@@ -75,6 +75,15 @@ export default {
   wechatDraftDialog_pickCover: "选择封面图",
   wechatDraftDialog_coverEmpty: "尚未选择封面图",
   wechatDraftDialog_submit: "发布到草稿箱",
+  wechatDraftDialog_previewTitle: "手机预览",
+  wechatDraftDialog_previewHint: "接近公众号图文宽度，发布前先看排版和图片。",
+  wechatDraftDialog_previewLoading: "正在生成预览…",
+  wechatDraftDialog_previewFailed: "预览生成失败，仍可尝试发布。",
+  wechatDraftDialog_imageCount: "将上传 {count} 张正文图片",
+  wechatDraftDialog_unresolvedImages:
+    "有 {count} 张图片找不到，请先修好路径再发布：",
+  wechatDraftDialog_ipHint:
+    "若提示 IP 不在白名单，请把本机出口 IP 加到微信公众平台「基本配置 → IP 白名单」。",
 
   simpleBlogDialog_title: "发布到 Simple Blog",
   simpleBlogDialog_desc:
@@ -138,14 +147,19 @@ export default {
   askVault_ask: "生成回答",
   askVault_asking: "生成中…",
   askVault_retrieveHint: "只检索片段、不调用 AI；可先检查来源再生成。",
+  askVault_confirmSend: "确认发送并生成",
+  askVault_confirmSendHint:
+    "将发送 {count} 段笔记给模型。点片段可跳回原文；生成结果不会静默改写笔记。",
   askVault_toggleSources: "显示将发送的片段",
   askVault_sourcesPreview: "将发送的片段",
   askVault_sourcesTab: "来源",
   askVault_sourcesHint:
-    "这些片段会作为上下文发给 AI。也可直接点「生成回答」自动检索并生成。",
-  askVault_sourcesEmpty: "点「生成回答」或「仅检索」后，相关片段会显示在这里。",
+    "这些片段会作为上下文发给模型。请先确认，再点「确认发送并生成」。",
+  askVault_sourcesEmpty:
+    "输入问题后点「生成回答」或「仅检索」，相关片段会显示在这里。",
   askVault_answer: "回答",
-  askVault_answerEmpty: "输入问题后点「生成回答」（Cmd/Ctrl+Enter）。",
+  askVault_answerEmpty:
+    "输入问题后先检索来源，确认将发送的片段，再生成回答（Cmd/Ctrl+Enter）。",
   askVault_insert: "插入到当前笔记（需确认）",
   askVault_insertNeedsNote: "请先打开一篇笔记再插入。",
   askVault_citations: "引用",
@@ -775,6 +789,20 @@ export default {
   notifications_setWechatAppSecretFirst:
     "请先在发布设置里填写公众号 AppSecret。",
   notifications_setWechatCoverFirst: "请先选择公众号封面图。",
+  notifications_wechatTitleRequired: "请填写公众号图文标题。",
+  notifications_wechatIpAllowlist:
+    "当前出口 IP 不在公众号白名单。请到微信公众平台「基本配置」加入本机公网 IP 后再试。",
+  notifications_wechatInvalidAppId:
+    "公众号 AppID 无效。请到设置 → 发布核对 AppID。",
+  notifications_wechatInvalidAppSecret:
+    "公众号 AppSecret 无效。请到设置 → 发布重新填写，并确认开发者密码未重置。",
+  notifications_wechatQuotaExceeded:
+    "公众号接口今日调用次数已用完，请稍后再试。",
+  notifications_wechatMediaFailed:
+    "封面或正文图片上传失败。请换一张较小的 jpg/png，并确认图片能打开。",
+  notifications_wechatApiUnauthorized:
+    "当前公众号未开通草稿箱接口权限。请在公众平台确认账号类型与权限。",
+  notifications_wechatNetworkFailed: "连接微信接口失败。请检查网络后重试。",
   notifications_noContentToPublish: "没有可发布的内容",
   notifications_saveBeforePublishFailed: "发布前保存笔记失败。",
   notifications_publishTimeout:

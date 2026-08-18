@@ -55,6 +55,16 @@
       "id": "q10",
       "query": "代码高亮 表格 任务列表",
       "expectAnyPath": ["01-Markdown-语法示例.md"]
+    },
+    {
+      "id": "q11",
+      "query": "上次关于发布流程的结论",
+      "expectAnyPath": ["03-发布与问库.md"]
+    },
+    {
+      "id": "q12",
+      "query": "微信公众号草稿 封面图",
+      "expectAnyPath": ["03-发布与问库.md"]
     }
   ]
 }

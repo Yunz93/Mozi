@@ -43,6 +43,8 @@ export interface WechatImageAsset {
 
 export interface PreparedWechatDraftPublish {
   contentHtml: string;
+  /** Styled HTML for the in-app phone preview; image srcs are still local/remote URLs. */
+  previewHtml: string;
   imageAssets: WechatImageAsset[];
   unresolvedImages: string[];
 }
@@ -485,9 +487,12 @@ export async function prepareWechatDraftPublish(
       "alt",
       embed.getAttribute("data-wiki-label")?.trim() || resolved.name,
     );
-    image.setAttribute(
-      "src",
+    applyWechatImageSource(
+      image,
       registerImageAsset({ sourcePath: resolved.path }),
+      {
+        sourcePath: resolved.path,
+      },
     );
     embed.replaceWith(image);
   }
@@ -495,7 +500,11 @@ export async function prepareWechatDraftPublish(
   const images = Array.from(host.querySelectorAll<HTMLImageElement>("img"));
   for (const image of images) {
     const src = image.getAttribute("src")?.trim() || "";
-    if (!src || src.startsWith("__WECHAT_LOCAL_IMAGE_")) {
+    if (
+      !src ||
+      src.startsWith("__WECHAT_LOCAL_IMAGE_") ||
+      image.hasAttribute("data-wechat-placeholder")
+    ) {
       continue;
     }
 
@@ -504,7 +513,9 @@ export async function prepareWechatDraftPublish(
     }
 
     if (isRemoteTarget(src)) {
-      image.setAttribute("src", registerImageAsset({ sourceUrl: src }));
+      applyWechatImageSource(image, registerImageAsset({ sourceUrl: src }), {
+        sourceUrl: src,
+      });
       continue;
     }
 
@@ -517,17 +528,91 @@ export async function prepareWechatDraftPublish(
       continue;
     }
 
-    image.setAttribute(
-      "src",
+    applyWechatImageSource(
+      image,
       registerImageAsset({ sourcePath: resolved.path }),
+      {
+        sourcePath: resolved.path,
+      },
     );
   }
 
   applyWechatPreviewStyles(host, settings);
+  const previewHost = host.cloneNode(true) as HTMLDivElement;
+  previewHost
+    .querySelectorAll("[data-wechat-placeholder]")
+    .forEach((element) => element.removeAttribute("data-wechat-placeholder"));
+  const previewHtml = previewHost.outerHTML;
+  swapPreviewSourcesForPlaceholders(host);
 
   return {
     contentHtml: host.outerHTML,
+    previewHtml,
     imageAssets,
     unresolvedImages,
   };
+}
+
+function applyWechatImageSource(
+  image: HTMLImageElement,
+  placeholder: string,
+  asset: Omit<WechatImageAsset, "placeholder">,
+): void {
+  const previewSrc = asset.sourceUrl || asset.sourcePath || placeholder;
+  image.setAttribute("src", previewSrc);
+  image.setAttribute("data-wechat-placeholder", placeholder);
+}
+
+function swapPreviewSourcesForPlaceholders(host: HTMLElement): void {
+  host
+    .querySelectorAll<HTMLImageElement>("img[data-wechat-placeholder]")
+    .forEach((image) => {
+      const placeholder = image.getAttribute("data-wechat-placeholder");
+      if (!placeholder) return;
+      image.setAttribute("src", placeholder);
+      image.removeAttribute("data-wechat-placeholder");
+    });
+}
+
+function isDisplayablePreviewSrc(src: string): boolean {
+  return (
+    src.startsWith("http://") ||
+    src.startsWith("https://") ||
+    src.startsWith("data:") ||
+    src.startsWith("blob:") ||
+    src.startsWith("asset:") ||
+    src.startsWith("file:")
+  );
+}
+
+/** Convert local file paths in preview HTML so the phone frame can render them. */
+export async function hydrateWechatPreviewImages(
+  previewHtml: string,
+): Promise<string> {
+  if (typeof document === "undefined") return previewHtml;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = previewHtml;
+  const images = Array.from(wrap.querySelectorAll<HTMLImageElement>("img"));
+  if (images.length === 0) return previewHtml;
+
+  let convertFileSrc: ((path: string) => string) | null = null;
+  try {
+    const core = await import("@tauri-apps/api/core");
+    convertFileSrc = core.convertFileSrc;
+  } catch {
+    convertFileSrc = null;
+  }
+
+  for (const image of images) {
+    const src = image.getAttribute("src")?.trim() || "";
+    if (!src || isDisplayablePreviewSrc(src)) continue;
+    if (!convertFileSrc) continue;
+    try {
+      image.setAttribute("src", convertFileSrc(src));
+    } catch {
+      // Keep the original path; the preview still shows alt text.
+    }
+  }
+
+  return wrap.innerHTML;
 }

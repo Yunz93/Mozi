@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildAskVaultPrompt } from "../ai/prompts";
-import { estimateLineOffset, hitsToPreviewSnippets } from "./askVaultService";
+import {
+  citationEditorRange,
+  estimateLineOffset,
+  hitsToPreviewSnippets,
+  shouldConfirmAskVaultSend,
+} from "./askVaultService";
 import { remapPathsInChunkIndex } from "./chunkIndexService";
 import { chunkMarkdownFile } from "./chunkService";
 import { keywordSearchChunks, tokenizeSearchQuery } from "./retrieveService";
@@ -53,6 +58,55 @@ describe("hitsToPreviewSnippets", () => {
     ]);
     expect(snippets[0]).toContain("[1] a.md");
     expect(snippets[0]).toContain("Hello retrieval");
+  });
+});
+
+describe("citationEditorRange", () => {
+  it("lands on the chunk text so citation clicks can scroll to the source", () => {
+    const content = `---
+title: 发布
+---
+
+# 发布
+
+上次发布流程的结论是先跑完整测试再打 tag，并且同步更新 changelog 文档。
+`;
+    const chunk = chunkMarkdownFile({
+      path: "/vault/03-发布与问库.md",
+      vaultRoot: "/vault",
+      content,
+    })[0]!;
+    expect(chunk).toBeTruthy();
+    const range = citationEditorRange(content, chunk.startLine, chunk.endLine);
+    expect(content.slice(range.start, range.end)).toContain(
+      "上次发布流程的结论",
+    );
+  });
+});
+
+describe("shouldConfirmAskVaultSend", () => {
+  it("requires a matching previewed question and retrieved hits", () => {
+    expect(
+      shouldConfirmAskVaultSend({
+        question: "上次关于发布流程的结论是什么",
+        lastPreviewedQuestion: "上次关于发布流程的结论是什么",
+        pendingHitCount: 2,
+      }),
+    ).toBe(true);
+    expect(
+      shouldConfirmAskVaultSend({
+        question: "另一个问题",
+        lastPreviewedQuestion: "上次关于发布流程的结论是什么",
+        pendingHitCount: 2,
+      }),
+    ).toBe(false);
+    expect(
+      shouldConfirmAskVaultSend({
+        question: "上次关于发布流程的结论是什么",
+        lastPreviewedQuestion: "上次关于发布流程的结论是什么",
+        pendingHitCount: 0,
+      }),
+    ).toBe(false);
   });
 });
 

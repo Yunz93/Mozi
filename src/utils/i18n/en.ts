@@ -81,6 +81,17 @@ export default {
   wechatDraftDialog_pickCover: "Choose cover image",
   wechatDraftDialog_coverEmpty: "No cover image selected yet",
   wechatDraftDialog_submit: "Publish to drafts",
+  wechatDraftDialog_previewTitle: "Phone preview",
+  wechatDraftDialog_previewHint:
+    "Approximate Official Account article width. Check layout and images before publishing.",
+  wechatDraftDialog_previewLoading: "Building preview…",
+  wechatDraftDialog_previewFailed:
+    "Could not build the preview. You can still try to publish.",
+  wechatDraftDialog_imageCount: "{count} body image(s) will be uploaded",
+  wechatDraftDialog_unresolvedImages:
+    "{count} image(s) could not be resolved. Fix the paths before publishing:",
+  wechatDraftDialog_ipHint:
+    "If the API says the IP is not allowlisted, add this machine's public IP under Official Account Settings → Basic Configuration → IP whitelist.",
 
   simpleBlogDialog_title: "Publish to Simple Blog",
   simpleBlogDialog_desc:
@@ -148,16 +159,19 @@ export default {
   askVault_asking: "Generating…",
   askVault_retrieveHint:
     "Retrieve snippets without calling AI — review sources first if you want.",
+  askVault_confirmSend: "Confirm send and generate",
+  askVault_confirmSendHint:
+    "{count} snippet(s) will be sent to the model. Click a snippet to jump back. Generated text is never applied silently.",
   askVault_toggleSources: "Show snippets to send",
   askVault_sourcesPreview: "Snippets to send",
   askVault_sourcesTab: "Sources",
   askVault_sourcesHint:
-    "These snippets are sent as AI context. Or click Generate answer to retrieve and answer in one step.",
+    "These snippets are sent as model context. Review them, then click Confirm send and generate.",
   askVault_sourcesEmpty:
     "After Generate answer or Retrieve only, matching snippets appear here.",
   askVault_answer: "Answer",
   askVault_answerEmpty:
-    "Type a question and click Generate answer (Cmd/Ctrl+Enter).",
+    "Type a question, review the snippets to send, then generate (Cmd/Ctrl+Enter).",
   askVault_insert: "Insert into current note (confirm required)",
   askVault_insertNeedsNote: "Open a note before inserting.",
   askVault_citations: "Citations",
@@ -841,6 +855,21 @@ export default {
     "Set the WeChat AppSecret in Publishing settings first.",
   notifications_setWechatCoverFirst:
     "Choose a cover image for the WeChat draft first.",
+  notifications_wechatTitleRequired: "Enter a title for the WeChat draft.",
+  notifications_wechatIpAllowlist:
+    "This machine's public IP is not in the Official Account IP allowlist. Add it under Settings → Basic Configuration, then retry.",
+  notifications_wechatInvalidAppId:
+    "The WeChat AppID is invalid. Check it in Settings → Publishing.",
+  notifications_wechatInvalidAppSecret:
+    "The WeChat AppSecret is invalid. Paste it again in Settings → Publishing and confirm it has not been reset.",
+  notifications_wechatQuotaExceeded:
+    "The Official Account API daily quota has been reached. Try again later.",
+  notifications_wechatMediaFailed:
+    "The cover or body image failed to upload. Use a smaller jpg/png that can be opened.",
+  notifications_wechatApiUnauthorized:
+    "This Official Account cannot use the draft API. Check the account type and permissions on the WeChat platform.",
+  notifications_wechatNetworkFailed:
+    "Could not reach the WeChat API. Check the network and retry.",
   notifications_noContentToPublish: "No content to publish",
   notifications_saveBeforePublishFailed:
     "Failed to save the note before publishing.",
