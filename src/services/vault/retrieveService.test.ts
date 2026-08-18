@@ -36,6 +36,34 @@ describe("retrieveService", () => {
     });
     expect(hits[0]?.chunk.path).toBe("/vault/alpha.md");
   });
+
+  it("excludes glob-matched notes from keyword retrieve", async () => {
+    const trash = chunkMarkdownFile({
+      path: "/vault/.trash/old.md",
+      vaultRoot: "/vault",
+      content:
+        "# Old\n\nThis note talks about knowledge base retrieval quality.\n",
+    })[0]!;
+    const snapshotWithTrash: ChunkIndexSnapshot = {
+      ...snapshot,
+      byPath: {
+        ...snapshot.byPath,
+        "/vault/.trash/old.md": [trash],
+      },
+    };
+    const hits = await retrieve({
+      query: "retrieval",
+      chunkIndex: snapshotWithTrash,
+      vectorStore: new VectorStore(),
+      embeddingProvider: new NoneEmbeddingProvider(),
+      retrieve: {
+        mode: "keyword",
+        topK: 5,
+        excludeGlobs: [".trash/**"],
+      },
+    });
+    expect(hits.map((hit) => hit.chunk.path)).toEqual(["/vault/alpha.md"]);
+  });
 });
 
 describe("vectorStore", () => {

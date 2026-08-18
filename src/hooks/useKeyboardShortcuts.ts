@@ -23,6 +23,7 @@ interface UseKeyboardShortcutsOptions {
   onCloseTab?: () => void;
   onOpenKnowledgeBase?: () => void;
   onExportPdf?: () => void;
+  onCommandPalette?: () => void;
 }
 
 const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
@@ -38,6 +39,7 @@ const EDITABLE_SAFE_SHORTCUTS = new Set<keyof ShortcutConfig>([
   "toggleTheme",
   "openKnowledgeBase",
   "exportPdf",
+  "commandPalette",
   "closeTab",
   "newNote",
   "newFolder",
@@ -182,6 +184,7 @@ function useShortcutListener(
         closeTab: options.onCloseTab,
         openKnowledgeBase: options.onOpenKnowledgeBase,
         exportPdf: options.onExportPdf,
+        commandPalette: options.onCommandPalette,
       });
 
       for (const entry of shortcutEntries) {
@@ -215,6 +218,7 @@ function useShortcutListener(
     [
       options.onAIAnalyze,
       options.onCloseTab,
+      options.onCommandPalette,
       options.onExportPdf,
       options.onLocateCurrentFile,
       options.onNewFolder,

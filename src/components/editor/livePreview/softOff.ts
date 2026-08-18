@@ -10,6 +10,8 @@ import {
   isLargeEditorState,
 } from "../hooks/codeMirrorHelpers";
 import { bindLivePreviewWidgetCaret } from "./shared";
+import { useAppStore } from "../../../store/appStore";
+import { t, type TranslationKey } from "../../../utils/i18n";
 
 export type LivePreviewOptimizationMode = "normal" | "heavy" | "large";
 
@@ -31,16 +33,39 @@ export function getLivePreviewOptimizationMode(
   return "normal";
 }
 
+function softOffKindKey(kind: SoftOffKind): TranslationKey {
+  switch (kind) {
+    case "table":
+      return "editor_softOffKind_table";
+    case "callout":
+      return "editor_softOffKind_callout";
+    case "mermaid":
+      return "editor_softOffKind_mermaid";
+    case "math":
+      return "editor_softOffKind_math";
+    case "image":
+      return "editor_softOffKind_image";
+    case "wiki":
+      return "editor_softOffKind_wiki";
+    case "link":
+      return "editor_softOffKind_link";
+    default:
+      return "editor_softOffKind_formatting";
+  }
+}
+
 export function softOffReason(
   mode: LivePreviewOptimizationMode,
   kind: SoftOffKind,
 ): string | null {
   if (mode === "normal") return null;
+  const language = useAppStore.getState().settings.language;
+  const kindLabel = t(language, softOffKindKey(kind));
   if (mode === "large") {
-    return `Large-file mode: ${kind} widgets disabled (${">"}5,000 lines or ${">"}500k chars)`;
+    return t(language, "editor_softOffLarge", { kind: kindLabel });
   }
   if (kind === "table" || kind === "callout" || kind === "mermaid") {
-    return `Heavy-file mode: ${kind} widgets deferred (${">"}2,000 lines or ${">"}200k chars)`;
+    return t(language, "editor_softOffHeavy", { kind: kindLabel });
   }
   return null;
 }
@@ -102,24 +127,6 @@ export class SoftOffPlaceholderWidget extends WidgetType {
 }
 
 function softOffLabel(kind: SoftOffKind): string {
-  switch (kind) {
-    case "table":
-      return "Table";
-    case "callout":
-      return "Callout";
-    case "mermaid":
-      return "Mermaid";
-    case "math":
-      return "Math";
-    case "image":
-      return "Image";
-    case "wiki":
-      return "Wiki";
-    case "link":
-      return "Link";
-    case "formatting":
-      return "Formatting";
-    default:
-      return kind;
-  }
+  const language = useAppStore.getState().settings.language;
+  return t(language, softOffKindKey(kind));
 }

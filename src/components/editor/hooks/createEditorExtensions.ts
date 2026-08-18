@@ -62,7 +62,11 @@ import { cancelPendingLivePreviewReveals } from "../livePreview/shared";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
-import { getEditorTooltipSpace, isLargeEditorState } from "./codeMirrorHelpers";
+import {
+  getEditorTooltipSpace,
+  isHeavyLivePreviewState,
+  isLargeEditorState,
+} from "./codeMirrorHelpers";
 import {
   type EditorPreferenceCompartments,
   type EditorPreferenceOptions,
@@ -342,23 +346,26 @@ export function createEditorExtensions(
         }
 
         const isLarge = isLargeEditorState(update.state);
+        const isHeavy = isHeavyLivePreviewState(update.state);
         pendingContentChangeIsLargeRef.current = isLarge;
-        changeTimeoutRef.current = setTimeout(
-          () => {
-            const view = viewRef.current;
-            if (view && !isSyncingContentRef.current) {
-              const shouldSkipHistory =
-                pendingContentChangeIsLargeRef.current ||
-                isLargeEditorState(view.state);
-              pendingContentChangeIsLargeRef.current = false;
-              onChangeRef.current(view.state.doc.toString(), {
-                skipHistory: shouldSkipHistory,
-              });
-            }
-            changeTimeoutRef.current = null;
-          },
-          isLarge ? 240 : 16,
-        );
+        const debounceMs = isLarge
+          ? 240
+          : isHeavy || update.state.doc.length >= 40_000
+            ? 120
+            : 16;
+        changeTimeoutRef.current = setTimeout(() => {
+          const view = viewRef.current;
+          if (view && !isSyncingContentRef.current) {
+            const shouldSkipHistory =
+              pendingContentChangeIsLargeRef.current ||
+              isLargeEditorState(view.state);
+            pendingContentChangeIsLargeRef.current = false;
+            onChangeRef.current(view.state.doc.toString(), {
+              skipHistory: shouldSkipHistory,
+            });
+          }
+          changeTimeoutRef.current = null;
+        }, debounceMs);
       }
 
       // Auto-trigger completion for wiki links

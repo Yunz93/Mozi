@@ -17,6 +17,7 @@ import {
   FONT_DEFAULTS_VERSION,
   SYSTEM_DEFAULT_FONT_FAMILY,
 } from "../utils/fontSettings";
+import { resolvePersistedShortcuts } from "./persistMigrations";
 
 afterEach(() => {
   useAppStore.setState({
@@ -78,6 +79,22 @@ describe("defaultSettings", () => {
     expect(defaultSettings.convertHtmlOnPaste).toBe(true);
     expect(defaultSettings.fillMissingFrontmatterOnSave).toBe(true);
     expect(defaultSettings.refreshFrontmatterOnSave).toBe(true);
+    expect(defaultSettings.indexExcludeGlobs).toEqual([
+      ".trash/**",
+      "**/node_modules/**",
+    ]);
+    expect(defaultSettings.shortcuts.commandPalette).toMatch(/Shift\+P$/);
+  });
+});
+
+describe("persisted shortcut migration", () => {
+  it("fills commandPalette when older settings omit it", () => {
+    const shortcuts = resolvePersistedShortcuts({
+      shortcuts: { save: "Ctrl+S" },
+    });
+    expect(shortcuts.commandPalette).toBe(
+      defaultSettings.shortcuts.commandPalette,
+    );
   });
 });
 

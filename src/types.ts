@@ -80,6 +80,7 @@ export interface ShortcutConfig {
   closeTab: string;
   openKnowledgeBase: string;
   exportPdf: string;
+  commandPalette: string;
 }
 
 export interface MetadataField {
@@ -244,6 +245,8 @@ export interface AppSettings {
   /** Hub used to download builtin embedding weights */
   embeddingHub?: "auto" | "huggingface" | "hf-mirror";
   privacyMode?: boolean;
+  /** Vault-relative globs skipped by Ask Vault / chunk index. */
+  indexExcludeGlobs?: string[];
   imageHosting: ImageHostingConfig;
   imageHostingGithubToken?: string;
   imageHostingS3SecretAccessKey?: string;

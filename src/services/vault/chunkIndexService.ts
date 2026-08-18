@@ -2,6 +2,7 @@ import type { FileNode } from "../../types";
 import type { ChunkIndexSnapshot, TextChunk } from "../../types/vaultIndex";
 import { flattenFiles, isMarkdownFile } from "../../utils/markdownLinkUtils";
 import { chunkMarkdownFile } from "./chunkService";
+import { pathMatchesAnyGlob } from "../../utils/pathGlob";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -29,10 +30,15 @@ export async function buildFullChunkIndex(options: {
   readFile: (path: string) => Promise<string>;
   onProgress?: (done: number, total: number, currentPath: string) => void;
   shouldCancel?: () => boolean;
+  excludeGlobs?: string[];
 }): Promise<ChunkIndexSnapshot> {
   const paths = flattenFiles(options.files)
     .filter(isMarkdownFile)
-    .map((node) => normalizePath(node.path));
+    .map((node) => normalizePath(node.path))
+    .filter(
+      (path) =>
+        !pathMatchesAnyGlob(path, options.excludeGlobs, options.vaultRoot),
+    );
   const byPath: Record<string, TextChunk[]> = {};
 
   for (let index = 0; index < paths.length; index += 1) {
@@ -66,10 +72,15 @@ export async function upsertChunkPaths(options: {
   vaultRoot: string;
   readFile: (path: string) => Promise<string>;
   contentsByPath?: Record<string, string>;
+  excludeGlobs?: string[];
 }): Promise<ChunkIndexSnapshot> {
   const byPath = { ...options.snapshot.byPath };
   for (const rawPath of options.paths) {
     const path = normalizePath(rawPath);
+    if (pathMatchesAnyGlob(path, options.excludeGlobs, options.vaultRoot)) {
+      delete byPath[path];
+      continue;
+    }
     try {
       const content =
         options.contentsByPath?.[path] ??

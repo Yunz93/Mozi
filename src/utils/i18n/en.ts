@@ -6,6 +6,23 @@ export default {
   common_delete: "Delete",
   common_language: "Language",
   common_interface: "Interface",
+  commandPalette_title: "Command palette",
+  commandPalette_placeholder: "Type a command… table, publish, Ask Vault",
+  commandPalette_empty: "No matching commands",
+  commandPalette_needEditor: "Open a note before running editor commands",
+  commandPalette_groupWorkspace: "Workspace",
+  commandPalette_groupEditor: "Editor",
+  commandPalette_groupTable: "Table",
+  commandPalette_groupPublish: "Publish",
+  commandPalette_bold: "Bold",
+  commandPalette_italic: "Italic",
+  commandPalette_insertLink: "Insert link",
+  commandPalette_insertCodeBlock: "Insert code block",
+  commandPalette_bulletList: "Bullet list",
+  commandPalette_numberedList: "Numbered list",
+  commandPalette_quote: "Quote",
+  commandPalette_heading: "Heading",
+  commandPalette_askVault: "Ask Vault",
   common_simplifiedChinese: "Simplified Chinese",
   common_english: "English",
   common_loading: "Loading...",
@@ -220,6 +237,10 @@ export default {
   index_vectors: "Vector index",
   index_vectorsReady: "Ready ({count})",
   index_vectorsOff: "Disabled",
+  index_excludeTitle: "Exclude paths",
+  index_excludeDesc:
+    "These vault-relative globs are skipped by Ask Vault chunks. One pattern per line; * and ** are supported. Rebuild the index after changing them.",
+  index_excludeHint: "Trash and node_modules are excluded by default.",
   index_embeddingTitle: "Semantic search / Embedding",
   index_embeddingDesc:
     "Uses a built-in on-device model by default (first run downloads tens of MB, then works offline). You can also point at Ollama or another OpenAI-compatible endpoint. Off = keyword only.",
@@ -554,6 +575,9 @@ export default {
   settings_searchDesc: "Open search and jump between matches.",
   settings_openSearch: "Open Search",
   settings_openSearchDesc: "Open the search panel for the current note.",
+  settings_commandPalette: "Command palette",
+  settings_commandPaletteDesc:
+    "Search and run commands such as insert table, publish, and Ask Vault.",
   settings_sidebarSearch: "Sidebar Search",
   settings_sidebarSearchDesc:
     "Open the sidebar and focus the file search field.",
@@ -831,6 +855,15 @@ export default {
   notifications_exportHtmlFailed: "Failed to export HTML",
   notifications_longImageExported: "Long image saved",
   notifications_longImageExportFailed: "Failed to generate long image",
+  notifications_exportTimedOut:
+    "Export timed out. Shorten the note or drop complex diagrams and retry.",
+  notifications_exportEmptyOutput:
+    "Export produced an empty image. The note may be too large to rasterize.",
+  notifications_exportTooLarge:
+    "The note is too large to export fully. Shorten it and retry.",
+  notifications_exportPrepareFailed: "Failed while preparing export HTML.",
+  notifications_exportRasterFailed:
+    "Failed while turning the page into an image.",
   notifications_longImageCopied: "Image copied to clipboard",
   notifications_longImageCopyFailed: "Failed to copy image",
   notifications_longImageShareFailed: "System share failed",
@@ -997,6 +1030,8 @@ export default {
   notifications_sampleNotesSynced: "Sample notes synced to the knowledge base",
   notifications_knowledgeBaseOpenedSuccessfully:
     "Knowledge base opened successfully",
+  notifications_obsidianVaultDetected:
+    "Opened as an Obsidian vault (.obsidian detected).",
   notifications_revealInExplorerUnsupported:
     "Reveal in file explorer is not supported in this environment",
   notifications_itemAlreadyInTrash: "Item is already in trash.",
@@ -1017,6 +1052,18 @@ export default {
     "Large-file optimization: tables, callouts, and Mermaid show placeholders.",
   editor_livePreviewLargeFileMode:
     "Very large file mode: math, images, and wiki Live widgets are off; source remains editable.",
+  editor_softOffLarge:
+    "Large-file mode: {kind} widgets disabled (>5,000 lines or >500k chars)",
+  editor_softOffHeavy:
+    "Heavy-file mode: {kind} widgets deferred (>2,000 lines or >200k chars)",
+  editor_softOffKind_table: "table",
+  editor_softOffKind_callout: "callout",
+  editor_softOffKind_mermaid: "Mermaid",
+  editor_softOffKind_math: "math",
+  editor_softOffKind_image: "image",
+  editor_softOffKind_wiki: "wiki",
+  editor_softOffKind_link: "link",
+  editor_softOffKind_formatting: "formatting",
   table_cellHint:
     "Right-click to add/delete rows or columns; Tab/Enter to navigate",
   table_insertRowAbove: "Insert row above",
@@ -1025,6 +1072,11 @@ export default {
   table_insertColumnLeft: "Insert column left",
   table_insertColumnRight: "Insert column right",
   table_deleteColumn: "Delete column",
+  table_format: "Format table",
+  table_alignLeft: "Align column left",
+  table_alignCenter: "Align column center",
+  table_alignRight: "Align column right",
+  table_insert: "Insert table",
   editor_uploadToHosting: "Upload to hosting",
   preview_loading: "Loading...",
   preview_doubleClickReveal: "Double-click to reveal in Finder",

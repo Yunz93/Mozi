@@ -321,6 +321,35 @@
   margin-top: 0;
 }
 
+.preview-pane-document.markdown-body blockquote.mp-callout {
+  border-inline-start-width: 4px;
+}
+
+.preview-pane-document.markdown-body .mp-callout-title {
+  font-weight: 700;
+  text-transform: capitalize;
+  margin-bottom: 0.35em;
+}
+
+.preview-pane-document.markdown-body .mp-callout-warning,
+.preview-pane-document.markdown-body .mp-callout-caution {
+  border-inline-start-color: #d97706;
+  background: color-mix(in srgb, #d97706 10%, transparent);
+}
+
+.preview-pane-document.markdown-body .mp-callout-error,
+.preview-pane-document.markdown-body .mp-callout-danger,
+.preview-pane-document.markdown-body .mp-callout-bug {
+  border-inline-start-color: #dc2626;
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+}
+
+.preview-pane-document.markdown-body .mp-callout-success,
+.preview-pane-document.markdown-body .mp-callout-tip {
+  border-inline-start-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 10%, transparent);
+}
+
 .preview-pane-document.markdown-body .preview-source-blank-line {
   display: block;
   height: calc(var(--preview-line-height) * 1em);

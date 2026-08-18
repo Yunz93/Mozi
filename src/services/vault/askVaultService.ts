@@ -120,6 +120,7 @@ export async function retrieveAskVaultHits(
       scope: request.scope ?? "vault",
       folderPath: request.folderPath,
       filePaths: request.filePaths,
+      excludeGlobs: request.settings.indexExcludeGlobs,
       topK: request.topK ?? 8,
     },
   });

@@ -454,12 +454,17 @@ export function useFileSystem() {
 
         updateKnowledgeBaseMetadata(result.dirPath);
         if (!options?.silentSuccess) {
+          const obsidianMarker = joinFsPath(result.dirPath, ".obsidian");
+          const looksLikeObsidian =
+            (await fs.fileExists?.(obsidianMarker)) === true;
           showNotification(
             t(
               settings.language,
-              "notifications_knowledgeBaseOpenedSuccessfully",
+              looksLikeObsidian
+                ? "notifications_obsidianVaultDetected"
+                : "notifications_knowledgeBaseOpenedSuccessfully",
             ),
-            "success",
+            looksLikeObsidian ? "info" : "success",
           );
         }
         return result.dirPath;

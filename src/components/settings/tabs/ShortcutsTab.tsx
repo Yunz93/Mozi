@@ -183,6 +183,13 @@ function getShortcutGroups(
           settingKey: "search",
         },
         {
+          id: "commandPalette",
+          label: t("settings_commandPalette"),
+          description: t("settings_commandPaletteDesc"),
+          editable: true,
+          settingKey: "commandPalette",
+        },
+        {
           id: "sidebarSearch",
           label: t("settings_sidebarSearch"),
           description: t("settings_sidebarSearchDesc"),
@@ -252,6 +259,7 @@ function getShortcutLabels(
     closeTab: t("settings_closeTab"),
     openKnowledgeBase: t("settings_openKnowledgeBase"),
     exportPdf: t("settings_exportPdf"),
+    commandPalette: t("settings_commandPalette"),
   };
 }
 

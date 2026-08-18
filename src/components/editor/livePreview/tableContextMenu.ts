@@ -5,6 +5,7 @@
 import type { EditorView } from "@codemirror/view";
 import { useAppStore } from "../../../store/appStore";
 import { t, type TranslationKey } from "../../../utils/i18n";
+import { formatTable } from "../behavior/tables";
 
 export type LiveTableStructureOp =
   | "insertRowAbove"
@@ -31,6 +32,11 @@ type MenuItem =
       labelKey: TranslationKey;
       disabled?: boolean;
     }
+  | {
+      type: "command";
+      labelKey: TranslationKey;
+      run: (view: EditorView) => void;
+    }
   | { type: "sep" };
 
 const MENU_ITEMS: MenuItem[] = [
@@ -49,6 +55,14 @@ const MENU_ITEMS: MenuItem[] = [
     labelKey: "table_insertColumnRight",
   },
   { type: "action", op: "deleteColumn", labelKey: "table_deleteColumn" },
+  { type: "sep" },
+  {
+    type: "command",
+    labelKey: "table_format",
+    run: (view) => {
+      formatTable(view);
+    },
+  },
 ];
 
 let openMenu: HTMLElement | null = null;
@@ -104,6 +118,28 @@ export function openLiveTableContextMenu(
       const sep = document.createElement("div");
       sep.className = "cm-live-preview-table-menu-sep";
       menu.appendChild(sep);
+      continue;
+    }
+
+    if (item.type === "command") {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cm-live-preview-table-menu-item";
+      btn.setAttribute("role", "menuitem");
+      const label = document.createElement("span");
+      label.textContent = t(language, item.labelKey);
+      btn.appendChild(label);
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeLiveTableContextMenu();
+        item.run(target.view);
+      });
+      menu.appendChild(btn);
       continue;
     }
 

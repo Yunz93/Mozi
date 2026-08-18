@@ -78,6 +78,7 @@ export interface RetrieveOptions {
   filePaths?: string[];
   topK?: number;
   excludePaths?: string[];
+  excludeGlobs?: string[];
 }
 
 export interface AskVaultCitation {
