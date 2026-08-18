@@ -213,6 +213,7 @@ export function useVaultIndexLifecycle(): {
           paths: toAdd,
           vaultRoot,
           readFile: (path) => fs.readFile(path),
+          excludeGlobs: useAppStore.getState().settings.indexExcludeGlobs,
         });
       }
       await refreshSemanticForChunkIndex(chunkIndex, { previousByPath });
@@ -276,6 +277,7 @@ export function useVaultIndexLifecycle(): {
         vaultRoot,
         readFile: (path) => fs.readFile(path),
         shouldCancel: () => generation !== generationRef.current,
+        excludeGlobs: state.settings.indexExcludeGlobs,
       });
       if (generation !== generationRef.current) return;
       await refreshSemanticForChunkIndex(chunkIndex, {
@@ -367,6 +369,7 @@ export function useVaultIndexLifecycle(): {
           files: state.files,
           vaultRoot,
           readFile: (path) => fs.readFile(path),
+          excludeGlobs: state.settings.indexExcludeGlobs,
         });
         await refreshSemanticForChunkIndex(chunkIndex);
         return;
@@ -406,6 +409,7 @@ export function useVaultIndexLifecycle(): {
           vaultRoot,
           readFile: async () => fileContent,
           contentsByPath: { [path]: fileContent },
+          excludeGlobs: state.settings.indexExcludeGlobs,
         });
         await refreshSemanticForChunkIndex(nextChunks, {
           previousByPath: previousChunks?.byPath,

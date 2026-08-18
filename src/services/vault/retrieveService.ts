@@ -6,6 +6,7 @@ import type {
 } from "../../types/vaultIndex";
 import type { VectorStore } from "./vectorStore";
 import type { EmbeddingProvider } from "./embeddingProvider";
+import { pathMatchesAnyGlob } from "../../utils/pathGlob";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -23,7 +24,7 @@ export function listChunks(
   snapshot: ChunkIndexSnapshot | null,
   options: Pick<
     RetrieveOptions,
-    "scope" | "folderPath" | "filePaths" | "excludePaths"
+    "scope" | "folderPath" | "filePaths" | "excludePaths" | "excludeGlobs"
   > = {},
 ): TextChunk[] {
   if (!snapshot) return [];
@@ -37,6 +38,9 @@ export function listChunks(
   return all.filter((chunk) => {
     const path = normalizePath(chunk.path);
     if (exclude.has(path)) return false;
+    if (pathMatchesAnyGlob(path, options.excludeGlobs, snapshot.vaultRoot)) {
+      return false;
+    }
     if (fileFilter && !fileFilter.includes(path)) return false;
     if (options.scope === "folder" && folder) {
       if (path !== folder && !path.startsWith(`${folder}/`)) return false;

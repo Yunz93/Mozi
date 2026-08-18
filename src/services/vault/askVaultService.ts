@@ -120,6 +120,7 @@ export async function retrieveAskVaultHits(
       scope: request.scope ?? "vault",
       folderPath: request.folderPath,
       filePaths: request.filePaths,
+      excludeGlobs: request.settings.indexExcludeGlobs,
       topK: request.topK ?? 8,
     },
   });
@@ -236,13 +237,76 @@ export function estimateLineOffset(
   return offset;
 }
 
+export function citationEditorRange(
+  content: string,
+  startLine: number,
+  endLine: number,
+): { start: number; end: number } {
+  const start = estimateLineOffset(content, startLine);
+  const end = estimateLineOffset(content, endLine + 1);
+  return { start, end: Math.max(start + 1, end) };
+}
+
 export function normalizeAskVaultPath(path: string): string {
   return normalizePath(path);
 }
 
+export interface AskVaultPreviewSnippet {
+  index: number;
+  path: string;
+  relPath: string;
+  titlePath: string[];
+  headingAnchor: string | null;
+  startLine: number;
+  endLine: number;
+  snippet: string;
+}
+
+export function hitsToPreviewItems(
+  hits: RetrieveHit[],
+): AskVaultPreviewSnippet[] {
+  return hits.map((hit, index) => ({
+    index: index + 1,
+    path: hit.chunk.path,
+    relPath: hit.chunk.relPath || hit.chunk.path,
+    titlePath: hit.chunk.titlePath,
+    headingAnchor: hit.chunk.headingAnchor,
+    startLine: hit.chunk.startLine,
+    endLine: hit.chunk.endLine,
+    snippet: hit.chunk.text.slice(0, 240),
+  }));
+}
+
 export function hitsToPreviewSnippets(hits: RetrieveHit[]): string[] {
-  return hits.map(
-    (hit, index) =>
-      `[${index + 1}] ${hit.chunk.relPath || hit.chunk.path}\n${hit.chunk.text.slice(0, 240)}`,
+  return hitsToPreviewItems(hits).map(
+    (item) => `[${item.index}] ${item.relPath}\n${item.snippet}`,
+  );
+}
+
+export function previewItemToCitation(
+  item: AskVaultPreviewSnippet,
+): AskVaultCitation {
+  return {
+    index: item.index,
+    path: item.path,
+    relPath: item.relPath,
+    titlePath: item.titlePath,
+    snippet: item.snippet,
+    startLine: item.startLine,
+    endLine: item.endLine,
+    headingAnchor: item.headingAnchor,
+  };
+}
+
+export function shouldConfirmAskVaultSend(options: {
+  question: string;
+  lastPreviewedQuestion: string | null;
+  pendingHitCount: number;
+}): boolean {
+  const question = options.question.trim();
+  return (
+    question.length > 0 &&
+    options.pendingHitCount > 0 &&
+    options.lastPreviewedQuestion === question
   );
 }

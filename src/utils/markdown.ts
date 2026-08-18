@@ -22,6 +22,7 @@ import {
 } from "./markdownAlphaRomanList";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
 import { normalizeHttpUrlForHtmlAttribute } from "../components/editor/preview/previewMedia";
+import { markdownItCallouts } from "./markdownCallouts";
 
 interface MarkdownRenderOptions {
   highlighter?: ShikiHighlighter | null;
@@ -53,7 +54,8 @@ const createMarkdownIt = () => {
   })
     .use(taskLists)
     // GFM/Obsidian-style [^id] refs and [^id]: definitions (otherwise parsed as reference links).
-    .use(footnote);
+    .use(footnote)
+    .use(markdownItCallouts);
 
   // 关闭 setext 标题(下划线式 `foo\n---` / `foo\n===`)。
   // 它与列表编辑中间态强冲突:在 `- test` 下一行只敲了一个孤立 `-`、还没写空格和内容时,
@@ -256,7 +258,7 @@ let currentTheme: ThemeMode = "light";
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 5;
+const MARKDOWN_RENDERER_CACHE_VERSION = 6;
 const PREVIEW_BLANK_LINE_HTML =
   '<div class="preview-source-blank-line"></div>\n';
 
@@ -568,6 +570,7 @@ export function renderMarkdown(
       "data-wiki-width",
       "data-wiki-height",
       "data-block-id",
+      "data-callout",
       "data-shiki-block",
       "value",
       // 用于 alpha/roman 有序列表: <ol type="A" start="3"> 等

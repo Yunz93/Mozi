@@ -6,6 +6,23 @@ export default {
   common_delete: "删除",
   common_language: "语言",
   common_interface: "界面",
+  commandPalette_title: "命令面板",
+  commandPalette_placeholder: "输入命令… 例如 表格、发布、问库",
+  commandPalette_empty: "没有匹配的命令",
+  commandPalette_needEditor: "请先打开一篇笔记再运行编辑命令",
+  commandPalette_groupWorkspace: "工作区",
+  commandPalette_groupEditor: "编辑",
+  commandPalette_groupTable: "表格",
+  commandPalette_groupPublish: "发布",
+  commandPalette_bold: "加粗",
+  commandPalette_italic: "斜体",
+  commandPalette_insertLink: "插入链接",
+  commandPalette_insertCodeBlock: "插入代码块",
+  commandPalette_bulletList: "无序列表",
+  commandPalette_numberedList: "有序列表",
+  commandPalette_quote: "引用",
+  commandPalette_heading: "标题级别",
+  commandPalette_askVault: "问库",
   common_simplifiedChinese: "简体中文",
   common_english: "English",
   common_loading: "加载中...",
@@ -75,6 +92,15 @@ export default {
   wechatDraftDialog_pickCover: "选择封面图",
   wechatDraftDialog_coverEmpty: "尚未选择封面图",
   wechatDraftDialog_submit: "发布到草稿箱",
+  wechatDraftDialog_previewTitle: "手机预览",
+  wechatDraftDialog_previewHint: "接近公众号图文宽度，发布前先看排版和图片。",
+  wechatDraftDialog_previewLoading: "正在生成预览…",
+  wechatDraftDialog_previewFailed: "预览生成失败，仍可尝试发布。",
+  wechatDraftDialog_imageCount: "将上传 {count} 张正文图片",
+  wechatDraftDialog_unresolvedImages:
+    "有 {count} 张图片找不到，请先修好路径再发布：",
+  wechatDraftDialog_ipHint:
+    "若提示 IP 不在白名单，请把本机出口 IP 加到微信公众平台「基本配置 → IP 白名单」。",
 
   simpleBlogDialog_title: "发布到 Simple Blog",
   simpleBlogDialog_desc:
@@ -138,14 +164,19 @@ export default {
   askVault_ask: "生成回答",
   askVault_asking: "生成中…",
   askVault_retrieveHint: "只检索片段、不调用 AI；可先检查来源再生成。",
+  askVault_confirmSend: "确认发送并生成",
+  askVault_confirmSendHint:
+    "将发送 {count} 段笔记给模型。点片段可跳回原文；生成结果不会静默改写笔记。",
   askVault_toggleSources: "显示将发送的片段",
   askVault_sourcesPreview: "将发送的片段",
   askVault_sourcesTab: "来源",
   askVault_sourcesHint:
-    "这些片段会作为上下文发给 AI。也可直接点「生成回答」自动检索并生成。",
-  askVault_sourcesEmpty: "点「生成回答」或「仅检索」后，相关片段会显示在这里。",
+    "这些片段会作为上下文发给模型。请先确认，再点「确认发送并生成」。",
+  askVault_sourcesEmpty:
+    "输入问题后点「生成回答」或「仅检索」，相关片段会显示在这里。",
   askVault_answer: "回答",
-  askVault_answerEmpty: "输入问题后点「生成回答」（Cmd/Ctrl+Enter）。",
+  askVault_answerEmpty:
+    "输入问题后先检索来源，确认将发送的片段，再生成回答（Cmd/Ctrl+Enter）。",
   askVault_insert: "插入到当前笔记（需确认）",
   askVault_insertNeedsNote: "请先打开一篇笔记再插入。",
   askVault_citations: "引用",
@@ -192,6 +223,10 @@ export default {
   index_vectors: "向量索引",
   index_vectorsReady: "已就绪（{count}）",
   index_vectorsOff: "未启用",
+  index_excludeTitle: "排除路径",
+  index_excludeDesc:
+    "这些相对路径不会进入问库切片。一行一条，支持 * 与 **。修改后请重建索引。",
+  index_excludeHint: "默认排除回收站和 node_modules。",
   index_embeddingTitle: "语义检索 / Embedding",
   index_embeddingDesc:
     "默认使用软件内置本地模型（首次会下载约几十 MB，之后离线可用）。也可改用 Ollama 等 OpenAI 兼容接口。关闭则仅关键词搜索。",
@@ -505,6 +540,8 @@ export default {
   settings_searchDesc: "打开搜索并在匹配结果间跳转。",
   settings_openSearch: "打开搜索",
   settings_openSearchDesc: "打开当前笔记的搜索面板。",
+  settings_commandPalette: "命令面板",
+  settings_commandPaletteDesc: "搜索并运行插入表格、发布、问库等命令。",
   settings_sidebarSearch: "侧边栏搜索",
   settings_sidebarSearchDesc: "打开侧边栏并聚焦文件搜索框。",
   settings_nextMatch: "下一个匹配",
@@ -759,6 +796,11 @@ export default {
   notifications_exportHtmlFailed: "导出 HTML 失败",
   notifications_longImageExported: "长图已保存",
   notifications_longImageExportFailed: "生成长图失败",
+  notifications_exportTimedOut: "导出超时。请缩短笔记或关掉复杂图表后重试。",
+  notifications_exportEmptyOutput: "导出结果为空。可能是内容过大或渲染失败。",
+  notifications_exportTooLarge: "内容太大，无法完整导出。请缩短笔记后重试。",
+  notifications_exportPrepareFailed: "准备导出 HTML 失败。",
+  notifications_exportRasterFailed: "把页面画成图片失败。",
   notifications_longImageCopied: "图片已复制到剪贴板",
   notifications_longImageCopyFailed: "复制图片失败",
   notifications_longImageShareFailed: "系统分享失败",
@@ -775,6 +817,20 @@ export default {
   notifications_setWechatAppSecretFirst:
     "请先在发布设置里填写公众号 AppSecret。",
   notifications_setWechatCoverFirst: "请先选择公众号封面图。",
+  notifications_wechatTitleRequired: "请填写公众号图文标题。",
+  notifications_wechatIpAllowlist:
+    "当前出口 IP 不在公众号白名单。请到微信公众平台「基本配置」加入本机公网 IP 后再试。",
+  notifications_wechatInvalidAppId:
+    "公众号 AppID 无效。请到设置 → 发布核对 AppID。",
+  notifications_wechatInvalidAppSecret:
+    "公众号 AppSecret 无效。请到设置 → 发布重新填写，并确认开发者密码未重置。",
+  notifications_wechatQuotaExceeded:
+    "公众号接口今日调用次数已用完，请稍后再试。",
+  notifications_wechatMediaFailed:
+    "封面或正文图片上传失败。请换一张较小的 jpg/png，并确认图片能打开。",
+  notifications_wechatApiUnauthorized:
+    "当前公众号未开通草稿箱接口权限。请在公众平台确认账号类型与权限。",
+  notifications_wechatNetworkFailed: "连接微信接口失败。请检查网络后重试。",
   notifications_noContentToPublish: "没有可发布的内容",
   notifications_saveBeforePublishFailed: "发布前保存笔记失败。",
   notifications_publishTimeout:
@@ -884,6 +940,8 @@ export default {
   notifications_openInNewWindowFailed: "无法在新窗口打开：{{error}}",
   notifications_sampleNotesSynced: "示例笔记已同步到知识库",
   notifications_knowledgeBaseOpenedSuccessfully: "知识库已打开",
+  notifications_obsidianVaultDetected:
+    "已按 Obsidian 知识库打开（检测到 .obsidian）。",
   notifications_revealInExplorerUnsupported: "当前环境不支持在文件管理器中定位",
   notifications_itemAlreadyInTrash: "该项目已在回收站中。",
   notifications_moveToTrashUnsupported: "当前环境不支持移到回收站。",
@@ -901,6 +959,16 @@ export default {
     "已进入大文件优化模式：表格 / Callout / Mermaid 显示占位，详情见组件提示。",
   editor_livePreviewLargeFileMode:
     "已进入超大文件优化模式：公式、图片、Wiki 等 Live 组件已关闭，源码仍可编辑。",
+  editor_softOffLarge: "超大文件模式：已关闭{kind}（超过 5000 行或 50 万字）",
+  editor_softOffHeavy: "大文件模式：暂缓{kind}（超过 2000 行或 20 万字）",
+  editor_softOffKind_table: "表格",
+  editor_softOffKind_callout: "Callout",
+  editor_softOffKind_mermaid: "Mermaid",
+  editor_softOffKind_math: "公式",
+  editor_softOffKind_image: "图片",
+  editor_softOffKind_wiki: "Wiki",
+  editor_softOffKind_link: "链接",
+  editor_softOffKind_formatting: "标记",
   table_cellHint: "右键可增删行列；Tab / Enter 导航",
   table_insertRowAbove: "在上方插入行",
   table_insertRowBelow: "在下方插入行",
@@ -908,6 +976,11 @@ export default {
   table_insertColumnLeft: "在左侧插入列",
   table_insertColumnRight: "在右侧插入列",
   table_deleteColumn: "删除列",
+  table_format: "格式化表格",
+  table_alignLeft: "列对齐：左",
+  table_alignCenter: "列对齐：中",
+  table_alignRight: "列对齐：右",
+  table_insert: "插入表格",
   editor_uploadToHosting: "上传到图床",
   preview_loading: "加载中...",
   preview_doubleClickReveal: "双击可在 Finder 中定位",

@@ -585,6 +585,35 @@ ${exportDelStrikeBlock}
       padding: 0.9rem 1rem;
     }
 
+    .export-document .markdown-body blockquote.mp-callout {
+      border-left-width: 4px;
+    }
+
+    .export-document .markdown-body .mp-callout-title {
+      font-weight: 700;
+      text-transform: capitalize;
+      margin-bottom: 0.35em;
+    }
+
+    .export-document .markdown-body .mp-callout-warning,
+    .export-document .markdown-body .mp-callout-caution {
+      border-left-color: #d97706;
+      background: color-mix(in srgb, #d97706 10%, transparent);
+    }
+
+    .export-document .markdown-body .mp-callout-error,
+    .export-document .markdown-body .mp-callout-danger,
+    .export-document .markdown-body .mp-callout-bug {
+      border-left-color: #dc2626;
+      background: color-mix(in srgb, #dc2626 10%, transparent);
+    }
+
+    .export-document .markdown-body .mp-callout-success,
+    .export-document .markdown-body .mp-callout-tip {
+      border-left-color: #16a34a;
+      background: color-mix(in srgb, #16a34a 10%, transparent);
+    }
+
     .export-document .markdown-body code {
       color: var(--mp-doc-code-text);
       background: var(--mp-doc-code-bg);

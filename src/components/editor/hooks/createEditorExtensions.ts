@@ -30,7 +30,7 @@ import {
   tooltips,
   type ViewUpdate,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import { resolveEditorCodeLanguage } from "../../../utils/editorCodeLanguages";
@@ -39,6 +39,10 @@ import {
   createMarkdownKeyBindings,
   getStrictOrderedListNormalizationChanges,
 } from "../behavior";
+import {
+  defaultKeymapWithoutEnter,
+  editorImeGuardPlugin,
+} from "../behavior/imeGuard";
 import { handleStructuredPaste } from "../behavior/input";
 import { markdownFenceLanguageCompletion } from "../behavior/fenceLanguageCompletion";
 import { markdownFencedCodeInputHandler } from "../behavior/fencedCodeInput";
@@ -58,7 +62,11 @@ import { cancelPendingLivePreviewReveals } from "../livePreview/shared";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
-import { getEditorTooltipSpace, isLargeEditorState } from "./codeMirrorHelpers";
+import {
+  getEditorTooltipSpace,
+  isHeavyLivePreviewState,
+  isLargeEditorState,
+} from "./codeMirrorHelpers";
 import {
   type EditorPreferenceCompartments,
   type EditorPreferenceOptions,
@@ -181,7 +189,12 @@ export function createEditorExtensions(
     compartments.darkTheme.of(EditorView.darkTheme.of(themeMode === "dark")),
     editorAutocompletePanelBaseTheme,
     EditorView.inputHandler.of(markdownFencedCodeInputHandler),
-    keymap.of([...completionKeymap, ...defaultKeymap, ...historyKeymap]),
+    editorImeGuardPlugin,
+    keymap.of([
+      ...completionKeymap,
+      ...defaultKeymapWithoutEnter(),
+      ...historyKeymap,
+    ]),
     compartments.keymap.of(
       Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
     ),
@@ -333,23 +346,26 @@ export function createEditorExtensions(
         }
 
         const isLarge = isLargeEditorState(update.state);
+        const isHeavy = isHeavyLivePreviewState(update.state);
         pendingContentChangeIsLargeRef.current = isLarge;
-        changeTimeoutRef.current = setTimeout(
-          () => {
-            const view = viewRef.current;
-            if (view && !isSyncingContentRef.current) {
-              const shouldSkipHistory =
-                pendingContentChangeIsLargeRef.current ||
-                isLargeEditorState(view.state);
-              pendingContentChangeIsLargeRef.current = false;
-              onChangeRef.current(view.state.doc.toString(), {
-                skipHistory: shouldSkipHistory,
-              });
-            }
-            changeTimeoutRef.current = null;
-          },
-          isLarge ? 240 : 16,
-        );
+        const debounceMs = isLarge
+          ? 240
+          : isHeavy || update.state.doc.length >= 40_000
+            ? 120
+            : 16;
+        changeTimeoutRef.current = setTimeout(() => {
+          const view = viewRef.current;
+          if (view && !isSyncingContentRef.current) {
+            const shouldSkipHistory =
+              pendingContentChangeIsLargeRef.current ||
+              isLargeEditorState(view.state);
+            pendingContentChangeIsLargeRef.current = false;
+            onChangeRef.current(view.state.doc.toString(), {
+              skipHistory: shouldSkipHistory,
+            });
+          }
+          changeTimeoutRef.current = null;
+        }, debounceMs);
       }
 
       // Auto-trigger completion for wiki links

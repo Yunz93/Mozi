@@ -19,6 +19,7 @@ import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useStoreHydration } from "./hooks/useStoreHydration";
 import { resolvePreviewOnlyViewModeTransition } from "./utils/viewModeSession";
+import { getNextViewMode } from "./utils/viewMode";
 import { useShikiHighlighter } from "./hooks/useShikiHighlighter";
 import { useThemeSync } from "./hooks/useThemeSync";
 import { useSystemThemeFollow } from "./hooks/useSystemThemeFollow";
@@ -31,6 +32,8 @@ import type { CodeMirrorContentChangeMeta } from "./components/editor/hooks/useC
 import { RightRail } from "./components/rightRail/RightRail";
 import { AskVaultPanel } from "./components/ai/AskVaultPanel";
 import { ContentSearch } from "./components/search/ContentSearch";
+import { CommandPalette } from "./components/commandPalette/CommandPalette";
+import { buildCommandPaletteItems } from "./components/commandPalette/buildCommandPaletteItems";
 import { useExportActions } from "./hooks/useExportActions";
 import { usePublishActions } from "./hooks/usePublishActions";
 import { ViewMode } from "./types";
@@ -196,6 +199,7 @@ const App: React.FC = () => {
   const [isShareLongImageDialogOpen, setIsShareLongImageDialogOpen] =
     useState(false);
   const [isAskVaultOpen, setIsAskVaultOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isRestoringStartupKnowledgeBase, setIsRestoringStartupKnowledgeBase] =
     useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
@@ -394,6 +398,9 @@ const App: React.FC = () => {
       },
       onExportPdf: () => {
         void handleExportToPdf();
+      },
+      onCommandPalette: () => {
+        setIsCommandPaletteOpen((open) => !open);
       },
       onToggleView: isNonMarkdownWorkspaceFile ? () => {} : undefined,
     },
@@ -597,6 +604,92 @@ const App: React.FC = () => {
     }
     setIsPublishTargetDialogOpen(true);
   }, [isNonMarkdownWorkspaceFile, showNotification, t]);
+
+  const commandPaletteItems = useMemo(
+    () =>
+      buildCommandPaletteItems({
+        t,
+        shortcuts: settings.shortcuts,
+        showNeedEditor: () =>
+          showNotification(t("commandPalette_needEditor"), "info"),
+        save: () => {
+          if (!currentFilePath) return;
+          void forceSave(undefined, {
+            formatBeforeSave: settings.formatMarkdownOnManualSave,
+            trigger: "manual",
+          }).then((saved) => {
+            if (saved) showNotification(t("app_saved"), "success");
+          });
+        },
+        newNote: () => setIsNewNoteDialogOpen(true),
+        newFolder: () => {
+          void fileOps.handleNewFolder(undefined, t("app_untitledFolder"));
+        },
+        newWindow: () => {
+          void handleOpenNewWindow();
+        },
+        closeTab: () => {
+          if (!activeTabId) return;
+          closeTab(activeTabId);
+        },
+        toggleView: () => {
+          if (isNonMarkdownWorkspaceFile) return;
+          setViewMode(getNextViewMode(viewMode), "toggle");
+        },
+        toggleSidebar: () => setSidebarOpen(!isSidebarOpen),
+        toggleOutline: () => setIsOutlineOpen((prev) => !prev),
+        toggleTheme,
+        search: () => setIsSearchBarOpen(true),
+        sidebarSearch: () => {
+          setSidebarOpen(true);
+          setSidebarSearchRequestKey((prev) => prev + 1);
+        },
+        locateCurrentFile: () => {
+          if (!activeTabId) return;
+          setSidebarOpen(true);
+          setSidebarLocateRequestKey((prev) => prev + 1);
+        },
+        settings: () => setSettingsOpen(true),
+        openKnowledgeBase: () => {
+          void handleSwitchKnowledgeBase();
+        },
+        exportPdf: () => {
+          void handleExportToPdf();
+        },
+        exportHtml: () => {
+          void handleExportToHtml();
+        },
+        shareLongImage: () => setIsShareLongImageDialogOpen(true),
+        publish: handleOpenPublishDialog,
+        askVault: () => {
+          setIsAskVaultOpen(true);
+          setIsOutlineOpen(false);
+        },
+      }),
+    [
+      activeTabId,
+      closeTab,
+      currentFilePath,
+      fileOps,
+      forceSave,
+      handleExportToHtml,
+      handleExportToPdf,
+      handleOpenPublishDialog,
+      handleOpenNewWindow,
+      handleSwitchKnowledgeBase,
+      isNonMarkdownWorkspaceFile,
+      isSidebarOpen,
+      setSidebarOpen,
+      setSettingsOpen,
+      setViewMode,
+      settings.formatMarkdownOnManualSave,
+      settings.shortcuts,
+      showNotification,
+      t,
+      toggleTheme,
+      viewMode,
+    ],
+  );
 
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
@@ -964,6 +1057,12 @@ const App: React.FC = () => {
               {isSearchBarOpen && (
                 <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
               )}
+              {isCommandPaletteOpen ? (
+                <CommandPalette
+                  commands={commandPaletteItems}
+                  onClose={() => setIsCommandPaletteOpen(false)}
+                />
+              ) : null}
             </div>
           </main>
         </div>

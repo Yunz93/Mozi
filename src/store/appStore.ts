@@ -46,6 +46,7 @@ import {
   sanitizeSettingsForPersistence,
   stripNonRuntimeSettings,
 } from "./persistMigrations";
+import { DEFAULT_INDEX_EXCLUDE_GLOBS } from "../utils/pathGlob";
 
 // Re-export types from slice stores
 export type {
@@ -163,6 +164,12 @@ export const useAppStore = create<AppState>()(
             persistedSettings.metadataFields,
           ),
           shortcuts: resolvePersistedShortcuts(persistedSettings),
+          indexExcludeGlobs: Array.isArray(persistedSettings.indexExcludeGlobs)
+            ? persistedSettings.indexExcludeGlobs.filter(
+                (item): item is string =>
+                  typeof item === "string" && item.trim().length > 0,
+              )
+            : [...DEFAULT_INDEX_EXCLUDE_GLOBS],
         };
 
         return {

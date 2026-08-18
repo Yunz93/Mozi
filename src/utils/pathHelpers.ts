@@ -19,6 +19,14 @@ export function normalizeSlashes(path: string): string {
 }
 
 /**
+ * Slash-normalize plus Unicode NFC so macOS NFD filenames match
+ * NFC markdown/wiki links (e.g. `截图.png`).
+ */
+export function canonicalizePath(path: string): string {
+  return normalizeSlashes(path).normalize("NFC");
+}
+
+/**
  * Sanitize a resource folder name: trim, normalize slashes, strip
  * leading/trailing slashes and leading `./`. Rejects `..` path segments.
  */

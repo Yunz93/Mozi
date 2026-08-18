@@ -1,4 +1,5 @@
 import type { AppLanguage } from "../types";
+import { classifyWechatPublishError } from "./wechatPublishErrors";
 import zhCN from "./i18n/zh-CN";
 import en from "./i18n/en";
 
@@ -35,6 +36,28 @@ const knownErrorMessages: Record<string, TranslationKey> = {
   "Please configure AI settings first.": "notifications_aiConfigFirst",
   "Failed to create the wiki file.": "notifications_wikiCreateFailed",
   "Gemini API key is required": "notifications_aiConfigFirst",
+  "WeChat AppID is required for publishing.":
+    "notifications_setWechatAppIdFirst",
+  "WeChat AppSecret is required for publishing.":
+    "notifications_setWechatAppSecretFirst",
+  "WeChat draft title is required.": "notifications_wechatTitleRequired",
+};
+
+const wechatPublishErrorKeys: Record<
+  import("./wechatPublishErrors").WechatPublishErrorKind,
+  TranslationKey
+> = {
+  appId: "notifications_setWechatAppIdFirst",
+  appSecret: "notifications_setWechatAppSecretFirst",
+  title: "notifications_wechatTitleRequired",
+  ipAllowlist: "notifications_wechatIpAllowlist",
+  invalidAppId: "notifications_wechatInvalidAppId",
+  invalidSecret: "notifications_wechatInvalidAppSecret",
+  quota: "notifications_wechatQuotaExceeded",
+  media: "notifications_wechatMediaFailed",
+  permission: "notifications_wechatApiUnauthorized",
+  network: "notifications_wechatNetworkFailed",
+  generic: "notifications_wechatPublishFailed",
 };
 
 export function localizeKnownError(
@@ -44,6 +67,11 @@ export function localizeKnownError(
   const normalizedMessage = message.trim();
   const exactKey = knownErrorMessages[normalizedMessage];
   if (exactKey) return t(language, exactKey);
+
+  const wechatKind = classifyWechatPublishError(normalizedMessage);
+  if (wechatKind) {
+    return t(language, wechatPublishErrorKeys[wechatKind]);
+  }
 
   const isDeepSeekMessage = /deepseek/i.test(normalizedMessage);
   if (isDeepSeekMessage) {

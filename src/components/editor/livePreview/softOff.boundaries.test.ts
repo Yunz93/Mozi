@@ -12,6 +12,8 @@ import { buildTableDecorations, livePreviewTables } from "./tables";
 import { selectionAffectsCoverage } from "./shared";
 import { getLivePreviewOptimizationMode, softOffReason } from "./softOff";
 import { LARGE_FILE_THRESHOLDS } from "../../../utils/performance";
+import { t } from "../../../utils/i18n";
+import { useAppStore } from "../../../store/appStore";
 
 function docWithLines(lineCount: number, line = "x"): string {
   return Array.from({ length: lineCount }, () => line).join("\n");
@@ -102,7 +104,12 @@ describe("live preview soft-off boundaries", () => {
       docWithLines(LARGE_FILE_THRESHOLDS.LINE_COUNT + 1) + "\n\n$E=mc^2$\n";
     const state = createState(largeDoc, largeDoc.length - 1);
     expect(getLivePreviewOptimizationMode(state)).toBe("large");
-    expect(softOffReason("large", "math")).toMatch(/Large-file mode/i);
+    const language = useAppStore.getState().settings.language;
+    expect(softOffReason("large", "math")).toBe(
+      t(language, "editor_softOffLarge", {
+        kind: t(language, "editor_softOffKind_math"),
+      }),
+    );
     const math = buildMathDecorations(state);
     expect(math.decorations.size).toBe(0);
   });

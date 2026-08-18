@@ -27,6 +27,7 @@ import {
 } from "../utils/editorPreferences";
 import { normalizeNewNoteLocation } from "../utils/newNoteLocation";
 import { getPreferredShortcutModifierToken } from "../utils/shortcuts";
+import { DEFAULT_INDEX_EXCLUDE_GLOBS } from "../utils/pathGlob";
 
 function normalizeThemeMode(themeMode: unknown): AppSettings["themeMode"] {
   return themeMode === "dark" ? "dark" : "light";
@@ -198,6 +199,7 @@ export const defaultSettings: AppSettings = {
   embeddingApiKey: "",
   embeddingModel: "nomic-embed-text",
   privacyMode: false,
+  indexExcludeGlobs: [...DEFAULT_INDEX_EXCLUDE_GLOBS],
   imageHosting: defaultImageHostingConfig,
   shortcuts: {
     save: `${primaryShortcutModifier}+S`,
@@ -216,6 +218,7 @@ export const defaultSettings: AppSettings = {
     closeTab: `${primaryShortcutModifier}+W`,
     openKnowledgeBase: "Cmd+Shift+K",
     exportPdf: "Cmd+Shift+H",
+    commandPalette: `${primaryShortcutModifier}+Shift+P`,
   },
   knowledgeBases: [],
   lastKnowledgeBasePath: "",

@@ -14,6 +14,10 @@ import {
 } from "../../../services/vault/builtinEmbedding";
 import { useSecureSettings } from "../useSecureSettings";
 import { AppSelect } from "../../ui/AppSelect";
+import {
+  DEFAULT_INDEX_EXCLUDE_GLOBS,
+  parseExcludeGlobText,
+} from "../../../utils/pathGlob";
 
 interface IndexTabProps {
   settings: AppSettings;
@@ -136,6 +140,30 @@ export const IndexTab: React.FC<IndexTabProps> = ({
         {progress.error ? (
           <p className="text-rose-500 text-xs pt-1">{progress.error}</p>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+          {t("index_excludeTitle")}
+        </h4>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {t("index_excludeDesc")}
+        </p>
+        <textarea
+          className="mt-1 w-full min-h-[6rem] rounded-xl border border-gray-200 bg-white px-3 py-2 font-mono text-xs dark:border-white/10 dark:bg-black/20"
+          value={(
+            settings.indexExcludeGlobs ?? DEFAULT_INDEX_EXCLUDE_GLOBS
+          ).join("\n")}
+          onChange={(event) =>
+            onUpdateSettings({
+              indexExcludeGlobs: parseExcludeGlobText(event.target.value),
+            })
+          }
+          spellCheck={false}
+        />
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {t("index_excludeHint")}
+        </p>
       </div>
 
       <div className="space-y-3">

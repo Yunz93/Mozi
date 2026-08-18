@@ -27,6 +27,16 @@ describe("renderMarkdown", () => {
     clearMarkdownCache();
   });
 
+  it("renders Obsidian callouts as styled blockquotes", () => {
+    const html = renderMarkdown("> [!note] 提示\n> 本地文件夹当作知识库");
+    expect(html).toContain("mp-callout");
+    expect(html).toContain("mp-callout-note");
+    expect(html).toContain("mp-callout-title");
+    expect(html).toContain("提示");
+    expect(html).toContain("本地文件夹当作知识库");
+    expect(html).not.toContain("[!note]");
+  });
+
   it("renders wikilink anchor with data-wikilink", () => {
     const html = renderMarkdown("See [[My Note|label]].");
     expect(html).toContain("data-wikilink");

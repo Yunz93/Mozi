@@ -37,6 +37,7 @@ export async function exportToHtml(
     highlighter,
     markdownStylePreset = "nord",
     orderedListMode,
+    language = "zh-CN",
   } = options;
 
   const { frontmatter, body } = parseFrontmatter(content);
@@ -79,7 +80,7 @@ export async function exportToHtml(
   );
 
   const html = `<!DOCTYPE html>
-	<html lang="en" data-theme="${theme}" class="${theme === "dark" ? "dark" : ""}"${katexRenderMode ? ` data-katex-render-mode="${katexRenderMode}"` : ""}>
+	<html lang="${language === "en" ? "en" : "zh-CN"}" data-theme="${theme}" class="${theme === "dark" ? "dark" : ""}"${katexRenderMode ? ` data-katex-render-mode="${katexRenderMode}"` : ""}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

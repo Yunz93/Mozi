@@ -8,6 +8,10 @@ import {
 } from "../utils/fontSettings";
 import { getFileSystem } from "../types/filesystem";
 import { t } from "../utils/i18n";
+import {
+  classifyExportError,
+  EXPORT_ERROR_I18N_KEYS,
+} from "../utils/export/exportErrors";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
 import { findFileInTree } from "../utils/fileTree";
 import {
@@ -77,6 +81,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
         orderedListMode: settings.orderedListMode,
+        language: settings.language,
       });
       const savedPath = await exportToPdf(
         htmlContent,
@@ -111,8 +116,16 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       }
     } catch (error) {
       console.error("Failed to export PDF:", error);
+      const kind = classifyExportError(
+        error instanceof Error ? error.message : String(error),
+      );
       showNotification(
-        t(settings.language, "notifications_exportPdfFailed"),
+        t(
+          settings.language,
+          kind === "generic"
+            ? "notifications_exportPdfFailed"
+            : EXPORT_ERROR_I18N_KEYS[kind],
+        ),
         "error",
       );
     }
@@ -178,6 +191,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
         orderedListMode: settings.orderedListMode,
+        language: settings.language,
       });
       const filename =
         activeFile.name.replace(/\.(md|markdown)$/i, "") || "export";
@@ -206,8 +220,16 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       }
     } catch (error) {
       console.error("Failed to export HTML:", error);
+      const kind = classifyExportError(
+        error instanceof Error ? error.message : String(error),
+      );
       showNotification(
-        t(settings.language, "notifications_exportHtmlFailed"),
+        t(
+          settings.language,
+          kind === "generic"
+            ? "notifications_exportHtmlFailed"
+            : EXPORT_ERROR_I18N_KEYS[kind],
+        ),
         "error",
       );
     }
@@ -262,6 +284,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
         orderedListMode: settings.orderedListMode,
+        language: settings.language,
       });
 
       return {

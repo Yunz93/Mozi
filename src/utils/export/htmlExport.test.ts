@@ -20,4 +20,32 @@ describe("exportToHtml", () => {
     expect(looseHtml).toMatch(/<li[^>]*value="3"/);
     expect(strictHtml).not.toMatch(/value="3"/);
   });
+
+  it("uses zh-CN as the default document language", async () => {
+    const html = await exportToHtml("# hi", {
+      theme: "light",
+      includeProperties: false,
+    });
+    expect(html).toContain('lang="zh-CN"');
+  });
+
+  it("honors English document language", async () => {
+    const html = await exportToHtml("# hi", {
+      theme: "light",
+      includeProperties: false,
+      language: "en",
+    });
+    expect(html).toContain('lang="en"');
+  });
+
+  it("exports Obsidian callouts with the same markup as preview", async () => {
+    const html = await exportToHtml("> [!note] Hint\n> body", {
+      theme: "light",
+      includeProperties: false,
+    });
+    expect(html).toContain("mp-callout");
+    expect(html).toContain("mp-callout-note");
+    expect(html).toContain("mp-callout-title");
+    expect(html).toContain(".mp-callout-title");
+  });
 });

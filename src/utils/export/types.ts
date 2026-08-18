@@ -2,6 +2,7 @@ import type {
   FileNode,
   MarkdownStylePreset,
   OrderedListMode,
+  AppLanguage,
 } from "../../types";
 import type { FontSettings } from "../fontSettings";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
@@ -25,6 +26,7 @@ export interface ExportOptions {
   highlighter?: ShikiHighlighter | null;
   markdownStylePreset?: MarkdownStylePreset;
   orderedListMode?: OrderedListMode;
+  language?: AppLanguage;
 }
 
 export interface SaveExportOptions {

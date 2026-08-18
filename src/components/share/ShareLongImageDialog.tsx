@@ -11,6 +11,10 @@ import { saveExportFile } from "../../utils/export/core";
 import type { ExportAttachmentContext } from "../../utils/export/attachments";
 import { getFileSystem, isTauriEnvironment } from "../../types/filesystem";
 import type { LongImageSharePayload } from "./longImageSharePayload";
+import {
+  classifyExportError,
+  EXPORT_ERROR_I18N_KEYS,
+} from "../../utils/export/exportErrors";
 
 interface ShareLongImageDialogProps {
   isOpen: boolean;
@@ -95,7 +99,17 @@ export const ShareLongImageDialog: React.FC<ShareLongImageDialogProps> = ({
         return;
       }
       console.error("Long image export failed:", error);
-      showNotification(t("notifications_longImageExportFailed"), "error");
+      const kind = classifyExportError(
+        error instanceof Error ? error.message : String(error),
+      );
+      showNotification(
+        t(
+          kind === "generic"
+            ? "notifications_longImageExportFailed"
+            : EXPORT_ERROR_I18N_KEYS[kind],
+        ),
+        "error",
+      );
     } finally {
       if (sessionId === generationSessionRef.current) {
         setGenerating(false);
