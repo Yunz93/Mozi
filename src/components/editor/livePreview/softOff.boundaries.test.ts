@@ -3,8 +3,8 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { livePreviewContextFacet } from "./context";
+import { createEditorMarkdownLanguage } from "../editorMarkdown";
 import { buildMathDecorations, livePreviewMath } from "./math";
 import { buildMermaidDecorations, livePreviewMermaid } from "./mermaid";
 import { buildCalloutDecorations, livePreviewCallouts } from "./callouts";
@@ -28,7 +28,7 @@ function createState(
     doc,
     selection: { anchor: Math.min(cursor, doc.length) },
     extensions: [
-      markdown({ base: markdownLanguage }),
+      createEditorMarkdownLanguage(),
       livePreviewContextFacet.of({
         sourceFilePath: null,
         rootFolderPath: null,

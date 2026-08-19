@@ -24,8 +24,8 @@ import {
   keymap,
   placeholder as cmPlaceholder,
 } from "@codemirror/view";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { resolveEditorCodeLanguage } from "../../../utils/editorCodeLanguages";
+import { createEditorMarkdownLanguage } from "../editorMarkdown";
 import { extractMarkdownFenceLanguages } from "../../../utils/shikiLanguages";
 import { createMarkdownKeyBindings } from "../behavior";
 import type { OrderedListMode, ThemeMode } from "../../../types";
@@ -414,10 +414,7 @@ export function useCodeMirror(
     if (!view) return;
     view.dispatch({
       effects: compartments.markdown.reconfigure(
-        markdown({
-          base: markdownLanguage,
-          codeLanguages: resolveEditorCodeLanguage,
-        }),
+        createEditorMarkdownLanguage(),
       ),
     });
   }, [compartments.markdown, markdownLanguageRevision]);

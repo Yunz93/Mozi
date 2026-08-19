@@ -258,6 +258,13 @@ describe("renderMarkdown", () => {
       expect(html).not.toMatch(/<h2\b/);
       expect(html).toMatch(/<ul>[\s\S]*<li>[\s\S]*test[\s\S]*<\/ul>/);
     });
+
+    it("does not render a paragraph plus lone hyphen as a heading", () => {
+      const html = renderMarkdown(
+        "墨知提供了两种便捷的博客发布方式：微信公众号 + Simple Blog, 其中:\n-",
+      );
+      expect(html).not.toMatch(/<h[1-6]\b/);
+    });
   });
 
   it("loose ordered list mode preserves author markers in preview HTML", () => {

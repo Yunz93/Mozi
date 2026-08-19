@@ -61,6 +61,7 @@ const createMarkdownIt = () => {
   // 它与列表编辑中间态强冲突:在 `- test` 下一行只敲了一个孤立 `-`、还没写空格和内容时,
   // markdown-it 会按 CommonMark 把上一项渲染成 <h2>,导致预览突然跳成大字标题。
   // 项目只保留 ATX 风格(`# foo`)的标题,符合现代 markdown 风格指南。
+  // Live Preview / 源码高亮同样在 createEditorMarkdownLanguage 里 remove SetextHeading。
   md.disable("lheading");
 
   md.core.ruler.after("inline", "obsidian_block_references", (state) => {
