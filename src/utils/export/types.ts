@@ -37,4 +37,5 @@ export interface SaveExportOptions {
   description: string;
 }
 
-export const PREVIEW_PANEL_WIDTH_PX = 768;
+/** Comfortable-medium preview sheet width (`getPaneLayoutMetrics(920)`). */
+export const PREVIEW_PANEL_WIDTH_PX = 920;

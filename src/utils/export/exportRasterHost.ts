@@ -226,7 +226,7 @@ export function mountExportHtmlForRasterization(
   host.style.left = "0";
   host.style.top = "0";
   host.style.right = "0";
-  host.style.width = `${PREVIEW_PANEL_WIDTH_PX + 64}px`;
+  host.style.width = `${PREVIEW_PANEL_WIDTH_PX}px`;
   host.style.maxWidth = "100vw";
   host.style.margin = "0 auto";
   host.style.background = backgroundColor;
