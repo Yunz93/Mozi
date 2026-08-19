@@ -15,7 +15,7 @@ import {
   loadAskVaultHistory,
   previewItemToCitation,
   retrieveAskVaultHits,
-  shouldConfirmAskVaultSend,
+  resolveAskVaultSubmitKind,
   type AskVaultHistoryItem,
   type AskVaultPreviewSnippet,
 } from "../../services/vault/askVaultService";
@@ -149,11 +149,12 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     !retrieving &&
     !generating;
 
-  const canConfirmSend = shouldConfirmAskVaultSend({
-    question,
-    lastPreviewedQuestion,
-    pendingHitCount: pendingHits.length,
-  });
+  const canReuseHits =
+    resolveAskVaultSubmitKind({
+      question,
+      lastPreviewedQuestion,
+      pendingHitCount: pendingHits.length,
+    }) === "reuseHits";
   const scopeNeedsFile = scope === "folder" || scope === "files";
   const scopeBlocked = scopeNeedsFile && !currentFilePath;
   const showReadinessDetail = blocked || readinessExpanded || keywordOnly;
@@ -277,6 +278,19 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     [language, showNotification, setSettingsOpen, t],
   );
 
+  const loadPreviewHits = useCallback(
+    async (trimmed: string): Promise<RetrieveHit[] | null> => {
+      const activeSettings = await resolveHydratedSettings();
+      if (!(await ensureAskConfig(activeSettings))) return null;
+      const hits = await retrieveAskVaultHits(buildRequest(activeSettings));
+      setPendingHits(hits);
+      setPreviewItems(hitsToPreviewItems(hits));
+      setLastPreviewedQuestion(trimmed);
+      return hits;
+    },
+    [resolveHydratedSettings, ensureAskConfig, buildRequest],
+  );
+
   /** Optional: preview snippets without calling the chat model. */
   const handleRetrieve = useCallback(async () => {
     const trimmed = question.trim();
@@ -287,13 +301,8 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     setCitations([]);
     setPrimaryTab("ask");
     try {
-      const activeSettings = await resolveHydratedSettings();
-      if (!(await ensureAskConfig(activeSettings))) return;
-
-      const hits = await retrieveAskVaultHits(buildRequest(activeSettings));
-      setPendingHits(hits);
-      setPreviewItems(hitsToPreviewItems(hits));
-      setLastPreviewedQuestion(trimmed);
+      const hits = await loadPreviewHits(trimmed);
+      if (hits === null) return;
       setSecondaryTab("sources");
       if (hits.length === 0) {
         showNotification(t("askVault_noHits"), "info");
@@ -314,19 +323,14 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     rootFolderPath,
     canAsk,
     scopeBlocked,
-    resolveHydratedSettings,
-    ensureAskConfig,
-    buildRequest,
+    loadPreviewHits,
     language,
     showNotification,
     setSettingsOpen,
     t,
   ]);
 
-  /**
-   * First click retrieves snippets for review. Confirming the same question
-   * then sends those snippets to the model.
-   */
+  /** Send retrieved snippets to the model and show the answer tab. */
   const handleGenerateFromHits = useCallback(
     async (hits: RetrieveHit[], trimmed: string) => {
       if (!rootFolderPath) return;
@@ -381,21 +385,53 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     const trimmed = question.trim();
     if (!trimmed || !rootFolderPath || !canAsk || scopeBlocked) return;
 
-    if (canConfirmSend) {
+    if (canReuseHits) {
       await handleGenerateFromHits(pendingHits, trimmed);
       return;
     }
 
-    await handleRetrieve();
+    setRetrieving(true);
+    setAnswerMarkdown("");
+    setCitations([]);
+    setPrimaryTab("ask");
+    setSecondaryTab("answer");
+    let hits: RetrieveHit[] | null = null;
+    try {
+      hits = await loadPreviewHits(trimmed);
+      if (hits === null) return;
+      if (hits.length === 0) {
+        setSecondaryTab("sources");
+        showNotification(t("askVault_noHits"), "info");
+        return;
+      }
+    } catch (error) {
+      showNotification(
+        error instanceof Error
+          ? localizeKnownError(language, error.message)
+          : t("askVault_failed"),
+        "error",
+      );
+      setSettingsOpen(true, "ai");
+      return;
+    } finally {
+      setRetrieving(false);
+    }
+
+    if (!hits || hits.length === 0) return;
+    await handleGenerateFromHits(hits, trimmed);
   }, [
     question,
     rootFolderPath,
     canAsk,
     scopeBlocked,
-    canConfirmSend,
+    canReuseHits,
     pendingHits,
     handleGenerateFromHits,
-    handleRetrieve,
+    loadPreviewHits,
+    language,
+    showNotification,
+    setSettingsOpen,
+    t,
   ]);
 
   const handleOpenCitation = useCallback(
@@ -708,22 +744,22 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                       </div>
                     ) : null}
                   </div>
+                ) : retrieving || generating ? (
+                  <p className="ask-vault-empty">
+                    {retrieving
+                      ? t("askVault_retrieving")
+                      : t("askVault_asking")}
+                  </p>
                 ) : (
                   <p className="ask-vault-empty">{t("askVault_answerEmpty")}</p>
                 )
               ) : previewItems.length > 0 ? (
                 <div className="ask-vault-sources-preview">
-                  {canConfirmSend ? (
-                    <p className="ask-vault-confirm-banner">
-                      {t("askVault_confirmSendHint", {
-                        count: previewItems.length,
-                      })}
-                    </p>
-                  ) : (
-                    <p className="ask-vault-sources-hint">
-                      {t("askVault_sourcesHint")}
-                    </p>
-                  )}
+                  <p className="ask-vault-confirm-banner">
+                    {t("askVault_confirmSendHint", {
+                      count: previewItems.length,
+                    })}
+                  </p>
                   {previewItems.map((item) => (
                     <button
                       key={`${item.index}-${item.path}-${item.startLine}`}
@@ -793,9 +829,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                   ? t("askVault_retrieving")
                   : generating
                     ? t("askVault_asking")
-                    : canConfirmSend
-                      ? t("askVault_confirmSend")
-                      : t("askVault_ask")}
+                    : t("askVault_ask")}
               </button>
               <button
                 type="button"

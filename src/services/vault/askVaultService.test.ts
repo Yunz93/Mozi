@@ -4,7 +4,7 @@ import {
   citationEditorRange,
   estimateLineOffset,
   hitsToPreviewSnippets,
-  shouldConfirmAskVaultSend,
+  resolveAskVaultSubmitKind,
 } from "./askVaultService";
 import { remapPathsInChunkIndex } from "./chunkIndexService";
 import { chunkMarkdownFile } from "./chunkService";
@@ -84,29 +84,42 @@ title: 发布
   });
 });
 
-describe("shouldConfirmAskVaultSend", () => {
-  it("requires a matching previewed question and retrieved hits", () => {
+describe("resolveAskVaultSubmitKind", () => {
+  it("answers a new question in one generate click", () => {
     expect(
-      shouldConfirmAskVaultSend({
+      resolveAskVaultSubmitKind({
+        question: "上次关于发布流程的结论是什么",
+        lastPreviewedQuestion: null,
+        pendingHitCount: 0,
+      }),
+    ).toBe("retrieveThenGenerate");
+  });
+
+  it("reuses hits after retrieve-only for the same question", () => {
+    expect(
+      resolveAskVaultSubmitKind({
         question: "上次关于发布流程的结论是什么",
         lastPreviewedQuestion: "上次关于发布流程的结论是什么",
         pendingHitCount: 2,
       }),
-    ).toBe(true);
+    ).toBe("reuseHits");
+  });
+
+  it("retrieves again when the question or hits no longer match", () => {
     expect(
-      shouldConfirmAskVaultSend({
+      resolveAskVaultSubmitKind({
         question: "另一个问题",
         lastPreviewedQuestion: "上次关于发布流程的结论是什么",
         pendingHitCount: 2,
       }),
-    ).toBe(false);
+    ).toBe("retrieveThenGenerate");
     expect(
-      shouldConfirmAskVaultSend({
+      resolveAskVaultSubmitKind({
         question: "上次关于发布流程的结论是什么",
         lastPreviewedQuestion: "上次关于发布流程的结论是什么",
         pendingHitCount: 0,
       }),
-    ).toBe(false);
+    ).toBe("retrieveThenGenerate");
   });
 });
 

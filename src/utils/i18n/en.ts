@@ -176,19 +176,18 @@ export default {
   askVault_asking: "Generating…",
   askVault_retrieveHint:
     "Retrieve snippets without calling AI — review sources first if you want.",
-  askVault_confirmSend: "Confirm send and generate",
   askVault_confirmSendHint:
     "{count} snippet(s) will be sent to the model. Click a snippet to jump back. Generated text is never applied silently.",
   askVault_toggleSources: "Show snippets to send",
   askVault_sourcesPreview: "Snippets to send",
   askVault_sourcesTab: "Sources",
   askVault_sourcesHint:
-    "These snippets are sent as model context. Review them, then click Confirm send and generate.",
+    "These snippets are sent as model context. Click a snippet to jump back. Use Retrieve only to inspect sources first.",
   askVault_sourcesEmpty:
     "After Generate answer or Retrieve only, matching snippets appear here.",
   askVault_answer: "Answer",
   askVault_answerEmpty:
-    "Type a question, review the snippets to send, then generate (Cmd/Ctrl+Enter).",
+    "Type a question, then Generate answer (Cmd/Ctrl+Enter). Use Retrieve only to review sources first.",
   askVault_insert: "Insert into current note (confirm required)",
   askVault_insertNeedsNote: "Open a note before inserting.",
   askVault_citations: "Citations",
