@@ -128,6 +128,57 @@ function resolveRelativeLocalPath(
   return joinNormalizedPath(root, segments);
 }
 
+const OBJECT_URL_RETRY_DELAYS_MS = [0, 40, 120];
+
+function wait(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function readLocalPreviewObjectUrl(
+  getFileObjectUrl: (path: string) => Promise<string>,
+  path: string,
+): Promise<string> {
+  let lastError: unknown;
+  for (const delayMs of OBJECT_URL_RETRY_DELAYS_MS) {
+    await wait(delayMs);
+    try {
+      const objectUrl = await getFileObjectUrl(path);
+      if (objectUrl) return objectUrl;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Failed to read local preview image: ${path}`);
+}
+
+/**
+ * Vault files cannot be served over Tauri's `asset://` protocol (no
+ * protocol-asset scope). Caching those URLs leaves a gray alt-text box.
+ */
+export function isUsablePreviewDisplaySrc(src: string): boolean {
+  const trimmed = src.trim();
+  if (!trimmed) return false;
+  return !trimmed.startsWith("asset:") && !trimmed.startsWith("tauri:");
+}
+
+function previewImageNeedsWarm(image: HTMLImageElement): boolean {
+  const warmed = image.getAttribute("data-preview-warmed");
+  const src = image.getAttribute("src")?.trim() ?? "";
+  const originalSrc =
+    image.getAttribute("data-original-src")?.trim() ||
+    image.getAttribute("data-preview-pending-src")?.trim() ||
+    "";
+  if (image.getAttribute("data-preview-pending-src")) return true;
+  if (warmed === "pending") return true;
+  if (originalSrc && (!src || !isUsablePreviewDisplaySrc(src))) return true;
+  return false;
+}
+
 function registerUnloadCleanup() {
   if (unloadCleanupRegistered || typeof window === "undefined") {
     return;
@@ -185,19 +236,27 @@ export async function resolvePreviewSource(
       : "";
 
   if (localSourceCandidate) {
-    try {
-      const fs = await getFileSystem();
-      if (typeof fs.getFileObjectUrl === "function") {
-        return await fs.getFileObjectUrl(localSourceCandidate);
-      }
-    } catch {
-      // Fall through to environment-specific URL resolution.
+    const fs = await getFileSystem();
+    if (typeof fs.getFileObjectUrl === "function") {
+      // Newly pasted files can miss the first read; retry instead of falling
+      // through to `asset://`, which this app cannot load for vault paths.
+      return readLocalPreviewObjectUrl(
+        fs.getFileObjectUrl.bind(fs),
+        localSourceCandidate,
+      );
     }
   }
 
   if (isTauriEnvironment()) {
     if (trimmedSrc.startsWith("asset:") || trimmedSrc.startsWith("tauri:")) {
       return trimmedSrc;
+    }
+
+    const fs = await getFileSystem();
+    if (typeof fs.getFileObjectUrl === "function") {
+      throw new Error(
+        `Failed to materialize local preview image: ${localSourceCandidate || trimmedSrc}`,
+      );
     }
 
     const { convertFileSrc } = await import("@tauri-apps/api/core");
@@ -216,7 +275,7 @@ export async function resolvePreviewSource(
       return trimmedSrc;
     }
 
-    // Last resort only — vault paths are not on the asset protocol scope.
+    // Last resort only — object-url helper missing (tests / degraded FS).
     return convertFileSrc(await normalize(absolutePath));
   }
 
@@ -404,6 +463,10 @@ export async function warmPreviewImage(
       return resolvedSrc;
     }
 
+    if (!isUsablePreviewDisplaySrc(resolvedSrc)) {
+      throw new Error(`Unusable preview source: ${resolvedSrc}`);
+    }
+
     try {
       const cachedSrc = await fetchBlobUrl(resolvedSrc);
       resolvedPreviewImageCache.set(cacheKey, cachedSrc);
@@ -502,11 +565,7 @@ export function mountLazyPreviewImageWarming(
   };
 
   const enqueue = (image: HTMLImageElement) => {
-    if (
-      cancelled ||
-      queued.has(image) ||
-      image.getAttribute("data-preview-warmed") === "true"
-    ) {
+    if (cancelled || queued.has(image) || !previewImageNeedsWarm(image)) {
       return;
     }
     queued.add(image);
@@ -532,7 +591,7 @@ export function mountLazyPreviewImageWarming(
   );
 
   const pendingImages = container.querySelectorAll<HTMLImageElement>(
-    'img[data-preview-warmed="pending"], img[data-preview-pending-src]',
+    'img[data-preview-warmed="pending"], img[data-preview-pending-src], img[data-original-src]',
   );
   // Eagerly enqueue known pending images. IntersectionObserver alone is
   // unreliable with `content-visibility: auto` / rapid preview re-enhance

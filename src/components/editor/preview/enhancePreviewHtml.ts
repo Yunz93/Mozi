@@ -10,6 +10,7 @@
 import { renderMarkdown } from "../../../utils/markdown";
 import {
   getCachedPreviewImageSrc,
+  hydrateCachedPreviewImageSources,
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
   warmPreviewImage,
@@ -654,5 +655,8 @@ export async function enhancePreviewHtml(
     }),
   );
 
-  return restoreShikiPresFromSnapshots(host.innerHTML, shikiSnapshots);
+  return hydrateCachedPreviewImageSources(
+    restoreShikiPresFromSnapshots(host.innerHTML, shikiSnapshots),
+    currentFilePath || undefined,
+  );
 }

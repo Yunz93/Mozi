@@ -16,6 +16,8 @@ import { useAppStore } from "../../../store/appStore";
 import { t } from "../../../utils/i18n";
 import { joinFsPath, normalizeSlashes } from "../../../utils/pathHelpers";
 import { resolveAttachmentTargetDir } from "../../../utils/attachmentLocation";
+import { clearAttachmentResolverCache } from "../../../utils/attachmentResolver";
+import { invalidateLivePreviewWikiCachesForPath } from "../livePreview/wiki";
 import {
   isImageHostingEnabled,
   uploadImageToHosting,
@@ -127,6 +129,8 @@ export function useImagePaste(
         await fileSystem.createDirectory(absoluteDir);
         await writeBinaryFile(imagePath, new Uint8Array(arrayBuffer));
         await refreshFileTree();
+        clearAttachmentResolverCache();
+        invalidateLivePreviewWikiCachesForPath(imagePath);
 
         const insertText = buildPastedImageMarkdown(
           imageMarkdownPath,
@@ -176,6 +180,8 @@ export function useImagePaste(
       await fileSystem.createDirectory(absoluteDir);
       await writeBinaryFile(imagePath, new Uint8Array(arrayBuffer));
       await refreshFileTree();
+      clearAttachmentResolverCache();
+      invalidateLivePreviewWikiCachesForPath(imagePath);
     },
     [resolveTarget, writeBinaryFile, refreshFileTree],
   );

@@ -22,6 +22,7 @@ import {
 } from "../preview/previewMedia";
 import {
   getCachedPreviewImageSrc,
+  isUsablePreviewDisplaySrc,
   resolvePreviewSource,
 } from "../../../utils/previewImageCache";
 import { livePreviewImageQueue } from "./asyncQueue";
@@ -352,6 +353,9 @@ export const livePreviewImages = ViewPlugin.fromClass(
             pathOrSrc,
             ctx.sourceFilePath ?? undefined,
           );
+          if (!isUsablePreviewDisplaySrc(displaySrc)) {
+            throw new Error(`Unusable preview source: ${displaySrc}`);
+          }
           const finalSrc = isDirectDisplaySrc(displaySrc)
             ? displaySrcFor(displaySrc)
             : displaySrc;
