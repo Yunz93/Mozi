@@ -11,6 +11,10 @@ import {
   type WechatDraftDefaults,
   type WechatDraftPublishInput,
 } from "../../utils/wechatPublish";
+import {
+  isUsablePreviewDisplaySrc,
+  resolvePreviewSource,
+} from "../../utils/previewImageCache";
 
 interface WechatDraftDialogProps {
   isOpen: boolean;
@@ -34,6 +38,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   const [contentSourceUrl, setContentSourceUrl] = useState("");
   const [showCoverPic, setShowCoverPic] = useState(true);
   const [coverImagePath, setCoverImagePath] = useState("");
+  const [coverPreviewSrc, setCoverPreviewSrc] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(false);
@@ -59,6 +64,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
     setContentSourceUrl(defaults.contentSourceUrl);
     setShowCoverPic(defaults.showCoverPic);
     setCoverImagePath("");
+    setCoverPreviewSrc("");
 
     requestAnimationFrame(() => {
       titleInputRef.current?.focus();
@@ -91,7 +97,10 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
           settings,
         });
         if (previewRequestId.current !== requestId) return;
-        const hydrated = await hydrateWechatPreviewImages(prepared.previewHtml);
+        const hydrated = await hydrateWechatPreviewImages(
+          prepared.previewHtml,
+          currentFilePath,
+        );
         if (previewRequestId.current !== requestId) return;
         setPreviewHtml(hydrated);
         setImageCount(prepared.imageAssets.length);
@@ -116,6 +125,31 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
     markdownContent,
     settings,
   ]);
+
+  useEffect(() => {
+    if (!coverImagePath) {
+      setCoverPreviewSrc("");
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const resolved = await resolvePreviewSource(coverImagePath);
+        if (!cancelled && isUsablePreviewDisplaySrc(resolved)) {
+          setCoverPreviewSrc(resolved);
+        }
+      } catch {
+        if (!cancelled) {
+          setCoverPreviewSrc("");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [coverImagePath]);
 
   const handlePickCover = async () => {
     if (!isTauriEnvironment()) {
@@ -164,13 +198,13 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={t("wechatDraftDialog_title")}
-      className="max-w-5xl"
-      contentClassName="py-3"
+      className="max-w-5xl h-[88vh]"
+      contentClassName="flex min-h-0 flex-col overflow-hidden py-3"
       contentScroll={false}
     >
       <div className="publish-form-panel flex min-h-0 h-full flex-col">
         <div className="wechat-draft-layout">
-          <div className="-mx-1 min-w-0 space-y-3 px-1">
+          <div className="wechat-draft-form -mx-1 min-w-0 space-y-3 px-1">
             <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
               {t("wechatDraftDialog_desc")}
             </p>
@@ -279,6 +313,13 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
+                {coverPreviewSrc ? (
+                  <img
+                    src={coverPreviewSrc}
+                    alt=""
+                    className="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/10"
+                  />
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
@@ -330,25 +371,32 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
           </aside>
         </div>
 
-        <div className="mt-3 flex shrink-0 justify-end gap-3 border-t border-gray-200/50 pt-3 dark:border-white/10">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {t("common_cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-black dark:bg-white px-5 py-2 text-sm font-medium text-white dark:text-black transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
-          >
-            {isSubmitting
-              ? t("toolbar_publishing")
-              : t("wechatDraftDialog_submit")}
-          </button>
+        <div className="wechat-draft-footer mt-3 flex shrink-0 flex-col items-end gap-2 border-t border-gray-200/50 pt-3 dark:border-white/10">
+          {!coverImagePath.trim() ? (
+            <p className="w-full text-right text-xs leading-5 text-amber-700 dark:text-amber-200">
+              {t("wechatDraftDialog_coverRequired")}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {t("common_cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black dark:bg-white px-5 py-2 text-sm font-medium text-white dark:text-black transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
+            >
+              {isSubmitting
+                ? t("toolbar_publishing")
+                : t("wechatDraftDialog_submit")}
+            </button>
+          </div>
         </div>
       </div>
     </Dialog>

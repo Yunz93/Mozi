@@ -97,6 +97,7 @@ export default {
   wechatDraftDialog_showCover: "Show cover in article",
   wechatDraftDialog_pickCover: "Choose cover image",
   wechatDraftDialog_coverEmpty: "No cover image selected yet",
+  wechatDraftDialog_coverRequired: "Choose a cover image before publishing.",
   wechatDraftDialog_submit: "Publish to drafts",
   wechatDraftDialog_previewTitle: "Phone preview",
   wechatDraftDialog_previewHint:

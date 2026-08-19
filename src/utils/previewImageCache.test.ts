@@ -21,6 +21,7 @@ import { isTauriEnvironment } from "../types/filesystem";
 import {
   getCachedPreviewImageSrc,
   hydrateCachedPreviewImageSources,
+  isUsablePreviewDisplaySrc,
   mountLazyPreviewImageWarming,
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
@@ -97,6 +98,24 @@ describe("previewSourceNeedsMaterialization", () => {
         "resources/Pasted image 20260603161808.png",
       ),
     ).toBe(true);
+  });
+});
+
+describe("isUsablePreviewDisplaySrc", () => {
+  it("accepts http(s), data, and blob URLs", () => {
+    expect(isUsablePreviewDisplaySrc("https://cdn.example/a.png")).toBe(true);
+    expect(isUsablePreviewDisplaySrc("http://cdn.example/a.png")).toBe(true);
+    expect(isUsablePreviewDisplaySrc("data:image/png;base64,abc")).toBe(true);
+    expect(isUsablePreviewDisplaySrc("blob:abc")).toBe(true);
+  });
+
+  it("rejects local paths and Tauri asset/file protocols", () => {
+    expect(isUsablePreviewDisplaySrc("/vault/img/a.png")).toBe(false);
+    expect(isUsablePreviewDisplaySrc("asset://localhost/vault/img/a.png")).toBe(
+      false,
+    );
+    expect(isUsablePreviewDisplaySrc("file:///vault/img/a.png")).toBe(false);
+    expect(isUsablePreviewDisplaySrc("tauri://localhost/img.png")).toBe(false);
   });
 });
 

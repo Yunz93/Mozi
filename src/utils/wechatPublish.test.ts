@@ -1,7 +1,29 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./previewImageCache", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./previewImageCache")>();
+  return {
+    ...actual,
+    resolvePreviewSource: vi.fn(async (src: string) => {
+      if (
+        src.startsWith("asset:") ||
+        src.startsWith("file:") ||
+        src.startsWith("tauri:")
+      ) {
+        return src;
+      }
+      if (src.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(src)) {
+        return `blob:wechat-${src}`;
+      }
+      return src;
+    }),
+  };
+});
+
 import {
   extractWechatDraftDefaults,
+  hydrateWechatPreviewImages,
   prepareWechatDraftPublish,
 } from "./wechatPublish";
 import { clearMarkdownCache, renderMarkdown } from "./markdown";
@@ -158,5 +180,32 @@ describe("prepareWechatDraftPublish", () => {
     expect(prepared.previewHtml).toContain("/notes/cover.png");
     expect(prepared.previewHtml).not.toContain("__WECHAT_LOCAL_IMAGE_1__");
     expect(prepared.unresolvedImages).toHaveLength(0);
+  });
+});
+
+describe("hydrateWechatPreviewImages", () => {
+  it("turns local attachment paths into blob URLs for the phone preview", async () => {
+    const hydrated = await hydrateWechatPreviewImages(
+      '<img src="/notes/cover.png" alt="封面">',
+      "/notes/post.md",
+    );
+
+    expect(hydrated).toContain('src="blob:wechat-/notes/cover.png"');
+    expect(hydrated).not.toContain('src="/notes/cover.png"');
+  });
+
+  it("keeps remote images and refuses Tauri asset protocol URLs", async () => {
+    const hydrated = await hydrateWechatPreviewImages(
+      [
+        '<img src="https://cdn.example/a.png" alt="remote">',
+        '<img src="asset://localhost/notes/cover.png" alt="asset">',
+        '<img src="blob:already" alt="blob">',
+      ].join(""),
+      "/notes/post.md",
+    );
+
+    expect(hydrated).toContain('src="https://cdn.example/a.png"');
+    expect(hydrated).toContain('src="asset://localhost/notes/cover.png"');
+    expect(hydrated).toContain('src="blob:already"');
   });
 });

@@ -91,6 +91,7 @@ export default {
   wechatDraftDialog_showCover: "正文显示封面",
   wechatDraftDialog_pickCover: "选择封面图",
   wechatDraftDialog_coverEmpty: "尚未选择封面图",
+  wechatDraftDialog_coverRequired: "请先选择封面图后再发布。",
   wechatDraftDialog_submit: "发布到草稿箱",
   wechatDraftDialog_previewTitle: "手机预览",
   wechatDraftDialog_previewHint: "接近公众号图文宽度，发布前先看排版和图片。",
