@@ -45,6 +45,7 @@ import {
 } from "../behavior/imeGuard";
 import { handleStructuredPaste } from "../behavior/input";
 import { markdownFenceLanguageCompletion } from "../behavior/fenceLanguageCompletion";
+import { markdownSlashInsertCompletion } from "../behavior/slashInsertCompletion";
 import { markdownFencedCodeInputHandler } from "../behavior/fencedCodeInput";
 import {
   frontmatterDecorations,
@@ -179,6 +180,8 @@ export function createEditorExtensions(
   } = ctx;
 
   const customCompletion: CompletionSource = (cmCtx: CompletionContext) => {
+    const slash = markdownSlashInsertCompletion(cmCtx);
+    if (slash) return slash;
     const fence = markdownFenceLanguageCompletion(cmCtx);
     if (fence) return fence;
     return completionSourceRef.current?.(cmCtx) ?? null;
