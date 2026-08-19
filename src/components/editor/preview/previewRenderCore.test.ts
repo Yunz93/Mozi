@@ -9,7 +9,10 @@ import {
   shouldUseAsyncPreviewEnhancement,
 } from "./previewRenderCore";
 import { clearMarkdownCache } from "../../../utils/markdown";
-import { warmPreviewImage } from "../../../utils/previewImageCache";
+import {
+  invalidateCachedPreviewImageSrc,
+  warmPreviewImage,
+} from "../../../utils/previewImageCache";
 
 (globalThis as typeof globalThis & { __PROD__?: boolean }).__PROD__ ??= false;
 
@@ -203,6 +206,7 @@ describe("renderMarkdownPreview", () => {
     expect(result.bodyHTML).toMatch(/src="[^"]*poster\.png/);
 
     fetchSpy.mockRestore();
+    invalidateCachedPreviewImageSrc();
   });
 
   it("renders nested unordered lists into queryable preview DOM", () => {

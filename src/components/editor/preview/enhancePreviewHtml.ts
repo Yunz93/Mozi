@@ -11,6 +11,7 @@ import { renderMarkdown } from "../../../utils/markdown";
 import {
   getCachedPreviewImageSrc,
   hydrateCachedPreviewImageSources,
+  isUsablePreviewDisplaySrc,
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
   warmPreviewImage,
@@ -104,7 +105,7 @@ async function configureResolvedPreviewImage(
     previewTarget,
     sourceFilePath || undefined,
   );
-  if (cachedSrc) {
+  if (cachedSrc && isUsablePreviewDisplaySrc(cachedSrc)) {
     configurePreviewImageElement(image, cachedSrc, previewTarget);
     return;
   }
@@ -113,11 +114,13 @@ async function configureResolvedPreviewImage(
     const displaySrc = previewSourceNeedsMaterialization(previewTarget)
       ? await warmPreviewImage(previewTarget, sourceFilePath || undefined)
       : await resolvePreviewSource(previewTarget, sourceFilePath || undefined);
-    configurePreviewImageElement(
-      image,
-      displaySrc || previewTarget,
-      previewTarget,
-    );
+    if (!isUsablePreviewDisplaySrc(displaySrc)) {
+      configurePreviewImageElement(image, "", previewTarget, {
+        warmed: false,
+      });
+      return;
+    }
+    configurePreviewImageElement(image, displaySrc, previewTarget);
   } catch {
     configurePreviewImageElement(image, "", previewTarget, {
       warmed: false,
@@ -243,7 +246,7 @@ export async function enhancePreviewHtml(
             currentFilePath,
           );
         } catch {
-          configurePreviewImageElement(image, previewTarget, previewTarget, {
+          configurePreviewImageElement(image, "", previewTarget, {
             warmed: false,
           });
         }
@@ -535,12 +538,9 @@ export async function enhancePreviewHtml(
               currentFilePath,
             );
           } catch {
-            configurePreviewImageElement(
-              image,
-              resolvedTarget.path,
-              resolvedTarget.path,
-              { warmed: false },
-            );
+            configurePreviewImageElement(image, "", resolvedTarget.path, {
+              warmed: false,
+            });
           }
 
           replaceWikiEmbedNode(embed, image);

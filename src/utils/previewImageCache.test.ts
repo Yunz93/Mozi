@@ -34,6 +34,11 @@ describe("resolvePreviewSource", () => {
     vi.mocked(isTauriEnvironment).mockReturnValue(false);
   });
 
+  afterEach(async () => {
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({} as never);
+  });
+
   it("returns data and blob urls unchanged", async () => {
     await expect(
       resolvePreviewSource("data:image/png;base64,abc"),
@@ -47,6 +52,19 @@ describe("resolvePreviewSource", () => {
       "/vault/notes/a.md",
     );
     expect(resolved).toContain("img/poster.png");
+  });
+
+  it("falls through when no filesystem is available instead of throwing", async () => {
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockRejectedValue(
+      new Error("No supported file system available"),
+    );
+
+    const resolved = await resolvePreviewSource(
+      "assets/poster.png",
+      "/vault/notes/a.md",
+    );
+    expect(resolved).toContain("poster.png");
   });
 });
 

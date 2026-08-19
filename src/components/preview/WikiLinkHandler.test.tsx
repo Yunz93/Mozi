@@ -23,6 +23,10 @@ vi.mock("../../utils/previewImageCache", () => ({
   warmPreviewImage: vi.fn(),
   resolvePreviewSource: vi.fn(),
   hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
+  isUsablePreviewDisplaySrc: (src: string) =>
+    Boolean(src?.trim()) &&
+    !src.trim().startsWith("asset:") &&
+    !src.trim().startsWith("tauri:"),
 }));
 
 import { resolveAttachmentTarget } from "../../utils/attachmentResolver";

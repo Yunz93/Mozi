@@ -137,6 +137,18 @@ function wait(ms: number): Promise<void> {
   });
 }
 
+async function tryGetFileSystem(): Promise<Awaited<
+  ReturnType<typeof getFileSystem>
+> | null> {
+  try {
+    return await getFileSystem();
+  } catch {
+    // Unit tests and browsers without File System Access still render previews
+    // via `URL()` / last-resort protocol conversion.
+    return null;
+  }
+}
+
 async function readLocalPreviewObjectUrl(
   getFileObjectUrl: (path: string) => Promise<string>,
   path: string,
@@ -236,8 +248,8 @@ export async function resolvePreviewSource(
       : "";
 
   if (localSourceCandidate) {
-    const fs = await getFileSystem();
-    if (typeof fs.getFileObjectUrl === "function") {
+    const fs = await tryGetFileSystem();
+    if (fs && typeof fs.getFileObjectUrl === "function") {
       // Newly pasted files can miss the first read; retry instead of falling
       // through to `asset://`, which this app cannot load for vault paths.
       return readLocalPreviewObjectUrl(
@@ -250,13 +262,6 @@ export async function resolvePreviewSource(
   if (isTauriEnvironment()) {
     if (trimmedSrc.startsWith("asset:") || trimmedSrc.startsWith("tauri:")) {
       return trimmedSrc;
-    }
-
-    const fs = await getFileSystem();
-    if (typeof fs.getFileObjectUrl === "function") {
-      throw new Error(
-        `Failed to materialize local preview image: ${localSourceCandidate || trimmedSrc}`,
-      );
     }
 
     const { convertFileSrc } = await import("@tauri-apps/api/core");
@@ -423,7 +428,11 @@ export function hydrateCachedPreviewImageSources(
     if (!originalSrc) return;
 
     const cachedSrc = getCachedPreviewImageSrc(originalSrc, sourceFilePath);
-    if (!cachedSrc || cachedSrc === image.getAttribute("src")) {
+    if (
+      !cachedSrc ||
+      !isUsablePreviewDisplaySrc(cachedSrc) ||
+      cachedSrc === image.getAttribute("src")
+    ) {
       return;
     }
 
@@ -547,7 +556,11 @@ export function mountLazyPreviewImageWarming(
                 pendingSrc,
                 sourceFilePath,
               );
-              if (!cancelled && image.isConnected) {
+              if (
+                !cancelled &&
+                image.isConnected &&
+                isUsablePreviewDisplaySrc(fallbackSrc)
+              ) {
                 image.setAttribute("src", fallbackSrc);
                 image.setAttribute("data-preview-warmed", "true");
                 image.removeAttribute("data-preview-pending-src");

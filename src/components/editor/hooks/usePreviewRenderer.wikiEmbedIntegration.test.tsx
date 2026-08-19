@@ -24,6 +24,10 @@ vi.mock("../../../utils/previewImageCache", () => ({
   previewSourceNeedsMaterialization: vi.fn(() => false),
   mountLazyPreviewImageWarming: vi.fn(() => () => {}),
   hydrateCachedPreviewImageSources: vi.fn((html: string) => html),
+  isUsablePreviewDisplaySrc: (src: string) =>
+    Boolean(src?.trim()) &&
+    !src.trim().startsWith("asset:") &&
+    !src.trim().startsWith("tauri:"),
 }));
 
 vi.mock("../../../utils/attachmentResolver", () => ({

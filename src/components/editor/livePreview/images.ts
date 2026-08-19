@@ -409,6 +409,10 @@ export const livePreviewImages = ViewPlugin.fromClass(
         }
       }
 
+      if (livePreviewContextChanged(update)) {
+        this.failedCache.clear();
+      }
+
       if (
         resolved ||
         livePreviewContextChanged(update) ||
