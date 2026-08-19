@@ -4,14 +4,22 @@ export interface ParsedMarkdownDestination {
   title: string;
 }
 
-export function parseMarkdownDestination(rawDestination: string): ParsedMarkdownDestination {
+const TRAILING_TITLE_RE = /^(.*?)\s+("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*$/;
+
+export function destinationNeedsAngleBrackets(path: string): boolean {
+  return /\s/.test(path);
+}
+
+export function parseMarkdownDestination(
+  rawDestination: string,
+): ParsedMarkdownDestination {
   const trimmed = rawDestination.trim();
   if (!trimmed) {
-    return { path: '', angleBrackets: false, title: '' };
+    return { path: "", angleBrackets: false, title: "" };
   }
 
-  if (trimmed.startsWith('<')) {
-    const closingIndex = trimmed.indexOf('>');
+  if (trimmed.startsWith("<")) {
+    const closingIndex = trimmed.indexOf(">");
     if (closingIndex > 0) {
       return {
         path: trimmed.slice(1, closingIndex).trim(),
@@ -21,24 +29,36 @@ export function parseMarkdownDestination(rawDestination: string): ParsedMarkdown
     }
   }
 
-  const titleMatch = trimmed.match(/^(\S+)(\s+(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'))?\s*$/);
+  const titleMatch = trimmed.match(TRAILING_TITLE_RE);
+  if (titleMatch) {
+    return {
+      path: (titleMatch[1] ?? "").trim(),
+      angleBrackets: false,
+      title: titleMatch[2]?.trim() ?? "",
+    };
+  }
+
   return {
-    path: (titleMatch?.[1] ?? trimmed).trim(),
+    path: trimmed,
     angleBrackets: false,
-    title: titleMatch?.[2]?.trim() ?? '',
+    title: "",
   };
 }
 
-export function stripMarkdownDestination(rawDestination: string): string | null {
+export function stripMarkdownDestination(
+  rawDestination: string,
+): string | null {
   const path = parseMarkdownDestination(rawDestination).path.trim();
   return path || null;
 }
 
 export function buildMarkdownDestination(
   path: string,
-  parsedDestination: ParsedMarkdownDestination
+  parsedDestination: ParsedMarkdownDestination,
 ): string {
-  const normalizedPath = parsedDestination.angleBrackets ? `<${path}>` : path;
+  const useBrackets =
+    parsedDestination.angleBrackets || destinationNeedsAngleBrackets(path);
+  const normalizedPath = useBrackets ? `<${path}>` : path;
   return parsedDestination.title
     ? `${normalizedPath} ${parsedDestination.title}`
     : normalizedPath;

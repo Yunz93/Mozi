@@ -369,6 +369,30 @@ describe("renderMarkdown", () => {
     expect(html).toContain("https://example.com/my%20image.png");
   });
 
+  it("renders GitHub raw image URLs that contain spaces", () => {
+    const html = renderMarkdown(
+      "![M 記](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M 記-1776170252301.png)",
+    );
+    expect(html).toContain("<img");
+    expect(html).toContain("M%20");
+    expect(html).toContain("1776170252301.png");
+  });
+
+  it("renders image destinations that start with a space", () => {
+    const html = renderMarkdown("![M 記]( 記-1776170252301.png)");
+    expect(html).toContain("<img");
+    expect(html).toMatch(/記-1776170252301\.png|%E8%A8%98-1776170252301\.png/);
+  });
+
+  it("keeps a quoted title out of the src when the path has spaces", () => {
+    const html = renderMarkdown(
+      '![alt](https://example.com/my image.png "cover")',
+    );
+    expect(html).toContain("my%20image.png");
+    expect(html).not.toContain("cover%22");
+    expect(html).toContain('alt="alt"');
+  });
+
   it("wraps link URLs containing spaces in angle brackets before rendering", () => {
     const md = "[label](https://example.com/my doc.pdf)";
     const html = renderMarkdown(md);

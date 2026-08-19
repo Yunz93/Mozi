@@ -1,17 +1,20 @@
-import type { FileNode } from '../types';
-import { stripMarkdownDestination } from './markdownDestination';
-import { parseWikiLinkReference } from './wikiLinks';
+import type { FileNode } from "../types";
+import { stripMarkdownDestination } from "./markdownDestination";
+import { parseWikiLinkReference } from "./wikiLinks";
 
 export const WIKI_LINK_REGEX = /!?\[\[([^[\]]+)\]\]/g;
-export const MARKDOWN_LINK_REGEX = /!?\[[^\]]*]\((<[^>\n]+>|[^)\n]+)\)/g;
-export const HTML_ATTACHMENT_REGEX = /<(?:img|audio|video|source|a)\b[^>]+(?:src|href)=["']([^"']+)["']/gi;
+export const MARKDOWN_LINK_REGEX = /!?\[[^\]]*]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
+export const HTML_ATTACHMENT_REGEX =
+  /<(?:img|audio|video|source|a)\b[^>]+(?:src|href)=["']([^"']+)["']/gi;
 
 export function flattenFiles(nodes: FileNode[]): FileNode[] {
-  return nodes.flatMap((node) => (
-    node.type === 'folder'
+  return nodes.flatMap((node) =>
+    node.type === "folder"
       ? flattenFiles(node.children ?? [])
-      : (node.isTrash ? [] : [node])
-  ));
+      : node.isTrash
+        ? []
+        : [node],
+  );
 }
 
 export function isMarkdownFile(node: FileNode): boolean {
@@ -32,7 +35,7 @@ export function extractAttachmentTargets(content: string): string[] {
   }
 
   for (const match of content.matchAll(MARKDOWN_LINK_REGEX)) {
-    const target = stripMarkdownDestination(match[1] ?? '');
+    const target = stripMarkdownDestination(match[1] ?? "");
     if (target) {
       targets.add(target);
     }

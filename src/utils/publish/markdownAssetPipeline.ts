@@ -7,7 +7,7 @@ import type { Frontmatter } from "../../types";
  * publishLocalImagesToHosting.ts and wechatPublish.ts.
  */
 
-export const MARKDOWN_IMAGE_REGEX = /!\[([^\]]*)\]\(([^)\n]+)\)/g;
+export const MARKDOWN_IMAGE_REGEX = /!\[([^\]]*)\]\(\s*([^)\n]+)\s*\)/g;
 export const WIKI_EMBED_REGEX = /!\[\[([^\]\n]+)\]\]/g;
 
 /**

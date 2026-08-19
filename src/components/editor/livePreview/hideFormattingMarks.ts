@@ -26,6 +26,10 @@ import {
   ViewportDecorationWindow,
 } from "./shared";
 import { findCalloutRanges } from "./callouts";
+import {
+  collectMarkdownImageRanges,
+  collectMarkdownLinkRanges,
+} from "../../../utils/markdownInlineRanges";
 
 const HIDEABLE_MARK_NODES = new Set([
   "HeaderMark",
@@ -61,11 +65,32 @@ const hideUrlDecoration = Decoration.replace({
   inclusive: true,
 });
 
+type MarkdownConstructRange = {
+  name: "Image" | "Link";
+  from: number;
+  to: number;
+};
+
+function findCoveringConstruct(
+  constructs: MarkdownConstructRange[],
+  from: number,
+  to: number,
+): MarkdownConstructRange | null {
+  return (
+    constructs.find((range) => rangesOverlap(from, to, range.from, range.to)) ??
+    null
+  );
+}
+
 function findInlineParent(
   state: EditorState,
   markFrom: number,
   markTo: number,
+  constructs: MarkdownConstructRange[] = [],
 ): { name: string; from: number; to: number } | null {
+  const covering = findCoveringConstruct(constructs, markFrom, markTo);
+  if (covering) return covering;
+
   const mid = Math.min(markFrom, Math.max(markFrom, markTo - 1));
   let node = syntaxTree(state).resolveInner(mid, 1);
   for (let depth = 0; depth < 10 && node; depth += 1) {
@@ -83,13 +108,14 @@ function shouldRevealMark(
   name: string,
   from: number,
   to: number,
+  constructs: MarkdownConstructRange[] = [],
 ): boolean {
   if (BLOCK_MARK_NODES.has(name)) {
     const line = state.doc.lineAt(from);
     return selectionTouchesRange(state, line.from, line.to);
   }
 
-  const parent = findInlineParent(state, from, to);
+  const parent = findInlineParent(state, from, to, constructs);
   if (parent) {
     return selectionTouchesRange(state, parent.from, parent.to);
   }
@@ -97,7 +123,12 @@ function shouldRevealMark(
   return selectionTouchesRange(state, from, to, 1);
 }
 
-function shouldHideUrl(state: EditorState, from: number, to: number): boolean {
+function shouldHideUrl(
+  state: EditorState,
+  from: number,
+  to: number,
+  constructs: MarkdownConstructRange[] = [],
+): boolean {
   // Autolink body is the URL itself — never hide it.
   let node = syntaxTree(state).resolveInner(from, 1);
   for (let depth = 0; depth < 8 && node; depth += 1) {
@@ -106,7 +137,7 @@ function shouldHideUrl(state: EditorState, from: number, to: number): boolean {
     node = node.parent;
   }
 
-  const parent = findInlineParent(state, from, to);
+  const parent = findInlineParent(state, from, to, constructs);
   // Inactive images/links are fully replaced by widgets — skip partial hides.
   if (parent?.name === "Image" || parent?.name === "Link") {
     return false;
@@ -130,6 +161,19 @@ export function buildLivePreviewHideDecorations(
   const tree = ensureLivePreviewViewportTree(view, parseTo);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
   const { from: viewFrom, to: viewTo } = getLivePreviewDecorationRange(view);
+  const viewportText = state.doc.sliceString(viewFrom, viewTo);
+  const markdownConstructs: MarkdownConstructRange[] = [
+    ...collectMarkdownImageRanges(viewportText).map((range) => ({
+      name: "Image" as const,
+      from: range.from + viewFrom,
+      to: range.to + viewFrom,
+    })),
+    ...collectMarkdownLinkRanges(viewportText).map((range) => ({
+      name: "Link" as const,
+      from: range.from + viewFrom,
+      to: range.to + viewFrom,
+    })),
+  ];
   // Look back so open callouts that started above the viewport still suppress marks.
   const calloutScanFrom = Math.max(0, viewFrom - 8000);
   const calloutSlice = state.doc.sliceString(calloutScanFrom, viewTo);
@@ -149,6 +193,13 @@ export function buildLivePreviewHideDecorations(
     enter: (node) => {
       const { name, from, to } = node;
       if (from >= to) return;
+      const covering = findCoveringConstruct(markdownConstructs, from, to);
+      if (
+        covering &&
+        !selectionTouchesRange(state, covering.from, covering.to)
+      ) {
+        return;
+      }
       if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
         return;
       }
@@ -158,7 +209,7 @@ export function buildLivePreviewHideDecorations(
 
       if (HIDEABLE_MARK_NODES.has(name)) {
         if (hasSkipAncestor(state, from)) return;
-        const parent = findInlineParent(state, from, to);
+        const parent = findInlineParent(state, from, to, markdownConstructs);
         // Image/Link widgets replace the whole construct when inactive.
         if (
           (parent?.name === "Image" || parent?.name === "Link") &&
@@ -166,7 +217,7 @@ export function buildLivePreviewHideDecorations(
         ) {
           return;
         }
-        if (shouldRevealMark(state, name, from, to)) return;
+        if (shouldRevealMark(state, name, from, to, markdownConstructs)) return;
         let hideTo = to;
         // ATX hashes / `>` marks are just the sigil; the following space would
         // indent the first visual line while wrapped lines sit under the chrome.
@@ -182,7 +233,7 @@ export function buildLivePreviewHideDecorations(
 
       if (name === "URL") {
         if (hasSkipAncestor(state, from)) return;
-        if (!shouldHideUrl(state, from, to)) return;
+        if (!shouldHideUrl(state, from, to, markdownConstructs)) return;
         ranges.push({ from, to, deco: hideUrlDecoration });
       }
     },
