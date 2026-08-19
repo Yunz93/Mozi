@@ -1,5 +1,6 @@
 import type { StateCommand } from "@codemirror/state";
 import { markdownCommands } from "../editor/behavior";
+import { openTableInsertPicker } from "../editor/behavior/tableInsertPicker";
 import type { ShortcutConfig } from "../../types";
 import type { TranslationKey } from "../../utils/i18n";
 import { getActiveEditorView } from "../../utils/editorSelectionBridge";
@@ -223,9 +224,17 @@ export function buildCommandPaletteItems(
       id: "insertTable",
       title: t("table_insert"),
       group: table,
-      keywords: "gfm html paste excel",
+      keywords: "gfm html paste excel / 表格 3x3 slash",
       shortcut: "Mod+Shift+T",
-      run: () => runEditorCommand(markdownCommands.insertTable, showNeedEditor),
+      run: () => {
+        const view = getActiveEditorView();
+        if (!view) {
+          showNeedEditor();
+          return;
+        }
+        view.focus();
+        openTableInsertPicker(view);
+      },
     },
     {
       id: "formatTable",

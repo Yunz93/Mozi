@@ -641,10 +641,17 @@ export function serializeFormattedTable(table: MarkdownTable): string[] {
   return [header, sep, ...body];
 }
 
-export function createEmptyTable(rows: number, cols: number): MarkdownTable {
+export function createEmptyTable(
+  rows: number,
+  cols: number,
+  headerLabels?: string[],
+): MarkdownTable {
   const columnCount = Math.max(1, cols);
   const bodyRows = Math.max(1, rows);
-  const header = Array.from({ length: columnCount }, (_, i) => `列${i + 1}`);
+  const header = Array.from(
+    { length: columnCount },
+    (_, i) => headerLabels?.[i] || `列${i + 1}`,
+  );
   const alignments = Array.from(
     { length: columnCount },
     () => "none" as ColumnAlignment,

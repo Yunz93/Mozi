@@ -32,6 +32,12 @@ import {
   setColumnAlignment,
 } from "../../../utils/markdownTable";
 import { isInsideFencedCode } from "./core";
+import {
+  bodyRowsForVisualRows,
+  TABLE_INSERT_DEFAULT_COLS,
+  TABLE_INSERT_DEFAULT_ROWS,
+  tableInsertHeaderLabels,
+} from "../../../utils/tableInsert";
 
 function docLines(state: EditorState): string[] {
   const text = state.doc.toString();
@@ -324,30 +330,55 @@ export const handleTableEnter: StateCommand = ({
   return selectCell(state, dispatch, lines, targetLine, cursor.col);
 };
 
-export const insertTable: StateCommand = ({ state, dispatch }): boolean => {
-  const main = state.selection.main;
-  if (isInsideFencedCode(state, main.from)) return false;
-  if (isInMarkdownTable(state, main.from)) return false;
+export interface InsertMarkdownTableOptions {
+  visualRows?: number;
+  cols?: number;
+  headers?: string[];
+  replaceFrom?: number;
+  replaceTo?: number;
+}
 
-  const table = createEmptyTable(2, 3);
+export function insertMarkdownTable(
+  state: EditorState,
+  dispatch: Parameters<StateCommand>[0]["dispatch"],
+  options: InsertMarkdownTableOptions = {},
+): boolean {
+  const replaceFrom = options.replaceFrom;
+  const replaceTo = options.replaceTo;
+  const pos = replaceFrom ?? state.selection.main.from;
+  if (isInsideFencedCode(state, pos)) return false;
+  if (isInMarkdownTable(state, pos)) return false;
+
+  const visualRows = options.visualRows ?? TABLE_INSERT_DEFAULT_ROWS;
+  const cols = options.cols ?? TABLE_INSERT_DEFAULT_COLS;
+  const headers = options.headers ?? tableInsertHeaderLabels(cols);
+  const table = createEmptyTable(
+    bodyRowsForVisualRows(visualRows),
+    cols,
+    headers,
+  );
   const tableText = serializeTable(table).join("\n");
-  const line = state.doc.lineAt(main.from);
+  const line = state.doc.lineAt(pos);
 
   let from: number;
   let to: number;
   let insert: string;
 
-  if (line.text.trim() === "") {
+  if (replaceFrom != null && replaceTo != null) {
+    from = replaceFrom;
+    to = replaceTo;
+    insert = `${tableText}\n`;
+  } else if (line.text.trim() === "") {
     from = line.from;
     to = line.to;
     insert = `${tableText}\n`;
-  } else if (main.from === line.to) {
+  } else if (state.selection.main.from === line.to) {
     from = line.to;
     to = line.to;
     insert = `\n${tableText}\n`;
   } else {
-    from = main.from;
-    to = main.to;
+    from = state.selection.main.from;
+    to = state.selection.main.to;
     insert = `\n${tableText}\n`;
   }
 
@@ -373,7 +404,10 @@ export const insertTable: StateCommand = ({ state, dispatch }): boolean => {
     }),
   );
   return true;
-};
+}
+
+export const insertTable: StateCommand = ({ state, dispatch }): boolean =>
+  insertMarkdownTable(state, dispatch);
 
 export const insertTableRowAbove: StateCommand = ({ state, dispatch }) =>
   applyTableMutation(state, dispatch, (table, logicalRow, col) => {

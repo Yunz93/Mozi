@@ -1713,3 +1713,54 @@
   margin: 0.25rem 0.35rem;
   background: color-mix(in srgb, var(--mp-doc-muted, #94a3b8) 35%, transparent);
 }
+
+.cm-table-insert-picker {
+  position: fixed;
+  z-index: 10050;
+  padding: 0.55rem 0.6rem 0.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--mp-doc-border, rgba(148, 163, 184, 0.35));
+  background: var(--mp-doc-surface, #fff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+  color: var(--mp-doc-text, #1f2937);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.dark .cm-table-insert-picker {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color: #e2e8f0;
+}
+
+.cm-table-insert-picker-title {
+  font-weight: 600;
+  margin: 0 0.15rem 0.4rem;
+}
+
+.cm-table-insert-picker-grid {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.cm-table-insert-picker-cell {
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border-radius: 0.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: transparent;
+  cursor: pointer;
+}
+
+.cm-table-insert-picker-cell.is-active {
+  background: color-mix(in srgb, var(--mp-accent, #3b82f6) 38%, transparent);
+  border-color: var(--mp-accent, #3b82f6);
+}
+
+.cm-table-insert-picker-status {
+  margin: 0.4rem 0.15rem 0;
+  color: var(--mp-doc-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
