@@ -72,7 +72,8 @@ function buildPastedImageMarkdown(
 }
 
 function buildRemoteImageMarkdown(url: string, altText: string): string {
-  return `![${altText}](${url})`;
+  const dest = /\s/.test(url) ? `<${url}>` : url;
+  return `![${altText}](${dest})`;
 }
 
 function buildMarkdownImagePath(

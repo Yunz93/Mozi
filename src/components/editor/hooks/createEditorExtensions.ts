@@ -52,6 +52,7 @@ import {
   markdownListDecorations,
   markdownHighlightStyle,
 } from "../decorations";
+import { markdownDestinationHighlight } from "../markdownDestinationHighlight";
 import {
   createLivePreviewContextExtension,
   createLivePreviewPluginExtensions,
@@ -228,6 +229,7 @@ export function createEditorExtensions(
     ),
     compartments.wrap.of(wordWrap ? EditorView.lineWrapping : []),
     syntaxHighlighting(markdownHighlightStyle),
+    markdownDestinationHighlight,
     compartments.placeholder.of(cmPlaceholder(placeholder)),
     EditorView.domEventHandlers({
       mousedown: () => {

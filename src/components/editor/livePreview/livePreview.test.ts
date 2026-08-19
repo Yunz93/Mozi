@@ -240,6 +240,24 @@ describe("live preview hide formatting", () => {
     expect(widget!.resolvedSrc).toContain("M%20%E8%A8%98-1.png");
   });
 
+  it("previews markdown images whose destination starts with a space", () => {
+    const doc = "![M 記]( 記-1776170252301.png)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewImageDecorations(
+      view,
+      new Map(),
+      () => undefined,
+    );
+    let widget: { rawSrc: string } | null = null;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        widget = value.spec.widget as { rawSrc: string };
+      }
+    });
+    expect(widget).not.toBeNull();
+    expect(widget!.rawSrc).toBe("記-1776170252301.png");
+  });
+
   it("replaces inactive math with widgets", () => {
     const view = mount("area $E=mc^2$ done\n\naway", 22);
     const deco = buildLivePreviewMathDecorations(view);
@@ -673,6 +691,18 @@ describe("live preview hide formatting", () => {
       if (value.spec.widget) widgetCount += 1;
     });
     expect(widgetCount).toBe(1);
+  });
+
+  it("replaces inactive markdown links whose URLs contain spaces", () => {
+    const doc = "go [PRD](docs/完整 PRD.md)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewLinkDecorations(view);
+    let href = "";
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      const widget = value.spec.widget as { href?: string } | undefined;
+      if (widget?.href) href = widget.href;
+    });
+    expect(href).toBe("docs/完整 PRD.md");
   });
 
   it("does not replace frontmatter fences with HR widgets", () => {

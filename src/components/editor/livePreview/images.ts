@@ -26,6 +26,7 @@ import {
 } from "../../../utils/previewImageCache";
 import { livePreviewImageQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
+import { collectMarkdownImageRanges } from "../../../utils/markdownInlineRanges";
 import {
   collectVisibleWikiRanges,
   getLivePreviewDecorationRange,
@@ -50,53 +51,6 @@ const imageResolvedEffect = StateEffect.define<{
 
 /** Persist natural size across widget remounts to limit scroll/layout thrash. */
 const imageNaturalSizeCache = new Map<string, number>();
-
-/**
- * CommonMark ends bare destinations at the first space, so Lezer's Image node
- * truncates URLs like `...(M 記.png)`. Scan the full `![alt](dest)` form instead.
- */
-const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
-
-export interface MarkdownImageRange {
-  from: number;
-  to: number;
-  alt: string;
-  url: string;
-  urlFrom: number;
-  urlTo: number;
-}
-
-export function collectMarkdownImageRanges(
-  docText: string,
-  from = 0,
-  to = docText.length,
-): MarkdownImageRange[] {
-  const slice = docText.slice(from, to);
-  const results: MarkdownImageRange[] = [];
-  const re = new RegExp(MARKDOWN_IMAGE_RE.source, "g");
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(slice)) !== null) {
-    const full = match[0];
-    const alt = match[1] ?? "";
-    const destRaw = match[2] ?? "";
-    const fullFrom = from + match.index;
-    const fullTo = fullFrom + full.length;
-    const destOffsetInFull = full.indexOf(destRaw, full.indexOf("("));
-    if (destOffsetInFull < 0) continue;
-    const leading = destRaw.length - destRaw.trimStart().length;
-    let url = destRaw.trim();
-    let urlFrom = fullFrom + destOffsetInFull + leading;
-    let urlTo = urlFrom + url.length;
-    if (url.startsWith("<") && url.endsWith(">")) {
-      url = url.slice(1, -1).trim();
-      urlFrom += 1;
-      urlTo -= 1;
-    }
-    if (!url) continue;
-    results.push({ from: fullFrom, to: fullTo, alt, url, urlFrom, urlTo });
-  }
-  return results;
-}
 
 function isDirectDisplaySrc(url: string): boolean {
   return (

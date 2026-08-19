@@ -17,6 +17,10 @@ import type { MarkdownStylePreset, OrderedListMode, ThemeMode } from "../types";
 import { LRUCache, hashContent } from "./performance";
 import { normalizeMarkdownTablesForRender } from "./markdownTableNormalize";
 import {
+  parseMarkdownDestination,
+  buildMarkdownDestination,
+} from "./markdownDestination";
+import {
   preprocessAlphaRomanLists,
   applyAlphaRomanListAttrs,
 } from "./markdownAlphaRomanList";
@@ -258,7 +262,7 @@ let currentTheme: ThemeMode = "light";
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 6;
+const MARKDOWN_RENDERER_CACHE_VERSION = 7;
 const PREVIEW_BLANK_LINE_HTML =
   '<div class="preview-source-blank-line"></div>\n';
 
@@ -427,12 +431,10 @@ function createCacheKey(
  * http(s) URLs). Editor source can keep literal spaces; this is render-time only.
  */
 function angleBracketBareMarkdownDestinations(markdown: string): string {
-  const wrap = (prefix: string, url: string, suffix: string): string => {
-    const trimmed = url.trim();
-    if (!trimmed || !/\s/.test(trimmed) || trimmed.startsWith("<")) {
-      return `${prefix}${url}${suffix}`;
-    }
-    return `${prefix}<${trimmed}>${suffix}`;
+  const wrap = (prefix: string, dest: string, suffix: string): string => {
+    const parsed = parseMarkdownDestination(dest);
+    if (!parsed.path) return `${prefix}${dest}${suffix}`;
+    return `${prefix}${buildMarkdownDestination(parsed.path, parsed)}${suffix}`;
   };
 
   // Images: ![alt](dest with spaces)

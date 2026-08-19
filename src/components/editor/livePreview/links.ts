@@ -11,19 +11,17 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { syntaxTree } from "@codemirror/language";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
+import { collectMarkdownLinkRanges } from "../../../utils/markdownInlineRanges";
 import {
   collectVisibleWikiRanges,
-  ensureLivePreviewViewportTree,
   getLivePreviewDecorationRange,
   hasSkipAncestor,
   livePreviewContextChanged,
   rangesOverlap,
   selectionTouchesRange,
   shouldRebuildLivePreviewDecorations,
-  maxVisibleParseTo,
   ViewportDecorationWindow,
 } from "./shared";
 
@@ -76,29 +74,6 @@ class MarkdownLinkWidget extends WidgetType {
   }
 }
 
-function extractLinkParts(
-  state: { doc: { sliceString: (a: number, b: number) => string } },
-  from: number,
-  to: number,
-): { label: string; href: string } {
-  let href = "";
-  let label = "";
-  const tree = syntaxTree(state as never);
-  tree.iterate({
-    from,
-    to,
-    enter: (node) => {
-      if (node.name === "URL") {
-        href = state.doc.sliceString(node.from, node.to);
-      }
-    },
-  });
-  const full = state.doc.sliceString(from, to);
-  const labelMatch = full.match(/^\[([^\]]*)\]/);
-  label = labelMatch?.[1] ?? "";
-  return { label, href: href.trim() };
-}
-
 export function buildLivePreviewLinkDecorations(
   view: EditorView,
 ): DecorationSet {
@@ -108,36 +83,39 @@ export function buildLivePreviewLinkDecorations(
 
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
-  const parseTo = maxVisibleParseTo(view);
-  const tree = ensureLivePreviewViewportTree(view, parseTo);
   const wikiRanges = collectVisibleWikiRanges(view, 2);
   const { from: viewportFrom, to: viewportTo } =
     getLivePreviewDecorationRange(view);
+  const docText = state.doc.sliceString(viewportFrom, viewportTo);
+  const links = collectMarkdownLinkRanges(docText, 0, docText.length)
+    .map((link) => ({
+      ...link,
+      from: link.from + viewportFrom,
+      to: link.to + viewportFrom,
+    }))
+    .sort((a, b) => a.from - b.from || a.to - b.to);
 
-  tree.iterate({
-    from: viewportFrom,
-    to: viewportTo,
-    enter: (node) => {
-      if (node.name !== "Link") return;
-      const { from, to } = node;
-      if (selectionTouchesRange(state, from, to)) return;
-      if (hasSkipAncestor(state, from)) return;
-      if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
-        return;
-      }
+  let lastTo = -1;
+  for (const link of links) {
+    const { from, to, alt, url } = link;
+    if (from < lastTo) continue;
+    if (from >= to) continue;
+    if (selectionTouchesRange(state, from, to)) continue;
+    if (hasSkipAncestor(state, from)) continue;
+    if (wikiRanges.some((w) => rangesOverlap(from, to, w.from, w.to))) {
+      continue;
+    }
+    if (!url) continue;
 
-      const { label, href } = extractLinkParts(state, from, to);
-      if (!href) return;
-
-      builder.add(
-        from,
-        to,
-        Decoration.replace({
-          widget: new MarkdownLinkWidget(label, href, from),
-        }),
-      );
-    },
-  });
+    builder.add(
+      from,
+      to,
+      Decoration.replace({
+        widget: new MarkdownLinkWidget(alt, url, from),
+      }),
+    );
+    lastTo = to;
+  }
 
   return builder.finish();
 }

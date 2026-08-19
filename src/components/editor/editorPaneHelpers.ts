@@ -39,7 +39,7 @@ export interface LocalImageMatch {
   to: number;
 }
 
-const STANDARD_IMAGE_RE = /!\[([^\]]*)\]\((<[^>\n]+>|[^)\n]+)\)/g;
+const STANDARD_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
 const OBSIDIAN_IMAGE_RE = /!\[\[([^\]|]+?)(?:\|([^\]]*?))?\]\]/g;
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 
