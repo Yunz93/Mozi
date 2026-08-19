@@ -14,6 +14,10 @@ import {
 } from "./markdownStyle";
 import { getPathBasename } from "../app/appShellUtils";
 import { isRemoteTarget } from "./publish/markdownAssetPipeline";
+import {
+  isUsablePreviewDisplaySrc,
+  resolvePreviewSource,
+} from "./previewImageCache";
 import type { AppSettings, FileNode, Frontmatter } from "../types";
 
 export interface WechatDraftDefaults {
@@ -574,20 +578,10 @@ function swapPreviewSourcesForPlaceholders(host: HTMLElement): void {
     });
 }
 
-function isDisplayablePreviewSrc(src: string): boolean {
-  return (
-    src.startsWith("http://") ||
-    src.startsWith("https://") ||
-    src.startsWith("data:") ||
-    src.startsWith("blob:") ||
-    src.startsWith("asset:") ||
-    src.startsWith("file:")
-  );
-}
-
 /** Convert local file paths in preview HTML so the phone frame can render them. */
 export async function hydrateWechatPreviewImages(
   previewHtml: string,
+  sourceFilePath?: string,
 ): Promise<string> {
   if (typeof document === "undefined") return previewHtml;
   const wrap = document.createElement("div");
@@ -595,24 +589,20 @@ export async function hydrateWechatPreviewImages(
   const images = Array.from(wrap.querySelectorAll<HTMLImageElement>("img"));
   if (images.length === 0) return previewHtml;
 
-  let convertFileSrc: ((path: string) => string) | null = null;
-  try {
-    const core = await import("@tauri-apps/api/core");
-    convertFileSrc = core.convertFileSrc;
-  } catch {
-    convertFileSrc = null;
-  }
+  await Promise.all(
+    images.map(async (image) => {
+      const src = image.getAttribute("src")?.trim() || "";
+      if (!src || isUsablePreviewDisplaySrc(src)) return;
 
-  for (const image of images) {
-    const src = image.getAttribute("src")?.trim() || "";
-    if (!src || isDisplayablePreviewSrc(src)) continue;
-    if (!convertFileSrc) continue;
-    try {
-      image.setAttribute("src", convertFileSrc(src));
-    } catch {
-      // Keep the original path; the preview still shows alt text.
-    }
-  }
+      try {
+        const resolved = await resolvePreviewSource(src, sourceFilePath);
+        if (!isUsablePreviewDisplaySrc(resolved)) return;
+        image.setAttribute("src", resolved);
+      } catch {
+        // Keep the original path; the preview still shows alt text.
+      }
+    }),
+  );
 
   return wrap.innerHTML;
 }

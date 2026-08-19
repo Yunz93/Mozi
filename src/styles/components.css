@@ -971,14 +971,37 @@
 .wechat-draft-layout {
   display: grid;
   gap: 1rem;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+}
+
+.wechat-draft-form {
+  min-width: 0;
 }
 
 @media (min-width: 880px) {
   .wechat-draft-layout {
     grid-template-columns: minmax(0, 1fr) 375px;
-    align-items: start;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .wechat-draft-form {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .wechat-draft-preview-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .wechat-phone-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: min(560px, 100%);
   }
 }
 
@@ -989,7 +1012,7 @@
 .wechat-phone-frame {
   width: 375px;
   max-width: 100%;
-  max-height: 560px;
+  max-height: min(560px, 100%);
   overflow: auto;
   border-radius: 1.25rem;
   background: #f7f7f7;

@@ -263,6 +263,17 @@ export function previewSourceNeedsMaterialization(src: string): boolean {
   return true;
 }
 
+/** True when a webview can paint this src without Tauri asset-protocol scope. */
+export function isUsablePreviewDisplaySrc(src: string): boolean {
+  const trimmed = src.trim();
+  return (
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  );
+}
+
 async function fetchBlobUrl(src: string): Promise<string> {
   if (src.startsWith("data:") || src.startsWith("blob:")) {
     return src;

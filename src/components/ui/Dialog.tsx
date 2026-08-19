@@ -138,7 +138,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
         {/* Content */}
         <div
-          className={`min-h-0 flex-1 ${contentScroll ? "overflow-y-auto" : "overflow-visible"} px-6 py-4 ${contentClassName}`}
+          className={`min-h-0 flex-1 ${contentScroll ? "overflow-y-auto" : "overflow-hidden"} px-6 py-4 ${contentClassName}`}
         >
           {children}
         </div>
