@@ -164,19 +164,18 @@ export default {
   askVault_ask: "生成回答",
   askVault_asking: "生成中…",
   askVault_retrieveHint: "只检索片段、不调用 AI；可先检查来源再生成。",
-  askVault_confirmSend: "确认发送并生成",
   askVault_confirmSendHint:
     "将发送 {count} 段笔记给模型。点片段可跳回原文；生成结果不会静默改写笔记。",
   askVault_toggleSources: "显示将发送的片段",
   askVault_sourcesPreview: "将发送的片段",
   askVault_sourcesTab: "来源",
   askVault_sourcesHint:
-    "这些片段会作为上下文发给模型。请先确认，再点「确认发送并生成」。",
+    "这些片段会作为上下文发给模型。点片段可跳回原文。需要先看来源时用「仅检索」。",
   askVault_sourcesEmpty:
     "输入问题后点「生成回答」或「仅检索」，相关片段会显示在这里。",
   askVault_answer: "回答",
   askVault_answerEmpty:
-    "输入问题后先检索来源，确认将发送的片段，再生成回答（Cmd/Ctrl+Enter）。",
+    "输入问题后点「生成回答」（Cmd/Ctrl+Enter）。需要先看来源时用「仅检索」。",
   askVault_insert: "插入到当前笔记（需确认）",
   askVault_insertNeedsNote: "请先打开一篇笔记再插入。",
   askVault_citations: "引用",

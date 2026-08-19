@@ -298,15 +298,24 @@ export function previewItemToCitation(
   };
 }
 
-export function shouldConfirmAskVaultSend(options: {
+export type AskVaultSubmitKind = "reuseHits" | "retrieveThenGenerate";
+
+/**
+ * Generate answer always answers in one click.
+ * After optional "Retrieve only", the same question can reuse those hits.
+ */
+export function resolveAskVaultSubmitKind(options: {
   question: string;
   lastPreviewedQuestion: string | null;
   pendingHitCount: number;
-}): boolean {
+}): AskVaultSubmitKind {
   const question = options.question.trim();
-  return (
+  if (
     question.length > 0 &&
     options.pendingHitCount > 0 &&
     options.lastPreviewedQuestion === question
-  );
+  ) {
+    return "reuseHits";
+  }
+  return "retrieveThenGenerate";
 }
