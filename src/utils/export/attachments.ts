@@ -98,7 +98,7 @@ export async function prepareHtmlForDownload(
   host.style.position = "fixed";
   host.style.left = "-10000px";
   host.style.top = "0";
-  host.style.width = `${PREVIEW_PANEL_WIDTH_PX + 64}px`;
+  host.style.width = `${PREVIEW_PANEL_WIDTH_PX}px`;
   host.style.background = backgroundColor;
   host.style.pointerEvents = "none";
   host.style.visibility = "hidden";

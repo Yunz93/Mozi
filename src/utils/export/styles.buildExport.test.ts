@@ -219,11 +219,27 @@ describe("buildExportStyles", () => {
   it("uses a single preview-like padding layer instead of double padding", () => {
     const css = buildExportStyles("light");
     const docBlock = css.match(/\.export-document\s*\{[^}]*\}/);
-    expect(docBlock?.[0]).toContain("padding: 44px 40px 72px");
-    const bodyBlock = css.match(
-      /\.export-document \.markdown-body\s*\{[^}]*\}/,
+    expect(docBlock?.[0]).toContain("padding: 0");
+    expect(docBlock?.[0]).toContain("max-width: 920px");
+    expect(css).toMatch(
+      /\.export-document \.markdown-body\s*\{[^}]*padding:\s*44px 40px 60px/m,
     );
-    expect(bodyBlock?.[0]).toMatch(/padding:\s*0/);
+  });
+
+  it("matches preview heading letter-spacing and table chrome", () => {
+    const css = buildExportStyles("light");
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h1[\s\S]*?letter-spacing:\s*0\.01em/,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body table\s*\{[^}]*display:\s*table/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body table\s*\{[^}]*border-collapse:\s*collapse/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body table th\s*,\s*\.export-document \.markdown-body table td\s*\{[^}]*border:\s*1px solid/m,
+    );
   });
 
   it("mirrors preview Mermaid container styling and nested-SVG guards", () => {
@@ -246,7 +262,7 @@ describe("buildExportStyles", () => {
       /\.export-document \.markdown-body \.mermaid svg svg\s*\{[^}]*width:\s*auto !important/m,
     );
     expect(lightCss).toMatch(
-      /\.export-document \.markdown-body \.mermaid > svg\s*\{[^}]*max-width:\s*100% !important/m,
+      /\.export-document \.markdown-body \.mermaid > svg\s*\{[^}]*max-width:\s*none !important/m,
     );
   });
 

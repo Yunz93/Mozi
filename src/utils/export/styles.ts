@@ -3,6 +3,7 @@ import githubMarkdownCss from "github-markdown-css/github-markdown.css?inline";
 import { escapeHtml } from "./core";
 import { flattenHeadingNodes, parseHeadings } from "../outline";
 import { PREVIEW_PANEL_WIDTH_PX } from "./types";
+import { getPaneLayoutMetrics } from "../../components/editor/paneLayout";
 import {
   buildDynamicFontFaceCss,
   type FontSettings,
@@ -129,6 +130,11 @@ export function buildExportStyles(
     '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace';
   const resolvedCodeFontSize =
     codeFontSize ?? Math.max(12, resolvedFontSize - 1);
+  const previewLayout = getPaneLayoutMetrics(
+    PREVIEW_PANEL_WIDTH_PX,
+    "comfortable",
+  );
+  const documentPadding = `${previewLayout.contentPaddingTop}px ${previewLayout.contentPaddingX}px ${previewLayout.contentPaddingBottom}px`;
   const normalizedStylePreset =
     normalizeMarkdownStylePreset(markdownStylePreset);
   const tokens = getMarkdownStyleTokens(normalizedStylePreset, theme);
@@ -215,12 +221,19 @@ ${markdownStyleCssVariables}
       line-height: 1.95;
       background-color: transparent;
       color: var(--text-primary);
-      /* Single padding layer like the preview pane (medium layout: 44/40/60);
-         the old export double padding (30+52 top, 28+56 x) made shared images
-         look much narrower than the live preview. */
-      padding: 44px 40px 72px;
-      max-width: ${PREVIEW_PANEL_WIDTH_PX}px;
+      /* Same comfortable-medium preview sheet: padding lives on the article
+         (preview-pane-document) so the column width matches Reading mode. */
+      padding: 0;
+      max-width: ${previewLayout.sheetMaxWidth}px;
       margin: 0 auto;
+      --pane-content-top: ${previewLayout.contentPaddingTop}px;
+      --pane-content-px: ${previewLayout.contentPaddingX}px;
+      --pane-content-bottom: ${previewLayout.contentPaddingBottom}px;
+      --preview-font-family: ${resolvedFontFamily};
+      --preview-font-size: ${resolvedFontSize}px;
+      --preview-code-font-family: ${resolvedCodeFontFamily};
+      --preview-code-font-size: ${resolvedCodeFontSize}px;
+      --preview-line-height: 1.95;
 ${markdownStyleCssVariables}
     }
 
@@ -229,7 +242,8 @@ ${markdownStyleCssVariables}
       min-width: 200px;
       max-width: none;
       margin: 0;
-      padding: 0;
+      /* Concrete padding for html2canvas (it cannot resolve preview.css vars). */
+      padding: ${documentPadding};
       background: transparent !important;
       color: var(--text-primary);
       font-family: inherit !important;
@@ -237,6 +251,7 @@ ${markdownStyleCssVariables}
       line-height: inherit;
       overflow-wrap: anywhere;
       word-break: break-word;
+      letter-spacing: 0.01em;
     }
 
     /* Match preview.css paragraph rhythm (preview-pane-document rules). */
@@ -355,6 +370,7 @@ ${markdownStyleCssVariables}
     .export-document .markdown-body h5,
     .export-document .markdown-body h6 {
       color: var(--mp-doc-accent);
+      letter-spacing: 0.01em;
       background: var(--mp-doc-heading-bg);
       border-color: var(--mp-doc-heading-border);
       font-weight: var(--mp-doc-heading-weight);
@@ -732,14 +748,18 @@ ${exportDelStrikeBlock}
     }
 
     .export-document .markdown-body table {
+      display: table;
       width: 100%;
       max-width: 100%;
+      border-collapse: collapse;
       table-layout: fixed;
+      color: var(--mp-doc-text);
     }
 
     .export-document .markdown-body table th,
     .export-document .markdown-body table td {
-      border-color: var(--border-color);
+      border: 1px solid var(--mp-doc-border);
+      color: inherit;
       text-align: left;
       min-width: 0;
       overflow-wrap: break-word;
@@ -747,7 +767,8 @@ ${exportDelStrikeBlock}
     }
 
     .export-document .markdown-body table tr {
-      background-color: transparent;
+      background-color: ${theme === "dark" ? "rgba(15, 23, 42, 0.72)" : "rgba(255, 255, 255, 0.92)"};
+      border-top: 1px solid var(--mp-doc-border);
     }
 
     .export-document .markdown-body table tr:nth-child(2n) {
@@ -761,6 +782,7 @@ ${exportDelStrikeBlock}
     .export-document .markdown-body table th {
       background-color: var(--mp-doc-table-header-bg);
       color: var(--mp-doc-text);
+      font-weight: 600;
     }
 
     .export-document .markdown-body ul li::marker,
@@ -794,7 +816,7 @@ ${exportDelStrikeBlock}
       display: block;
       width: auto;
       height: auto;
-      max-width: 100% !important;
+      max-width: none !important;
       margin: 0 auto;
     }
 

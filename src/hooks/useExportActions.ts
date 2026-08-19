@@ -9,6 +9,10 @@ import {
 import { getFileSystem } from "../types/filesystem";
 import { t } from "../utils/i18n";
 import {
+  getScaledCodeFontSize,
+  getScaledEditorFontSize,
+} from "../utils/uiFontSize";
+import {
   classifyExportError,
   EXPORT_ERROR_I18N_KEYS,
 } from "../utils/export/exportErrors";
@@ -278,8 +282,14 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         fontFamily: previewFontFamily,
         codeFontFamily,
         fontSettings: settings,
-        fontSize: settings.fontSize,
-        codeFontSize: Math.max(12, settings.fontSize - 2),
+        fontSize: getScaledEditorFontSize(
+          settings.fontSize,
+          settings.uiFontSize,
+        ),
+        codeFontSize: getScaledCodeFontSize(
+          settings.fontSize,
+          settings.uiFontSize,
+        ),
         includeProperties: false,
         highlighter,
         markdownStylePreset: settings.markdownStylePreset,
@@ -304,6 +314,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       settings.markdownStylePreset,
       settings.orderedListMode,
       settings.themeMode,
+      settings.uiFontSize,
       showNotification,
     ]);
 

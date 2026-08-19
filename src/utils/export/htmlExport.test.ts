@@ -48,4 +48,12 @@ describe("exportToHtml", () => {
     expect(html).toContain("mp-callout-title");
     expect(html).toContain(".mp-callout-title");
   });
+
+  it("marks the export article as a preview document so reading-mode CSS applies", async () => {
+    const html = await exportToHtml("# hi", {
+      theme: "light",
+      includeProperties: false,
+    });
+    expect(html).toContain('class="markdown-body preview-pane-document"');
+  });
 });

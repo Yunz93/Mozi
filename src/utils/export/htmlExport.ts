@@ -73,7 +73,7 @@ export async function exportToHtml(
   );
   const propertiesHtml = includeProperties ? renderProperties(frontmatter) : "";
   const documentMarkup = buildExportDocument(
-    `${propertiesHtml}<article class="markdown-body" data-markdown-style="${markdownStylePreset}">${htmlContent}</article>`,
+    `${propertiesHtml}<article class="markdown-body preview-pane-document" data-markdown-style="${markdownStylePreset}">${htmlContent}</article>`,
     toc,
     markdownStylePreset,
     theme,
