@@ -170,12 +170,16 @@ async function readLocalPreviewObjectUrl(
 
 /**
  * Vault files cannot be served over Tauri's `asset://` protocol (no
- * protocol-asset scope). Caching those URLs leaves a gray alt-text box.
+ * protocol-asset scope). Only in-memory and http(s) URLs can paint in the webview.
  */
 export function isUsablePreviewDisplaySrc(src: string): boolean {
   const trimmed = src.trim();
-  if (!trimmed) return false;
-  return !trimmed.startsWith("asset:") && !trimmed.startsWith("tauri:");
+  return (
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  );
 }
 
 function previewImageNeedsWarm(image: HTMLImageElement): boolean {
@@ -325,17 +329,6 @@ export function previewSourceNeedsMaterialization(src: string): boolean {
   // asset:/tauri: are included here because vault asset-protocol serving is
   // not configured; treating them as already-displayable would leave broken imgs.
   return true;
-}
-
-/** True when a webview can paint this src without Tauri asset-protocol scope. */
-export function isUsablePreviewDisplaySrc(src: string): boolean {
-  const trimmed = src.trim();
-  return (
-    trimmed.startsWith("https://") ||
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("data:") ||
-    trimmed.startsWith("blob:")
-  );
 }
 
 async function fetchBlobUrl(src: string): Promise<string> {

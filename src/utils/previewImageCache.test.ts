@@ -26,7 +26,6 @@ import {
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
   invalidateCachedPreviewImageSrc,
-  isUsablePreviewDisplaySrc,
   warmPreviewImage,
 } from "./previewImageCache";
 
