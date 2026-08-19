@@ -3,8 +3,8 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { livePreviewContextFacet } from "./context";
+import { createEditorMarkdownLanguage } from "../editorMarkdown";
 import { buildMathDecorations, livePreviewMath } from "./math";
 import { buildTableDecorations, livePreviewTables } from "./tables";
 import { buildCalloutDecorations, livePreviewCallouts } from "./callouts";
@@ -17,7 +17,7 @@ function mount(doc: string, extras: import("@codemirror/state").Extension[]) {
       doc,
       selection: { anchor: doc.length - 1 },
       extensions: [
-        markdown({ base: markdownLanguage }),
+        createEditorMarkdownLanguage(),
         livePreviewContextFacet.of({
           sourceFilePath: null,
           rootFolderPath: null,
@@ -42,7 +42,7 @@ describe("live preview incremental block rebuilds", () => {
       EditorState.create({
         doc,
         extensions: [
-          markdown({ base: markdownLanguage }),
+          createEditorMarkdownLanguage(),
           livePreviewContextFacet.of({
             sourceFilePath: null,
             rootFolderPath: null,
@@ -93,7 +93,7 @@ describe("live preview incremental block rebuilds", () => {
       EditorState.create({
         doc,
         extensions: [
-          markdown({ base: markdownLanguage }),
+          createEditorMarkdownLanguage(),
           livePreviewContextFacet.of({
             sourceFilePath: null,
             rootFolderPath: null,

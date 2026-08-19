@@ -3,8 +3,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { livePreviewContextFacet } from "./context";
+import { createEditorMarkdownLanguage } from "../editorMarkdown";
 import { livePreviewMermaid } from "./mermaid";
 
 vi.mock("../../../utils/markdown-extensions", async () => {
@@ -51,7 +51,7 @@ describe("live preview mermaid observers", () => {
       doc,
       selection: { anchor: doc.length - 1 },
       extensions: [
-        markdown({ base: markdownLanguage }),
+        createEditorMarkdownLanguage(),
         livePreviewContextFacet.of({
           sourceFilePath: null,
           rootFolderPath: null,
@@ -130,7 +130,7 @@ describe("live preview mermaid observers", () => {
       doc,
       selection: { anchor: doc.length - 1 },
       extensions: [
-        markdown({ base: markdownLanguage }),
+        createEditorMarkdownLanguage(),
         livePreviewContextFacet.of({
           sourceFilePath: null,
           rootFolderPath: null,

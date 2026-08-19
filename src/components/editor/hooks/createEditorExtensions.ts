@@ -31,9 +31,8 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { history, historyKeymap } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
-import { resolveEditorCodeLanguage } from "../../../utils/editorCodeLanguages";
+import { createEditorMarkdownLanguage } from "../editorMarkdown";
 import { convertHtmlToMarkdown } from "../../../utils/htmlToMarkdown";
 import {
   createMarkdownKeyBindings,
@@ -211,12 +210,7 @@ export function createEditorExtensions(
       tooltipSpace: getEditorTooltipSpace,
     }),
     ...wrapEditorPreferenceExtensions(preferenceCompartments, preferences),
-    compartments.markdown.of(
-      markdown({
-        base: markdownLanguage,
-        codeLanguages: resolveEditorCodeLanguage,
-      }),
-    ),
+    compartments.markdown.of(createEditorMarkdownLanguage()),
     drawSelection(),
     frontmatterDecorations,
     fencedCodeDecorations,

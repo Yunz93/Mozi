@@ -2,8 +2,8 @@
 
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it, afterEach, vi } from "vitest";
+import { createEditorMarkdownLanguage } from "../editorMarkdown";
 import { livePreviewContextFacet } from "./context";
 import {
   buildLivePreviewHideDecorations,
@@ -42,7 +42,7 @@ function createView(
     doc,
     selection: { anchor: cursor },
     extensions: [
-      markdown({ base: markdownLanguage }),
+      createEditorMarkdownLanguage(),
       EditorView.lineWrapping,
       livePreviewContextFacet.of({
         sourceFilePath: null,
