@@ -26,6 +26,7 @@ import {
 import { isImageAttachment } from "../preview/previewMedia";
 import {
   getCachedPreviewImageSrc,
+  isUsablePreviewDisplaySrc,
   resolvePreviewSource,
 } from "../../../utils/previewImageCache";
 import { renderMarkdown } from "../../../utils/markdown";
@@ -728,6 +729,9 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
               pathOrSrc,
               ctx.sourceFilePath ?? undefined,
             );
+            if (!isUsablePreviewDisplaySrc(displaySrc)) {
+              throw new Error(`Unusable preview source: ${displaySrc}`);
+            }
             wikiImageResolvedCache.set(job.cacheKey, displaySrc);
             wikiImageFailedCache.delete(job.cacheKey);
             if (view.dom.isConnected) {

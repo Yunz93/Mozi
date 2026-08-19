@@ -25,12 +25,18 @@ import {
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
   invalidateCachedPreviewImageSrc,
+  isUsablePreviewDisplaySrc,
   warmPreviewImage,
 } from "./previewImageCache";
 
 describe("resolvePreviewSource", () => {
   beforeEach(() => {
     vi.mocked(isTauriEnvironment).mockReturnValue(false);
+  });
+
+  afterEach(async () => {
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({} as never);
   });
 
   it("returns data and blob urls unchanged", async () => {
@@ -46,6 +52,19 @@ describe("resolvePreviewSource", () => {
       "/vault/notes/a.md",
     );
     expect(resolved).toContain("img/poster.png");
+  });
+
+  it("falls through when no filesystem is available instead of throwing", async () => {
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockRejectedValue(
+      new Error("No supported file system available"),
+    );
+
+    const resolved = await resolvePreviewSource(
+      "assets/poster.png",
+      "/vault/notes/a.md",
+    );
+    expect(resolved).toContain("poster.png");
   });
 });
 
@@ -82,6 +101,13 @@ describe("previewSourceNeedsMaterialization", () => {
 });
 
 describe("hydrateCachedPreviewImageSources", () => {
+  afterEach(async () => {
+    invalidateCachedPreviewImageSrc();
+    vi.mocked(isTauriEnvironment).mockReturnValue(false);
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({} as never);
+  });
+
   it("returns html unchanged when there are no images", () => {
     expect(
       hydrateCachedPreviewImageSources("<p>plain</p>", "/vault/a.md"),
@@ -93,11 +119,35 @@ describe("hydrateCachedPreviewImageSources", () => {
     expect(hydrateCachedPreviewImageSources(html, "/vault/a.md")).toBe(html);
     expect(getCachedPreviewImageSrc("poster.png", "/vault/a.md")).toBeNull();
   });
+
+  it("restores blob src when innerHTML dropped the object url", async () => {
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({
+      getFileObjectUrl: vi.fn(async () => "blob:restored-cjk-image"),
+    } as never);
+    vi.mocked(isTauriEnvironment).mockReturnValue(true);
+
+    await warmPreviewImage(
+      "/vault/resources/墨知正式版-1787151343910.png",
+      "/vault/墨知正式版.md",
+    );
+
+    const html = hydrateCachedPreviewImageSources(
+      '<img alt="墨知正式版-1787151343910.png" data-original-src="/vault/resources/墨知正式版-1787151343910.png" data-preview-warmed="true" />',
+      "/vault/墨知正式版.md",
+    );
+
+    expect(html).toContain("blob:restored-cjk-image");
+  });
 });
 
 describe("warmPreviewImage", () => {
-  afterEach(() => {
+  afterEach(async () => {
+    invalidateCachedPreviewImageSrc();
     vi.restoreAllMocks();
+    vi.mocked(isTauriEnvironment).mockReturnValue(false);
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({} as never);
   });
 
   it("falls back to resolved source when blob fetch is unavailable", async () => {
@@ -172,6 +222,13 @@ describe("resolvePreviewSource environment branches", () => {
     vi.mocked(getFileSystem).mockResolvedValue({} as never);
   });
 
+  afterEach(async () => {
+    invalidateCachedPreviewImageSrc();
+    vi.mocked(isTauriEnvironment).mockReturnValue(false);
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({} as never);
+  });
+
   it("resolves file:// paths through the filesystem object url helper in browser mode", async () => {
     const { getFileSystem } = await import("../types/filesystem");
     vi.mocked(getFileSystem).mockResolvedValue({
@@ -219,6 +276,40 @@ describe("resolvePreviewSource environment branches", () => {
       resolvePreviewSource("img/poster.png", "/vault/notes/a.md"),
     ).resolves.toBe("asset:///vault/notes/img/poster.png");
   });
+
+  it("does not cache asset protocol urls when object url lookup fails", async () => {
+    vi.mocked(isTauriEnvironment).mockReturnValue(true);
+    const { getFileSystem } = await import("../types/filesystem");
+    const getFileObjectUrl = vi.fn(async () => {
+      throw new Error("file not ready");
+    });
+    vi.mocked(getFileSystem).mockResolvedValue({ getFileObjectUrl } as never);
+
+    await expect(
+      resolvePreviewSource(
+        "resources/墨知正式版-1787151343910.png",
+        "/vault/墨知正式版.md",
+      ),
+    ).rejects.toThrow(/file not ready|Failed to read local preview image/);
+    expect(isUsablePreviewDisplaySrc("asset:///vault/resources/x.png")).toBe(
+      false,
+    );
+  });
+
+  it("retries object url lookup after a newly pasted file misses the first read", async () => {
+    vi.mocked(isTauriEnvironment).mockReturnValue(true);
+    const { getFileSystem } = await import("../types/filesystem");
+    const getFileObjectUrl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValue("blob:pasted-image");
+    vi.mocked(getFileSystem).mockResolvedValue({ getFileObjectUrl } as never);
+
+    await expect(
+      resolvePreviewSource("/vault/resources/墨知正式版-1787151343910.png"),
+    ).resolves.toBe("blob:pasted-image");
+    expect(getFileObjectUrl).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("hydrateCachedPreviewImageSources cache hits", () => {
@@ -243,8 +334,12 @@ describe("hydrateCachedPreviewImageSources cache hits", () => {
 });
 
 describe("mountLazyPreviewImageWarming", () => {
-  afterEach(() => {
+  afterEach(async () => {
+    invalidateCachedPreviewImageSrc();
     vi.restoreAllMocks();
+    vi.mocked(isTauriEnvironment).mockReturnValue(false);
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(getFileSystem).mockResolvedValue({} as never);
   });
 
   it("warms pending images when they intersect the viewport", async () => {
@@ -306,6 +401,53 @@ describe("mountLazyPreviewImageWarming", () => {
     stop();
     fetchSpy.mockRestore();
     createObjectURL.mockRestore();
+    host.remove();
+  });
+
+  it("rewarms images marked warmed whose src was stripped", async () => {
+    const observers: Array<{
+      callback: IntersectionObserverCallback;
+      observe: (target: Element) => void;
+    }> = [];
+
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        constructor(callback: IntersectionObserverCallback) {
+          observers.push({ callback, observe: this.observe });
+        }
+      },
+    );
+
+    const { getFileSystem } = await import("../types/filesystem");
+    vi.mocked(isTauriEnvironment).mockReturnValue(true);
+    vi.mocked(getFileSystem).mockResolvedValue({
+      getFileObjectUrl: vi.fn(async () => "blob:rewarmed-image"),
+    } as never);
+
+    const host = document.createElement("div");
+    const image = document.createElement("img");
+    image.alt = "墨知正式版-1787151343910.png";
+    image.setAttribute("data-preview-warmed", "true");
+    image.setAttribute(
+      "data-original-src",
+      "/vault/resources/墨知正式版-1787151343910.png",
+    );
+    host.appendChild(image);
+    document.body.appendChild(host);
+
+    const stop = mountLazyPreviewImageWarming(host, {
+      sourceFilePath: "/vault/墨知正式版.md",
+    });
+
+    await vi.waitFor(() => {
+      expect(image.getAttribute("src")).toBe("blob:rewarmed-image");
+    });
+
+    stop();
     host.remove();
   });
 });
