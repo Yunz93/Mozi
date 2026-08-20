@@ -144,6 +144,51 @@ describe("live preview hide formatting", () => {
     expect(hiddenTexts).toContain("> ");
   });
 
+  it("does not hide autolink or bare URLs when the cursor is away", () => {
+    const hiddenOf = (doc: string) => {
+      const view = mount(doc, doc.length - 1);
+      const hiddenTexts: string[] = [];
+      buildLivePreviewHideDecorations(view).between(
+        0,
+        view.state.doc.length,
+        (from, to) => {
+          hiddenTexts.push(view.state.doc.sliceString(from, to));
+        },
+      );
+      return hiddenTexts.join("|");
+    };
+
+    expect(hiddenOf("see <https://example.com/path>\n\naway")).not.toContain(
+      "https://example.com/path",
+    );
+    expect(hiddenOf("see https://example.com/path\n\naway")).not.toContain(
+      "https://example.com/path",
+    );
+    expect(
+      hiddenOf("```\ncurl https://example.com/path \\\\\n```\n\naway"),
+    ).not.toContain("https://example.com/path");
+    expect(
+      hiddenOf(
+        "curl https://maasapi.robbyant.com/v1/depth/generations \\\\\n\naway",
+      ),
+    ).not.toContain("https://maasapi.robbyant.com/v1/depth/generations");
+  });
+
+  it("still hides autolink angle brackets when the cursor is away", () => {
+    const doc = "see <https://example.com/path>\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const hiddenTexts: string[] = [];
+    buildLivePreviewHideDecorations(view).between(
+      0,
+      view.state.doc.length,
+      (from, to) => {
+        hiddenTexts.push(view.state.doc.sliceString(from, to));
+      },
+    );
+    expect(hiddenTexts).toEqual(expect.arrayContaining(["<", ">"]));
+    expect(hiddenTexts.join("|")).not.toContain("https://example.com/path");
+  });
+
   it("replaces task markers with widgets when inactive", () => {
     const view = mount("- [ ] todo\n\naway", 14);
     const deco = buildLivePreviewTaskDecorations(view);

@@ -61,10 +61,6 @@ const hideMarkDecoration = Decoration.replace({
   inclusive: true,
 });
 
-const hideUrlDecoration = Decoration.replace({
-  inclusive: true,
-});
-
 type MarkdownConstructRange = {
   name: "Image" | "Link";
   from: number;
@@ -121,31 +117,6 @@ function shouldRevealMark(
   }
 
   return selectionTouchesRange(state, from, to, 1);
-}
-
-function shouldHideUrl(
-  state: EditorState,
-  from: number,
-  to: number,
-  constructs: MarkdownConstructRange[] = [],
-): boolean {
-  // Autolink body is the URL itself — never hide it.
-  let node = syntaxTree(state).resolveInner(from, 1);
-  for (let depth = 0; depth < 8 && node; depth += 1) {
-    if (node.name === "Autolink") return false;
-    if (!node.parent) break;
-    node = node.parent;
-  }
-
-  const parent = findInlineParent(state, from, to, constructs);
-  // Inactive images/links are fully replaced by widgets — skip partial hides.
-  if (parent?.name === "Image" || parent?.name === "Link") {
-    return false;
-  }
-  if (parent) {
-    return !selectionTouchesRange(state, parent.from, parent.to);
-  }
-  return !selectionTouchesRange(state, from, to, 1);
 }
 
 export function buildLivePreviewHideDecorations(
@@ -229,12 +200,6 @@ export function buildLivePreviewHideDecorations(
         }
         ranges.push({ from, to: hideTo, deco: hideMarkDecoration });
         return;
-      }
-
-      if (name === "URL") {
-        if (hasSkipAncestor(state, from)) return;
-        if (!shouldHideUrl(state, from, to, markdownConstructs)) return;
-        ranges.push({ from, to, deco: hideUrlDecoration });
       }
     },
   });

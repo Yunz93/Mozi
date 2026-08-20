@@ -89,4 +89,10 @@ describe("live preview / reading visual parity", () => {
       /\[data-live-preview="true"\][\s\S]*?\.cm-live-preview-mermaid[\s\S]*?\.mermaid\s*>\s*svg\s*\{[^}]*max-width:\s*none !important/s,
     );
   });
+
+  it("underlines live URL tokens like markdown links", () => {
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\] \.tok-link,[\s\S]*?\[data-live-preview="true"\] \.tok-url \{/s,
+    );
+  });
 });

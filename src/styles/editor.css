@@ -1331,7 +1331,8 @@
 }
 
 .editor-pane-layout[data-live-preview="true"] .tok-link,
-.editor-pane-layout[data-live-preview="true"] .mp-tok-link {
+.editor-pane-layout[data-live-preview="true"] .mp-tok-link,
+.editor-pane-layout[data-live-preview="true"] .tok-url {
   color: var(--mp-doc-link, var(--mp-doc-accent, #0f9aa8));
   text-decoration: underline;
   text-decoration-thickness: 1.5px;
