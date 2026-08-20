@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.0.16"
+version = "1.0.17"
 description = "墨知 / Mozi — local-first Markdown knowledge-base editor (markdown-press)"
 authors = ["Yunz93"]
 license = "MIT"
