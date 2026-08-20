@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { classifyWindowLabel, isPrimaryAppWindow } from "./appWindow";
 
@@ -9,5 +11,28 @@ describe("appWindow", () => {
     expect(classifyWindowLabel("unknown")).toBe("other");
     expect(isPrimaryAppWindow("main")).toBe(true);
     expect(isPrimaryAppWindow("file-1")).toBe(false);
+  });
+});
+
+describe("macOS Dock new-window menu", () => {
+  const rust = readFileSync(
+    resolve(process.cwd(), "src-tauri/src/native_new_window.rs"),
+    "utf8",
+  );
+  const lib = readFileSync(
+    resolve(process.cwd(), "src-tauri/src/lib.rs"),
+    "utf8",
+  );
+
+  it("labels the Dock item 新建窗口 by default and New Window for en*", () => {
+    expect(rust).toMatch(/if lang\.starts_with\("en"\)/);
+    expect(rust).toContain('"New Window"');
+    expect(rust).toContain('"新建窗口"');
+  });
+
+  it("installs a Dock menu that calls open_new_window", () => {
+    expect(rust).toContain("setDockMenu");
+    expect(rust).toContain("crate::open_new_window");
+    expect(lib).toContain("install_dock_new_window_menu");
   });
 });
