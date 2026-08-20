@@ -44,5 +44,8 @@ describe("macOS Dock new-window menu", () => {
     expect(rust).not.toMatch(/fn open_new_window\s*\(/);
     expect(rust).toContain("fn on_dock_new_window");
     expect(rust).toContain("Allocated<AnyObject>");
+    expect(rust.match(/#\[unsafe\(method\(openNewWindow:\)\)\]/g)?.length).toBe(
+      1,
+    );
   });
 });

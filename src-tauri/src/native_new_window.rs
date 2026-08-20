@@ -47,7 +47,6 @@ mod macos {
             // from the Tauri command. Window create goes through
             // `create_empty_window` because a `pub` command in `lib.rs` hits E0255.
             #[unsafe(method(openNewWindow:))]
-            #[unsafe(method(openNewWindow:))]
             fn on_dock_new_window(&self, _sender: Option<&AnyObject>) {
                 if let Some(app) = DOCK_APP.get() {
                     let app = app.clone();
