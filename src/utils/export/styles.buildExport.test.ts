@@ -6,8 +6,11 @@ import {
 } from "./styles";
 
 describe("buildExportStyles", () => {
-  it("removes github-markdown h2 bottom border in export body", () => {
+  it("removes github-markdown heading bottom borders in export body", () => {
     const css = buildExportStyles("light");
+    expect(css).toMatch(
+      /\.export-document \.markdown-body h1\s*\{[^}]*border-bottom:\s*none/m,
+    );
     expect(css).toMatch(
       /\.export-document \.markdown-body h2\s*\{[^}]*border-bottom:\s*none/m,
     );
