@@ -32,14 +32,60 @@ function viewAt(doc: string, pos = doc.length): EditorView {
 }
 
 describe("markdownSlashInsertCompletion", () => {
-  it("offers a table picker on a line-start slash", () => {
+  it("offers the slash catalog on a line-start slash", () => {
     const result = completionAt("/");
     expect(result).not.toBeNull();
     expect(result?.from).toBe(0);
-    expect(result?.options[0]?.label).toBe("插入表格");
-    expect(result?.options.some((option) => option.detail === "3×3")).toBe(
-      true,
-    );
+    const labels = result?.options.map((option) => option.label) ?? [];
+    expect(labels[0]).toBe("插入表格");
+    expect(labels).toContain("插入提示");
+    expect(labels).toContain("插入流程图");
+    expect(labels).toContain("插入公式");
+    expect(labels).toContain("插入代码块");
+    expect(labels).toContain("嵌入笔记");
+    expect(labels).toContain("插入脚注");
+    expect(
+      result?.options.some((option) => /^\d+×\d+$/.test(option.detail ?? "")),
+    ).toBe(false);
+  });
+
+  it("inserts a warning callout from /警告", () => {
+    const result = completionAt("/警告");
+    expect(result?.options).toHaveLength(1);
+    const view = viewAt("/警告");
+    const apply = result?.options[0]?.apply;
+    expect(typeof apply).toBe("function");
+    if (typeof apply === "function") {
+      apply(view, result!.options[0]!, 0, 3);
+    }
+    expect(view.state.doc.toString()).toContain("> [!warning] 警告");
+    view.destroy();
+  });
+
+  it("inserts a footnote ref and definition", () => {
+    const result = completionAt("正文\n/脚注");
+    const view = viewAt("正文\n/脚注");
+    const apply = result?.options[0]?.apply;
+    expect(typeof apply).toBe("function");
+    if (typeof apply === "function") {
+      apply(view, result!.options[0]!, 3, 6);
+    }
+    const text = view.state.doc.toString();
+    expect(text).toContain("[^1]");
+    expect(text).toContain("[^1]: ");
+    expect(
+      view.state.sliceDoc(
+        view.state.selection.main.from,
+        view.state.selection.main.to,
+      ),
+    ).toBe("");
+    expect(
+      view.state.doc.sliceString(
+        view.state.selection.main.from - 2,
+        view.state.selection.main.from,
+      ),
+    ).toBe(": ");
+    view.destroy();
   });
 
   it("inserts a sized table from /3x4", () => {
