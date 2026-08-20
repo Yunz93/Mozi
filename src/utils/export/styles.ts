@@ -380,6 +380,8 @@ ${markdownStyleCssVariables}
     .export-document .markdown-body h1 {
       color: var(--mp-doc-heading-1);
       font-size: 1.6em;
+      border-bottom: none;
+      padding-bottom: 0;
     }
     .export-document .markdown-body h2 {
       color: var(--mp-doc-heading-2);
