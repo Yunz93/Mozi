@@ -12,20 +12,10 @@ import type {
 import type { EditorView } from "@codemirror/view";
 import { useAppStore } from "../../../store/appStore";
 import { t } from "../../../utils/i18n";
-import {
-  parseTableInsertSlashQuery,
-  TABLE_INSERT_DEFAULT_COLS,
-  TABLE_INSERT_DEFAULT_ROWS,
-} from "../../../utils/tableInsert";
+import { parseTableInsertSlashQuery } from "../../../utils/tableInsert";
 import { isInsideFencedCode, isInsideFrontmatter } from "./core";
 import { insertMarkdownTable, isInMarkdownTable } from "./tables";
 import { openTableInsertPicker } from "./tableInsertPicker";
-
-const PRESET_SIZES: Array<{ visualRows: number; cols: number }> = [
-  { visualRows: 3, cols: 3 },
-  { visualRows: 4, cols: 4 },
-  { visualRows: 5, cols: 3 },
-];
 
 function slashLineMatch(
   context: CompletionContext,
@@ -82,57 +72,29 @@ export function markdownSlashInsertCompletion(
   if (parsed.mode === "none") return null;
 
   const language = useAppStore.getState().settings.language;
-  const options: Completion[] = [];
-
-  if (parsed.mode === "sized") {
-    options.push({
-      label: t(language, "table_insertSized", {
-        rows: parsed.visualRows,
-        cols: parsed.cols,
-      }),
-      detail: `${parsed.visualRows}×${parsed.cols}`,
-      type: "function",
-      boost: 99,
-      apply: applySizedTable(parsed.visualRows, parsed.cols),
-    });
-  } else {
-    options.push({
-      label: t(language, "table_insert"),
-      detail: t(language, "table_insertPickerHint"),
-      type: "function",
-      boost: 99,
-      apply: applyTablePicker(),
-    });
-
-    if (!match.query.trim()) {
-      for (const preset of PRESET_SIZES) {
-        options.push({
-          label: t(language, "table_insertSized", {
-            rows: preset.visualRows,
-            cols: preset.cols,
-          }),
-          detail: `${preset.visualRows}×${preset.cols}`,
-          type: "function",
-          boost: 40,
-          apply: applySizedTable(preset.visualRows, preset.cols),
-        });
-      }
-    } else {
-      options.push({
-        label: t(language, "table_insertSized", {
-          rows: TABLE_INSERT_DEFAULT_ROWS,
-          cols: TABLE_INSERT_DEFAULT_COLS,
-        }),
-        detail: `${TABLE_INSERT_DEFAULT_ROWS}×${TABLE_INSERT_DEFAULT_COLS}`,
-        type: "function",
-        boost: 50,
-        apply: applySizedTable(
-          TABLE_INSERT_DEFAULT_ROWS,
-          TABLE_INSERT_DEFAULT_COLS,
-        ),
-      });
-    }
-  }
+  const options: Completion[] =
+    parsed.mode === "sized"
+      ? [
+          {
+            label: t(language, "table_insertSized", {
+              rows: parsed.visualRows,
+              cols: parsed.cols,
+            }),
+            detail: `${parsed.visualRows}×${parsed.cols}`,
+            type: "function",
+            boost: 99,
+            apply: applySizedTable(parsed.visualRows, parsed.cols),
+          },
+        ]
+      : [
+          {
+            label: t(language, "table_insert"),
+            detail: t(language, "table_insertPickerHint"),
+            type: "function",
+            boost: 99,
+            apply: applyTablePicker(),
+          },
+        ];
 
   return {
     from: match.from,

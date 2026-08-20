@@ -36,10 +36,15 @@ describe("markdownSlashInsertCompletion", () => {
     const result = completionAt("/");
     expect(result).not.toBeNull();
     expect(result?.from).toBe(0);
+    expect(result?.options).toHaveLength(1);
     expect(result?.options[0]?.label).toBe("插入表格");
-    expect(result?.options.some((option) => option.detail === "3×3")).toBe(
-      true,
-    );
+    expect(result?.options[0]?.detail).toBe("选择行列");
+  });
+
+  it("does not list preset sizes when typing a table alias", () => {
+    const result = completionAt("/表格");
+    expect(result?.options).toHaveLength(1);
+    expect(result?.options[0]?.label).toBe("插入表格");
   });
 
   it("inserts a sized table from /3x4", () => {
