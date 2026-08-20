@@ -46,7 +46,11 @@ import {
 } from "../livePreview";
 import type { LivePreviewContext } from "../livePreview";
 import { EMPTY_LIVE_PREVIEW_CONTEXT } from "../livePreview";
-import { scheduleLivePreviewMeasure } from "../livePreview/shared";
+import {
+  LIVE_PREVIEW_LAYOUT_SETTLE_MS,
+  requestLivePreviewRefresh,
+  scheduleLivePreviewMeasure,
+} from "../livePreview/shared";
 
 export { getEditorTooltipSpace };
 
@@ -239,16 +243,21 @@ export function useCodeMirror(
     });
     // Remounting widgets changes document height; keep the user's place.
     view.scrollDOM.scrollTop = scrollTop;
-    if (livePreviewEnabled) {
-      scheduleLivePreviewMeasure(view);
-      if (typeof document !== "undefined" && document.fonts?.ready) {
-        void document.fonts.ready.then(() => {
-          if (viewRef.current === view && view.dom.isConnected) {
-            scheduleLivePreviewMeasure(view);
-          }
-        });
-      }
+    if (!livePreviewEnabled) return undefined;
+    scheduleLivePreviewMeasure(view);
+    requestLivePreviewRefresh(view);
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (viewRef.current === view && view.dom.isConnected) {
+          scheduleLivePreviewMeasure(view);
+        }
+      });
     }
+    const settleTimer = window.setTimeout(() => {
+      if (viewRef.current !== view || !view.dom.isConnected) return;
+      requestLivePreviewRefresh(view);
+    }, LIVE_PREVIEW_LAYOUT_SETTLE_MS);
+    return () => window.clearTimeout(settleTimer);
   }, [compartments.livePreview, livePreviewEnabled]);
 
   useEffect(() => {

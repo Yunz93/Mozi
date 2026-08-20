@@ -4,7 +4,7 @@ import type {
   Extension,
   Transaction,
 } from "@codemirror/state";
-import { Range, StateField } from "@codemirror/state";
+import { Range, StateEffect, StateField } from "@codemirror/state";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import {
   Decoration,
@@ -237,6 +237,12 @@ export class ViewportDecorationWindow {
   }
 
   mark(view: Pick<EditorView, "visibleRanges" | "state">): void {
+    // Width-0 panes (Reading → Live) report no visible ranges. Treating that
+    // as the whole document locks the window so a later layout never rebuilds.
+    if (view.visibleRanges.length === 0) {
+      this.invalidate();
+      return;
+    }
     const padded = getPaddedVisibleRange(view, this.pad);
     this.from = padded.from;
     this.to = padded.to;
@@ -249,6 +255,46 @@ export class ViewportDecorationWindow {
 }
 
 /**
+ * Force Live Preview decorations to rebuild after a mode switch / pane resize.
+ * Viewport plugins otherwise keep a padded window from the pre-layout frame,
+ * so headings, quotes, and widgets can stay missing until the user types.
+ */
+export const livePreviewRefreshEffect = StateEffect.define<null>();
+
+/** Pane width CSS transition is 200ms; wait a bit longer for the last refresh. */
+export const LIVE_PREVIEW_LAYOUT_SETTLE_MS = 250;
+
+export function livePreviewRefreshRequested(
+  update: Pick<ViewUpdate, "transactions">,
+): boolean {
+  return (update.transactions ?? []).some((tr) =>
+    tr.effects.some((effect) => effect.is(livePreviewRefreshEffect)),
+  );
+}
+
+export function transactionHasLivePreviewRefresh(tr: Transaction): boolean {
+  return tr.effects.some((effect) => effect.is(livePreviewRefreshEffect));
+}
+
+const pendingRefreshViews = new WeakSet<EditorView>();
+
+/** Coalesce to one refresh dispatch on the next animation frame. */
+export function requestLivePreviewRefresh(view: EditorView): void {
+  if (typeof requestAnimationFrame !== "function") return;
+  if (!view.dom.isConnected) return;
+  if (pendingRefreshViews.has(view)) return;
+  pendingRefreshViews.add(view);
+  requestAnimationFrame(() => {
+    pendingRefreshViews.delete(view);
+    if (!view.dom.isConnected) return;
+    view.dispatch({
+      effects: livePreviewRefreshEffect.of(null),
+    });
+    scheduleLivePreviewMeasure(view);
+  });
+}
+
+/**
  * Combined rebuild gate for viewport-scoped plugins: content/selection changes
  * always rebuild; scroll only when the padded decoration window is exceeded.
  */
@@ -257,7 +303,10 @@ export function shouldRebuildLivePreviewDecorations(
   mode: "marks" | "widgets",
   window: ViewportDecorationWindow,
 ): boolean {
-  if (livePreviewShouldRebuild(update, mode)) {
+  if (
+    livePreviewRefreshRequested(update) ||
+    livePreviewShouldRebuild(update, mode)
+  ) {
     window.invalidate();
     return true;
   }
@@ -494,7 +543,10 @@ export function defineLivePreviewBlockDecorationField(options: {
         contextChanged = prevCtx !== nextCtx;
       }
 
-      const forceFull = contextChanged || options.rebuildOn?.(tr) === true;
+      const forceFull =
+        contextChanged ||
+        options.rebuildOn?.(tr) === true ||
+        transactionHasLivePreviewRefresh(tr);
 
       if (forceFull) {
         return normalizeBlockDecorationBuild(options.create(tr.state));
@@ -807,9 +859,11 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
 
     constructor(view: EditorView) {
       scheduleLivePreviewMeasure(view);
+      requestLivePreviewRefresh(view);
       queueMicrotask(() => {
         if (this.disposed || !view.dom.isConnected) return;
         scheduleLivePreviewMeasure(view);
+        requestLivePreviewRefresh(view);
       });
       if (typeof document !== "undefined" && document.fonts?.ready) {
         void document.fonts.ready.then(() => {
@@ -826,6 +880,7 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
         const width = view.scrollDOM.clientWidth;
         if (width === this.lastWidth) return;
         this.lastWidth = width;
+        requestLivePreviewRefresh(view);
         if (this.raf) return;
         this.raf = window.requestAnimationFrame(() => {
           this.raf = 0;
