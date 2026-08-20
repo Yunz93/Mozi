@@ -1,31 +1,29 @@
 /**
- * Line-start slash completions for inserting a Markdown table.
+ * Line-start slash completions for Markdown inserts that are awkward to type.
  *
- * `/` or `/表格` opens a size picker. `/3x4` / `/表格 3x4` inserts immediately.
+ * `/` lists table, callout, Mermaid, math, code, wiki embed, and footnote.
+ * `/3x4` still inserts a sized table immediately.
  */
 
-import type {
-  Completion,
-  CompletionContext,
-  CompletionResult,
+import {
+  startCompletion,
+  type Completion,
+  type CompletionContext,
+  type CompletionResult,
 } from "@codemirror/autocomplete";
+import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { useAppStore } from "../../../store/appStore";
 import { t } from "../../../utils/i18n";
 import {
-  parseTableInsertSlashQuery,
-  TABLE_INSERT_DEFAULT_COLS,
-  TABLE_INSERT_DEFAULT_ROWS,
-} from "../../../utils/tableInsert";
+  buildFootnoteInsert,
+  buildSlashInsertSnippet,
+  resolveSlashInsert,
+  type SlashInsertKind,
+} from "../../../utils/slashInsert";
 import { isInsideFencedCode, isInsideFrontmatter } from "./core";
 import { insertMarkdownTable, isInMarkdownTable } from "./tables";
 import { openTableInsertPicker } from "./tableInsertPicker";
-
-const PRESET_SIZES: Array<{ visualRows: number; cols: number }> = [
-  { visualRows: 3, cols: 3 },
-  { visualRows: 4, cols: 4 },
-  { visualRows: 5, cols: 3 },
-];
 
 function slashLineMatch(
   context: CompletionContext,
@@ -72,67 +70,113 @@ function applyTablePicker(): Completion["apply"] {
   };
 }
 
+function applySnippet(
+  kind: Exclude<SlashInsertKind, "table-picker" | "table-sized" | "footnote">,
+  startFollowupCompletion = false,
+): Completion["apply"] {
+  return (view, _completion, from, to) => {
+    const language = useAppStore.getState().settings.language;
+    const snippet = buildSlashInsertSnippet(kind, language);
+    const anchor = from + snippet.cursor;
+    view.dispatch({
+      changes: { from, to, insert: snippet.text },
+      selection:
+        snippet.select > 0
+          ? EditorSelection.range(anchor, anchor + snippet.select)
+          : EditorSelection.cursor(anchor),
+      scrollIntoView: true,
+      userEvent: "input",
+    });
+    if (startFollowupCompletion) {
+      requestAnimationFrame(() => startCompletion(view));
+    }
+  };
+}
+
+function applyFootnote(): Completion["apply"] {
+  return (view, _completion, from, to) => {
+    const doc = view.state.doc.toString();
+    const insert = buildFootnoteInsert(doc, from, to);
+    const cursor =
+      insert.definitionInsertFrom -
+      (to - from) +
+      insert.ref.length +
+      insert.definition.length;
+    view.dispatch({
+      changes: [
+        { from, to, insert: insert.ref },
+        { from: insert.definitionInsertFrom, insert: insert.definition },
+      ],
+      selection: { anchor: cursor },
+      scrollIntoView: true,
+      userEvent: "input",
+    });
+  };
+}
+
 export function markdownSlashInsertCompletion(
   context: CompletionContext,
 ): CompletionResult | null {
   const match = slashLineMatch(context);
   if (!match) return null;
 
-  const parsed = parseTableInsertSlashQuery(match.query);
-  if (parsed.mode === "none") return null;
+  const parsed = resolveSlashInsert(match.query);
+  if (parsed.length === 0) return null;
 
   const language = useAppStore.getState().settings.language;
-  const options: Completion[] = [];
-
-  if (parsed.mode === "sized") {
-    options.push({
-      label: t(language, "table_insertSized", {
-        rows: parsed.visualRows,
-        cols: parsed.cols,
-      }),
-      detail: `${parsed.visualRows}×${parsed.cols}`,
-      type: "function",
-      boost: 99,
-      apply: applySizedTable(parsed.visualRows, parsed.cols),
-    });
-  } else {
-    options.push({
-      label: t(language, "table_insert"),
-      detail: t(language, "table_insertPickerHint"),
-      type: "function",
-      boost: 99,
-      apply: applyTablePicker(),
-    });
-
-    if (!match.query.trim()) {
-      for (const preset of PRESET_SIZES) {
-        options.push({
-          label: t(language, "table_insertSized", {
-            rows: preset.visualRows,
-            cols: preset.cols,
-          }),
-          detail: `${preset.visualRows}×${preset.cols}`,
-          type: "function",
-          boost: 40,
-          apply: applySizedTable(preset.visualRows, preset.cols),
-        });
-      }
-    } else {
-      options.push({
+  const options: Completion[] = parsed.map((item, index) => {
+    const boost = 99 - index;
+    if (item.id === "table-sized" && item.tableSize) {
+      return {
         label: t(language, "table_insertSized", {
-          rows: TABLE_INSERT_DEFAULT_ROWS,
-          cols: TABLE_INSERT_DEFAULT_COLS,
+          rows: item.tableSize.visualRows,
+          cols: item.tableSize.cols,
         }),
-        detail: `${TABLE_INSERT_DEFAULT_ROWS}×${TABLE_INSERT_DEFAULT_COLS}`,
+        detail: `${item.tableSize.visualRows}×${item.tableSize.cols}`,
         type: "function",
-        boost: 50,
-        apply: applySizedTable(
-          TABLE_INSERT_DEFAULT_ROWS,
-          TABLE_INSERT_DEFAULT_COLS,
-        ),
-      });
+        boost,
+        apply: applySizedTable(item.tableSize.visualRows, item.tableSize.cols),
+      };
     }
-  }
+    if (item.id === "table-picker") {
+      return {
+        label: t(language, item.labelKey),
+        detail: item.detailKey ? t(language, item.detailKey) : undefined,
+        type: "function",
+        boost,
+        apply: applyTablePicker(),
+      };
+    }
+    if (item.id === "footnote") {
+      return {
+        label: t(language, item.labelKey),
+        detail: item.detailKey ? t(language, item.detailKey) : undefined,
+        type: "function",
+        boost,
+        apply: applyFootnote(),
+      };
+    }
+
+    if (item.id === "table-sized") {
+      return {
+        label: t(language, item.labelKey),
+        type: "function",
+        boost,
+        apply: applyTablePicker(),
+      };
+    }
+
+    return {
+      label: t(language, item.labelKey),
+      detail: item.detailKey ? t(language, item.detailKey) : undefined,
+      type: "function",
+      boost,
+      apply: applySnippet(
+        item.id,
+        item.id === "code-fence" || item.id === "wiki-embed",
+      ),
+    };
+  });
 
   return {
     from: match.from,
