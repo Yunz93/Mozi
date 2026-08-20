@@ -129,4 +129,10 @@ describe("live preview / reading visual parity", () => {
       /\.cm-fenced-code-line \.tok-inline-code[\s\S]*?background:\s*none/s,
     );
   });
+
+  it("underlines live URL tokens like markdown links", () => {
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\] \.tok-link,[\s\S]*?\[data-live-preview="true"\] \.tok-url,/s,
+    );
+  });
 });
