@@ -36,6 +36,8 @@ describe("macOS Dock new-window menu", () => {
     expect(rust).not.toContain("crate::open_new_window");
     expect(lib).toContain("install_dock_new_window_menu");
     expect(lib).toMatch(/async fn create_empty_window/);
+    expect(lib).not.toMatch(/pub(?:\(crate\))?\s+async fn open_new_window/);
+    expect(lib).toMatch(/\nasync fn open_new_window\(/);
   });
 
   it("does not reuse the tauri command name for the ObjC action", () => {

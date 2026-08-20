@@ -272,9 +272,9 @@ async fn open_file_in_new_window(
 
 /// Shared window-create path for the IPC command and native Dock menu.
 ///
-/// Must not be a `#[tauri::command]`: calling those from another module
-/// reimports `__cmd__open_new_window` / `__tauri_command_name_open_new_window`
-/// and fails rustc with E0255 on macOS.
+/// The Tauri command cannot be `pub` in `lib.rs`: `#[tauri::command]` glue
+/// reimports `__cmd__open_new_window` and fails rustc with E0255. Dock
+/// therefore calls this ordinary helper instead of the command.
 pub(crate) async fn create_empty_window(app: tauri::AppHandle) -> Result<(), String> {
     let label = next_window_label("win")?;
     let url = tauri::WebviewUrl::App("index.html".into());
@@ -283,8 +283,9 @@ pub(crate) async fn create_empty_window(app: tauri::AppHandle) -> Result<(), Str
 }
 
 /// Open an empty secondary window (restores the last knowledge base on boot).
+/// Must stay private in `lib.rs` — see `create_empty_window`.
 #[tauri::command]
-pub(crate) async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
+async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     create_empty_window(app).await
 }
 
