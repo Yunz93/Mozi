@@ -15,6 +15,7 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
+import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   defineLivePreviewBlockDecorationField,
@@ -29,6 +30,9 @@ import {
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
+
+/** Hide `- ` / `* ` / `1. ` on task lines so only the checkbox remains. */
+const hideTaskListMarkDecoration = Decoration.replace({});
 
 class BulletWidget extends WidgetType {
   constructor(
@@ -78,6 +82,33 @@ export function livePreviewListMarkerReplaceFrom(
 ): number {
   const indent = textBeforeMark.match(/[ \t]+$/);
   return indent ? markFrom - indent[0].length : markFrom;
+}
+
+function subtreeHasName(node: SyntaxNode | null, name: string): boolean {
+  let current = node;
+  while (current) {
+    if (current.name === name) return true;
+    if (subtreeHasName(current.firstChild, name)) return true;
+    current = current.nextSibling;
+  }
+  return false;
+}
+
+function listMarkIsTaskItem(
+  state: EditorState,
+  listMark: SyntaxNodeRef,
+  lineTo: number,
+  markTo: number,
+): boolean {
+  let item: SyntaxNode | null = listMark.node.parent;
+  while (item && item.name !== "ListItem") {
+    item = item.parent;
+  }
+  if (item && subtreeHasName(item.firstChild, "TaskMarker")) {
+    return true;
+  }
+  const after = state.doc.sliceString(markTo, Math.min(lineTo, markTo + 6));
+  return /^\s*\[[ xX]\]/.test(after);
 }
 
 /** 1 = top-level list, 2 = nested, … */
@@ -181,10 +212,6 @@ export function buildLivePreviewListMarkerDecorations(
       if (hasSkipAncestor(state, from)) return;
 
       const markText = state.doc.sliceString(from, to).trim();
-      // Skip task list lines — TaskMarker widget owns them.
-      const after = state.doc.sliceString(to, Math.min(line.to, to + 4));
-      if (/^\s*\[[ xX]\]/.test(after)) return;
-
       const ordered = /^\d+[.)]?$/.test(markText);
       const label = markText.replace(/[.)]$/, "");
       // Include trailing space after marker when present.
@@ -198,6 +225,7 @@ export function buildLivePreviewListMarkerDecorations(
         state.doc.sliceString(line.from, from),
       );
       const level = livePreviewListNestLevel(node.node);
+      const isTaskItem = listMarkIsTaskItem(state, node, line.to, to);
 
       if (!decoratedLines.has(line.from)) {
         decoratedLines.add(line.from);
@@ -211,9 +239,11 @@ export function buildLivePreviewListMarkerDecorations(
       ranges.push({
         from: replaceFrom,
         to: end,
-        deco: Decoration.replace({
-          widget: new BulletWidget(ordered, label),
-        }),
+        deco: isTaskItem
+          ? hideTaskListMarkDecoration
+          : Decoration.replace({
+              widget: new BulletWidget(ordered, label),
+            }),
       });
     },
   });

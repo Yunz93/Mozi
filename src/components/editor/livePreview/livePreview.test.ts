@@ -11,7 +11,10 @@ import {
 } from "./hideFormattingMarks";
 import { buildLivePreviewImageDecorations } from "./images";
 import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
-import { buildLivePreviewTaskDecorations } from "./taskCheckboxes";
+import {
+  buildLivePreviewTaskDecorations,
+  livePreviewTaskCheckboxes,
+} from "./taskCheckboxes";
 import { buildLivePreviewWikiDecorations, livePreviewWiki } from "./wiki";
 import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
 import {
@@ -867,6 +870,65 @@ describe("live preview hide formatting", () => {
     });
     expect(widgetSlices.every((slice) => !slice.includes(">"))).toBe(true);
     expect(widgetSlices.some((slice) => slice.includes("-"))).toBe(true);
+  });
+
+  it("hides the list hyphen on inactive task items instead of drawing a bullet", () => {
+    const doc =
+      "- [ ] 产品详情运动控制映射 Tab 展示版本卡片\n  - [ ] nested\n\naway";
+    const view = mount(doc, doc.length - 1, [
+      livePreviewListMarkers,
+      livePreviewTaskCheckboxes,
+    ]);
+    const listDeco = buildLivePreviewListMarkerDecorations(view);
+    const hiddenMarks: string[] = [];
+    let bulletCount = 0;
+    listDeco.between(0, view.state.doc.length, (from, to, value) => {
+      if (value.spec.widget) {
+        bulletCount += 1;
+        return;
+      }
+      if (from < to) {
+        hiddenMarks.push(view.state.doc.sliceString(from, to));
+      }
+    });
+    expect(bulletCount).toBe(0);
+    expect(hiddenMarks).toEqual(["- ", "  - "]);
+
+    const taskDeco = buildLivePreviewTaskDecorations(view);
+    let taskCount = 0;
+    taskDeco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) taskCount += 1;
+    });
+    expect(taskCount).toBe(2);
+
+    const lines = Array.from(view.dom.querySelectorAll(".cm-line"));
+    expect(lines[0]?.querySelector(".cm-live-preview-task")).not.toBeNull();
+    expect(lines[0]?.querySelector(".cm-live-preview-list-marker")).toBeNull();
+    expect(lines[0]?.textContent ?? "").not.toMatch(/^\s*-/);
+    expect(lines[1]?.textContent ?? "").not.toMatch(/-/);
+  });
+
+  it("still hides the hyphen for checked and ordered task items", () => {
+    const doc = "- [x] done\n1. [ ] numbered\n\naway";
+    const view = mount(doc, doc.length - 1, [
+      livePreviewListMarkers,
+      livePreviewTaskCheckboxes,
+    ]);
+    const listDeco = buildLivePreviewListMarkerDecorations(view);
+    const hiddenMarks: string[] = [];
+    listDeco.between(0, view.state.doc.length, (from, to, value) => {
+      if (!value.spec.widget && from < to) {
+        hiddenMarks.push(view.state.doc.sliceString(from, to));
+      }
+    });
+    expect(hiddenMarks).toEqual(["- ", "1. "]);
+    expect(view.dom.querySelectorAll(".cm-live-preview-task")).toHaveLength(2);
+    for (const line of Array.from(view.dom.querySelectorAll(".cm-line")).slice(
+      0,
+      2,
+    )) {
+      expect(line.textContent ?? "").not.toMatch(/^\s*[-*\d]/);
+    }
   });
 });
 
