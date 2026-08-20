@@ -167,6 +167,8 @@
   /* Keep editor gutter inset + code-block chrome padding on the line (CM measures this). */
   padding-left: calc(var(--pane-content-px) + 1.1rem) !important;
   padding-right: calc(var(--pane-content-px) + 1.1rem) !important;
+  /* Contain the overlay's negative z-index so scroller overflow cannot clip it. */
+  isolation: isolate;
 }
 
 .editor-pane-layout .cm-fenced-code-line::before {
@@ -177,12 +179,9 @@
   top: 0;
   bottom: 0;
   pointer-events: none;
-  /* Selection is drawn behind line backgrounds; keep fill translucent so it stays visible. */
-  background-color: color-mix(
-    in srgb,
-    var(--editor-code-block-bg) 55%,
-    transparent
-  );
+  /* Same fill as Reading `pre`. Sit behind glyphs inside the isolated line. */
+  z-index: -1;
+  background-color: var(--editor-code-block-bg);
   border-left: 1px solid var(--editor-code-block-border);
   border-right: 1px solid var(--editor-code-block-border);
 }
@@ -210,6 +209,23 @@
 
 .editor-pane-layout .cm-fenced-code-line-start.cm-fenced-code-line-end::before {
   border-radius: 1rem;
+}
+
+/* CM drawSelection sits behind this opaque chrome; show the range on glyphs. */
+.editor-pane-layout .cm-fenced-code-line::selection,
+.editor-pane-layout .cm-fenced-code-line *::selection {
+  background: var(--mp-doc-selection, rgba(168, 85, 247, 0.18)) !important;
+}
+
+/* Fenced code is also tagged `monospace`; do not paint inline-code pills inside. */
+.editor-pane-layout .cm-fenced-code-line .tok-inline-code,
+.editor-pane-layout .cm-fenced-code-line .mp-tok-inline-code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
 }
 
 .editor-pane-layout .cm-fenced-code-line-body {

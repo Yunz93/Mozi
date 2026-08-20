@@ -99,14 +99,32 @@ describe("markdownListDecorations", () => {
 });
 
 describe("editor fenced-code selection styles", () => {
-  it("keeps fenced code backgrounds translucent for drawSelection", () => {
+  it("keeps fenced code chrome as opaque as Reading", () => {
     const css = readFileSync(
       resolve(__dirname, "../../styles/editor.css"),
       "utf8",
     );
 
     expect(css).toMatch(
-      /\.editor-pane-layout\s+\.cm-fenced-code-line::before\s*\{[^}]*color-mix\([^)]*var\(--editor-code-block-bg\)[^)]*transparent/s,
+      /\.editor-pane-layout\s+\.cm-fenced-code-line\s*\{[^}]*isolation:\s*isolate/s,
+    );
+    expect(css).toMatch(
+      /\.editor-pane-layout\s+\.cm-fenced-code-line::before\s*\{[^}]*background-color:\s*var\(--editor-code-block-bg\)/s,
+    );
+    expect(css).toMatch(
+      /\.cm-fenced-code-line::before\s*\{[^}]*z-index:\s*-1/s,
+    );
+    expect(css).not.toMatch(
+      /\.cm-fenced-code-line::before\s*\{[^}]*z-index:\s*-2/s,
+    );
+    expect(css).not.toMatch(
+      /\.cm-fenced-code-line::before\s*\{[^}]*color-mix\([^)]*--editor-code-block-bg/s,
+    );
+    expect(css).toMatch(
+      /\.cm-fenced-code-line::selection[\s\S]*?--mp-doc-selection/s,
+    );
+    expect(css).toMatch(
+      /\.cm-fenced-code-line \.tok-inline-code[\s\S]*?background:\s*none/s,
     );
     expect(css).toMatch(
       /\.editor-pane-layout\s+\.cm-fenced-code-line::before\s*\{[^}]*left:\s*var\(--pane-content-px\)/s,
