@@ -35,4 +35,10 @@ describe("macOS Dock new-window menu", () => {
     expect(rust).toContain("crate::open_new_window");
     expect(lib).toContain("install_dock_new_window_menu");
   });
+
+  it("does not reuse the tauri command name for the ObjC action", () => {
+    expect(rust).not.toMatch(/fn open_new_window\s*\(/);
+    expect(rust).toContain("fn on_dock_new_window");
+    expect(rust).toContain("Allocated<AnyObject>");
+  });
 });

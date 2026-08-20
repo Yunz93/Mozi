@@ -31,7 +31,7 @@ static DOCK_APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 #[cfg(target_os = "macos")]
 mod macos {
     use super::DOCK_APP;
-    use objc2::rc::Retained;
+    use objc2::rc::{Allocated, Retained};
     use objc2::runtime::AnyObject;
     use objc2::{class, define_class, msg_send, sel, ClassType, MainThreadMarker, MainThreadOnly};
     use objc2_foundation::{NSObject, NSObjectProtocol, NSString};
@@ -43,8 +43,10 @@ mod macos {
         struct DockMenuTarget;
 
         impl DockMenuTarget {
+            // Must not be named `open_new_window`: `define_class!` would emit the
+            // same `__cmd__open_new_window` macros as `#[tauri::command]`.
             #[unsafe(method(openNewWindow:))]
-            fn open_new_window(&self, _sender: Option<&AnyObject>) {
+            fn on_dock_new_window(&self, _sender: Option<&AnyObject>) {
                 if let Some(app) = DOCK_APP.get() {
                     let app = app.clone();
                     tauri::async_runtime::spawn(async move {
@@ -70,8 +72,9 @@ mod macos {
 
         let title = NSString::from_str(super::native_new_window_title_from_env());
         let key = NSString::from_str("");
+        // `init*` requires `Allocated<T>` from `alloc`, not a raw `*mut AnyObject`.
         let item: Retained<AnyObject> = unsafe {
-            let alloc: *mut AnyObject = msg_send![class!(NSMenuItem), alloc];
+            let alloc: Allocated<AnyObject> = msg_send![class!(NSMenuItem), alloc];
             msg_send![
                 alloc,
                 initWithTitle: &*title,
@@ -84,7 +87,10 @@ mod macos {
             let _: () = msg_send![&*item, setEnabled: true];
         }
 
-        let menu: Retained<AnyObject> = unsafe { msg_send![class!(NSMenu), new] };
+        let menu: Retained<AnyObject> = unsafe {
+            let alloc: Allocated<AnyObject> = msg_send![class!(NSMenu), alloc];
+            msg_send![alloc, init]
+        };
         unsafe {
             let _: () = msg_send![&*menu, setAutoenablesItems: false];
             let _: () = msg_send![&*menu, addItem: &*item];
