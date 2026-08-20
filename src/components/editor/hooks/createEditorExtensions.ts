@@ -46,6 +46,7 @@ import { handleStructuredPaste } from "../behavior/input";
 import { markdownFenceLanguageCompletion } from "../behavior/fenceLanguageCompletion";
 import { markdownSlashInsertCompletion } from "../behavior/slashInsertCompletion";
 import { markdownFencedCodeInputHandler } from "../behavior/fencedCodeInput";
+import { createRefocusPointerSelectionExtension } from "../behavior/refocusPointerSelection";
 import {
   frontmatterDecorations,
   fencedCodeDecorations,
@@ -215,6 +216,7 @@ export function createEditorExtensions(
     ...wrapEditorPreferenceExtensions(preferenceCompartments, preferences),
     compartments.markdown.of(createEditorMarkdownLanguage()),
     drawSelection(),
+    createRefocusPointerSelectionExtension(),
     frontmatterDecorations,
     fencedCodeDecorations,
     markdownListDecorations,
