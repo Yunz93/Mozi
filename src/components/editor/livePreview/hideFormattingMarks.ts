@@ -404,6 +404,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     textDecoration: "underline",
     textDecorationThickness: "1.5px",
     textUnderlineOffset: "0.12em",
+    textDecorationSkipInk: "none",
+    textDecorationSkip: "none",
     cursor: "pointer",
   },
   ".cm-live-preview-wiki.is-unresolved": {
@@ -415,6 +417,8 @@ export const livePreviewTheme = EditorView.baseTheme({
     textDecoration: "underline",
     textDecorationThickness: "1.5px",
     textUnderlineOffset: "0.12em",
+    textDecorationSkipInk: "none",
+    textDecorationSkip: "none",
     cursor: "pointer",
   },
   ".cm-live-preview-table-wrap": {

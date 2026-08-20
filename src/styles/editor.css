@@ -1331,11 +1331,26 @@
 }
 
 .editor-pane-layout[data-live-preview="true"] .tok-link,
-.editor-pane-layout[data-live-preview="true"] .mp-tok-link {
+.editor-pane-layout[data-live-preview="true"] .mp-tok-link,
+.editor-pane-layout[data-live-preview="true"] .tok-url,
+.editor-pane-layout[data-live-preview="true"] .cm-md-link-dest {
   color: var(--mp-doc-link, var(--mp-doc-accent, #0f9aa8));
   text-decoration: underline;
   text-decoration-thickness: 1.5px;
   text-underline-offset: 0.12em;
+  /* Keep `/` `.` `-` in URLs on the same stroke (WebKit skip-ink). */
+  text-decoration-skip-ink: none;
+  text-decoration-skip: none;
+}
+
+/* If highlight tokens nest inside the dest mark, underline only the wrapper. */
+.editor-pane-layout[data-live-preview="true"] .cm-md-link-dest .tok-link,
+.editor-pane-layout[data-live-preview="true"] .cm-md-link-dest .mp-tok-link,
+.editor-pane-layout[data-live-preview="true"] .cm-md-link-dest .tok-url,
+.editor-pane-layout[data-live-preview="true"]
+  .cm-md-link-dest
+  .tok-punctuation {
+  text-decoration: none;
 }
 
 /* Plain `>` quotes: Reading blockquote chrome on CM lines.

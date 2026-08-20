@@ -14,6 +14,7 @@ import {
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
 import { collectMarkdownLinkRanges } from "../../../utils/markdownInlineRanges";
+import { bindLivePreviewWidgetModClick } from "./clickableLinks";
 import {
   collectVisibleWikiRanges,
   getLivePreviewDecorationRange,
@@ -48,23 +49,9 @@ class MarkdownLinkWidget extends WidgetType {
     el.href = this.href;
     el.textContent = this.label || this.href;
     el.setAttribute("contenteditable", "false");
-    el.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    bindLivePreviewWidgetModClick(el, view, this.from, () => {
       const ctx = view.state.facet(livePreviewContextFacet);
       void ctx.onOpenLink?.(this.href);
-    });
-    el.addEventListener("mousedown", (event) => {
-      // Keep selection from jumping into hidden source mid-click.
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const pos = Math.max(0, Math.min(this.from, view.state.doc.length));
-      view.focus();
-      view.dispatch({
-        selection: { anchor: pos },
-        scrollIntoView: false,
-      });
     });
     return el;
   }

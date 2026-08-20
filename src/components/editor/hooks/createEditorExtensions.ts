@@ -59,6 +59,7 @@ import {
 } from "../livePreview";
 import type { LivePreviewContext } from "../livePreview";
 import { clearPendingEditorRangeFocus } from "../../../utils/editorSelectionBridge";
+import { tryOpenLivePreviewLinkOnModClick } from "../livePreview/clickableLinks";
 import { cancelPendingLivePreviewReveals } from "../livePreview/shared";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
@@ -229,11 +230,14 @@ export function createEditorExtensions(
     markdownDestinationHighlight,
     compartments.placeholder.of(cmPlaceholder(placeholder)),
     EditorView.domEventHandlers({
-      mousedown: () => {
+      mousedown: (event, view) => {
         // User intent wins over stale outline/search focus requests and
         // deferred Live Preview image/wiki click-to-reveal selections.
         clearPendingEditorRangeFocus();
         cancelPendingLivePreviewReveals();
+        if (tryOpenLivePreviewLinkOnModClick(event, view)) {
+          return true;
+        }
         return false;
       },
       scroll: (() => {
