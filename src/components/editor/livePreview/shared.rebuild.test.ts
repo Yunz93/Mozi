@@ -9,6 +9,7 @@ import {
   shouldRebuildLivePreviewDecorations,
   ViewportDecorationWindow,
   getLivePreviewDecorationRange,
+  livePreviewRefreshEffect,
 } from "./shared";
 
 describe("livePreviewShouldRebuild", () => {
@@ -116,6 +117,48 @@ describe("ViewportDecorationWindow", () => {
       (view.visibleRanges[0]?.to ?? 0) - (view.visibleRanges[0]?.from ?? 0),
     );
 
+    view.destroy();
+    parent.remove();
+  });
+
+  it("stays invalid when the view has no visible ranges yet", () => {
+    const window = new ViewportDecorationWindow();
+    window.mark({
+      visibleRanges: [],
+      state: { doc: { length: 80 } },
+    } as never);
+    expect(
+      window.needsUpdate({
+        visibleRanges: [{ from: 0, to: 20 }],
+        state: { doc: { length: 80 } },
+      } as never),
+    ).toBe(true);
+  });
+
+  it("rebuilds when a live-preview refresh effect is dispatched", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({ doc: "hello world" }),
+      parent,
+    });
+    const window = new ViewportDecorationWindow();
+    window.mark(view);
+    const tr = view.state.update({
+      effects: livePreviewRefreshEffect.of(null),
+    });
+    const shim = {
+      docChanged: false,
+      viewportChanged: false,
+      selectionSet: false,
+      startState: view.state,
+      state: tr.state,
+      view,
+      transactions: [tr],
+    } as never;
+    expect(shouldRebuildLivePreviewDecorations(shim, "marks", window)).toBe(
+      true,
+    );
     view.destroy();
     parent.remove();
   });
