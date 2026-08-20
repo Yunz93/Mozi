@@ -140,6 +140,34 @@ function addGfmTableRule(service: TurndownService): void {
 
 let turndownService: TurndownService | null = null;
 
+/**
+ * Turndown's default escape turns every `\` into `\\`. That is correct for a
+ * few Markdown edge cases, but it doubles Windows paths, TeX, and shell line
+ * continuations when pasting HTML from a browser. Keep the other Markdown
+ * escapes; leave backslashes as typed.
+ */
+const MARKDOWN_ESCAPES_KEEPING_BACKSLASH: Array<[RegExp, string]> = [
+  [/\*/g, "\\*"],
+  [/^-/g, "\\-"],
+  [/^\+ /g, "\\+ "],
+  [/^(=+)/g, "\\$1"],
+  [/^(#{1,6}) /g, "\\$1 "],
+  [/`/g, "\\`"],
+  [/^~~~/g, "\\~~~"],
+  [/\[/g, "\\["],
+  [/\]/g, "\\]"],
+  [/^>/g, "\\>"],
+  [/_/g, "\\_"],
+  [/^(\d+)\. /g, "$1\\. "],
+];
+
+function escapeMarkdownKeepingBackslash(value: string): string {
+  return MARKDOWN_ESCAPES_KEEPING_BACKSLASH.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    value,
+  );
+}
+
 function getTurndownService(): TurndownService {
   if (!turndownService) {
     turndownService = new TurndownService({
@@ -150,6 +178,7 @@ function getTurndownService(): TurndownService {
       strongDelimiter: "**",
     });
     addGfmTableRule(turndownService);
+    turndownService.escape = escapeMarkdownKeepingBackslash;
   }
   return turndownService;
 }

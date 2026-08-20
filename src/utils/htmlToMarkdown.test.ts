@@ -60,4 +60,29 @@ describe("convertHtmlToMarkdown", () => {
     expect(markdown).toContain("| Outer |");
     expect(markdown).not.toContain("| inner |");
   });
+
+  it("does not double backslashes when converting pasted HTML", () => {
+    expect(
+      convertHtmlToMarkdown(
+        "<p>curl https://maasapi.robbyant.com/v1/depth/generations \\</p>",
+      ),
+    ).toBe("curl https://maasapi.robbyant.com/v1/depth/generations \\");
+    expect(convertHtmlToMarkdown("<p>C:\\Users\\test</p>")).toBe(
+      "C:\\Users\\test",
+    );
+  });
+
+  it("still escapes markdown punctuation other than backslash", () => {
+    expect(convertHtmlToMarkdown("<p>hello *world*</p>")).toBe(
+      "hello \\*world\\*",
+    );
+  });
+
+  it("keeps a single backslash inside fenced HTML code", () => {
+    expect(
+      convertHtmlToMarkdown(
+        "<pre><code>curl https://example.com \\\n  -H x</code></pre>",
+      ),
+    ).toBe("```\ncurl https://example.com \\\n  -H x\n```");
+  });
 });

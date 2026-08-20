@@ -10,7 +10,6 @@
 import type { MutableRefObject } from "react";
 import {
   Compartment,
-  EditorSelection,
   EditorState,
   type Extension,
   Prec,
@@ -33,7 +32,6 @@ import {
 import { history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting } from "@codemirror/language";
 import { createEditorMarkdownLanguage } from "../editorMarkdown";
-import { convertHtmlToMarkdown } from "../../../utils/htmlToMarkdown";
 import {
   createMarkdownKeyBindings,
   getStrictOrderedListNormalizationChanges,
@@ -42,6 +40,7 @@ import {
   defaultKeymapWithoutEnter,
   editorImeGuardPlugin,
 } from "../behavior/imeGuard";
+import { tryConvertHtmlPaste } from "../behavior/htmlPaste";
 import { handleStructuredPaste } from "../behavior/input";
 import { markdownFenceLanguageCompletion } from "../behavior/fenceLanguageCompletion";
 import { markdownSlashInsertCompletion } from "../behavior/slashInsertCompletion";
@@ -124,30 +123,6 @@ function clipboardHasImage(event: ClipboardEvent): boolean {
   return Array.from(event.clipboardData?.items ?? []).some((item) =>
     item.type.startsWith("image/"),
   );
-}
-
-function tryConvertHtmlPaste(view: EditorView, event: ClipboardEvent): boolean {
-  const html = event.clipboardData?.getData("text/html")?.trim();
-  if (!html) return false;
-
-  const markdownText = convertHtmlToMarkdown(html);
-  if (!markdownText) return false;
-
-  const selection = view.state.selection.main;
-  event.preventDefault();
-  view.dispatch(
-    view.state.update({
-      changes: {
-        from: selection.from,
-        to: selection.to,
-        insert: markdownText,
-      },
-      selection: EditorSelection.cursor(selection.from + markdownText.length),
-      scrollIntoView: true,
-      userEvent: "input.paste",
-    }),
-  );
-  return true;
 }
 
 export function createEditorExtensions(
