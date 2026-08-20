@@ -43,14 +43,15 @@ mod macos {
         struct DockMenuTarget;
 
         impl DockMenuTarget {
-            // Must not be named `open_new_window`: `define_class!` would emit the
-            // same `__cmd__open_new_window` macros as `#[tauri::command]`.
+            // Must not be named `open_new_window`: keep the action distinct
+            // from the Tauri command. Window create goes through
+            // `create_empty_window` because a `pub` command in `lib.rs` hits E0255.
             #[unsafe(method(openNewWindow:))]
             fn on_dock_new_window(&self, _sender: Option<&AnyObject>) {
                 if let Some(app) = DOCK_APP.get() {
                     let app = app.clone();
                     tauri::async_runtime::spawn(async move {
-                        if let Err(error) = crate::open_new_window(app).await {
+                        if let Err(error) = crate::create_empty_window(app).await {
                             log::error!("Failed to open new window from Dock menu: {error}");
                         }
                     });
