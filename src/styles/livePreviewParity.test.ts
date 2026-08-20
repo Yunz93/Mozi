@@ -72,6 +72,25 @@ describe("live preview / reading visual parity", () => {
     );
   });
 
+  it("draws a continuous live-preview link underline through URL punctuation", () => {
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\][\s\S]*?\.cm-md-link-dest\s*\{[^}]*text-decoration-skip-ink:\s*none/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\][\s\S]*?\.cm-md-link-dest\s*\{[^}]*text-decoration-skip:\s*none/s,
+    );
+    const theme = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/components/editor/livePreview/hideFormattingMarks.ts",
+      ),
+      "utf8",
+    );
+    expect(theme).toMatch(
+      /\.cm-live-preview-link":\s*\{[^}]*textDecorationSkipInk:\s*"none"/s,
+    );
+  });
+
   it("indents inactive nested live list lines beyond the parent marker", () => {
     expect(editorCss).toMatch(
       /\[data-live-preview="true"\]\s+\.cm-live-preview-list-level-2\s*\{[^}]*padding-left:\s*calc\(\s*var\(--pane-content-px\)\s*\+\s*var\(--mp-live-list-step\)/s,

@@ -18,7 +18,7 @@ import {
 } from "../../utils/markdownInlineRanges";
 
 const destinationMark = Decoration.mark({
-  class: "tok-link mp-tok-link",
+  class: "tok-link mp-tok-link cm-md-link-dest",
 });
 
 export function buildSpacedDestinationDecorations(

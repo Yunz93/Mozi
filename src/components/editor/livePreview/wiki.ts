@@ -38,6 +38,7 @@ import {
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewWikiQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
+import { bindLivePreviewWidgetModClick } from "./clickableLinks";
 import {
   collectWikiLinkRanges,
   collectChangedRanges,
@@ -94,20 +95,7 @@ class WikiLinkWidget extends WidgetType {
     el.href = "#";
     el.setAttribute("contenteditable", "false");
     el.textContent = this.label;
-    el.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const pos = Math.max(0, Math.min(this.from, view.state.doc.length));
-      view.focus();
-      view.dispatch({
-        selection: { anchor: pos },
-        scrollIntoView: false,
-      });
-    });
-    el.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    bindLivePreviewWidgetModClick(el, view, this.from, () => {
       const ctx = view.state.facet(livePreviewContextFacet);
       void ctx.onOpenWiki?.(this.target);
     });

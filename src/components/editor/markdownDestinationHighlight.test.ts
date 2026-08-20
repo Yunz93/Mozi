@@ -31,6 +31,11 @@ describe("markdownDestinationHighlight", () => {
     expect(marked).toBe(
       "https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M 記-1.png",
     );
+    let destClass = "";
+    deco.between(0, doc.length, (_from, _to, value) => {
+      destClass = String(value.spec.class ?? "");
+    });
+    expect(destClass).toContain("cm-md-link-dest");
   });
 
   it("marks a CJK destination after a leading space in the parens", () => {
