@@ -95,10 +95,19 @@ describe("live preview / reading visual parity", () => {
       /--editor-code-block-bg:\s*var\(--mp-doc-code-bg/,
     );
     expect(editorCss).toMatch(
+      /\.cm-fenced-code-line\s*\{[^}]*isolation:\s*isolate/s,
+    );
+    expect(editorCss).toMatch(
       /\.cm-fenced-code-line::before\s*\{[^}]*background-color:\s*var\(--editor-code-block-bg\)/s,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-fenced-code-line::before\s*\{[^}]*z-index:\s*-1/s,
     );
     expect(editorCss).not.toMatch(
       /\.cm-fenced-code-line::before\s*\{[^}]*color-mix\([^)]*--editor-code-block-bg/s,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-fenced-code-line \.tok-inline-code[\s\S]*?background:\s*none/s,
     );
   });
 });
