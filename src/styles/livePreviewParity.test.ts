@@ -89,4 +89,16 @@ describe("live preview / reading visual parity", () => {
       /\[data-live-preview="true"\][\s\S]*?\.cm-live-preview-mermaid[\s\S]*?\.mermaid\s*>\s*svg\s*\{[^}]*max-width:\s*none !important/s,
     );
   });
+
+  it("uses the Reading code-block fill for live/source fences", () => {
+    expect(editorCss).toMatch(
+      /--editor-code-block-bg:\s*var\(--mp-doc-code-bg/,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-fenced-code-line::before\s*\{[^}]*background-color:\s*var\(--editor-code-block-bg\)/s,
+    );
+    expect(editorCss).not.toMatch(
+      /\.cm-fenced-code-line::before\s*\{[^}]*color-mix\([^)]*--editor-code-block-bg/s,
+    );
+  });
 });

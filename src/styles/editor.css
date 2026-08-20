@@ -177,14 +177,12 @@
   top: 0;
   bottom: 0;
   pointer-events: none;
-  /* Selection is drawn behind line backgrounds; keep fill translucent so it stays visible. */
-  background-color: color-mix(
-    in srgb,
-    var(--editor-code-block-bg) 55%,
-    transparent
-  );
+  /* Same fill as Reading `pre`. Sit behind CM's selection layer (z-index: -1)
+     so an opaque chrome still shows the selected range. */
+  background-color: var(--editor-code-block-bg);
   border-left: 1px solid var(--editor-code-block-border);
   border-right: 1px solid var(--editor-code-block-border);
+  z-index: -2;
 }
 
 .editor-pane-layout .cm-fenced-code-line-start {
