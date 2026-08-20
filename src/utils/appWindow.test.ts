@@ -30,10 +30,12 @@ describe("macOS Dock new-window menu", () => {
     expect(rust).toContain('"新建窗口"');
   });
 
-  it("installs a Dock menu that calls open_new_window", () => {
+  it("installs a Dock menu that creates a window without invoking the Tauri command", () => {
     expect(rust).toContain("setDockMenu");
-    expect(rust).toContain("crate::open_new_window");
+    expect(rust).toContain("crate::create_empty_window");
+    expect(rust).not.toContain("crate::open_new_window");
     expect(lib).toContain("install_dock_new_window_menu");
+    expect(lib).toMatch(/async fn create_empty_window/);
   });
 
   it("does not reuse the tauri command name for the ObjC action", () => {

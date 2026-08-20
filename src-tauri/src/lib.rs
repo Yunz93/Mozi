@@ -270,13 +270,22 @@ async fn open_file_in_new_window(
     Ok(())
 }
 
-/// Open an empty secondary window (restores the last knowledge base on boot).
-#[tauri::command]
-pub(crate) async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
+/// Shared window-create path for the IPC command and native Dock menu.
+///
+/// Must not be a `#[tauri::command]`: calling those from another module
+/// reimports `__cmd__open_new_window` / `__tauri_command_name_open_new_window`
+/// and fails rustc with E0255 on macOS.
+pub(crate) async fn create_empty_window(app: tauri::AppHandle) -> Result<(), String> {
     let label = next_window_label("win")?;
     let url = tauri::WebviewUrl::App("index.html".into());
     let _ = build_secondary_window(&app, label, url)?;
     Ok(())
+}
+
+/// Open an empty secondary window (restores the last knowledge base on boot).
+#[tauri::command]
+pub(crate) async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
+    create_empty_window(app).await
 }
 
 const MAX_UPLOAD_IMAGE_BYTES: usize = 20 * 1024 * 1024;
