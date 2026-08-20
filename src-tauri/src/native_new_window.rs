@@ -90,7 +90,8 @@ mod macos {
             let _: () = msg_send![&*menu, addItem: &*item];
         }
 
-        let ns_app: Retained<AnyObject> = unsafe { msg_send![class!(NSApplication), sharedApplication] };
+        let ns_app: Retained<AnyObject> =
+            unsafe { msg_send![class!(NSApplication), sharedApplication] };
         unsafe {
             let _: () = msg_send![&*ns_app, setDockMenu: &*menu];
         }
