@@ -1,4 +1,5 @@
 mod image_hosting;
+mod native_new_window;
 mod publishing;
 mod sample_notes;
 mod secure_settings;
@@ -271,7 +272,7 @@ async fn open_file_in_new_window(
 
 /// Open an empty secondary window (restores the last knowledge base on boot).
 #[tauri::command]
-async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
+pub(crate) async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     let label = next_window_label("win")?;
     let url = tauri::WebviewUrl::App("index.html".into());
     let _ = build_secondary_window(&app, label, url)?;
@@ -359,6 +360,14 @@ pub fn run() {
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
+            }
+            #[cfg(target_os = "macos")]
+            {
+                if let Err(error) =
+                    native_new_window::install_dock_new_window_menu(app.handle())
+                {
+                    log::error!("Failed to install Dock new-window menu: {error}");
+                }
             }
             Ok(())
         })
