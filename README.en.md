@@ -93,7 +93,7 @@ Same settings tab: **App ID** and **App Secret** (App Secret stays in secure loc
 
 ## License
 
-[MIT License](./LICENSE)
+[Apache License 2.0](./LICENSE)
 
 ## Acknowledgements
 
