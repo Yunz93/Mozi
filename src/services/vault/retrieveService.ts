@@ -70,6 +70,107 @@ export function tokenizeSearchQuery(query: string): string[] {
   return [...tokens].filter((token) => token.length >= 2);
 }
 
+const LEADING_QUESTION_FILLERS =
+  /^(请你|请帮我|帮我|请问|请|我想知道|想知道|麻烦|能否|能不能)\s*/u;
+const TRAILING_QUESTION_FILLERS =
+  /(是什么|是啥|怎么样|如何处理|如何|吗|呢|啊|呀|吧|[？?])+$/u;
+const FOLLOW_UP_PREFIX =
+  /^(那|还有|继续|这个|刚才|上次说|以及|and |also |what about|how about)/i;
+
+/** Drop polite / interrogative wrappers so keyword search keeps content terms. */
+export function stripSearchFillers(query: string): string {
+  let next = normalizeSearchTarget(query);
+  next = next.replace(LEADING_QUESTION_FILLERS, "").trim();
+  next = next.replace(TRAILING_QUESTION_FILLERS, "").trim();
+  return next;
+}
+
+export function isFollowUpQuestion(query: string): boolean {
+  const text = query.trim();
+  if (!text) return false;
+  if ([...text].length <= 12) return true;
+  return FOLLOW_UP_PREFIX.test(text);
+}
+
+/** Original query plus cleaned / follow-up-blended variants. */
+export function expandSearchQueries(
+  query: string,
+  previousQuestion?: string,
+): string[] {
+  const queries: string[] = [];
+  const add = (value: string) => {
+    const next = value.trim();
+    if (next && !queries.includes(next)) queries.push(next);
+  };
+
+  add(query);
+  add(stripSearchFillers(query));
+
+  const previous = previousQuestion?.trim();
+  if (previous && isFollowUpQuestion(query)) {
+    const prev = stripSearchFillers(previous) || previous;
+    const curr = stripSearchFillers(query) || query.trim();
+    if (prev && curr) add(`${prev} ${curr}`);
+  }
+
+  return queries;
+}
+
+export function diversifyHits(
+  hits: RetrieveHit[],
+  topK: number,
+  maxPerPath: number,
+): RetrieveHit[] {
+  if (maxPerPath <= 0) return hits.slice(0, topK);
+  const picked: RetrieveHit[] = [];
+  const overflow: RetrieveHit[] = [];
+  const counts = new Map<string, number>();
+
+  for (const hit of hits) {
+    const path = hit.chunk.path;
+    const used = counts.get(path) ?? 0;
+    if (used < maxPerPath) {
+      picked.push(hit);
+      counts.set(path, used + 1);
+    } else {
+      overflow.push(hit);
+    }
+    if (picked.length >= topK) return picked;
+  }
+
+  for (const hit of overflow) {
+    picked.push(hit);
+    if (picked.length >= topK) break;
+  }
+  return picked;
+}
+
+export function expandNeighborChunks(
+  hits: RetrieveHit[],
+  snapshot: ChunkIndexSnapshot,
+  limit: number,
+): RetrieveHit[] {
+  const seen = new Set(hits.map((hit) => hit.chunk.id));
+  const extras: RetrieveHit[] = [];
+
+  for (const hit of hits) {
+    const siblings = snapshot.byPath[hit.chunk.path] ?? [];
+    const index = siblings.findIndex((chunk) => chunk.id === hit.chunk.id);
+    if (index < 0) continue;
+    for (const neighbor of [siblings[index - 1], siblings[index + 1]]) {
+      if (!neighbor || seen.has(neighbor.id)) continue;
+      seen.add(neighbor.id);
+      extras.push({
+        chunk: neighbor,
+        score: hit.score * 0.92,
+        source: hit.source,
+      });
+    }
+  }
+
+  return [...hits, ...extras].sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
 export function keywordSearchChunks(
   chunks: TextChunk[],
   query: string,
@@ -137,14 +238,36 @@ export async function retrieve(options: {
   retrieve: RetrieveOptions;
 }): Promise<RetrieveHit[]> {
   const topK = options.retrieve.topK ?? 12;
+  const candidateK = Math.max(
+    topK,
+    options.retrieve.maxChunksPerPath || options.retrieve.expandNeighbors
+      ? topK * 3
+      : topK,
+  );
   const chunks = listChunks(options.chunkIndex, options.retrieve);
   const mode = options.retrieve.mode;
+  const queries = expandSearchQueries(
+    options.query,
+    options.retrieve.previousQuestion,
+  );
 
   const keywordHits =
-    mode === "semantic" ? [] : keywordSearchChunks(chunks, options.query, topK);
+    mode === "semantic"
+      ? []
+      : rrfMerge(
+          queries.map((query) =>
+            keywordSearchChunks(chunks, query, candidateK),
+          ),
+          candidateK,
+        ).map((hit) => ({ ...hit, source: "keyword" as const }));
 
   if (mode === "keyword") {
-    return keywordHits;
+    return finalizeHits(
+      keywordHits,
+      options.chunkIndex,
+      options.retrieve,
+      topK,
+    );
   }
 
   const canEmbed =
@@ -154,28 +277,88 @@ export async function retrieve(options: {
     options.vectorStore.size() > 0;
 
   if (!canEmbed) {
-    return keywordHits;
+    return finalizeHits(
+      keywordHits,
+      options.chunkIndex,
+      options.retrieve,
+      topK,
+    );
   }
 
   try {
-    const [queryVector] = await options.embeddingProvider!.embed([
-      options.query,
-    ]);
-    const vectorHitsRaw = options.vectorStore!.search(queryVector, topK * 2);
+    const embedQueries =
+      queries.length > 1
+        ? [queries[0]!, queries[queries.length - 1]!]
+        : queries;
+    const uniqueEmbedQueries = [...new Set(embedQueries)];
+    const queryVectors =
+      await options.embeddingProvider!.embed(uniqueEmbedQueries);
     const chunkById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
-    const vectorHits: RetrieveHit[] = [];
-    for (const { id, score } of vectorHitsRaw) {
-      const chunk = chunkById.get(id);
-      if (!chunk) continue;
-      vectorHits.push({ chunk, score, source: "vector" });
-      if (vectorHits.length >= topK) break;
+    const vectorLists: RetrieveHit[][] = [];
+
+    for (const queryVector of queryVectors) {
+      const vectorHitsRaw = options.vectorStore!.search(
+        queryVector,
+        candidateK * 2,
+      );
+      const vectorHits: RetrieveHit[] = [];
+      for (const { id, score } of vectorHitsRaw) {
+        const chunk = chunkById.get(id);
+        if (!chunk) continue;
+        vectorHits.push({ chunk, score, source: "vector" });
+        if (vectorHits.length >= candidateK) break;
+      }
+      vectorLists.push(vectorHits);
     }
 
+    const vectorHits =
+      vectorLists.length === 1
+        ? vectorLists[0]!
+        : rrfMerge(vectorLists, candidateK).map((hit) => ({
+            ...hit,
+            source: "vector" as const,
+          }));
+
     if (mode === "semantic") {
-      return vectorHits;
+      return finalizeHits(
+        vectorHits,
+        options.chunkIndex,
+        options.retrieve,
+        topK,
+      );
     }
-    return rrfMerge([keywordHits, vectorHits], topK);
+    return finalizeHits(
+      rrfMerge([keywordHits, vectorHits], candidateK),
+      options.chunkIndex,
+      options.retrieve,
+      topK,
+    );
   } catch {
-    return keywordHits;
+    return finalizeHits(
+      keywordHits,
+      options.chunkIndex,
+      options.retrieve,
+      topK,
+    );
   }
+}
+
+function finalizeHits(
+  hits: RetrieveHit[],
+  snapshot: ChunkIndexSnapshot | null,
+  options: RetrieveOptions,
+  topK: number,
+): RetrieveHit[] {
+  let next = hits;
+  if (options.expandNeighbors && snapshot) {
+    next = expandNeighborChunks(
+      next,
+      snapshot,
+      Math.max(topK * 2, next.length),
+    );
+  }
+  if (options.maxChunksPerPath && options.maxChunksPerPath > 0) {
+    return diversifyHits(next, topK, options.maxChunksPerPath);
+  }
+  return next.slice(0, topK);
 }

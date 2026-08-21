@@ -517,6 +517,15 @@
   gap: 8px;
   padding: 14px 16px 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.ask-vault-brand {
+  margin: 0;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .ask-vault-tab-count {

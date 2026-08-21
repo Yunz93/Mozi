@@ -79,6 +79,12 @@ export interface RetrieveOptions {
   topK?: number;
   excludePaths?: string[];
   excludeGlobs?: string[];
+  /** Prior turn, used to expand short follow-up questions. */
+  previousQuestion?: string;
+  /** Cap how many chunks from the same note survive into the result. */
+  maxChunksPerPath?: number;
+  /** Include neighboring chunks from the same note around each hit. */
+  expandNeighbors?: boolean;
 }
 
 export interface AskVaultCitation {

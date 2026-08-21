@@ -11,9 +11,9 @@ const commands = [
   },
   {
     id: "askVault",
-    title: "问库",
+    title: "小知助手",
     group: "发布",
-    keywords: "ask vault",
+    keywords: "问库 ask vault",
     run: () => undefined,
   },
   {
@@ -36,6 +36,11 @@ describe("filterPaletteCommands", () => {
 
   it("matches keywords", () => {
     const matches = filterPaletteCommands(commands, "vault");
+    expect(matches.map((item) => item.id)).toEqual(["askVault"]);
+  });
+
+  it("still matches the former 问库 name", () => {
+    const matches = filterPaletteCommands(commands, "问库");
     expect(matches.map((item) => item.id)).toEqual(["askVault"]);
   });
 });

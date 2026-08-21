@@ -7,7 +7,7 @@ export default {
   common_language: "Language",
   common_interface: "Interface",
   commandPalette_title: "Command palette",
-  commandPalette_placeholder: "Type a command… table, publish, Ask Vault",
+  commandPalette_placeholder: "Type a command… table, publish, XiaoZhi",
   commandPalette_empty: "No matching commands",
   commandPalette_needEditor: "Open a note before running editor commands",
   commandPalette_groupWorkspace: "Workspace",
@@ -22,7 +22,7 @@ export default {
   commandPalette_numberedList: "Numbered list",
   commandPalette_quote: "Quote",
   commandPalette_heading: "Heading",
-  commandPalette_askVault: "Ask Vault",
+  commandPalette_askVault: "XiaoZhi Assistant",
   common_simplifiedChinese: "Simplified Chinese",
   common_english: "English",
   common_loading: "Loading...",
@@ -157,11 +157,11 @@ export default {
   links_neighborhoodExpandHint: "Click to enlarge and show titles",
   links_neighborhoodDialog: "Neighborhood graph",
 
-  askVault_title: "Ask vault",
-  askVault_short: "Ask",
+  askVault_title: "XiaoZhi Assistant",
+  askVault_short: "XiaoZhi",
   askVault_moduleHint:
     "Works beside the editor: retrieve, answer, jump to sources",
-  askVault_resize: "Resize Ask vault panel",
+  askVault_resize: "Resize XiaoZhi Assistant panel",
   askVault_tabAsk: "Ask",
   askVault_scope: "Search scope",
   askVault_scopeVault: "Entire vault",
@@ -170,7 +170,9 @@ export default {
   askVault_scopeNeedsNote:
     "Open a note first to use current folder / current note scope.",
   askVault_placeholder:
-    "Ask in natural language, e.g. What was the last conclusion about the release process?",
+    "Ask XiaoZhi, e.g. What was the last conclusion about the release process?",
+  askVault_followUpHint:
+    "Retrieval will include the previous question — good for short follow-ups like “and the cover image?”.",
   askVault_retrieve: "Retrieve only",
   askVault_retrieving: "Retrieving…",
   askVault_ask: "Generate answer",
@@ -198,7 +200,7 @@ export default {
   askVault_statusReady: "Ready",
   askVault_statusKeyword: "Keyword mode",
   askVault_statusBlocked: "Not ready",
-  askVault_failed: "Ask vault failed",
+  askVault_failed: "XiaoZhi Assistant could not answer",
   askVault_noHits:
     "No relevant snippets found. Try another question or configure embeddings.",
   askVault_sourcesStale:
@@ -219,7 +221,7 @@ export default {
 
   index_title: "Vault index",
   index_desc:
-    "Link and chunk indexes power backlinks, sidebar search, related notes, and Ask vault. Cached locally and rebuildable anytime without changing your Markdown. Ask vault also needs a model under AI settings.",
+    "Link and chunk indexes power backlinks, sidebar search, related notes, and XiaoZhi Assistant. Cached locally and rebuildable anytime without changing your Markdown. XiaoZhi Assistant also needs a model under AI settings.",
   index_status: "Status",
   index_statusReady: "Ready",
   index_statusBuilding: "Building ({done}/{total})",
@@ -239,7 +241,7 @@ export default {
   index_vectorsOff: "Disabled",
   index_excludeTitle: "Exclude paths",
   index_excludeDesc:
-    "These vault-relative globs are skipped by Ask Vault chunks. One pattern per line; * and ** are supported. Rebuild the index after changing them.",
+    "These vault-relative globs are skipped by XiaoZhi Assistant chunks. One pattern per line; * and ** are supported. Rebuild the index after changing them.",
   index_excludeHint: "Trash and node_modules are excluded by default.",
   index_embeddingTitle: "Semantic search / Embedding",
   index_embeddingDesc:
@@ -577,7 +579,7 @@ export default {
   settings_openSearchDesc: "Open the search panel for the current note.",
   settings_commandPalette: "Command palette",
   settings_commandPaletteDesc:
-    "Search and run commands such as insert table, publish, and Ask Vault.",
+    "Search and run commands such as insert table, publish, and XiaoZhi Assistant.",
   settings_sidebarSearch: "Sidebar Search",
   settings_sidebarSearchDesc:
     "Open the sidebar and focus the file search field.",
@@ -605,7 +607,7 @@ export default {
 
   settings_aiContentEnhance: "AI Content Enhancement",
   settings_aiContentEnhanceDesc:
-    "Choose an AI provider for note enhancement, wiki generation from selection, and Ask vault. Ask vault also needs the Index tab (chunks / embeddings).",
+    "Choose an AI provider for note enhancement, wiki generation from selection, and XiaoZhi Assistant. XiaoZhi Assistant also needs the Index tab (chunks / embeddings).",
   settings_aiProvider: "AI provider",
   settings_geminiApiKey: "Gemini API key",
   settings_secureSaving: "Saving to the system keychain...",
