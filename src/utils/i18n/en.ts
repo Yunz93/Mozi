@@ -831,6 +831,9 @@ export default {
   settings_updatesAvailableVersion: "Update available: {version}",
   settings_updatesPublishedAt: "Published: {date}",
   settings_updatesProgressPercent: "Download progress {percent}%",
+  settings_updatesProgressBytes: "{downloaded} / {total}",
+  settings_updatesProgressDownloaded: "Downloaded {downloaded}",
+  settings_updatesProgressLabel: "Update progress",
   settings_updatesReleaseNotes: "Release notes",
   settings_updatesGuide1:
     "Windows in-app updates depend on the `latest.json` metadata file and signed updater artifacts uploaded to the GitHub Release.",

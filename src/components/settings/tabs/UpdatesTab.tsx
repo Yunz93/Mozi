@@ -15,6 +15,12 @@ import {
   type AvailableUpdate,
   type UpdateDownloadEvent,
 } from "../../../services/updaterService";
+import { UpdateProgressPanel } from "../UpdateProgressPanel";
+import {
+  INITIAL_UPDATE_DOWNLOAD_PROGRESS,
+  applyUpdateDownloadEvent,
+  startUpdateDownload,
+} from "../../../utils/updateProgress";
 
 type StatusTone = "neutral" | "success" | "error";
 
@@ -50,8 +56,9 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
   const [isInstalling, setIsInstalling] = useState(false);
   const [statusTone, setStatusTone] = useState<StatusTone>("neutral");
   const [statusMessage, setStatusMessage] = useState<string>("");
-  const [downloadedBytes, setDownloadedBytes] = useState(0);
-  const [downloadSize, setDownloadSize] = useState<number | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(
+    INITIAL_UPDATE_DOWNLOAD_PROGRESS,
+  );
 
   useEffect(() => {
     let active = true;
@@ -80,10 +87,6 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
     };
   }, [availableUpdate]);
 
-  const progressPercent =
-    downloadSize && downloadSize > 0
-      ? Math.min(100, Math.round((downloadedBytes / downloadSize) * 100))
-      : null;
   const lastCheckedAt = formatTimestamp(settings.lastUpdateCheckAt, language);
   const updateBody = formatUpdateBody(availableUpdate?.body);
   const updatePublishedAt = formatTimestamp(
@@ -107,8 +110,7 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
     setIsChecking(true);
     setStatusTone("neutral");
     setStatusMessage(t("settings_updatesChecking"));
-    setDownloadedBytes(0);
-    setDownloadSize(null);
+    setDownloadProgress(INITIAL_UPDATE_DOWNLOAD_PROGRESS);
 
     try {
       if (!areUpdaterArtifactsEnabled()) {
@@ -168,18 +170,16 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
     setStatusMessage(
       t("settings_updatesPreparingInstall", { version: update.version }),
     );
-    setDownloadedBytes(0);
-    setDownloadSize(null);
+    setDownloadProgress(startUpdateDownload());
 
     try {
       await downloadAndInstallUpdate(update, (event: UpdateDownloadEvent) => {
+        setDownloadProgress((previous) =>
+          applyUpdateDownloadEvent(previous, event),
+        );
         switch (event.event) {
           case "Started":
-            setDownloadSize(event.data.contentLength ?? null);
             setStatusMessage(t("settings_updatesDownloading"));
-            break;
-          case "Progress":
-            setDownloadedBytes((previous) => previous + event.data.chunkLength);
             break;
           case "Finished":
             setStatusMessage(t("settings_updatesInstalling"));
@@ -196,6 +196,7 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
       );
     } finally {
       setIsInstalling(false);
+      setDownloadProgress(INITIAL_UPDATE_DOWNLOAD_PROGRESS);
     }
   };
 
@@ -353,9 +354,15 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
                     disabled={isInstalling || isChecking}
                     className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isInstalling
-                      ? t("settings_updatesInstalling")
-                      : t("settings_updatesInstallNow")}
+                    {downloadProgress.phase === "downloading"
+                      ? t("settings_updatesDownloading")
+                      : downloadProgress.phase === "preparing"
+                        ? t("settings_updatesPreparingInstall", {
+                            version: availableUpdate.version,
+                          })
+                        : isInstalling
+                          ? t("settings_updatesInstalling")
+                          : t("settings_updatesInstallNow")}
                   </button>
                 )}
 
@@ -387,7 +394,7 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
                 )}
               </div>
 
-              {statusMessage && (
+              {statusMessage && downloadProgress.phase === "idle" && (
                 <p
                   className={`mt-4 text-xs ${
                     statusTone === "error"
@@ -400,6 +407,11 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
                   {statusMessage}
                 </p>
               )}
+
+              <UpdateProgressPanel
+                progress={downloadProgress}
+                version={availableUpdate?.version}
+              />
             </div>
 
             {availableUpdate && (
@@ -432,22 +444,6 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
                     </span>
                   )}
                 </div>
-
-                {isInstalling && progressPercent !== null && (
-                  <div className="mt-5 space-y-2">
-                    <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-[width]"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      {t("settings_updatesProgressPercent", {
-                        percent: progressPercent,
-                      })}
-                    </p>
-                  </div>
-                )}
 
                 {updateBody && (
                   <div className="mt-5">

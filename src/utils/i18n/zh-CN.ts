@@ -773,6 +773,9 @@ export default {
   settings_updatesAvailableVersion: "可更新到 {version}",
   settings_updatesPublishedAt: "发布时间：{date}",
   settings_updatesProgressPercent: "下载进度 {percent}%",
+  settings_updatesProgressBytes: "{downloaded} / {total}",
+  settings_updatesProgressDownloaded: "已下载 {downloaded}",
+  settings_updatesProgressLabel: "更新进度",
   settings_updatesReleaseNotes: "发布说明",
   settings_updatesGuide1:
     "Windows 应用内更新依赖 GitHub Release 中的 `latest.json` 和签名更新包；发布新版本后，已安装用户才能收到更新。",
