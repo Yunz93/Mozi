@@ -7,7 +7,7 @@ export default {
   common_language: "语言",
   common_interface: "界面",
   commandPalette_title: "命令面板",
-  commandPalette_placeholder: "输入命令… 例如 表格、发布、问库",
+  commandPalette_placeholder: "输入命令… 例如 表格、发布、小知助手",
   commandPalette_empty: "没有匹配的命令",
   commandPalette_needEditor: "请先打开一篇笔记再运行编辑命令",
   commandPalette_groupWorkspace: "工作区",
@@ -22,7 +22,7 @@ export default {
   commandPalette_numberedList: "有序列表",
   commandPalette_quote: "引用",
   commandPalette_heading: "标题级别",
-  commandPalette_askVault: "问库",
+  commandPalette_askVault: "小知助手",
   common_simplifiedChinese: "简体中文",
   common_english: "English",
   common_loading: "加载中...",
@@ -148,10 +148,10 @@ export default {
   links_neighborhoodExpandHint: "点击放大查看文件标题",
   links_neighborhoodDialog: "邻域图",
 
-  askVault_title: "问知识库",
-  askVault_short: "问库",
-  askVault_moduleHint: "与编辑器并排使用：检索、回答、跳转引用",
-  askVault_resize: "调整问库面板宽度",
+  askVault_title: "小知助手",
+  askVault_short: "小知",
+  askVault_moduleHint: "与编辑器并排使用：检索知识库、回答、跳转引用",
+  askVault_resize: "调整小知助手面板宽度",
   askVault_tabAsk: "问答",
   askVault_scope: "检索范围",
   askVault_scopeVault: "全库",
@@ -159,7 +159,8 @@ export default {
   askVault_scopeCurrent: "当前笔记",
   askVault_scopeNeedsNote:
     "请先打开一篇笔记，才能使用当前文件夹 / 当前笔记范围。",
-  askVault_placeholder: "用自然语言提问，例如：上次关于发布流程的结论是什么？",
+  askVault_placeholder: "问小知助手，例如：上次关于发布流程的结论是什么？",
+  askVault_followUpHint: "将结合上一问检索，适合追问「那封面图呢」这类短问题。",
   askVault_retrieve: "仅检索",
   askVault_retrieving: "检索中…",
   askVault_ask: "生成回答",
@@ -186,7 +187,7 @@ export default {
   askVault_statusReady: "就绪",
   askVault_statusKeyword: "关键词模式",
   askVault_statusBlocked: "尚未就绪",
-  askVault_failed: "知识库问答失败",
+  askVault_failed: "小知助手暂时无法回答",
   askVault_noHits: "未检索到相关片段，可换个问法或配置 Embedding。",
   askVault_sourcesStale: "检索片段已失效（文件已移动或删除），请重新检索。",
   askVault_sourcesRefreshed: "部分来源已失效，已用剩余片段继续生成。",
@@ -205,7 +206,7 @@ export default {
 
   index_title: "知识库索引",
   index_desc:
-    "链接与切片索引支撑反向链接、侧边栏搜索、相关笔记与「问库」。缓存在本地，可随时重建，不会修改你的 Markdown 文件。问库还会用到「AI 增强」里的模型配置。",
+    "链接与切片索引支撑反向链接、侧边栏搜索、相关笔记与小知助手。缓存在本地，可随时重建，不会修改你的 Markdown 文件。小知助手还会用到「AI 增强」里的模型配置。",
   index_status: "状态",
   index_statusReady: "就绪",
   index_statusBuilding: "构建中 ({done}/{total})",
@@ -225,7 +226,7 @@ export default {
   index_vectorsOff: "未启用",
   index_excludeTitle: "排除路径",
   index_excludeDesc:
-    "这些相对路径不会进入问库切片。一行一条，支持 * 与 **。修改后请重建索引。",
+    "这些相对路径不会进入小知助手切片。一行一条，支持 * 与 **。修改后请重建索引。",
   index_excludeHint: "默认排除回收站和 node_modules。",
   index_embeddingTitle: "语义检索 / Embedding",
   index_embeddingDesc:
@@ -541,7 +542,7 @@ export default {
   settings_openSearch: "打开搜索",
   settings_openSearchDesc: "打开当前笔记的搜索面板。",
   settings_commandPalette: "命令面板",
-  settings_commandPaletteDesc: "搜索并运行插入表格、发布、问库等命令。",
+  settings_commandPaletteDesc: "搜索并运行插入表格、发布、小知助手等命令。",
   settings_sidebarSearch: "侧边栏搜索",
   settings_sidebarSearchDesc: "打开侧边栏并聚焦文件搜索框。",
   settings_nextMatch: "下一个匹配",
@@ -566,7 +567,7 @@ export default {
 
   settings_aiContentEnhance: "AI 内容增强",
   settings_aiContentEnhanceDesc:
-    "选择 AI 提供商，用于全文增强、选区生成 Wiki，以及工具栏「问库」问答。问库还依赖「知识库索引」页的切片 / Embedding。",
+    "选择 AI 提供商，用于全文增强、选区生成 Wiki，以及工具栏「小知助手」问答。小知助手还依赖「知识库索引」页的切片 / Embedding。",
   settings_aiProvider: "AI 提供商",
   settings_geminiApiKey: "Gemini API 密钥",
   settings_secureSaving: "正在写入系统钥匙串...",

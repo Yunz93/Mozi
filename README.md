@@ -49,7 +49,7 @@ xattr -cr /Applications/墨知.app
 - **知识库式 Markdown**：兼容双链 `[[wiki]]`、`![[嵌入]]`、YAML frontmatter 与可配置新建模板；图片粘贴、本地资源目录与未引用附件清理在同一条引用链路里。
 - **Excalidraw 画板**：打开与编辑 `.excalidraw`，兼容 Obsidian Excalidraw 插件的 `.excalidraw.md`（含默认 `compressed-json`）；支持侧边栏新建；笔记中可用 `![[drawing.excalidraw]]` / `![[drawing.excalidraw.md]]` 嵌入静态预览，点击进入编辑。
 - **富媒体预览**：图片、PDF、HTML、视频等附件可在阅读侧预览；HTML 支持适应宽度与缩放。
-- **知识层（Beta）**：反向链接与出链面板、当前笔记邻域图、相关笔记推荐（本地语义检索）、Ask Vault 库级问答（带来源引用）；内置本地 embedding，可开启隐私模式禁止非本地端点。
+- **知识层（Beta）**：反向链接与出链面板、当前笔记邻域图、相关笔记推荐（本地语义检索）、**小知助手**知识库问答（带来源引用）；内置本地 embedding，可开启隐私模式禁止非本地端点。
 - **导出与发布**：PDF、HTML，以及将整篇预览合成为一张长图；工具栏可发布到 **simple-blog**（GitHub + Vercel）或 **微信公众号草稿**。
 - **可选 AI 辅助**：在 Gemini 与 OpenAI 兼容接口之间切换，用于润色、摘要、标签与从选区生成词条等；无 API Key 时基础写作完整可用。
 - **外观与桌面体验**：浅色 / 深色主题、多种 Markdown 样式预设、字体与字号、中英界面、可自定义快捷键；Windows 支持应用内检查更新。

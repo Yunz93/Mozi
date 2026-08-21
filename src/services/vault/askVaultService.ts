@@ -23,6 +23,7 @@ export interface AskVaultRequest {
   folderPath?: string | null;
   filePaths?: string[];
   topK?: number;
+  previousQuestion?: string;
 }
 
 interface AskVaultModelResponse {
@@ -33,7 +34,7 @@ interface AskVaultModelResponse {
 const ASK_HISTORY_FILE = "ask-history.json";
 
 export const ASK_VAULT_SYSTEM_PROMPT =
-  "You answer questions ONLY using the provided numbered knowledge-base excerpts. Do not invent facts. Cite sources with [n] markers. If the excerpts are insufficient, say you could not find enough information in the vault.";
+  "You are XiaoZhi (小知助手). Answer questions ONLY using the provided numbered knowledge-base excerpts. Do not invent facts. Cite sources with [n] markers. If the excerpts are insufficient, say you could not find enough information in the vault.";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -122,6 +123,9 @@ export async function retrieveAskVaultHits(
       filePaths: request.filePaths,
       excludeGlobs: request.settings.indexExcludeGlobs,
       topK: request.topK ?? 8,
+      previousQuestion: request.previousQuestion,
+      maxChunksPerPath: 2,
+      expandNeighbors: true,
     },
   });
 }
@@ -130,6 +134,7 @@ export async function answerAskVaultFromHits(
   question: string,
   hits: RetrieveHit[],
   settings: AppSettings,
+  previousQuestion?: string,
 ): Promise<AskVaultAnswer> {
   ensureAIConfiguration(settings);
 
@@ -150,7 +155,7 @@ export async function answerAskVaultFromHits(
     text: hit.chunk.text,
   }));
 
-  const prompt = buildAskVaultPrompt(question, promptChunks);
+  const prompt = buildAskVaultPrompt(question, promptChunks, previousQuestion);
   const raw = await completeJsonWithProvider<AskVaultModelResponse>(
     prompt,
     settings,
@@ -191,7 +196,12 @@ export async function askVault(
 ): Promise<AskVaultAnswer> {
   ensureAIConfiguration(request.settings);
   const hits = await retrieveAskVaultHits(request);
-  return answerAskVaultFromHits(request.question, hits, request.settings);
+  return answerAskVaultFromHits(
+    request.question,
+    hits,
+    request.settings,
+    request.previousQuestion,
+  );
 }
 
 export interface AskVaultHistoryItem {

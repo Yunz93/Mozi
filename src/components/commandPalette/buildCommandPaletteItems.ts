@@ -325,7 +325,7 @@ export function buildCommandPaletteItems(
       id: "askVault",
       title: t("commandPalette_askVault"),
       group: publish,
-      keywords: "rag retrieve",
+      keywords: "问库 ask vault rag retrieve 小知 xiaozhi",
       run: actions.askVault,
     },
     {

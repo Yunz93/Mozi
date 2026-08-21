@@ -131,6 +131,7 @@ export interface AskVaultPromptChunk {
 export function buildAskVaultPrompt(
   question: string,
   chunks: AskVaultPromptChunk[],
+  previousQuestion?: string,
 ): string {
   const sources = chunks
     .map(
@@ -139,18 +140,24 @@ export function buildAskVaultPrompt(
     )
     .join("\n\n");
 
+  const followUp = previousQuestion?.trim()
+    ? `\nPrevious question (for follow-up context only; still answer from excerpts):\n${previousQuestion.trim()}\n`
+    : "";
+
   return `
+You are XiaoZhi (小知助手), a local knowledge-base assistant.
 You answer questions ONLY using the numbered knowledge-base excerpts below.
 Rules:
 1. If the excerpts are insufficient, say you could not find enough information in the vault.
 2. Do not invent facts that are not supported by the excerpts.
 3. Cite sources using [n] markers that match excerpt numbers.
 4. Prefer concise Markdown answers.
+5. If this is a follow-up, interpret it against the previous question, but still cite only the excerpts.
 
 Return JSON with:
 - answerMarkdown: string (Markdown answer with [n] citations)
 - citationIndexes: number[] (the excerpt numbers you relied on)
-
+${followUp}
 Question:
 ${question}
 

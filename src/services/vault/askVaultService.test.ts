@@ -27,6 +27,27 @@ describe("askVault prompts", () => {
     expect(prompt).toContain("What is RAG?");
     expect(prompt).toContain("[1] notes/rag.md");
     expect(prompt).toContain("citationIndexes");
+    expect(prompt).toContain("XiaoZhi");
+  });
+
+  it("includes the previous question for follow-ups", () => {
+    const prompt = buildAskVaultPrompt(
+      "那封面图呢",
+      [
+        {
+          index: 1,
+          path: "notes/publish.md",
+          titlePath: ["发布"],
+          startLine: 1,
+          endLine: 4,
+          text: "封面图在发布时选择。",
+        },
+      ],
+      "上次关于发布流程的结论是什么",
+    );
+    expect(prompt).toContain("Previous question");
+    expect(prompt).toContain("上次关于发布流程的结论是什么");
+    expect(prompt).toContain("那封面图呢");
   });
 });
 

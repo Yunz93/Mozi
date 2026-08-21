@@ -19,6 +19,7 @@ import {
   type AskVaultHistoryItem,
   type AskVaultPreviewSnippet,
 } from "../../services/vault/askVaultService";
+import { isFollowUpQuestion } from "../../services/vault/retrieveService";
 import { hydrateSensitiveSettingsIntoStore } from "../../services/secureSettingsService";
 import { localizeKnownError } from "../../utils/i18n";
 import { isImeComposingEvent } from "../../utils/imeKeyboard";
@@ -119,6 +120,9 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   const [lastPreviewedQuestion, setLastPreviewedQuestion] = useState<
     string | null
   >(null);
+  const [lastAnsweredQuestion, setLastAnsweredQuestion] = useState<
+    string | null
+  >(null);
   const [answerMarkdown, setAnswerMarkdown] = useState("");
   const [citations, setCitations] = useState<AskVaultCitation[]>([]);
   const [history, setHistory] = useState<AskVaultHistoryItem[]>([]);
@@ -148,6 +152,19 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     chunkCount > 0 &&
     !retrieving &&
     !generating;
+
+  const followUpQuestion = useMemo(() => {
+    const trimmed = question.trim();
+    if (
+      !lastAnsweredQuestion ||
+      !trimmed ||
+      trimmed === lastAnsweredQuestion ||
+      !isFollowUpQuestion(trimmed)
+    ) {
+      return null;
+    }
+    return lastAnsweredQuestion;
+  }, [question, lastAnsweredQuestion]);
 
   const canReuseHits =
     resolveAskVaultSubmitKind({
@@ -252,9 +269,10 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         folderPath,
         filePaths:
           scope === "files" && currentFilePath ? [currentFilePath] : undefined,
+        previousQuestion: followUpQuestion ?? undefined,
       };
     },
-    [question, scope, currentFilePath],
+    [question, scope, currentFilePath, followUpQuestion],
   );
 
   const ensureAskConfig = useCallback(
@@ -343,11 +361,13 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
           trimmed,
           hits,
           activeSettings,
+          followUpQuestion ?? undefined,
         );
         setAnswerMarkdown(
           normalizeAskVaultCitationMarkers(result.answerMarkdown),
         );
         setCitations(result.citations);
+        setLastAnsweredQuestion(trimmed);
         setSecondaryTab("answer");
 
         const historyItem: AskVaultHistoryItem = {
@@ -374,6 +394,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       rootFolderPath,
       resolveHydratedSettings,
       ensureAskConfig,
+      followUpQuestion,
       language,
       showNotification,
       setSettingsOpen,
@@ -521,6 +542,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       })),
     );
     setLastPreviewedQuestion(item.question);
+    setLastAnsweredQuestion(item.question);
     setPendingHits([]);
     setPrimaryTab("ask");
     setSecondaryTab("answer");
@@ -612,6 +634,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       />
 
       <div className="ask-vault-module-header right-rail-header">
+        <p className="ask-vault-brand">{t("askVault_title")}</p>
         <div className="right-rail-tabs" role="tablist">
           <button
             type="button"
@@ -818,6 +841,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
                 }
               }}
             />
+            {followUpQuestion ? (
+              <p className="ask-vault-scope-hint">
+                {t("askVault_followUpHint")}
+              </p>
+            ) : null}
             <div className="ask-vault-actions">
               <button
                 type="button"
