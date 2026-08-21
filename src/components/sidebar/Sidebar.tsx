@@ -54,6 +54,7 @@ export interface SidebarProps {
   onEmptyTrash: (files: FileNode[]) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
   onMoveToRoot: (sourceId: string) => void;
+  onImportDroppedFiles?: (destFolderPath: string, files: File[]) => void;
   currentKnowledgeBaseName?: string;
   currentKnowledgeBasePath?: string;
   onSwitchKnowledgeBase: () => void;
@@ -239,6 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     onEmptyTrash,
     onMoveNode,
     onMoveToRoot,
+    onImportDroppedFiles,
     currentKnowledgeBaseName,
     currentKnowledgeBasePath,
     onSwitchKnowledgeBase,
@@ -569,7 +571,14 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
             }`}
             onDragOver={handleRootDragOver}
             onDragLeave={handleRootDragLeave}
-            onDrop={(e) => handleRootDrop(e, onMoveToRoot)}
+            onDrop={(e) =>
+              handleRootDrop(e, onMoveToRoot, (droppedFiles) => {
+                onImportDroppedFiles?.(
+                  currentKnowledgeBasePath ?? "",
+                  droppedFiles,
+                );
+              })
+            }
             onDragEnd={() => setIsRootDragOver(false)}
             onContextMenu={handleRootContextMenu}
           >
@@ -588,7 +597,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                   {t("sidebar_noLocalFilesOpened")}
                 </p>
                 <p className="text-xs text-gray-400">
-                  {t("sidebar_openKnowledgeBaseHint")}
+                  {currentKnowledgeBasePath
+                    ? t("sidebar_dropToAddFiles")
+                    : t("sidebar_openKnowledgeBaseHint")}
                 </p>
               </div>
             ) : hasSearchQuery ? (
@@ -708,6 +719,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                     level={0}
                     onContextMenu={openContextMenu}
                     onMoveNode={onMoveNode}
+                    onImportDroppedFiles={onImportDroppedFiles}
                     forceExpanded={hasSearchQuery}
                     expandedPathIds={locatedPathIds}
                     locateRequestKey={locateCurrentFileRequestKey}

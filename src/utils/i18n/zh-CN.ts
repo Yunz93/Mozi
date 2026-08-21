@@ -285,6 +285,7 @@ export default {
   sidebar_newNote: "新建笔记",
   sidebar_noLocalFilesOpened: "还没有打开本地文件。",
   sidebar_openKnowledgeBaseHint: "可以点下面的按钮先打开一套知识库。",
+  sidebar_dropToAddFiles: "也可以把文件拖到这里，添加到知识库。",
   sidebar_openKnowledgeBaseDisabledStandalone:
     "当前是通过系统打开单个文件启动的，无法切换知识库。请从应用内打开知识库。",
   sidebar_searchingNotes: "正在搜索笔记...",
@@ -934,6 +935,10 @@ export default {
   notifications_cannotMoveIntoTrashDirectly: "不能直接把项目拖到回收站",
   notifications_targetFolderNotFound: "未找到目标文件夹",
   notifications_noKnowledgeBaseOpened: "请先打开知识库。",
+  notifications_fileAdded: "已添加 {name}",
+  notifications_filesAdded: "已添加 {count} 个文件",
+  notifications_addFilesFailed: "添加文件失败：{error}",
+  notifications_noFilesDropped: "没有可添加的文件",
   notifications_itemNotFound: "未找到项目",
   notifications_folderCreated: "文件夹已创建",
   notifications_failedRevealInExplorer: "在文件管理器中定位失败",
