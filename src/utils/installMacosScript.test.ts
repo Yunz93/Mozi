@@ -21,6 +21,9 @@ describe("install-macos.sh", () => {
     expect(script).toContain('ASSET_ARCH="x64"');
     expect(script).toContain("xattr -cr");
     expect(script).toContain('ditto "${SOURCE_APP}" "${APP_PATH}"');
+    expect(script).toContain("DMG_FILE");
+    expect(script).toContain("OPEN_APP");
+    expect(script).toContain("使用已下载的安装包");
   });
 
   it("is referenced from the README install instructions", () => {

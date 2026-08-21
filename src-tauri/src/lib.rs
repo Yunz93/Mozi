@@ -1,4 +1,5 @@
 mod image_hosting;
+mod macos_update;
 mod native_new_window;
 mod publishing;
 mod sample_notes;
@@ -361,7 +362,9 @@ pub fn run() {
             copy_sample_notes,
             publishing::publish_simple_blog,
             publishing::publish_wechat_draft,
-            upload_image_to_hosting
+            upload_image_to_hosting,
+            check_macos_update,
+            install_macos_update
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -590,6 +593,28 @@ async fn copy_sample_notes(
     }
 
     sample_notes::sync_sample_notes(source, &target)
+}
+
+#[tauri::command]
+async fn check_macos_update(
+    app: tauri::AppHandle,
+) -> Result<Option<macos_update::MacosUpdateInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || macos_update::check_macos_update_command(app))
+        .await
+        .map_err(|error| format!("Failed to join macOS update check: {error}"))?
+}
+
+#[tauri::command]
+async fn install_macos_update(
+    app: tauri::AppHandle,
+    tag: String,
+    on_event: tauri::ipc::Channel<macos_update::MacosUpdateProgressEvent>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        macos_update::install_macos_update_command(app, tag, on_event)
+    })
+    .await
+    .map_err(|error| format!("Failed to join macOS update install: {error}"))?
 }
 
 #[cfg(test)]

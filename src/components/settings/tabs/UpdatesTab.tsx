@@ -3,7 +3,7 @@ import { useI18n } from "../../../hooks/useI18n";
 import { useAppStore } from "../../../store/appStore";
 import type { AppSettings } from "../../../types";
 import { isTauriEnvironment } from "../../../types/filesystem";
-import { isWindowsPlatform } from "../../../utils/platform";
+import { isMacOSPlatform, isWindowsPlatform } from "../../../utils/platform";
 import { openExternalUrl } from "../../../utils/externalLinks";
 import type { SettingsTabProps } from "../types";
 import {
@@ -49,6 +49,8 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
   const showNotification = useAppStore((state) => state.showNotification);
   const isDesktop = isTauriEnvironment();
   const isWindows = useMemo(() => isWindowsPlatform(), []);
+  const isMac = useMemo(() => isMacOSPlatform(), []);
+  const canUpdateInApp = isWindows || isMac;
   const [currentVersion, setCurrentVersion] = useState<string>("");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -103,7 +105,7 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
   };
 
   const handleCheckUpdates = async (): Promise<AvailableUpdate | null> => {
-    if (!isWindows) {
+    if (!canUpdateInApp) {
       return null;
     }
 
@@ -113,7 +115,7 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
     setDownloadProgress(INITIAL_UPDATE_DOWNLOAD_PROGRESS);
 
     try {
-      if (!areUpdaterArtifactsEnabled()) {
+      if (isWindows && !areUpdaterArtifactsEnabled()) {
         await replaceAvailableUpdate(null);
         setStatusTone("neutral");
         setStatusMessage(t("settings_updatesArtifactsDisabled"));
@@ -264,31 +266,7 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
           </p>
         )}
 
-        {isDesktop && !isWindows && (
-          <div className="mt-4 space-y-4">
-            <div className="rounded-3xl border border-gray-200/70 bg-gray-50/80 px-6 py-6 text-sm leading-9 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
-              <p>{t("settings_updatesMacManualDesc")}</p>
-              <p className="mt-6">
-                {t("settings_updatesCurrentVersion")}
-                <span className="ml-3 font-mono text-sm text-gray-900 dark:text-white">
-                  {currentVersion || t("common_loading")}
-                </span>
-              </p>
-            </div>
-            <a
-              href={RELEASES_PAGE_URL}
-              onClick={(event) => {
-                event.preventDefault();
-                void openExternalUrl(RELEASES_PAGE_URL);
-              }}
-              className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 dark:bg-white dark:text-black"
-            >
-              {t("settings_updatesOpenReleases")}
-            </a>
-          </div>
-        )}
-
-        {isDesktop && isWindows && (
+        {isDesktop && canUpdateInApp && (
           <div className="mt-4 space-y-4">
             <div className="rounded-3xl border border-gray-200/70 bg-gray-50/80 px-6 py-6 dark:border-white/10 dark:bg-white/[0.04]">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -459,8 +437,28 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
             )}
 
             <div className="rounded-3xl border border-gray-200/70 bg-gray-50/80 px-6 py-5 text-sm leading-7 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
-              <p>{t("settings_updatesGuide1")}</p>
-              <p className="mt-2">{t("settings_updatesGuide2")}</p>
+              <p>
+                {isMac
+                  ? t("settings_updatesMacGuide1")
+                  : t("settings_updatesGuide1")}
+              </p>
+              <p className="mt-2">
+                {isMac
+                  ? t("settings_updatesMacGuide2")
+                  : t("settings_updatesGuide2")}
+              </p>
+              <p className="mt-4">
+                <a
+                  href={RELEASES_PAGE_URL}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void openExternalUrl(RELEASES_PAGE_URL);
+                  }}
+                  className="font-medium text-gray-900 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 dark:text-white dark:decoration-white/20 dark:hover:decoration-white"
+                >
+                  {t("settings_updatesOpenReleases")}
+                </a>
+              </p>
             </div>
           </div>
         )}

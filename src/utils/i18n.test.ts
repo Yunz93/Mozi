@@ -75,6 +75,8 @@ describe("t", () => {
       t("en", "settings_updatesProgressDownloaded", { downloaded: "2 KB" }),
     ).toBe("Downloaded 2 KB");
     expect(t("zh-CN", "settings_updatesProgressLabel")).toBe("更新进度");
+    expect(t("zh-CN", "settings_updatesMacGuide1")).toContain("安装脚本");
+    expect(t("en", "settings_updatesMacGuide2")).toContain("DMG");
   });
 });
 

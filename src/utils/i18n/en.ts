@@ -802,11 +802,11 @@ export default {
     "One-click publishing is available in the desktop app only.",
   settings_updatesSectionTitle: "App updates",
   settings_updatesSectionDesc:
-    "Windows supports in-app update checks and installation. macOS remains a manual download flow from GitHub Releases for now.",
+    "Windows installs signed updater packages. macOS uses the same install script as the website: it downloads the DMG and installs into Applications.",
   settings_updatesDesktopOnly:
     "App updates are available in the desktop app only.",
   settings_updatesMacManualDesc:
-    "macOS does not support in-app installation updates in this phase. Download the new build from GitHub Releases and install it manually.",
+    "macOS downloads the GitHub Release DMG and installs it with the same script used on the website, including clearing quarantine attributes.",
   settings_updatesOpenReleases: "Open GitHub Releases",
   settings_updatesCurrentVersionLabel: "Current version",
   settings_updatesLastCheckLabel: "Last checked",
@@ -814,7 +814,7 @@ export default {
   settings_updatesCurrentVersion: "Current version:",
   settings_updatesAutoCheck: "Check for updates on launch",
   settings_updatesAutoCheckDesc:
-    "Enabled only for the Windows desktop build. New versions show a reminder without interrupting your current work.",
+    "New versions show a reminder without interrupting your current work.",
   settings_updatesCheckNow: "Check now",
   settings_updatesChecking: "Checking for updates...",
   settings_updatesArtifactsDisabled:
@@ -839,6 +839,10 @@ export default {
     "Windows in-app updates depend on the `latest.json` metadata file and signed updater artifacts uploaded to the GitHub Release.",
   settings_updatesGuide2:
     "If you just published a release and the client still does not see it, verify the release contains the updater assets first, then check again.",
+  settings_updatesMacGuide1:
+    "macOS in-app updates download the GitHub Release DMG and install it with the same script used on the website, including clearing quarantine attributes.",
+  settings_updatesMacGuide2:
+    "The app restarts after installation. If a new release is not detected yet, confirm the GitHub Release includes a DMG for this Mac architecture, then check again.",
   settings_updatesCheckFailed: "Failed to check for updates: {error}",
   settings_updatesInstallFailed: "Failed to install the update: {error}",
 
