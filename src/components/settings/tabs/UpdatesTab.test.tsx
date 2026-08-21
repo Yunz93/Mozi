@@ -33,6 +33,7 @@ vi.mock("../../../types/filesystem", async (importOriginal) => {
 
 vi.mock("../../../utils/platform", () => ({
   isWindowsPlatform: () => true,
+  isMacOSPlatform: () => false,
 }));
 
 vi.mock("../../../services/updaterService", async (importOriginal) => {
@@ -82,6 +83,9 @@ vi.mock("../../../hooks/useI18n", () => ({
         settings_updatesReleaseNotes: "发布说明",
         settings_updatesGuide1: "guide1",
         settings_updatesGuide2: "guide2",
+        settings_updatesMacGuide1: "mac-guide1",
+        settings_updatesMacGuide2: "mac-guide2",
+        settings_updatesOpenReleases: "打开 GitHub Releases",
         notifications_updateAvailable: "发现新版本 {version}",
         common_loading: "加载中",
       };

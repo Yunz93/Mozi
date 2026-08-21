@@ -94,17 +94,24 @@ resolve_asset_url() {
   printf '%s' "${asset_url}"
 }
 
-log "正在查询 ${REPO} 的最新 macOS 安装包 (${ASSET_ARCH})..."
-if ! ASSET_URL="$(resolve_asset_url)"; then
-  if [[ "${ASSET_ARCH}" == "x64" ]]; then
-    die "未找到 Intel (x64) 版 macOS 安装包。当前 Release 可能仅提供 Apple Silicon (aarch64) 版本。"
+DMG_PATH=""
+if [[ -n "${DMG_FILE:-}" ]]; then
+  [[ -f "${DMG_FILE}" ]] || die "找不到安装包: ${DMG_FILE}"
+  DMG_PATH="${DMG_FILE}"
+  log "使用已下载的安装包: ${DMG_PATH}"
+else
+  log "正在查询 ${REPO} 的最新 macOS 安装包 (${ASSET_ARCH})..."
+  if ! ASSET_URL="$(resolve_asset_url)"; then
+    if [[ "${ASSET_ARCH}" == "x64" ]]; then
+      die "未找到 Intel (x64) 版 macOS 安装包。当前 Release 可能仅提供 Apple Silicon (aarch64) 版本。"
+    fi
+    die "未找到可用的 macOS 安装包。可尝试手动下载: https://github.com/${REPO}/releases/latest"
   fi
-  die "未找到可用的 macOS 安装包。可尝试手动下载: https://github.com/${REPO}/releases/latest"
-fi
 
-DMG_PATH="${TMP_DIR}/Mozi.dmg"
-log "正在下载: ${ASSET_URL}"
-curl -fsSL -o "${DMG_PATH}" -H "User-Agent: Mozi-installer" "${ASSET_URL}"
+  DMG_PATH="${TMP_DIR}/Mozi.dmg"
+  log "正在下载: ${ASSET_URL}"
+  curl -fsSL -o "${DMG_PATH}" -H "User-Agent: Mozi-installer" "${ASSET_URL}"
+fi
 
 log "正在移除下载隔离标记..."
 xattr -cr "${DMG_PATH}" 2>/dev/null || true

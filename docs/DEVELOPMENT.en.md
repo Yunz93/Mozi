@@ -91,7 +91,7 @@ git push origin v0.1.1
 
 CI automatically syncs the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` to the tag, then runs the Tauri build and uploads to GitHub Releases.
 
-macOS users should prefer the one-line installer `scripts/install-macos.sh`, which downloads the release, runs `xattr -cr`, and copies the app into `/Applications`.
+macOS users should prefer the one-line installer `scripts/install-macos.sh`, which downloads the release, runs `xattr -cr`, and copies the app into `/Applications`. The in-app Settings → About updater on macOS uses the same script and shows download progress.
 
 ### macOS signing & notarization
 

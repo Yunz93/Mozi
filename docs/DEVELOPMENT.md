@@ -91,7 +91,7 @@ git push origin v0.1.1
 
 CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的版本号同步为当前 tag 对应版本，再执行 Tauri 打包和 GitHub Release 上传。
 
-macOS 用户推荐使用一键安装脚本 `scripts/install-macos.sh`（自动下载 Release、执行 `xattr -cr` 并安装到 `/Applications`）。
+macOS 用户推荐使用一键安装脚本 `scripts/install-macos.sh`（自动下载 Release、执行 `xattr -cr` 并安装到 `/Applications`）。桌面应用设置页的「检查更新」在 macOS 上走同一套安装脚本，并显示下载进度。
 
 ### macOS 签名与公证
 

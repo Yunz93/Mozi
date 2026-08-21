@@ -745,10 +745,10 @@ export default {
   settings_desktopPublishOnly: "一键发布仅在桌面版可用。",
   settings_updatesSectionTitle: "应用更新",
   settings_updatesSectionDesc:
-    "Windows 版支持应用内检查和安装更新；macOS 当前仍通过 GitHub Releases 手动下载。",
+    "Windows 使用签名更新包安装；macOS 使用与官网相同的安装脚本下载 DMG，并安装到「应用程序」。",
   settings_updatesDesktopOnly: "应用更新仅在桌面版可用。",
   settings_updatesMacManualDesc:
-    "macOS 当前不提供应用内安装更新。请前往 GitHub Releases 下载新版本，然后按现有方式安装。",
+    "macOS 会下载 GitHub Release 中的 DMG，并用安装脚本清除隔离属性后安装到「应用程序」。",
   settings_updatesOpenReleases: "打开 GitHub Releases",
   settings_updatesCurrentVersionLabel: "当前版本",
   settings_updatesLastCheckLabel: "上次检查",
@@ -756,7 +756,7 @@ export default {
   settings_updatesCurrentVersion: "当前版本：",
   settings_updatesAutoCheck: "启动后自动检查更新",
   settings_updatesAutoCheckDesc:
-    "仅在 Windows 桌面版启用。发现新版本后会给出提示，但不会立刻打断当前写作。",
+    "发现新版本后会给出提示，但不会立刻打断当前写作。",
   settings_updatesCheckNow: "立即检查",
   settings_updatesChecking: "正在检查更新...",
   settings_updatesArtifactsDisabled:
@@ -781,6 +781,10 @@ export default {
     "Windows 应用内更新依赖 GitHub Release 中的 `latest.json` 和签名更新包；发布新版本后，已安装用户才能收到更新。",
   settings_updatesGuide2:
     "如果刚发布了新版本但客户端还没检测到，先确认该 release 已包含 updater 产物，再重新检查一次。",
+  settings_updatesMacGuide1:
+    "macOS 应用内更新会下载 GitHub Release 中的 DMG，并用与官网相同的安装脚本清除隔离属性后安装到「应用程序」。",
+  settings_updatesMacGuide2:
+    "安装完成后应用会自动重启。如果刚发布了新版本但还没检测到，请确认 Release 已包含对应架构的 DMG，再重新检查一次。",
   settings_updatesCheckFailed: "检查更新失败：{error}",
   settings_updatesInstallFailed: "安装更新失败：{error}",
 

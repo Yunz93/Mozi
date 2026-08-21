@@ -55,13 +55,15 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
    - the Windows NSIS installer
    - updater signature assets
    - `latest.json`
-4. Install the new release on at least one Windows machine where an older build is already present.
+   - the macOS `.dmg` (and `.app.tar.gz` updater artifact)
+4. Install the new release on at least one Windows machine and one Mac where an older build is already present.
 5. Open `Settings -> About` and confirm:
    - the app detects the newer version
    - release notes load
    - download and install complete successfully
+   - macOS uses the same DMG install script as the website (`xattr`, `ditto`, install into `/Applications`)
 
 ## Scope
 
-- Windows: in-app update checks and install flow are supported.
-- macOS: still manual download/install from GitHub Releases.
+- Windows: in-app update checks and install flow use the Tauri updater plugin and signed NSIS artifacts.
+- macOS: in-app update checks GitHub Releases, downloads the architecture-matched DMG, then runs `scripts/install-macos.sh` (the same installer as the README one-liner). The app quits and relaunches after install so the single-instance plugin does not keep the old process.

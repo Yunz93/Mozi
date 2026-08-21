@@ -4,6 +4,7 @@ import type { TranslationKey } from "../utils/i18n";
 import {
   areUpdaterArtifactsEnabled,
   checkForAppUpdate,
+  isInAppUpdaterSupported,
   isWindowsUpdaterSupported,
 } from "../services/updaterService";
 
@@ -33,8 +34,8 @@ export function useAppUpdater(options: UseAppUpdaterOptions): void {
     if (
       !settingsHydrated ||
       !autoCheckForUpdates ||
-      !isWindowsUpdaterSupported() ||
-      !areUpdaterArtifactsEnabled()
+      !isInAppUpdaterSupported() ||
+      (isWindowsUpdaterSupported() && !areUpdaterArtifactsEnabled())
     ) {
       return;
     }
