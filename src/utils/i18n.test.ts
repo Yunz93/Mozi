@@ -63,6 +63,19 @@ describe("t", () => {
   it("replaces params in English translation", () => {
     expect(t("en", "stats_minutes", { count: 3 })).toBe("3 min");
   });
+
+  it("formats update download progress labels", () => {
+    expect(
+      t("zh-CN", "settings_updatesProgressBytes", {
+        downloaded: "5 MB",
+        total: "10 MB",
+      }),
+    ).toBe("5 MB / 10 MB");
+    expect(
+      t("en", "settings_updatesProgressDownloaded", { downloaded: "2 KB" }),
+    ).toBe("Downloaded 2 KB");
+    expect(t("zh-CN", "settings_updatesProgressLabel")).toBe("更新进度");
+  });
 });
 
 describe("localizeKnownError", () => {
