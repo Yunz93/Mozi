@@ -301,6 +301,7 @@ export default {
   sidebar_noLocalFilesOpened: "No local files opened.",
   sidebar_openKnowledgeBaseHint:
     "Use the button below to open a knowledge base.",
+  sidebar_dropToAddFiles: "You can also drop files here to add them.",
   sidebar_openKnowledgeBaseDisabledStandalone:
     "This window was opened from a single file in the system file browser, so switching knowledge bases is disabled. Open a knowledge base from inside the app instead.",
   sidebar_searchingNotes: "Searching notes...",
@@ -1021,6 +1022,10 @@ export default {
   notifications_targetFolderNotFound: "Target folder not found",
   notifications_noKnowledgeBaseOpened:
     "No knowledge base opened. Please open one first.",
+  notifications_fileAdded: "Added {name}",
+  notifications_filesAdded: "Added {count} files",
+  notifications_addFilesFailed: "Failed to add files: {error}",
+  notifications_noFilesDropped: "No files to add",
   notifications_itemNotFound: "Item not found",
   notifications_folderCreated: "Folder created",
   notifications_failedRevealInExplorer: "Failed to reveal in file explorer",

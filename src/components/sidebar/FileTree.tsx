@@ -12,10 +12,24 @@ import { getFileTypeBadge } from "../../utils/fileIconKind";
 import { useI18n } from "../../hooks/useI18n";
 import {
   extractDraggedNodeId as extractDraggedNodeIdFromEvent,
+  hasDragPayload,
   setDragPayload,
 } from "./dragPayload";
+import {
+  extractDroppedFiles,
+  resolveSidebarDropIntent,
+} from "../../utils/droppedFiles";
 
 const AUTO_EXPAND_ON_DRAG_MS = 420;
+
+/** Folder that should receive files dropped onto this tree node. */
+export function resolveTreeDropFolderPath(node: FileNode): string {
+  if (node.type === "folder") return node.path;
+  const normalized = node.path.replace(/\\/g, "/");
+  const idx = normalized.lastIndexOf("/");
+  if (idx <= 0) return "";
+  return normalized.slice(0, idx);
+}
 
 interface FileTreeItemProps {
   node: FileNode;
@@ -24,6 +38,7 @@ interface FileTreeItemProps {
   onSelect: (node: FileNode) => void;
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
+  onImportDroppedFiles?: (destFolderPath: string, files: File[]) => void;
   forceExpanded?: boolean;
   expandedPathIds?: Set<string>;
   locateRequestKey?: number;
@@ -37,6 +52,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     onSelect,
     onContextMenu,
     onMoveNode,
+    onImportDroppedFiles,
     forceExpanded = false,
     expandedPathIds,
     locateRequestKey = 0,
@@ -100,9 +116,11 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     const handleDragOver = useCallback(
       (e: React.DragEvent) => {
         if (!isDropTarget) return;
+        const intent = resolveSidebarDropIntent(e, hasDragPayload(e));
+        if (!intent) return;
         e.preventDefault();
         e.stopPropagation();
-        e.dataTransfer.dropEffect = "move";
+        e.dataTransfer.dropEffect = intent === "import-files" ? "copy" : "move";
         setIsDragOver(true);
         if (isFolder && !expanded && autoExpandTimerRef.current === null) {
           autoExpandTimerRef.current = window.setTimeout(() => {
@@ -132,6 +150,15 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         setIsDragOver(false);
         clearAutoExpandTimer();
 
+        const intent = resolveSidebarDropIntent(e, hasDragPayload(e));
+        if (intent === "import-files") {
+          const dropped = extractDroppedFiles(e);
+          if (dropped.length > 0) {
+            onImportDroppedFiles?.(resolveTreeDropFolderPath(node), dropped);
+          }
+          return;
+        }
+
         const sourceId = extractDraggedNodeId(e);
         if (!sourceId) return;
 
@@ -143,8 +170,9 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         clearAutoExpandTimer,
         extractDraggedNodeId,
         isDropTarget,
+        onImportDroppedFiles,
         onMoveNode,
-        node.id,
+        node,
       ],
     );
 
@@ -319,6 +347,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
                 level={level + 1}
                 onContextMenu={onContextMenu}
                 onMoveNode={onMoveNode}
+                onImportDroppedFiles={onImportDroppedFiles}
                 forceExpanded={forceExpanded}
                 expandedPathIds={expandedPathIds}
                 locateRequestKey={locateRequestKey}

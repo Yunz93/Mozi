@@ -4,6 +4,10 @@ import {
   hasDragPayload,
   setDragPayload,
 } from "../dragPayload";
+import {
+  extractDroppedFiles,
+  resolveSidebarDropIntent,
+} from "../../../utils/droppedFiles";
 
 export interface UseSidebarDragAndDropReturn {
   isRootDragOver: boolean;
@@ -15,6 +19,7 @@ export interface UseSidebarDragAndDropReturn {
   handleRootDrop: (
     event: React.DragEvent<HTMLDivElement>,
     onMoveToRoot: (nodeId: string) => void,
+    onImportDroppedFiles?: (files: File[]) => void,
   ) => void;
 }
 
@@ -38,9 +43,11 @@ export function useSidebarDragAndDrop(): UseSidebarDragAndDropReturn {
     (event: React.DragEvent<HTMLDivElement>) => {
       // During dragover the payload data is not readable (protected mode);
       // only the list of types is, so gate on that instead of getData.
-      if (!hasDragPayload(event)) return;
+      const intent = resolveSidebarDropIntent(event, hasDragPayload(event));
+      if (!intent) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
+      event.dataTransfer.dropEffect =
+        intent === "import-files" ? "copy" : "move";
       setIsRootDragOver(true);
     },
     [],
@@ -59,10 +66,21 @@ export function useSidebarDragAndDrop(): UseSidebarDragAndDropReturn {
     (
       event: React.DragEvent<HTMLDivElement>,
       onMoveToRoot: (nodeId: string) => void,
+      onImportDroppedFiles?: (files: File[]) => void,
     ) => {
       event.preventDefault();
-      const sourceId = extractDraggedNodeIdFromEvent(event);
       setIsRootDragOver(false);
+
+      const intent = resolveSidebarDropIntent(event, hasDragPayload(event));
+      if (intent === "import-files") {
+        const files = extractDroppedFiles(event);
+        if (files.length > 0) {
+          onImportDroppedFiles?.(files);
+          return;
+        }
+      }
+
+      const sourceId = extractDraggedNodeIdFromEvent(event);
       if (!sourceId) return;
       onMoveToRoot(sourceId);
     },

@@ -45,6 +45,7 @@ import {
 } from "../services/vault/semanticIndexRuntime";
 import { packVectorSnapshot } from "../services/vault/vectorStore";
 import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
+import { importDroppedFiles } from "../services/filesystem/importDroppedFiles";
 
 /** Prevent overlapping create calls for the same destination path. */
 const createDocumentInFlight = new Set<string>();
@@ -803,6 +804,109 @@ export function useFileOperations() {
     [files, rootFolderPath, moveNodeToTargetPath, showNotification],
   );
 
+  const handleImportDroppedFiles = useCallback(
+    async (targetFolderPath: string, dropped: File[]) => {
+      if (!rootFolderPath) {
+        showNotification(
+          t(settings.language, "notifications_noKnowledgeBaseOpened"),
+          "error",
+        );
+        return;
+      }
+
+      const dest = targetFolderPath.trim() || rootFolderPath;
+      if (!isSameOrChildPath(dest, rootFolderPath)) {
+        showNotification(
+          t(settings.language, "notifications_invalidTargetFolder"),
+          "error",
+        );
+        return;
+      }
+
+      if (dropped.length === 0) {
+        showNotification(
+          t(settings.language, "notifications_noFilesDropped"),
+          "info",
+        );
+        return;
+      }
+
+      try {
+        const fs = await getFileSystem();
+        const result = await importDroppedFiles({
+          files: dropped,
+          targetFolderPath: dest,
+          fs,
+        });
+
+        if (result.imported.length > 0) {
+          await refreshFileTree();
+        }
+
+        if (result.imported.length === 1) {
+          showNotification(
+            t(settings.language, "notifications_fileAdded", {
+              name: result.imported[0]!.name,
+            }),
+            "success",
+          );
+        } else if (result.imported.length > 1) {
+          showNotification(
+            t(settings.language, "notifications_filesAdded", {
+              count: result.imported.length,
+            }),
+            "success",
+          );
+        } else if (result.failed.length === 0) {
+          showNotification(
+            t(settings.language, "notifications_noFilesDropped"),
+            "info",
+          );
+        }
+
+        if (result.failed.length > 0) {
+          const first = result.failed[0]!;
+          showNotification(
+            t(settings.language, "notifications_addFilesFailed", {
+              error: first.error,
+            }),
+            "error",
+          );
+        }
+
+        const openable = result.imported.filter(
+          (file) =>
+            isMarkdownFile(file.name) ||
+            isExcalidrawFile(file.name) ||
+            isPreviewOnlyFile(file.name),
+        );
+        if (openable.length !== 1) return;
+
+        const node = findFileInTree(
+          useAppStore.getState().files,
+          openable[0]!.path,
+        );
+        if (node) {
+          await handleFileSelect(node);
+        }
+      } catch (error) {
+        showNotification(
+          t(settings.language, "notifications_addFilesFailed", {
+            error: error instanceof Error ? error.message : String(error),
+          }),
+          "error",
+        );
+      }
+    },
+    [
+      handleFileSelect,
+      refreshFileTree,
+      rootFolderPath,
+      settings.language,
+      showNotification,
+    ],
+  );
+
   const handleNewFolder = useCallback(
     async (parentFolder?: FileNode, name?: string) => {
       if (!name || !name.trim()) return;
@@ -883,6 +987,7 @@ export function useFileOperations() {
     handleDelete,
     handleMoveNode,
     handleMoveToRoot,
+    handleImportDroppedFiles,
     handleNewFolder,
     handleRevealInExplorer,
     handleOpenInFileExplorer,

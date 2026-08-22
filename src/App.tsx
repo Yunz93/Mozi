@@ -964,6 +964,7 @@ const App: React.FC = () => {
             onEmptyTrash={fileOps.handleEmptyTrash}
             onMoveNode={fileOps.handleMoveNode}
             onMoveToRoot={fileOps.handleMoveToRoot}
+            onImportDroppedFiles={fileOps.handleImportDroppedFiles}
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
