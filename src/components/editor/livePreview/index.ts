@@ -1,4 +1,4 @@
-import type { Extension } from "@codemirror/state";
+import { Prec, type Extension } from "@codemirror/state";
 import {
   EMPTY_LIVE_PREVIEW_CONTEXT,
   livePreviewContextFacet,
@@ -48,7 +48,7 @@ export function createLivePreviewPluginExtensions(): Extension[] {
     livePreviewGeometryRemeasure,
     livePreviewHideFormatting,
     livePreviewTaskCheckboxes,
-    livePreviewListMarkers,
+    Prec.high(livePreviewListMarkers),
     livePreviewBlockquotes,
     livePreviewImages,
     livePreviewLinks,
@@ -113,6 +113,7 @@ export {
   livePreviewListMarkerReplaceFrom,
   livePreviewListMarkers,
   livePreviewListNestLevel,
+  livePreviewListNestLevelFromIndent,
 } from "./listAndHighlight";
 export { buildLivePreviewLinkDecorations, livePreviewLinks } from "./links";
 export {

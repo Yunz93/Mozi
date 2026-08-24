@@ -16,6 +16,15 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
+import {
+  BLOCKQUOTE_REGEX,
+  ORDERED_LIST_REGEX,
+  TASK_LIST_REGEX,
+  UNORDERED_LIST_REGEX,
+  getIndentColumnWidth,
+  isInsideFencedCode,
+  isWithinFrontmatterBlock,
+} from "../behavior/core";
 import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   defineLivePreviewBlockDecorationField,
@@ -82,6 +91,73 @@ export function livePreviewListMarkerReplaceFrom(
 ): number {
   const indent = textBeforeMark.match(/[ \t]+$/);
   return indent ? markFrom - indent[0].length : markFrom;
+}
+
+type LivePreviewListLineParts = {
+  quoteLen: number;
+  indent: string;
+  marker: string;
+  ordered: boolean;
+  label: string;
+  isTask: boolean;
+};
+
+function livePreviewListLineParts(
+  lineText: string,
+): LivePreviewListLineParts | null {
+  let quoteLen = 0;
+  let rest = lineText;
+  const quoteMatch = lineText.match(BLOCKQUOTE_REGEX);
+  if (quoteMatch) {
+    quoteLen = quoteMatch[1].length + quoteMatch[2].length;
+    rest = quoteMatch[3];
+  }
+
+  const task = rest.match(TASK_LIST_REGEX);
+  if (task) {
+    return {
+      quoteLen,
+      indent: task[1] ?? "",
+      marker: task[2] ?? "-",
+      ordered: false,
+      label: "",
+      isTask: true,
+    };
+  }
+
+  const ordered = rest.match(ORDERED_LIST_REGEX);
+  if (ordered) {
+    return {
+      quoteLen,
+      indent: ordered[1] ?? "",
+      marker: `${ordered[2] ?? ""}${ordered[3] ?? "."}`,
+      ordered: true,
+      label: ordered[2] ?? "1",
+      isTask: false,
+    };
+  }
+
+  const unordered = rest.match(UNORDERED_LIST_REGEX);
+  if (!unordered) return null;
+  return {
+    quoteLen,
+    indent: unordered[1] ?? "",
+    marker: unordered[2] ?? "-",
+    ordered: false,
+    label: "",
+    isTask: false,
+  };
+}
+
+/** Indent-based nest level when the syntax tree did not emit a nested ListMark. */
+export function livePreviewListNestLevelFromIndent(indent: string): number {
+  const cols = getIndentColumnWidth(indent);
+  if (cols <= 0) return 1;
+  const step = cols % 4 === 0 ? 4 : 2;
+  return Math.max(
+    1,
+    Math.min(Math.floor(cols / step) + 1, MAX_LIVE_LIST_LEVEL),
+  );
 }
 
 function subtreeHasName(node: SyntaxNode | null, name: string): boolean {
@@ -247,6 +323,48 @@ export function buildLivePreviewListMarkerDecorations(
       });
     },
   });
+
+  // Nested items can be parsed as indented code / paragraph text, so ListMark
+  // is missing and the hyphen stays visible. Scan source lines as a fallback.
+  let linePos = viewportFrom;
+  while (linePos <= viewportTo) {
+    const line = state.doc.lineAt(linePos);
+    if (
+      !decoratedLines.has(line.from) &&
+      !selectionTouchesRange(state, line.from, line.to) &&
+      !isWithinFrontmatterBlock(state, line.from) &&
+      !isInsideFencedCode(state, line.from)
+    ) {
+      const parts = livePreviewListLineParts(line.text);
+      if (parts) {
+        const afterMarker =
+          parts.quoteLen + parts.indent.length + parts.marker.length;
+        const hasSpace = line.text[afterMarker] === " ";
+        const replaceFrom = line.from + parts.quoteLen;
+        const replaceTo = line.from + afterMarker + (hasSpace ? 1 : 0);
+        const level = livePreviewListNestLevelFromIndent(parts.indent);
+        decoratedLines.add(line.from);
+        ranges.push({
+          from: line.from,
+          to: line.from,
+          deco: livePreviewListLineDecos[level - 1]!,
+        });
+        if (replaceTo > replaceFrom) {
+          ranges.push({
+            from: replaceFrom,
+            to: replaceTo,
+            deco: parts.isTask
+              ? hideTaskListMarkDecoration
+              : Decoration.replace({
+                  widget: new BulletWidget(parts.ordered, parts.label),
+                }),
+          });
+        }
+      }
+    }
+    if (line.to >= viewportTo) break;
+    linePos = line.to + 1;
+  }
 
   ranges.sort((a, b) => a.from - b.from || a.to - b.to);
   for (const range of ranges) {

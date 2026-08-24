@@ -1170,7 +1170,7 @@
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-line {
   --mp-live-list-step: 1.5em;
   --mp-live-list-marker-em: 1.15em;
-  text-indent: calc(-1 * var(--mp-live-list-marker-em));
+  text-indent: calc(-1 * var(--mp-live-list-marker-em)) !important;
 }
 
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-list-level-1 {
