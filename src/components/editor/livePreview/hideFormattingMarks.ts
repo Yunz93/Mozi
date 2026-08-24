@@ -284,6 +284,7 @@ export const livePreviewTheme = EditorView.baseTheme({
     height: "auto",
     borderRadius: "0.35rem",
     cursor: "text",
+    userSelect: "none",
   },
   ".cm-live-preview-image-wrap": {
     display: "inline-block",
@@ -292,6 +293,7 @@ export const livePreviewTheme = EditorView.baseTheme({
     // Prefer padding over margin — CM block height maps ignore vertical margins.
     paddingBlock: "0.35em",
     cursor: "text",
+    userSelect: "none",
   },
   ".cm-live-preview-image-wrap.is-loading": {
     minWidth: "4rem",

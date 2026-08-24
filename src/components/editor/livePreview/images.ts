@@ -39,9 +39,8 @@ import {
   ViewportDecorationWindow,
   bindLivePreviewImageMeasure,
   scheduleLivePreviewMeasure,
-  scheduleLivePreviewReveal,
   isLivePreviewRevealCurrent,
-  cancelPendingLivePreviewReveals,
+  bindLivePreviewClickToReveal,
 } from "./shared";
 
 const imageResolvedEffect = StateEffect.define<{
@@ -139,45 +138,27 @@ class MarkdownImageWidget extends WidgetType {
     }
     wrap.appendChild(img);
 
-    const revealSource = () => {
+    bindLivePreviewClickToReveal(view, wrap, (generation) => {
       const urlFrom = this.urlFrom;
       const urlTo = this.urlTo;
       const from = this.from;
       const to = this.to;
-      scheduleLivePreviewReveal(view, (generation) => {
-        view.focus();
-        // Cover the whole image construct so replace widgets drop on rebuild.
-        // Selecting a sub-range inside an active replace decoration collapses.
-        view.dispatch({
-          selection: { anchor: from, head: to },
-          scrollIntoView: false,
-        });
-        if (urlFrom < urlTo) {
-          requestAnimationFrame(() => {
-            if (!isLivePreviewRevealCurrent(generation)) return;
-            if (!view.dom.isConnected) return;
-            view.dispatch({
-              selection: { anchor: urlFrom, head: urlTo },
-              scrollIntoView: false,
-            });
-          });
-        }
+      // Cover the whole image construct so replace widgets drop on rebuild.
+      // Selecting a sub-range inside an active replace decoration collapses.
+      view.dispatch({
+        selection: { anchor: from, head: to },
+        scrollIntoView: false,
       });
-    };
-
-    wrap.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      // Drop any prior deferred reveal before this click's reveal runs.
-      cancelPendingLivePreviewReveals();
-      // Prevent CM from applying a DOM selection inside the replaced range.
-      event.preventDefault();
-      event.stopPropagation();
-    });
-    wrap.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      // Defer past CM's DOM selection flush from this click.
-      revealSource();
+      if (urlFrom < urlTo) {
+        requestAnimationFrame(() => {
+          if (!isLivePreviewRevealCurrent(generation)) return;
+          if (!view.dom.isConnected) return;
+          view.dispatch({
+            selection: { anchor: urlFrom, head: urlTo },
+            scrollIntoView: false,
+          });
+        });
+      }
     });
 
     return wrap;
