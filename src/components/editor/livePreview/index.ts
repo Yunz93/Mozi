@@ -135,4 +135,5 @@ export {
   LIVE_PREVIEW_VIEWPORT_DECORATION_PAD,
   cancelPendingLivePreviewReveals,
   livePreviewGeometryRemeasure,
+  bindLivePreviewClickToReveal,
 } from "./shared";

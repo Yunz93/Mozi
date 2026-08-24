@@ -930,3 +930,83 @@ export function bindLivePreviewWidgetCaret(
     });
   });
 }
+
+/**
+ * Apply a deferred reveal selection. Happy-DOM (and rare browser races) can
+ * fire `selectionchange` synchronously inside `dispatch`, which CM rejects as
+ * a nested update. Retry once on the next timeout when that happens.
+ */
+function invokeLivePreviewRevealApply(
+  view: EditorView,
+  generation: number,
+  apply: (generation: number) => void,
+): void {
+  if (!isLivePreviewRevealCurrent(generation)) return;
+  if (!view.dom.isConnected) return;
+  try {
+    apply(generation);
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !error.message.includes("update is in progress")
+    ) {
+      throw error;
+    }
+    window.setTimeout(() => {
+      if (!isLivePreviewRevealCurrent(generation)) return;
+      if (!view.dom.isConnected) return;
+      apply(generation);
+    }, 0);
+  }
+}
+
+/**
+ * Click-to-reveal for tall image widgets. Selecting the source drops the
+ * replace widget, so following text jumps up under the cursor; CM/native
+ * selection can then extend into that text. Suppress the mouse gesture and
+ * re-assert the intended range after layout settles.
+ */
+export function bindLivePreviewClickToReveal(
+  view: EditorView,
+  el: HTMLElement,
+  apply: (generation: number) => void,
+): void {
+  const suppress = (event: MouseEvent) => {
+    if (event.button !== 0) return;
+    cancelPendingLivePreviewReveals();
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  el.addEventListener("mousedown", suppress, true);
+  el.addEventListener("mouseup", suppress, true);
+  el.addEventListener(
+    "selectstart",
+    (event) => {
+      event.preventDefault();
+    },
+    true,
+  );
+  el.addEventListener(
+    "click",
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      scheduleLivePreviewReveal(view, (generation) => {
+        if (view.dom.isConnected) view.focus();
+        invokeLivePreviewRevealApply(view, generation, apply);
+        const reassert = () => {
+          invokeLivePreviewRevealApply(view, generation, apply);
+        };
+        // Wait for the replace widget to drop (layout) and for CM to finish
+        // its own frame/selection flush. Dispatching from rAF itself can nest
+        // inside an in-progress EditorView.update.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            window.setTimeout(reassert, 0);
+          });
+        });
+      });
+    },
+    true,
+  );
+}

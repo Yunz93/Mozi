@@ -52,10 +52,9 @@ import {
   bindLivePreviewImageMeasure,
   bindLivePreviewMediaMeasure,
   bindLivePreviewWidgetCaret,
+  bindLivePreviewClickToReveal,
   bindLivePreviewWidgetResizeMeasure,
   scheduleLivePreviewMeasure,
-  scheduleLivePreviewReveal,
-  cancelPendingLivePreviewReveals,
   type BlockDecorationBuild,
   type CoverageRange,
   type WikiLinkRange,
@@ -168,23 +167,10 @@ class WikiImageWidget extends WidgetType {
     }
     wrap.appendChild(img);
 
-    wrap.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      cancelPendingLivePreviewReveals();
-      event.preventDefault();
-      event.stopPropagation();
-    });
-    wrap.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const from = this.from;
-      const to = this.to;
-      scheduleLivePreviewReveal(view, () => {
-        view.focus();
-        view.dispatch({
-          selection: { anchor: from, head: to },
-          scrollIntoView: false,
-        });
+    bindLivePreviewClickToReveal(view, wrap, () => {
+      view.dispatch({
+        selection: { anchor: this.from, head: this.to },
+        scrollIntoView: false,
       });
     });
 
