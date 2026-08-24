@@ -85,7 +85,7 @@ function formatYamlScalar(value: unknown): string {
 function renderYamlValue(value: unknown): string[] {
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return ["- "];
+      return ["[]"];
     }
 
     return value.flatMap((item) => {
@@ -183,7 +183,7 @@ export function generateFrontmatter(frontmatter: Frontmatter): string {
 
     const yamlLines = entries.flatMap(([key, value]) => {
       const rendered = renderYamlValue(value);
-      if (Array.isArray(value)) {
+      if (Array.isArray(value) && value.length > 0) {
         return [
           `${formatYamlKey(key)}:`,
           ...rendered.map((line) => `  ${line}`),

@@ -4,10 +4,9 @@ import { useFileSystem } from "./useFileSystem";
 import type { FileNode } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { clearAttachmentResolverCache } from "../utils/attachmentResolver";
-import { generateFrontmatter } from "../utils/frontmatter";
 import { t } from "../utils/i18n";
 import { findAndRewriteAffectedFiles } from "../utils/linkRewriter";
-import { parseMetadataTemplateValue } from "../utils/metadataFields";
+import { buildFrontmatterFromMetadataTemplate } from "../utils/metadataFields";
 import { findFileInTree } from "../utils/fileTree";
 import {
   buildTabPathRemapState,
@@ -272,14 +271,9 @@ export function useFileOperations() {
       );
       const finalFileName = `${normalizedName}.md`;
       const documentTitle = normalizedName;
-      const meta: Record<string, string | string[] | number | boolean> = {};
-
-      settings.metadataFields.forEach((f) => {
-        meta[f.key] = parseMetadataTemplateValue(f.defaultValue);
-      });
-
-      const frontmatterBlock =
-        Object.keys(meta).length > 0 ? generateFrontmatter(meta) : "";
+      const frontmatterBlock = buildFrontmatterFromMetadataTemplate(
+        settings.metadataFields,
+      );
       const initialContent = `${frontmatterBlock}# ${documentTitle}\n\n`;
 
       const storeState = useAppStore.getState();
