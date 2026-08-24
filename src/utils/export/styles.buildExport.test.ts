@@ -206,6 +206,19 @@ describe("buildExportStyles", () => {
     );
   });
 
+  it("keeps callout body line spacing aligned with prose", () => {
+    const css = buildExportStyles("light");
+    expect(css).toMatch(
+      /\.export-document \.markdown-body \.mp-callout-title\s*\{[^}]*margin:\s*0/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body \.mp-callout p\s*\{[^}]*margin-bottom:\s*0/m,
+    );
+    expect(css).toMatch(
+      /\.export-document \.markdown-body \.mp-callout p:empty\s*\{[^}]*display:\s*none/m,
+    );
+  });
+
   it("matches preview paragraph rhythm and inline-code line-height", () => {
     const css = buildExportStyles("light");
     expect(css).toMatch(

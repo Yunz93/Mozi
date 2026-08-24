@@ -37,6 +37,28 @@ describe("renderMarkdown", () => {
     expect(html).not.toContain("[!note]");
   });
 
+  it("does not leave an empty paragraph after a callout title", () => {
+    const html = renderMarkdown("> [!caution] 注意\n>\n> 测试\n>\n> 测试");
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const callout = doc.querySelector(".mp-callout");
+    expect(callout).not.toBeNull();
+    const paragraphs = [...callout!.querySelectorAll("p")];
+    expect(paragraphs.map((p) => p.textContent?.trim())).toEqual([
+      "测试",
+      "测试",
+    ]);
+    expect(html).not.toMatch(/<p>\s*<\/p>/);
+    expect(html.match(/测试/g)?.length).toBe(2);
+  });
+
+  it("renders tight callout body lines once", () => {
+    const html = renderMarkdown("> [!caution] 注意\n> 测试\n> 测试");
+    expect(html.match(/测试/g)?.length).toBe(2);
+    expect(html).toContain("mp-callout-caution");
+    expect(html).not.toMatch(/<p>\s*<\/p>/);
+    expect(html).toMatch(/<p>测试<br>\s*测试<\/p>/);
+  });
+
   it("renders wikilink anchor with data-wikilink", () => {
     const html = renderMarkdown("See [[My Note|label]].");
     expect(html).toContain("data-wikilink");

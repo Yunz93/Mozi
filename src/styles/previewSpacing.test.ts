@@ -23,6 +23,26 @@ describe("preview spacing CSS", () => {
     );
   });
 
+  it("keeps callout body line spacing aligned with prose", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "src/styles/preview.css"),
+      "utf8",
+    );
+
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.mp-callout-title\s*\{[^}]*margin:\s*0;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.mp-callout p\s*\{[^}]*margin-bottom:\s*0;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body \.mp-callout p:empty\s*\{[^}]*display:\s*none;/m,
+    );
+    expect(css).toMatch(
+      /\.preview-pane-document\.markdown-body\s*\n\s*\.mp-callout\s*\n\s*:has\(\+ \.preview-source-blank-line\)\s*\{[^}]*margin-bottom:\s*0;/m,
+    );
+  });
+
   it("does not add paragraph-to-list spacing when the source has no blank line", () => {
     const css = readFileSync(
       resolve(process.cwd(), "src/styles/preview.css"),

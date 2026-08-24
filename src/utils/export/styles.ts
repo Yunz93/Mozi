@@ -610,7 +610,21 @@ ${exportDelStrikeBlock}
     .export-document .markdown-body .mp-callout-title {
       font-weight: 700;
       text-transform: capitalize;
-      margin-bottom: 0.35em;
+      margin: 0;
+    }
+
+    .export-document .markdown-body .mp-callout p {
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+
+    .export-document .markdown-body .mp-callout p:empty {
+      display: none;
+    }
+
+    .export-document .markdown-body .mp-callout
+      :has(+ .preview-source-blank-line) {
+      margin-bottom: 0;
     }
 
     .export-document .markdown-body .mp-callout-warning,

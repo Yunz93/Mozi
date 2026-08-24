@@ -1552,6 +1552,25 @@
 }
 
 /* Nested markdown-it HTML inside callouts / note embeds. */
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-callout-body.markdown-body {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-callout-body.markdown-body
+  p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.editor-pane-layout[data-live-preview="true"]
+  .cm-live-preview-callout-body.markdown-body
+  p:empty {
+  display: none;
+}
+
 .editor-pane-layout[data-live-preview="true"] .markdown-body table {
   width: 100%;
   max-width: 100%;

@@ -354,6 +354,12 @@ describe("live preview hide formatting", () => {
       /cm-live-preview-math-display[^}]*text-align:\s*center/,
     );
     expect(sheetText).toMatch(
+      /cm-live-preview-callout-body\.markdown-body\s*\{[^}]*line-height:\s*inherit/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-callout-body\.markdown-body p\s*\{[^}]*margin-bottom:\s*0/,
+    );
+    expect(sheetText).toMatch(
       /cm-live-preview-mermaid[^}]*text-align:\s*center/,
     );
     expect(sheetText).toMatch(

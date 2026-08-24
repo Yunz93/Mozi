@@ -514,14 +514,20 @@ export const livePreviewTheme = EditorView.baseTheme({
   },
   ".cm-live-preview-callout-title": {
     fontWeight: "700",
-    // Prefer padding — CM block height maps ignore vertical margins.
-    paddingBottom: "0.35em",
+    paddingBottom: 0,
     textTransform: "capitalize",
     color: "var(--mp-doc-text, inherit)",
   },
   ".cm-live-preview-callout-body.markdown-body": {
-    fontSize: "0.95em",
-    lineHeight: "1.7",
+    fontSize: "inherit",
+    lineHeight: "inherit",
+  },
+  ".cm-live-preview-callout-body.markdown-body p": {
+    marginTop: 0,
+    marginBottom: 0,
+  },
+  ".cm-live-preview-callout-body.markdown-body p:empty": {
+    display: "none",
   },
   ".cm-live-preview-callout-warning, .cm-live-preview-callout-caution": {
     borderInlineStartColor: "#d97706",

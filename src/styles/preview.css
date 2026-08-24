@@ -328,7 +328,23 @@
 .preview-pane-document.markdown-body .mp-callout-title {
   font-weight: 700;
   text-transform: capitalize;
-  margin-bottom: 0.35em;
+  margin: 0;
+}
+
+/* Callout body uses the same line box as prose; do not stack paragraph margins. */
+.preview-pane-document.markdown-body .mp-callout p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.preview-pane-document.markdown-body .mp-callout p:empty {
+  display: none;
+}
+
+.preview-pane-document.markdown-body
+  .mp-callout
+  :has(+ .preview-source-blank-line) {
+  margin-bottom: 0;
 }
 
 .preview-pane-document.markdown-body .mp-callout-warning,

@@ -15,6 +15,20 @@ function firstInlineInBlockquote(
   return null;
 }
 
+function removeEmptyParagraphAroundInline(
+  tokens: Token[],
+  inline: Token,
+): void {
+  const inlineIndex = tokens.indexOf(inline);
+  if (inlineIndex <= 0) return;
+  if (
+    tokens[inlineIndex - 1]?.type === "paragraph_open" &&
+    tokens[inlineIndex + 1]?.type === "paragraph_close"
+  ) {
+    tokens.splice(inlineIndex - 1, 3);
+  }
+}
+
 /**
  * Turn Obsidian/GitHub `> [!note] Title` blockquotes into styled callouts
  * so preview, PDF, long image, and blog HTML match Live Preview.
@@ -37,12 +51,18 @@ export function markdownItCallouts(md: MarkdownIt): void {
 
       const rest = inline.content.replace(/^[^\n]*\n?/, "");
       inline.content = rest;
-      inline.children = md.parseInline(rest, state.env)[0]?.children ?? [];
+      // Let the core inline rule parse `content` once. Feeding parseInline
+      // children here duplicated body text when both arrays were rendered.
+      inline.children = [];
 
       const titleOpen = new state.Token("html_block", "", 0);
       titleOpen.content = `<div class="mp-callout-title">${md.utils.escapeHtml(title)}</div>`;
       tokens.splice(i + 1, 0, titleOpen);
       i += 1;
+
+      if (!rest.trim()) {
+        removeEmptyParagraphAroundInline(tokens, inline);
+      }
     }
   });
 }

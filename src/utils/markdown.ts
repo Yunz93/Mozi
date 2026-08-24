@@ -263,7 +263,7 @@ let currentTheme: ThemeMode = "light";
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 7;
+const MARKDOWN_RENDERER_CACHE_VERSION = 8;
 const PREVIEW_BLANK_LINE_HTML =
   '<div class="preview-source-blank-line"></div>\n';
 

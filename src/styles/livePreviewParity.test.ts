@@ -135,4 +135,13 @@ describe("live preview / reading visual parity", () => {
       /\[data-live-preview="true"\] \.tok-link,[\s\S]*?\[data-live-preview="true"\] \.tok-url,/s,
     );
   });
+
+  it("keeps live callout body line spacing aligned with prose", () => {
+    expect(editorCss).toMatch(
+      /\.cm-live-preview-callout-body\.markdown-body\s*\{[^}]*line-height:\s*inherit;/m,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-live-preview-callout-body\.markdown-body\s*\n\s*p\s*\{[^}]*margin-bottom:\s*0;/m,
+    );
+  });
 });
