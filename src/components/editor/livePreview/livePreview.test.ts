@@ -22,6 +22,8 @@ import {
   findCalloutRanges,
   livePreviewCallouts,
 } from "./callouts";
+import { markdownListDecorations } from "../decorations";
+import { indentationGuides } from "../hooks/indentationGuides";
 import {
   buildLivePreviewBlockquoteDecorations,
   buildLivePreviewListMarkerDecorations,
@@ -31,6 +33,7 @@ import {
   livePreviewHighlights,
   livePreviewListMarkerReplaceFrom,
   livePreviewListMarkers,
+  livePreviewListNestLevelFromIndent,
 } from "./listAndHighlight";
 import { buildLivePreviewLinkDecorations } from "./links";
 import { livePreviewMermaid } from "./mermaid";
@@ -67,6 +70,13 @@ describe("livePreviewListMarkerReplaceFrom", () => {
     expect(livePreviewListMarkerReplaceFrom(10, 14, "    ")).toBe(10);
     expect(livePreviewListMarkerReplaceFrom(0, 2, "  ")).toBe(0);
     expect(livePreviewListMarkerReplaceFrom(0, 4, ">   ")).toBe(1);
+  });
+
+  it("maps source indent to live nest levels", () => {
+    expect(livePreviewListNestLevelFromIndent("")).toBe(1);
+    expect(livePreviewListNestLevelFromIndent("  ")).toBe(2);
+    expect(livePreviewListNestLevelFromIndent("    ")).toBe(2);
+    expect(livePreviewListNestLevelFromIndent("        ")).toBe(3);
   });
 });
 
@@ -901,6 +911,37 @@ describe("live preview hide formatting", () => {
     expect(
       childLine?.querySelector(".cm-live-preview-list-marker.is-bullet"),
     ).not.toBeNull();
+  });
+
+  it("renders Tab-indented second and third level bullets next to hang-indent decorations", () => {
+    const doc = [
+      "- 一级列表",
+      "    - 二级列表",
+      "        - 三级列表",
+      "        - ",
+    ].join("\n");
+    const cursor = doc.length;
+    const view = mount(doc, cursor, [
+      markdownListDecorations,
+      ...indentationGuides(),
+      livePreviewListMarkers,
+    ]);
+    const lines = Array.from(view.dom.querySelectorAll(".cm-line"));
+    expect(
+      lines[0]?.querySelector(".cm-live-preview-list-marker"),
+    ).not.toBeNull();
+    expect(lines[1]?.textContent ?? "").not.toMatch(/-/);
+    expect(lines[2]?.textContent ?? "").not.toMatch(/-/);
+    expect(
+      lines[1]?.querySelector(".cm-live-preview-list-marker.is-bullet"),
+    ).not.toBeNull();
+    expect(
+      lines[2]?.querySelector(".cm-live-preview-list-marker.is-bullet"),
+    ).not.toBeNull();
+    expect(lines[3]?.textContent ?? "").toMatch(/-/);
+    expect(lines[2]?.className.includes("cm-live-preview-list-level-3")).toBe(
+      true,
+    );
   });
 
   it("does not eat blockquote marks when replacing nested quote lists", () => {

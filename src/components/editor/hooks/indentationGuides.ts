@@ -13,6 +13,7 @@ import {
 } from "@codemirror/view";
 
 const indentGuideMark = Decoration.mark({ class: "cm-indent-guide" });
+const LIST_LINE_RE = /^[ \t]*(?:>[ \t]*)*(?:[-+*] |\d+[.)] )/;
 
 function buildIndentGuideDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
@@ -23,6 +24,10 @@ function buildIndentGuideDecorations(view: EditorView): DecorationSet {
     while (pos <= to) {
       const line = view.state.doc.lineAt(pos);
       const text = line.text;
+      if (LIST_LINE_RE.test(text)) {
+        pos = line.to + 1;
+        continue;
+      }
       let col = 0;
 
       for (let i = 0; i < text.length; i += 1) {

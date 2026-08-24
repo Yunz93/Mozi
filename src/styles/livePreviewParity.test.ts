@@ -98,6 +98,9 @@ describe("live preview / reading visual parity", () => {
     expect(editorCss).toMatch(
       /\[data-live-preview="true"\]\s+\.cm-live-preview-list-line\.is-nested::before\s*\{[^}]*background:\s*var\(--mp-doc-border/s,
     );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-list-line\s*\{[^}]*text-indent:\s*calc\(-1 \* var\(--mp-live-list-marker-em\)\) !important/s,
+    );
   });
 
   it("does not shrink live mermaid diagrams to the text column", () => {
