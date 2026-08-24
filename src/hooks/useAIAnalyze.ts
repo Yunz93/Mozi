@@ -1,6 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
 import { useFileSystem } from "./useFileSystem";
+import { isExcalidrawWorkspaceFile } from "../utils/excalidrawDocument";
+import { isPreviewOnlyFile } from "../utils/fileTypes";
 import {
   analyzeMarkdownWithProvider,
   ensureAIConfiguration,
@@ -30,6 +32,22 @@ function getFileNameFromPath(path: string | null): string {
   if (!path) return "";
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts[parts.length - 1] || "";
+}
+
+/** True when the current note can run full-document AI enhance. */
+export function canRequestAiEnhance(options: {
+  isAnalyzing: boolean;
+  activeTabId: string | null;
+  currentFilePath: string | null;
+  content: string;
+}): boolean {
+  if (options.isAnalyzing) return false;
+  if (!options.activeTabId || !options.content) return false;
+  const fileName = getFileNameFromPath(options.currentFilePath);
+  if (!fileName) return false;
+  if (isPreviewOnlyFile(fileName)) return false;
+  if (isExcalidrawWorkspaceFile(fileName, options.content)) return false;
+  return true;
 }
 
 function stripMarkdownExtension(fileName: string): string {
@@ -182,18 +200,39 @@ function getDefaultWikiCategory(language: AppLanguage): string {
  */
 export function useAIAnalyze() {
   const {
-    settings,
     activeTabId,
     setAnalyzing,
     showNotification,
     setSettingsOpen,
     currentFilePath,
     rootFolderPath,
+    isAnalyzing,
   } = useAppStore();
   const content = useAppStore(selectContent);
   const { createFile, refreshFileTree } = useFileSystem();
+  const [isAiEnhanceConfirmOpen, setAiEnhanceConfirmOpen] = useState(false);
+
+  const requestAIAnalyze = useCallback(() => {
+    const state = useAppStore.getState();
+    if (
+      !canRequestAiEnhance({
+        isAnalyzing: state.isAnalyzing,
+        activeTabId: state.activeTabId,
+        currentFilePath: state.currentFilePath,
+        content: selectContent(state),
+      })
+    ) {
+      return;
+    }
+    setAiEnhanceConfirmOpen(true);
+  }, []);
+
+  const closeAiEnhanceConfirm = useCallback(() => {
+    setAiEnhanceConfirmOpen(false);
+  }, []);
 
   const handleAIAnalyze = useCallback(async () => {
+    if (isAnalyzing) return;
     if (!content || !activeTabId) return;
     const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
 
@@ -263,7 +302,14 @@ export function useAIAnalyze() {
     } finally {
       setAnalyzing(false);
     }
-  }, [activeTabId, content, setAnalyzing, showNotification, setSettingsOpen]);
+  }, [
+    activeTabId,
+    content,
+    isAnalyzing,
+    setAnalyzing,
+    showNotification,
+    setSettingsOpen,
+  ]);
 
   const handleGenerateWikiFromSelection = useCallback(
     async (selection: {
@@ -401,6 +447,9 @@ export function useAIAnalyze() {
 
   return {
     handleAIAnalyze,
+    requestAIAnalyze,
+    closeAiEnhanceConfirm,
+    isAiEnhanceConfirmOpen,
     handleGenerateWikiFromSelection,
   };
 }

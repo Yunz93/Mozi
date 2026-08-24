@@ -143,7 +143,13 @@ const App: React.FC = () => {
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
   const { highlighter } = useShikiHighlighter(content);
-  const { handleAIAnalyze, handleGenerateWikiFromSelection } = useAIAnalyze();
+  const {
+    handleAIAnalyze,
+    requestAIAnalyze,
+    closeAiEnhanceConfirm,
+    isAiEnhanceConfirmOpen,
+    handleGenerateWikiFromSelection,
+  } = useAIAnalyze();
   const fileOps = useFileOperations();
 
   const { headings: outlineHeadings } = useOutline();
@@ -350,7 +356,7 @@ const App: React.FC = () => {
         }
       }
     },
-    handleAIAnalyze,
+    requestAIAnalyze,
     {
       onSearch: () => setIsSearchBarOpen(true),
       onSidebarSearch: () => {
@@ -985,7 +991,7 @@ const App: React.FC = () => {
               fileName={activeFile?.name || ""}
               viewMode={viewMode}
               onViewModeChange={handleToolbarViewModeChange}
-              onAIAnalyze={handleAIAnalyze}
+              onAIAnalyze={requestAIAnalyze}
               onAskVault={() => {
                 setIsAskVaultOpen((prev) => {
                   const next = !prev;
@@ -1100,6 +1106,12 @@ const App: React.FC = () => {
             void handleSubmitWechatDraft(input);
           }}
           onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
+          isAiEnhanceConfirmOpen={isAiEnhanceConfirmOpen}
+          onConfirmAiEnhance={() => {
+            closeAiEnhanceConfirm();
+            void handleAIAnalyze();
+          }}
+          onCancelAiEnhance={closeAiEnhanceConfirm}
           cleanupPendingCount={pendingCleanupAttachments?.length ?? 0}
           onConfirmCleanupAttachments={() => {
             void confirmCleanupUnusedAttachments();

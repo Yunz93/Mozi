@@ -79,6 +79,8 @@ describe("t", () => {
     expect(t("en", "notifications_fileAdded", { name: "a.md" })).toBe(
       "Added a.md",
     );
+    expect(t("zh-CN", "ai_confirmTitle")).toBe("开始 AI 增强？");
+    expect(t("en", "ai_confirmRun")).toBe("Start enhance");
     expect(t("en", "settings_updatesMacGuide2")).toContain("DMG");
   });
 });

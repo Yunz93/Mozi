@@ -254,7 +254,7 @@ export function useKeyboardShortcuts(
 
 export function useGlobalKeyboardShortcuts(
   executeSave: () => Promise<void>,
-  handleAIAnalyze: () => Promise<void>,
+  handleAIAnalyze: () => void | Promise<void>,
   options: Omit<UseKeyboardShortcutsOptions, "onSave" | "onAIAnalyze"> = {},
 ) {
   const handleKeyDown = useShortcutListener(

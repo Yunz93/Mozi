@@ -342,6 +342,10 @@ export default {
     "「{name}」上次保存失败时留下了备份内容，与磁盘上的文件不一致。要恢复备份内容吗？选择“放弃备份”将删除备份并保留磁盘上的版本。",
   draft_restoreConfirm: "恢复备份",
   draft_restoreDiscard: "放弃备份",
+  ai_confirmTitle: "开始 AI 增强？",
+  ai_confirmMessage:
+    "将对当前笔记调用 AI 生成增强内容，可能耗时并产生费用。完成后仍可预览再决定是否应用。",
+  ai_confirmRun: "开始增强",
   ai_reviewTitle: "AI 增强结果",
   ai_reviewDescription: "请确认以下内容。应用后将替换当前笔记（可撤销）。",
   ai_reviewLengthChange: "字符数 {before} → {after}",
