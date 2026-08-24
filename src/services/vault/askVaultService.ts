@@ -14,7 +14,12 @@ import {
   getActiveChunkIndex,
   getActiveVectorStore,
 } from "./semanticIndexRuntime";
-import { readIndexJson, writeIndexJson } from "./indexStorage";
+import {
+  ASK_HISTORY_FILE,
+  hashVaultId,
+  readIndexJson,
+  writeIndexJson,
+} from "./indexStorage";
 
 export interface AskVaultRequest {
   question: string;
@@ -30,8 +35,6 @@ interface AskVaultModelResponse {
   answerMarkdown?: string;
   citationIndexes?: number[];
 }
-
-const ASK_HISTORY_FILE = "ask-history.json";
 
 export const ASK_VAULT_SYSTEM_PROMPT =
   "You are XiaoZhi (小知助手). Answer questions ONLY using the provided numbered knowledge-base excerpts. Do not invent facts. Cite sources with [n] markers. If the excerpts are insufficient, say you could not find enough information in the vault.";
@@ -211,25 +214,87 @@ export interface AskVaultHistoryItem {
   at: number;
 }
 
+const ASK_HISTORY_LS_PREFIX = "markdown-press.ask-history.";
+const ASK_HISTORY_LIMIT = 50;
+
+export function askVaultHistoryLocalStorageKey(vaultId: string): string {
+  return `${ASK_HISTORY_LS_PREFIX}${vaultId}`;
+}
+
+function isHistoryItem(value: unknown): value is AskVaultHistoryItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as AskVaultHistoryItem;
+  return (
+    typeof item.id === "string" &&
+    typeof item.question === "string" &&
+    typeof item.at === "number" &&
+    Boolean(item.answer) &&
+    typeof item.answer.answerMarkdown === "string"
+  );
+}
+
+export function parseAskVaultHistory(value: unknown): AskVaultHistoryItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isHistoryItem).slice(0, ASK_HISTORY_LIMIT);
+}
+
+function readLocalAskVaultHistory(vaultId: string): AskVaultHistoryItem[] {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(askVaultHistoryLocalStorageKey(vaultId));
+    if (!raw) return [];
+    return parseAskVaultHistory(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalAskVaultHistory(
+  vaultId: string,
+  items: AskVaultHistoryItem[],
+): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(
+      askVaultHistoryLocalStorageKey(vaultId),
+      JSON.stringify(items),
+    );
+  } catch {
+    // Quota or private mode — disk persist is the primary copy.
+  }
+}
+
 export async function appendAskVaultHistory(
   vaultRoot: string,
   item: AskVaultHistoryItem,
 ): Promise<void> {
-  const existing =
-    (await readIndexJson<AskVaultHistoryItem[]>(vaultRoot, ASK_HISTORY_FILE)) ??
-    [];
-  const next = [item, ...existing].slice(0, 50);
-  await writeIndexJson(vaultRoot, ASK_HISTORY_FILE, next);
+  const existing = await loadAskVaultHistory(vaultRoot);
+  const next = [
+    item,
+    ...existing.filter((entry) => entry.id !== item.id),
+  ].slice(0, ASK_HISTORY_LIMIT);
+  const vaultId = await hashVaultId(vaultRoot);
+  writeLocalAskVaultHistory(vaultId, next);
+  await writeIndexJson(vaultRoot, ASK_HISTORY_FILE, next, "ask-history");
 }
 
 export async function loadAskVaultHistory(
   vaultRoot: string,
 ): Promise<AskVaultHistoryItem[]> {
-  const existing = await readIndexJson<AskVaultHistoryItem[]>(
-    vaultRoot,
-    ASK_HISTORY_FILE,
+  const vaultId = await hashVaultId(vaultRoot);
+  const fromDisk = parseAskVaultHistory(
+    await readIndexJson<unknown>(vaultRoot, ASK_HISTORY_FILE, "ask-history"),
   );
-  return existing ?? [];
+  if (fromDisk.length > 0) {
+    writeLocalAskVaultHistory(vaultId, fromDisk);
+    return fromDisk;
+  }
+
+  const fromLocal = readLocalAskVaultHistory(vaultId);
+  if (fromLocal.length > 0) {
+    await writeIndexJson(vaultRoot, ASK_HISTORY_FILE, fromLocal, "ask-history");
+  }
+  return fromLocal;
 }
 
 export function estimateLineOffset(

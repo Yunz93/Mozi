@@ -187,11 +187,6 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   }, [answerMarkdown, settings.themeMode, settings.markdownStylePreset]);
 
   useEffect(() => {
-    if (!open || !rootFolderPath) return;
-    void loadAskVaultHistory(rootFolderPath).then(setHistory);
-  }, [open, rootFolderPath]);
-
-  useEffect(() => {
     if (!open) return;
     void hydrateSensitiveSettingsIntoStore();
   }, [open]);
@@ -547,6 +542,20 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     setPrimaryTab("ask");
     setSecondaryTab("answer");
   }, []);
+
+  useEffect(() => {
+    if (!open || !rootFolderPath) return;
+    let cancelled = false;
+    void loadAskVaultHistory(rootFolderPath).then((items) => {
+      if (cancelled) return;
+      setHistory(items);
+      const latest = items[0];
+      if (latest) restoreHistoryItem(latest);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, rootFolderPath, restoreHistoryItem]);
 
   const handleAnswerClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {

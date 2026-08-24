@@ -28,7 +28,14 @@
     "fs:allow-exists",
     "fs:allow-rename",
     "fs:allow-remove",
-    "fs:allow-mkdir"
+    "fs:allow-mkdir",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$APPDATA/MarkdownPress" },
+        { "path": "$APPDATA/MarkdownPress/**" }
+      ]
+    }
   ],
   "platforms": ["macOS", "windows", "linux"]
 }
