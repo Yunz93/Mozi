@@ -14,8 +14,7 @@ export type SlashInsertKind =
   | "table-picker"
   | "table-sized"
   | "callout-note"
-  | "callout-warning"
-  | "callout-caution"
+  | "todo"
   | "mermaid-flowchart"
   | "mermaid-sequence"
   | "math-block"
@@ -65,6 +64,8 @@ export const SLASH_INSERT_COMMANDS: SlashInsertCommand[] = [
     aliases: [
       "note",
       "tip",
+      "说明",
+      "插入说明",
       "提示",
       "提示块",
       "高亮",
@@ -76,16 +77,21 @@ export const SLASH_INSERT_COMMANDS: SlashInsertCommand[] = [
     detailKey: "slash_calloutHint",
   },
   {
-    id: "callout-warning",
-    aliases: ["warning", "warn", "警告", "插入警告"],
-    labelKey: "slash_calloutWarning",
-    detailKey: "slash_calloutHint",
-  },
-  {
-    id: "callout-caution",
-    aliases: ["caution", "important", "注意", "重要", "插入注意"],
-    labelKey: "slash_calloutCaution",
-    detailKey: "slash_calloutHint",
+    id: "todo",
+    aliases: [
+      "todo",
+      "task",
+      "checkbox",
+      "checklist",
+      "待办",
+      "待办项",
+      "任务",
+      "任务列表",
+      "插入待办",
+      "插入待办项",
+    ],
+    labelKey: "slash_todo",
+    detailKey: "slash_todoHint",
   },
   {
     id: "mermaid-flowchart",
@@ -201,19 +207,13 @@ export function buildSlashInsertSnippet(
   if (id === "callout-note") {
     return calloutSnippet("note", t(language, "slash_calloutTitleNote"), body);
   }
-  if (id === "callout-warning") {
-    return calloutSnippet(
-      "warning",
-      t(language, "slash_calloutTitleWarning"),
-      body,
-    );
-  }
-  if (id === "callout-caution") {
-    return calloutSnippet(
-      "caution",
-      t(language, "slash_calloutTitleCaution"),
-      body,
-    );
+  if (id === "todo") {
+    const prefix = "- [ ] ";
+    return {
+      text: `${prefix}${body}`,
+      cursor: prefix.length,
+      select: body.length,
+    };
   }
   if (id === "mermaid-flowchart") {
     const start = t(language, "slash_mermaidStart");
