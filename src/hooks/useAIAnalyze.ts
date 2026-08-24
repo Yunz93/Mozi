@@ -10,7 +10,10 @@ import {
 } from "../services/aiService";
 import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
 import { generateFrontmatter, parseFrontmatter } from "../utils/frontmatter";
-import { parseMetadataTemplateValue } from "../utils/metadataFields";
+import {
+  parseMetadataTemplateValue,
+  mergeAiEnhanceFrontmatter,
+} from "../utils/metadataFields";
 import { type AppLanguage, type Frontmatter } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { joinFsPath } from "../utils/pathHelpers";
@@ -255,30 +258,12 @@ export function useAIAnalyze() {
         parseFrontmatter(content);
       const result = await analyzeMarkdownWithProvider(body, hydratedSettings);
       const today = new Date().toISOString().split("T")[0];
-
-      const aiFields: Partial<Frontmatter> = {
+      const mergedFrontmatter = mergeAiEnhanceFrontmatter(existingFrontmatter, {
         title: result.seoTitle,
         date: today,
         description: result.summary,
         tags: result.suggestedTags,
-      };
-
-      const mergedFrontmatter: Frontmatter = {
-        ...existingFrontmatter,
-        ...aiFields,
-        ...(existingFrontmatter?.category !== undefined && {
-          category: existingFrontmatter.category,
-        }),
-        ...(existingFrontmatter?.status !== undefined && {
-          status: existingFrontmatter.status,
-        }),
-        ...(existingFrontmatter?.is_publish !== undefined && {
-          is_publish: existingFrontmatter.is_publish,
-        }),
-        ...(existingFrontmatter?.layout !== undefined && {
-          layout: existingFrontmatter.layout,
-        }),
-      };
+      });
 
       const frontmatterBlock = generateFrontmatter(mergedFrontmatter);
       const optimizedBody = (result.optimizedMarkdown || body).trim();

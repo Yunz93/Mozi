@@ -4,6 +4,8 @@ import {
   fillMissingFrontmatterFields,
   parseMetadataTemplateValue,
   normalizeMetadataFields,
+  buildFrontmatterFromMetadataTemplate,
+  mergeAiEnhanceFrontmatter,
   DEFAULT_METADATA_FIELDS,
 } from "./metadataFields";
 
@@ -916,5 +918,88 @@ describe("fillMissingFrontmatterFields", () => {
     expect(next.startsWith("---\r\n")).toBe(true);
     expect(next).toContain("\r\nslug: hello\r\n");
     expect(next.endsWith("\r\n\r\nBody")).toBe(true);
+  });
+
+  it("does not add date created when a date field already exists", () => {
+    const doc = ["---", "date: 2026-01-01", "---", "", "Body"].join("\n");
+    const next = fillMissingFrontmatterFields(doc, DEFAULT_METADATA_FIELDS);
+    expect(next).toContain("date: 2026-01-01");
+    expect(next).not.toMatch(/date created:/i);
+    expect(next).not.toContain("create_time:");
+  });
+
+  it("does not add date modified when update_time already exists", () => {
+    const doc = [
+      "---",
+      "update_time: 2026-01-01 00:00:00",
+      "---",
+      "",
+      "Body",
+    ].join("\n");
+    const next = fillMissingFrontmatterFields(doc, DEFAULT_METADATA_FIELDS);
+    expect(next).toContain("update_time: 2026-01-01 00:00:00");
+    expect(next).not.toMatch(/date modified:/i);
+  });
+});
+
+describe("buildFrontmatterFromMetadataTemplate", () => {
+  it("writes unique keys and empty tags as [] instead of a dummy list item", () => {
+    const yaml = buildFrontmatterFromMetadataTemplate(DEFAULT_METADATA_FIELDS);
+    expect(yaml).toContain("status: draft");
+    expect(yaml).toContain("tags: []");
+    expect(yaml).not.toMatch(/^ {2}- $/m);
+    const keys = [...yaml.matchAll(/^"?([A-Za-z][^:\n]*)"?:/gm)].map((match) =>
+      match[1]!.toLowerCase(),
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("skips equivalent date keys in the template", () => {
+    const yaml = buildFrontmatterFromMetadataTemplate([
+      { key: "date created", defaultValue: "2026-01-01", description: "" },
+      { key: "date", defaultValue: "2026-02-02", description: "" },
+      { key: "create_time", defaultValue: "2026-03-03", description: "" },
+    ]);
+    expect(yaml).toContain("date created:");
+    expect(yaml).not.toMatch(/^date:/m);
+    expect(yaml).not.toContain("create_time:");
+  });
+});
+
+describe("mergeAiEnhanceFrontmatter", () => {
+  it("does not add a second date field when date created already exists", () => {
+    const merged = mergeAiEnhanceFrontmatter(
+      {
+        "date created": "2026-01-01 00:00:00",
+        "date modified": "2026-01-02 00:00:00",
+        status: "draft",
+        tags: [],
+      },
+      {
+        title: "SEO",
+        date: "2026-08-24",
+        description: "summary",
+        tags: ["ai"],
+      },
+    );
+    expect(merged.title).toBe("SEO");
+    expect(merged.description).toBe("summary");
+    expect(merged.tags).toEqual(["ai"]);
+    expect(merged.status).toBe("draft");
+    expect(merged.date).toBeUndefined();
+    expect(merged["date created"]).toBe("2026-01-01 00:00:00");
+  });
+
+  it("adds date when the note has no date-like field", () => {
+    const merged = mergeAiEnhanceFrontmatter(
+      { status: "draft" },
+      {
+        title: "SEO",
+        date: "2026-08-24",
+        description: "summary",
+        tags: [],
+      },
+    );
+    expect(merged.date).toBe("2026-08-24");
   });
 });

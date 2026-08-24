@@ -78,6 +78,19 @@ const AUTO_REFRESH_UPDATE_TIME_KEYS = new Set([
   "last modified",
 ]);
 
+/** Keys that describe the same fact; filling one should not add another. */
+const FRONTMATTER_EQUIVALENT_KEY_GROUPS: readonly (readonly string[])[] = [
+  ["date created", "date_created", "create_time", "created_at", "date"],
+  [
+    "date modified",
+    "date_modified",
+    "update_time",
+    "updated_at",
+    "last_modified",
+    "last modified",
+  ],
+];
+
 function cloneMetadataFields(fields: MetadataField[]): MetadataField[] {
   return fields.map((field) => ({ ...field }));
 }
@@ -198,6 +211,65 @@ export function parseMetadataTemplateValue(
   if (!Number.isNaN(num) && rawValue.trim() !== "") return num;
 
   return rawValue;
+}
+
+function expandEquivalentFrontmatterKeys(keys: Iterable<string>): Set<string> {
+  const expanded = new Set(
+    [...keys].map((key) => key.trim().toLowerCase()).filter(Boolean),
+  );
+  for (const group of FRONTMATTER_EQUIVALENT_KEY_GROUPS) {
+    if (group.some((key) => expanded.has(key))) {
+      for (const key of group) expanded.add(key);
+    }
+  }
+  return expanded;
+}
+
+/** Build YAML for a new note from the metadata template. */
+export function buildFrontmatterFromMetadataTemplate(
+  fields: readonly MetadataField[],
+): string {
+  const meta: Frontmatter = {};
+  const seen = new Set<string>();
+  for (const field of fields) {
+    const key = field.key.trim();
+    if (!key) continue;
+    const keyLower = key.toLowerCase();
+    if (seen.has(keyLower)) continue;
+    const equivalent = expandEquivalentFrontmatterKeys(seen);
+    if (equivalent.has(keyLower)) continue;
+    seen.add(keyLower);
+    meta[key] = parseMetadataTemplateValue(field.defaultValue);
+  }
+  return generateFrontmatter(meta);
+}
+
+export function mergeAiEnhanceFrontmatter(
+  existing: Frontmatter | null | undefined,
+  ai: {
+    title: string;
+    date: string;
+    description: string;
+    tags: string[];
+  },
+): Frontmatter {
+  const base: Frontmatter = { ...(existing ?? {}) };
+  const merged: Frontmatter = {
+    ...base,
+    title: ai.title,
+    description: ai.description,
+    tags: ai.tags,
+  };
+  if (base.category !== undefined) merged.category = base.category;
+  if (base.status !== undefined) merged.status = base.status;
+  if (base.is_publish !== undefined) merged.is_publish = base.is_publish;
+  if (base.layout !== undefined) merged.layout = base.layout;
+
+  const existingKeys = expandEquivalentFrontmatterKeys(Object.keys(base));
+  if (!existingKeys.has("date")) {
+    merged.date = ai.date;
+  }
+  return merged;
 }
 
 export function normalizeMetadataFields(input: unknown): MetadataField[] {
@@ -439,9 +511,7 @@ function collectMissingFrontmatterFields(
   existing: Frontmatter,
   fields: MetadataField[],
 ): Frontmatter {
-  const existingLower = new Set(
-    Object.keys(existing).map((key) => key.trim().toLowerCase()),
-  );
+  const existingLower = expandEquivalentFrontmatterKeys(Object.keys(existing));
   const additions: Frontmatter = {};
   const seenTemplateLower = new Set<string>();
 
@@ -453,6 +523,10 @@ function collectMissingFrontmatterFields(
     if (seenTemplateLower.has(keyLower)) continue;
     seenTemplateLower.add(keyLower);
     if (existingLower.has(keyLower)) continue;
+    existingLower.add(keyLower);
+    for (const extra of expandEquivalentFrontmatterKeys([keyLower])) {
+      existingLower.add(extra);
+    }
 
     additions[key] = parseMetadataTemplateValue(field.defaultValue);
   }

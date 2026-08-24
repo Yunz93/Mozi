@@ -105,8 +105,7 @@ describe("generateFrontmatter", () => {
 
   it("handles empty arrays", () => {
     const result = generateFrontmatter({ tags: [] });
-    expect(result).toContain("tags:");
-    expect(result).toContain("- ");
+    expect(result).toBe("---\ntags: []\n---\n\n");
   });
 
   it("returns empty string when generation throws", () => {
