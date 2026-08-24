@@ -12,8 +12,7 @@ describe("resolveSlashInsert", () => {
     expect(ids).toEqual([
       "table-picker",
       "callout-note",
-      "callout-warning",
-      "callout-caution",
+      "todo",
       "mermaid-flowchart",
       "mermaid-sequence",
       "math-block",
@@ -35,9 +34,11 @@ describe("resolveSlashInsert", () => {
   });
 
   it("filters commands by alias", () => {
-    expect(resolveSlashInsert("警告").map((item) => item.id)).toEqual([
-      "callout-warning",
+    expect(resolveSlashInsert("说明").map((item) => item.id)).toEqual([
+      "callout-note",
     ]);
+    expect(resolveSlashInsert("警告").map((item) => item.id)).toEqual([]);
+    expect(resolveSlashInsert("待办").map((item) => item.id)).toEqual(["todo"]);
     expect(resolveSlashInsert("流程").map((item) => item.id)).toEqual([
       "mermaid-flowchart",
     ]);
@@ -52,7 +53,15 @@ describe("resolveSlashInsert", () => {
 describe("buildSlashInsertSnippet", () => {
   it("builds a note callout with the body selected", () => {
     const snippet = buildSlashInsertSnippet("callout-note", "zh-CN");
-    expect(snippet.text).toBe("> [!note] 提示\n> 内容");
+    expect(snippet.text).toBe("> [!note] 说明\n> 内容");
+    expect(
+      snippet.text.slice(snippet.cursor, snippet.cursor + snippet.select),
+    ).toBe("内容");
+  });
+
+  it("builds a task item with the body selected", () => {
+    const snippet = buildSlashInsertSnippet("todo", "zh-CN");
+    expect(snippet.text).toBe("- [ ] 内容");
     expect(
       snippet.text.slice(snippet.cursor, snippet.cursor + snippet.select),
     ).toBe("内容");

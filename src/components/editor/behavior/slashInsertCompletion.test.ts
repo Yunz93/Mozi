@@ -38,7 +38,10 @@ describe("markdownSlashInsertCompletion", () => {
     expect(result?.from).toBe(0);
     const labels = result?.options.map((option) => option.label) ?? [];
     expect(labels[0]).toBe("插入表格");
-    expect(labels).toContain("插入提示");
+    expect(labels).toContain("插入说明");
+    expect(labels).toContain("插入待办项");
+    expect(labels).not.toContain("插入警告");
+    expect(labels).not.toContain("插入注意");
     expect(labels).toContain("插入流程图");
     expect(labels).toContain("插入公式");
     expect(labels).toContain("插入代码块");
@@ -49,16 +52,35 @@ describe("markdownSlashInsertCompletion", () => {
     ).toBe(false);
   });
 
-  it("inserts a warning callout from /警告", () => {
-    const result = completionAt("/警告");
+  it("inserts a note callout from /说明", () => {
+    const result = completionAt("/说明");
     expect(result?.options).toHaveLength(1);
-    const view = viewAt("/警告");
+    const view = viewAt("/说明");
     const apply = result?.options[0]?.apply;
     expect(typeof apply).toBe("function");
     if (typeof apply === "function") {
       apply(view, result!.options[0]!, 0, 3);
     }
-    expect(view.state.doc.toString()).toContain("> [!warning] 警告");
+    expect(view.state.doc.toString()).toContain("> [!note] 说明");
+    view.destroy();
+  });
+
+  it("inserts a task item from /待办", () => {
+    const result = completionAt("/待办");
+    expect(result?.options).toHaveLength(1);
+    const view = viewAt("/待办");
+    const apply = result?.options[0]?.apply;
+    expect(typeof apply).toBe("function");
+    if (typeof apply === "function") {
+      apply(view, result!.options[0]!, 0, 3);
+    }
+    expect(view.state.doc.toString()).toBe("- [ ] 内容");
+    expect(
+      view.state.sliceDoc(
+        view.state.selection.main.from,
+        view.state.selection.main.to,
+      ),
+    ).toBe("内容");
     view.destroy();
   });
 

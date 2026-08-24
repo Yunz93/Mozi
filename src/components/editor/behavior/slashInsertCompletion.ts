@@ -1,7 +1,7 @@
 /**
  * Line-start slash completions for Markdown inserts that are awkward to type.
  *
- * `/` lists table, callout, Mermaid, math, code, wiki embed, and footnote.
+ * `/` lists table, callout, to-do, Mermaid, math, code, wiki embed, and footnote.
  * `/3x4` still inserts a sized table immediately.
  */
 
