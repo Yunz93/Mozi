@@ -48,6 +48,9 @@ interface AppDialogsProps {
   onCloseWechatDraft: () => void;
   onSubmitWechatDraft: (input: WechatDraftPublishInput) => void;
   onCloseShareLongImage: () => void;
+  isAiEnhanceConfirmOpen?: boolean;
+  onConfirmAiEnhance?: () => void;
+  onCancelAiEnhance?: () => void;
   cleanupPendingCount?: number;
   onConfirmCleanupAttachments?: () => void;
   onCancelCleanupAttachments?: () => void;
@@ -81,6 +84,9 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   onCloseWechatDraft,
   onSubmitWechatDraft,
   onCloseShareLongImage,
+  isAiEnhanceConfirmOpen = false,
+  onConfirmAiEnhance,
+  onCancelAiEnhance,
   cleanupPendingCount = 0,
   onConfirmCleanupAttachments,
   onCancelCleanupAttachments,
@@ -174,6 +180,16 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         })}
         confirmText={tr("draft_restoreConfirm")}
         cancelText={tr("draft_restoreDiscard")}
+        variant="warning"
+      />
+
+      <ConfirmDialog
+        isOpen={isAiEnhanceConfirmOpen}
+        onClose={() => onCancelAiEnhance?.()}
+        onConfirm={() => onConfirmAiEnhance?.()}
+        title={tr("ai_confirmTitle")}
+        message={tr("ai_confirmMessage")}
+        confirmText={tr("ai_confirmRun")}
         variant="warning"
       />
 

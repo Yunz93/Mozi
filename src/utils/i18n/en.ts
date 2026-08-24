@@ -361,6 +361,10 @@ export default {
     'A backup of "{name}" was kept after a failed save and differs from the file on disk. Restore the backup? Choosing "Discard backup" deletes it and keeps the version on disk.',
   draft_restoreConfirm: "Restore backup",
   draft_restoreDiscard: "Discard backup",
+  ai_confirmTitle: "Start AI Enhance?",
+  ai_confirmMessage:
+    "This sends the current note to AI for enhancement. It may take a while and use API quota. You can still review the result before applying it.",
+  ai_confirmRun: "Start enhance",
   ai_reviewTitle: "AI enhancement result",
   ai_reviewDescription:
     "Review the content below. Applying replaces the current note (undoable).",
