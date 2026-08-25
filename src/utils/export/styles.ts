@@ -951,12 +951,12 @@ ${exportDelStrikeBlock}
       width: auto;
     }
 
-    .export-document .markdown-body img.preview-attachment-image[data-wiki-embed-w] {
+    .export-document .markdown-body img[data-wiki-embed-w] {
       width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
       max-width: min(100%, attr(data-wiki-embed-w px, 100%)) !important;
     }
 
-    .export-document .markdown-body img.preview-attachment-image[data-wiki-embed-h] {
+    .export-document .markdown-body img[data-wiki-embed-h] {
       height: attr(data-wiki-embed-h px, auto) !important;
       max-height: attr(data-wiki-embed-h px, none) !important;
       object-fit: contain;

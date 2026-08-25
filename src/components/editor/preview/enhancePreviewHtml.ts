@@ -19,6 +19,7 @@ import {
 import {
   parseWikiLinkReference,
   extractWikiNoteFragment,
+  splitObsidianImageAlt,
 } from "../../../utils/wikiLinks";
 import {
   resolveAttachmentTarget,
@@ -28,6 +29,7 @@ import type { MarkdownStylePreset, OrderedListMode } from "../../../types";
 import type { ShikiHighlighter } from "../../../hooks/useShikiHighlighter";
 import {
   buildIframeEmbed,
+  applyPreviewImageEmbedSize,
   configurePreviewImageElement,
   createPreviewHtmlContainer,
   createPreviewPdfContainer,
@@ -250,6 +252,22 @@ export async function enhancePreviewHtml(
             warmed: false,
           });
         }
+
+        const sized = splitObsidianImageAlt(image.alt || "");
+        const widthAttr = Number(image.getAttribute("width") || "");
+        const heightAttr = Number(image.getAttribute("height") || "");
+        const width =
+          (Number.isFinite(widthAttr) && widthAttr > 0
+            ? widthAttr
+            : undefined) ?? sized.width;
+        const height =
+          (Number.isFinite(heightAttr) && heightAttr > 0
+            ? heightAttr
+            : undefined) ?? sized.height;
+        if (sized.width || sized.height) {
+          image.alt = sized.label;
+        }
+        applyPreviewImageEmbedSize(image, width, height);
       } catch (error) {
         console.warn("Failed to process image:", error);
       }
@@ -505,31 +523,7 @@ export async function enhancePreviewHtml(
           const image = document.createElement("img");
           image.className = "preview-attachment-image";
           image.alt = label || resolvedTarget.name;
-          if (embedWidth) {
-            // Inline `!important` guards against preview CSS or WKWebView style quirks
-            // that can otherwise override the embed sizing.
-            image.style.setProperty("width", `${embedWidth}px`, "important");
-            image.style.setProperty(
-              "max-width",
-              `${embedWidth}px`,
-              "important",
-            );
-            // WKWebView may strip inline style on innerHTML readback; the typed
-            // attr() fallback in preview.css may not work in older WKWebView.
-            // The HTML width attribute is the most robust fallback (universal support).
-            image.setAttribute("width", String(embedWidth));
-            image.setAttribute("data-wiki-embed-w", String(embedWidth));
-          }
-          if (embedHeight) {
-            image.style.setProperty("height", `${embedHeight}px`, "important");
-            image.style.setProperty(
-              "max-height",
-              `${embedHeight}px`,
-              "important",
-            );
-            image.style.objectFit = "contain";
-            image.setAttribute("data-wiki-embed-h", String(embedHeight));
-          }
+          applyPreviewImageEmbedSize(image, embedWidth, embedHeight);
 
           try {
             await configureResolvedPreviewImage(

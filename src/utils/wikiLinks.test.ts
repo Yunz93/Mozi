@@ -4,6 +4,7 @@ import {
   extractWikiNoteFragment,
   resolveWikiLinkFile,
   buildWikiReferenceTarget,
+  splitObsidianImageAlt,
 } from "./wikiLinks";
 import type { FileNode } from "../types";
 
@@ -62,6 +63,38 @@ describe("parseWikiLinkReference", () => {
     const result = parseWikiLinkReference("note|300x200");
     expect(result.embedSize).toBeNull();
     expect(result.displayText).toBe("300x200");
+  });
+});
+
+describe("splitObsidianImageAlt", () => {
+  it("parses width-only size from markdown image alt", () => {
+    expect(splitObsidianImageAlt("墨知正式版-1787670846943|300")).toEqual({
+      label: "墨知正式版-1787670846943",
+      width: 300,
+      height: undefined,
+    });
+  });
+
+  it("parses width and height from markdown image alt", () => {
+    expect(splitObsidianImageAlt("cover|300x200")).toEqual({
+      label: "cover",
+      width: 300,
+      height: 200,
+    });
+  });
+
+  it("keeps alt unchanged when the pipe segment is not a size", () => {
+    expect(splitObsidianImageAlt("foo|bar")).toEqual({
+      label: "foo|bar",
+    });
+  });
+
+  it("parses size-only alt", () => {
+    expect(splitObsidianImageAlt("|240")).toEqual({
+      label: "",
+      width: 240,
+      height: undefined,
+    });
   });
 });
 

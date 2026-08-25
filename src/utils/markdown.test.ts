@@ -310,6 +310,32 @@ describe("renderMarkdown", () => {
     expect(html).toContain('fetchpriority="auto"');
   });
 
+  it("applies Obsidian pipe size from markdown image alt", () => {
+    const html = renderMarkdown(
+      "![墨知正式版-1787670846943|300](https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/ink.png)",
+    );
+    expect(html).toContain('alt="墨知正式版-1787670846943"');
+    expect(html).not.toContain("1787670846943|300");
+    expect(html).toContain('width="300"');
+    expect(html).toContain('data-wiki-embed-w="300"');
+    expect(html).not.toContain('data-wiki-embed-w="300px"');
+  });
+
+  it("applies Obsidian width x height from markdown image alt", () => {
+    const html = renderMarkdown("![cover|120x80](poster.png)");
+    expect(html).toContain('alt="cover"');
+    expect(html).toContain('width="120"');
+    expect(html).toContain('height="80"');
+    expect(html).toContain('data-wiki-embed-h="80"');
+  });
+
+  it("does not treat a non-numeric alt pipe as image size", () => {
+    const html = renderMarkdown("![foo|bar](poster.png)");
+    expect(html).toContain('alt="foo|bar"');
+    expect(html).not.toContain("data-wiki-embed-w=");
+    expect(html).not.toContain('width="');
+  });
+
   it("renders GFM/Obsidian footnotes as superscript refs and a footnotes section", () => {
     const md = "Text[^a] end.\n\n[^a]: https://example.com/doc";
     const html = renderMarkdown(md);

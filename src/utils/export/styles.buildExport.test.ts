@@ -166,7 +166,7 @@ describe("buildExportStyles", () => {
       /\.export-document \.markdown-body \.preview-attachment-image\s*\{[^}]*box-shadow:\s*0 20px 44px rgba\(0,\s*0,\s*0,\s*0\.3\)/m,
     );
     expect(lightCss).toMatch(
-      /img\.preview-attachment-image\[data-wiki-embed-w\][\s\S]*?attr\(data-wiki-embed-w px,\s*100%\)/m,
+      /img\[data-wiki-embed-w\][\s\S]*?attr\(data-wiki-embed-w px,\s*100%\)/m,
     );
   });
 

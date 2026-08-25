@@ -28,6 +28,7 @@ import {
 import { livePreviewImageQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import { collectMarkdownImageRanges } from "../../../utils/markdownInlineRanges";
+import { splitObsidianImageAlt } from "../../../utils/wikiLinks";
 import {
   collectVisibleWikiRanges,
   getLivePreviewDecorationRange,
@@ -77,6 +78,8 @@ class MarkdownImageWidget extends WidgetType {
     readonly to: number,
     readonly urlFrom: number,
     readonly urlTo: number,
+    readonly width?: number,
+    readonly height?: number,
     readonly failed = false,
   ) {
     super();
@@ -91,6 +94,8 @@ class MarkdownImageWidget extends WidgetType {
       this.to === other.to &&
       this.urlFrom === other.urlFrom &&
       this.urlTo === other.urlTo &&
+      this.width === other.width &&
+      this.height === other.height &&
       this.failed === other.failed
     );
   }
@@ -112,18 +117,22 @@ class MarkdownImageWidget extends WidgetType {
     img.loading = "eager";
     img.decoding = "async";
     const cachedH = imageNaturalSizeCache.get(this.rawSrc);
-    if (cachedH && cachedH > 0) {
+    if (!this.width && !this.height && cachedH && cachedH > 0) {
       img.style.maxHeight = "none";
       // Hint layout before decode so remounts don't collapse then expand.
       img.height = Math.min(cachedH, 2400);
     }
+    if (this.width) img.style.width = `${this.width}px`;
+    if (this.height) img.style.height = `${this.height}px`;
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
       bindLivePreviewImageMeasure(view, img, () => {
         if (img.naturalHeight <= 0) return;
         wrap.classList.remove("is-loading");
         img.alt = this.alt || this.rawSrc;
-        imageNaturalSizeCache.set(this.rawSrc, img.naturalHeight);
+        if (!this.width && !this.height) {
+          imageNaturalSizeCache.set(this.rawSrc, img.naturalHeight);
+        }
       });
       bindLivePreviewImageErrorRetry(
         view,
@@ -206,7 +215,8 @@ export function buildLivePreviewImageDecorations(
   let lastTo = -1;
 
   for (const image of images) {
-    const { from, to, alt, url, urlFrom, urlTo } = image;
+    const { from, to, alt: rawAlt, url, urlFrom, urlTo } = image;
+    const { label: alt, width, height } = splitObsidianImageAlt(rawAlt);
     if (from < lastTo) continue;
     if (from >= to) continue;
     if (hasSkipAncestor(state, from)) continue;
@@ -245,6 +255,8 @@ export function buildLivePreviewImageDecorations(
           to,
           urlFrom,
           urlTo,
+          width,
+          height,
           failed,
         ),
       }),

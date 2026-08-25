@@ -32,7 +32,11 @@ function stripMarkdownExtension(value: string): string {
   return value.replace(/\.(md|markdown)$/i, "");
 }
 
-function parseEmbedSize(
+/**
+ * Obsidian 图片尺寸：`300` 或 `300x200`（像素）。
+ * 用于 `![[file|300]]` 以及标准 Markdown `![alt|300](url)`。
+ */
+export function parseObsidianImageSize(
   rawAlias: string,
 ): ParsedWikiLinkReference["embedSize"] {
   const trimmed = rawAlias.trim();
@@ -43,9 +47,37 @@ function parseEmbedSize(
 
   const width = Number(exactMatch[1]);
   const height = exactMatch[2] ? Number(exactMatch[2]) : undefined;
+  const parsedWidth = Number.isFinite(width) && width > 0 ? width : undefined;
+  const parsedHeight =
+    Number.isFinite(height) && height && height > 0 ? height : undefined;
+  if (!parsedWidth && !parsedHeight) return null;
   return {
-    width: Number.isFinite(width) ? width : undefined,
-    height: Number.isFinite(height) ? height : undefined,
+    width: parsedWidth,
+    height: parsedHeight,
+  };
+}
+
+/**
+ * 从 `![alt|300]` / `![alt|300x200]` 拆出说明文字与显示尺寸。
+ * 仅当最后一个 `|` 分段是合法尺寸时才剥离，避免误伤 `![foo|bar](url)`。
+ */
+export function splitObsidianImageAlt(alt: string): {
+  label: string;
+  width?: number;
+  height?: number;
+} {
+  const lastPipe = alt.lastIndexOf("|");
+  if (lastPipe < 0) {
+    return { label: alt };
+  }
+  const size = parseObsidianImageSize(alt.slice(lastPipe + 1));
+  if (!size) {
+    return { label: alt };
+  }
+  return {
+    label: alt.slice(0, lastPipe).trim(),
+    width: size.width,
+    height: size.height,
   };
 }
 
@@ -228,7 +260,7 @@ export function parseWikiLinkReference(
     : subpath.startsWith("^")
       ? "block"
       : "heading";
-  const embedSize = options?.embed ? parseEmbedSize(alias) : null;
+  const embedSize = options?.embed ? parseObsidianImageSize(alias) : null;
   const cleanedPath = stripMarkdownExtension(
     path.split("/").filter(Boolean).pop() || path,
   );
