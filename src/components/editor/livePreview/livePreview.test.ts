@@ -277,6 +277,31 @@ describe("live preview hide formatting", () => {
     expect(widget!.ignoreEvent(new MouseEvent("mousedown"))).toBe(true);
   });
 
+  it("applies Obsidian pipe size from markdown image alt", () => {
+    const doc =
+      "see ![墨知正式版-1787670846943|300](https://example.com/ink.png)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewImageDecorations(
+      view,
+      new Map(),
+      () => undefined,
+    );
+    let widget: { alt: string; width?: number; height?: number } | null = null;
+    deco.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        widget = value.spec.widget as typeof widget;
+      }
+    });
+    expect(widget).not.toBeNull();
+    expect(widget!.alt).toBe("墨知正式版-1787670846943");
+    expect(widget!.width).toBe(300);
+    expect(widget!.height).toBeUndefined();
+    const dom = (
+      widget as unknown as { toDOM: (view: EditorView) => HTMLElement }
+    ).toDOM(view);
+    expect(dom.querySelector("img")?.style.width).toBe("300px");
+  });
+
   it("keeps markdown image display urls after the global preview cache drops", () => {
     rememberCachedPreviewImageSrc(
       "墨知正式版-1.png",

@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  applyPreviewImageEmbedSize,
   buildIframeEmbed,
   configurePreviewImageElement,
   createPreviewHtmlContainer,
@@ -75,6 +76,28 @@ describe("configurePreviewImageElement", () => {
     );
     expect(image.getAttribute("data-preview-warmed")).toBe("pending");
     expect(image.getAttribute("loading")).toBe("lazy");
+  });
+});
+
+describe("applyPreviewImageEmbedSize", () => {
+  it("stores bare pixel numbers and important inline sizes", () => {
+    const image = document.createElement("img");
+    applyPreviewImageEmbedSize(image, 300, 180);
+
+    expect(image.getAttribute("width")).toBe("300");
+    expect(image.getAttribute("height")).toBe("180");
+    expect(image.getAttribute("data-wiki-embed-w")).toBe("300");
+    expect(image.getAttribute("data-wiki-embed-h")).toBe("180");
+    expect(image.getAttribute("data-wiki-embed-w")).not.toContain("px");
+    expect(image.style.getPropertyPriority("width")).toBe("important");
+    expect(image.style.width).toBe("300px");
+  });
+
+  it("ignores missing or non-positive sizes", () => {
+    const image = document.createElement("img");
+    applyPreviewImageEmbedSize(image, 0, undefined);
+    expect(image.hasAttribute("width")).toBe(false);
+    expect(image.hasAttribute("data-wiki-embed-w")).toBe(false);
   });
 });
 

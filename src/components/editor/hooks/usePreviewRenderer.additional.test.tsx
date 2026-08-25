@@ -123,6 +123,24 @@ describe("usePreviewRenderer additional coverage", () => {
     });
   });
 
+  it("applies Obsidian pipe size on standard markdown images", async () => {
+    mockedResolveAttachmentTarget.mockResolvedValue(null);
+
+    render(
+      <RendererHarness content="![墨知正式版-1787670846943|300](https://example.com/ink.png)" />,
+    );
+
+    await waitFor(() => {
+      const out = document.querySelector('[data-testid="out"]') as HTMLElement;
+      const image = out.querySelector("img") as HTMLImageElement | null;
+      expect(image).toBeTruthy();
+      expect(image?.getAttribute("alt")).toBe("墨知正式版-1787670846943");
+      expect(image?.getAttribute("width")).toBe("300");
+      expect(image?.getAttribute("data-wiki-embed-w")).toBe("300");
+      expect(image?.style.width).toBe("300px");
+    });
+  });
+
   it("clears markdown cache when the highlighter becomes available", async () => {
     const clearSpy = vi.spyOn(
       await import("../../../utils/markdown"),

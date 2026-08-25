@@ -306,6 +306,31 @@ export function normalizeExistingIframe(frame: HTMLIFrameElement): void {
   frame.setAttribute("allowfullscreen", "true");
 }
 
+/**
+ * 把 Obsidian 图片尺寸落到预览 `<img>` 上。
+ * `data-wiki-embed-w/h` 必须是裸数字，供 typed CSS `attr(... px)` 使用；
+ * HTML width/height 是 WKWebView 剥掉 inline style 后的兜底。
+ */
+export function applyPreviewImageEmbedSize(
+  image: HTMLImageElement,
+  width?: number,
+  height?: number,
+): void {
+  if (width && width > 0) {
+    image.style.setProperty("width", `${width}px`, "important");
+    image.style.setProperty("max-width", `${width}px`, "important");
+    image.setAttribute("width", String(width));
+    image.setAttribute("data-wiki-embed-w", String(width));
+  }
+  if (height && height > 0) {
+    image.style.setProperty("height", `${height}px`, "important");
+    image.style.setProperty("max-height", `${height}px`, "important");
+    image.style.objectFit = "contain";
+    image.setAttribute("height", String(height));
+    image.setAttribute("data-wiki-embed-h", String(height));
+  }
+}
+
 export function configurePreviewImageElement(
   image: HTMLImageElement,
   src: string,

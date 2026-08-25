@@ -12,7 +12,7 @@ import {
 } from "./markdown-extensions";
 import { normalizeShikiLanguage } from "./shikiLanguages";
 import { getMarkdownPressShikiTheme } from "./shikiTheme";
-import { parseWikiLinkReference } from "./wikiLinks";
+import { parseWikiLinkReference, splitObsidianImageAlt } from "./wikiLinks";
 import type { MarkdownStylePreset, OrderedListMode, ThemeMode } from "../types";
 import { LRUCache, hashContent } from "./performance";
 import { normalizeMarkdownTablesForRender } from "./markdownTableNormalize";
@@ -213,6 +213,26 @@ const createMarkdownIt = () => {
         token.attrs[srcIdx][1] = normalizeHttpUrlForHtmlAttribute(raw);
       }
     }
+
+    // Obsidian `![alt|300](url)` / `![alt|300x200](url)`：尺寸写在 alt 里。
+    // 默认 renderer 会用 children 覆盖 alt，所以要先剥掉尺寸再交给它。
+    const rawAlt = self.renderInlineAsText(token.children || [], options, env);
+    const sized = splitObsidianImageAlt(rawAlt);
+    if (sized.width || sized.height) {
+      const textToken = new Token("text", "", 0);
+      textToken.content = sized.label;
+      token.children = sized.label ? [textToken] : [];
+      token.attrSet("alt", sized.label);
+      if (sized.width) {
+        token.attrSet("width", String(sized.width));
+        token.attrSet("data-wiki-embed-w", String(sized.width));
+      }
+      if (sized.height) {
+        token.attrSet("height", String(sized.height));
+        token.attrSet("data-wiki-embed-h", String(sized.height));
+      }
+    }
+
     token.attrSet("decoding", "async");
     token.attrSet("loading", "lazy");
     token.attrSet("fetchpriority", "auto");
@@ -263,7 +283,7 @@ let currentTheme: ThemeMode = "light";
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 8;
+const MARKDOWN_RENDERER_CACHE_VERSION = 9;
 const PREVIEW_BLANK_LINE_HTML =
   '<div class="preview-source-blank-line"></div>\n';
 
@@ -572,6 +592,8 @@ export function renderMarkdown(
       "data-wiki-label",
       "data-wiki-width",
       "data-wiki-height",
+      "data-wiki-embed-w",
+      "data-wiki-embed-h",
       "data-block-id",
       "data-callout",
       "data-shiki-block",
