@@ -25,8 +25,8 @@ import {
 } from "../../../utils/attachmentResolver";
 import { isImageAttachment } from "../preview/previewMedia";
 import {
-  getCachedPreviewImageSrc,
   isUsablePreviewDisplaySrc,
+  rememberCachedPreviewImageSrc,
   resolvePreviewSource,
 } from "../../../utils/previewImageCache";
 import { renderMarkdown } from "../../../utils/markdown";
@@ -45,15 +45,18 @@ import {
   defineLivePreviewBlockDecorationField,
   expandRangesToBlocks,
   getCachedMarkdownHtml,
+  getLivePreviewDecorationRange,
   hasSkipAncestor,
   livePreviewContextChanged,
   mergeCoverageRanges,
   selectionTouchesRange,
   bindLivePreviewImageMeasure,
+  bindLivePreviewImageErrorRetry,
   bindLivePreviewMediaMeasure,
   bindLivePreviewWidgetCaret,
   bindLivePreviewClickToReveal,
   bindLivePreviewWidgetResizeMeasure,
+  resolveLivePreviewCachedImageSrc,
   scheduleLivePreviewMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
@@ -145,21 +148,29 @@ class WikiImageWidget extends WidgetType {
 
     const img = document.createElement("img");
     img.className = "cm-live-preview-image";
-    img.alt = this.label;
+    img.alt = "";
     img.draggable = false;
+    img.loading = "eager";
+    img.decoding = "async";
     if (this.width) img.style.width = `${this.width}px`;
     if (this.height) img.style.height = `${this.height}px`;
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
       bindLivePreviewImageMeasure(view, img, () => {
+        if (img.naturalHeight <= 0) return;
         wrap.classList.remove("is-loading");
+        img.alt = this.label;
       });
-      img.addEventListener("error", () => {
-        wrap.classList.remove("is-loading");
-        wrap.classList.add("is-error");
-        scheduleLivePreviewMeasure(view);
-      });
+      bindLivePreviewImageErrorRetry(
+        view,
+        wrap,
+        img,
+        parseWikiLinkReference(this.rawSrc, { embed: true }).path ||
+          this.rawSrc,
+        this.label,
+      );
     } else if (this.failed) {
+      img.alt = this.label;
       wrap.classList.add("is-error");
       queueMicrotask(() => scheduleLivePreviewMeasure(view));
     } else {
@@ -412,13 +423,15 @@ export function collectWikiAsyncJobs(
 
     if (looksLikeImage) {
       const key = cacheKeyFor(ctx.sourceFilePath, range.raw);
+      const pathHint = matched?.path ?? (parsed.path || parsed.target);
       if (
-        wikiImageResolvedCache.has(key) ||
-        wikiImageFailedCache.has(key) ||
-        getCachedPreviewImageSrc(
-          matched?.path ?? (parsed.path || parsed.target),
-          ctx.sourceFilePath ?? undefined,
-        )
+        resolveLivePreviewCachedImageSrc(
+          wikiImageResolvedCache,
+          key,
+          pathHint,
+          ctx.sourceFilePath,
+        ) ||
+        wikiImageFailedCache.has(key)
       ) {
         continue;
       }
@@ -522,10 +535,12 @@ export function buildWikiDecorations(
       if (looksLikeImage) {
         const key = cacheKeyFor(ctx.sourceFilePath, range.raw);
         const pathHint = matched?.path ?? (parsed.path || parsed.target);
-        const resolvedSrc =
-          resolvedCache.get(key) ??
-          getCachedPreviewImageSrc(pathHint, ctx.sourceFilePath ?? undefined) ??
-          null;
+        const resolvedSrc = resolveLivePreviewCachedImageSrc(
+          resolvedCache,
+          key,
+          pathHint,
+          ctx.sourceFilePath,
+        );
         const failed = !resolvedSrc && wikiImageFailedCache.has(key);
 
         builder.add(
@@ -680,6 +695,13 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
         for (const job of collectWikiAsyncJobs(update.state)) {
           this.enqueueJob(update.view, job);
         }
+        return;
+      }
+      if (update.selectionSet) {
+        const viewport = getLivePreviewDecorationRange(update.view);
+        for (const job of collectWikiAsyncJobs(update.state, [viewport])) {
+          this.enqueueJob(update.view, job);
+        }
       }
     }
 
@@ -708,6 +730,11 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
             }
             wikiImageResolvedCache.set(job.cacheKey, displaySrc);
             wikiImageFailedCache.delete(job.cacheKey);
+            rememberCachedPreviewImageSrc(
+              pathOrSrc,
+              ctx.sourceFilePath ?? undefined,
+              displaySrc,
+            );
             if (view.dom.isConnected) {
               dispatchWikiResolvedEffect(
                 view,

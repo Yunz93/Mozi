@@ -423,6 +423,11 @@ export class TauriFileSystem implements IFileSystem {
     return objectUrl;
   }
 
+  async refreshFileObjectUrl(path: string): Promise<string> {
+    this.invalidateObjectUrl(path);
+    return this.getFileObjectUrl(path);
+  }
+
   /**
    * Recursively read directory and return file nodes
    */

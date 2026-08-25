@@ -18,6 +18,11 @@ import { LRUCache } from "../../../utils/performance";
 import { isWithinFrontmatterBlock } from "../behavior/core";
 import { livePreviewContextFacet } from "./context";
 import type { LivePreviewContext } from "./context";
+import {
+  getCachedPreviewImageSrc,
+  isUsablePreviewDisplaySrc,
+  refreshPreviewSource,
+} from "../../../utils/previewImageCache";
 
 const SKIP_ANCESTOR_NODES = new Set([
   "FencedCode",
@@ -810,6 +815,74 @@ export function bindLivePreviewImageMeasure(
   }
   img.addEventListener("load", settle, { once: true });
   img.addEventListener("error", settle, { once: true });
+}
+
+/**
+ * Reuse a Live Preview plugin cache entry, copying from the global preview
+ * cache when needed so click-to-reveal remounts still have a display URL.
+ */
+export function resolveLivePreviewCachedImageSrc(
+  cache: Map<string, string>,
+  key: string,
+  lookupSrc: string,
+  sourceFilePath: string | null,
+): string | null {
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const globalSrc = getCachedPreviewImageSrc(
+    lookupSrc,
+    sourceFilePath ?? undefined,
+  );
+  if (!globalSrc) return null;
+  cache.set(key, globalSrc);
+  return globalSrc;
+}
+
+/**
+ * One refresh if a remounted widget's blob URL fails to paint.
+ * Avoid putting the filename in `alt` until load succeeds — empty-src / broken
+ * images otherwise show the native grey filename placeholder.
+ */
+export function bindLivePreviewImageErrorRetry(
+  view: EditorView,
+  wrap: HTMLElement,
+  img: HTMLImageElement,
+  refreshSrc: string,
+  alt: string,
+): void {
+  let retried = false;
+  img.addEventListener("error", () => {
+    if (retried) {
+      wrap.classList.remove("is-loading");
+      wrap.classList.add("is-error");
+      img.alt = alt;
+      wrap.title = `Failed to load: ${refreshSrc}`;
+      scheduleLivePreviewMeasure(view);
+      return;
+    }
+    retried = true;
+    const ctx = view.state.facet(livePreviewContextFacet);
+    void refreshPreviewSource(refreshSrc, ctx.sourceFilePath ?? undefined)
+      .then((src) => {
+        if (!img.isConnected) return;
+        if (!isUsablePreviewDisplaySrc(src)) {
+          wrap.classList.remove("is-loading");
+          wrap.classList.add("is-error");
+          img.alt = alt;
+          scheduleLivePreviewMeasure(view);
+          return;
+        }
+        img.removeAttribute("src");
+        img.src = src;
+      })
+      .catch(() => {
+        if (!img.isConnected) return;
+        wrap.classList.remove("is-loading");
+        wrap.classList.add("is-error");
+        img.alt = alt;
+        scheduleLivePreviewMeasure(view);
+      });
+  });
 }
 
 /**

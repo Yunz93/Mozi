@@ -21,8 +21,8 @@ import {
   normalizeHttpUrlForHtmlAttribute,
 } from "../preview/previewMedia";
 import {
-  getCachedPreviewImageSrc,
   isUsablePreviewDisplaySrc,
+  rememberCachedPreviewImageSrc,
   resolvePreviewSource,
 } from "../../../utils/previewImageCache";
 import { livePreviewImageQueue } from "./asyncQueue";
@@ -38,9 +38,11 @@ import {
   shouldRebuildLivePreviewDecorations,
   ViewportDecorationWindow,
   bindLivePreviewImageMeasure,
+  bindLivePreviewImageErrorRetry,
   scheduleLivePreviewMeasure,
   isLivePreviewRevealCurrent,
   bindLivePreviewClickToReveal,
+  resolveLivePreviewCachedImageSrc,
 } from "./shared";
 
 const imageResolvedEffect = StateEffect.define<{
@@ -105,9 +107,9 @@ class MarkdownImageWidget extends WidgetType {
 
     const img = document.createElement("img");
     img.className = "cm-live-preview-image";
-    img.alt = this.alt || this.rawSrc;
+    img.alt = "";
     img.draggable = false;
-    img.loading = "lazy";
+    img.loading = "eager";
     img.decoding = "async";
     const cachedH = imageNaturalSizeCache.get(this.rawSrc);
     if (cachedH && cachedH > 0) {
@@ -118,18 +120,20 @@ class MarkdownImageWidget extends WidgetType {
     if (this.resolvedSrc) {
       img.src = this.resolvedSrc;
       bindLivePreviewImageMeasure(view, img, () => {
+        if (img.naturalHeight <= 0) return;
         wrap.classList.remove("is-loading");
-        if (img.naturalHeight > 0) {
-          imageNaturalSizeCache.set(this.rawSrc, img.naturalHeight);
-        }
+        img.alt = this.alt || this.rawSrc;
+        imageNaturalSizeCache.set(this.rawSrc, img.naturalHeight);
       });
-      img.addEventListener("error", () => {
-        wrap.classList.remove("is-loading");
-        wrap.classList.add("is-error");
-        wrap.title = `Failed to load: ${this.rawSrc}`;
-        scheduleLivePreviewMeasure(view);
-      });
+      bindLivePreviewImageErrorRetry(
+        view,
+        wrap,
+        img,
+        this.rawSrc,
+        this.alt || this.rawSrc,
+      );
     } else if (this.failed) {
+      img.alt = this.alt || this.rawSrc;
       wrap.classList.add("is-error");
       wrap.title = `Failed to resolve: ${this.rawSrc}`;
       queueMicrotask(() => scheduleLivePreviewMeasure(view));
@@ -212,10 +216,12 @@ export function buildLivePreviewImageDecorations(
     }
 
     const key = cacheKeyFor(ctx.sourceFilePath, url);
-    let resolvedSrc =
-      resolvedCache.get(key) ??
-      getCachedPreviewImageSrc(url, ctx.sourceFilePath ?? undefined) ??
-      null;
+    let resolvedSrc = resolveLivePreviewCachedImageSrc(
+      resolvedCache,
+      key,
+      url,
+      ctx.sourceFilePath,
+    );
     const failed = !resolvedSrc && failedCache.has(key);
 
     if (!resolvedSrc && isDirectDisplaySrc(url)) {
@@ -296,6 +302,11 @@ export const livePreviewImages = ViewPlugin.fromClass(
             : displaySrc;
           this.resolvedCache.set(cacheKey, finalSrc);
           this.failedCache.delete(cacheKey);
+          rememberCachedPreviewImageSrc(
+            rawSrc,
+            ctx.sourceFilePath ?? undefined,
+            finalSrc,
+          );
           if (view.dom.isConnected) {
             view.dispatch({
               effects: imageResolvedEffect.of({

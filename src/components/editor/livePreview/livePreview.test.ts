@@ -10,12 +10,21 @@ import {
   livePreviewTheme,
 } from "./hideFormattingMarks";
 import { buildLivePreviewImageDecorations } from "./images";
+import {
+  rememberCachedPreviewImageSrc,
+  invalidateCachedPreviewImageSrc,
+} from "../../../utils/previewImageCache";
 import { buildLivePreviewMathDecorations, findMathRangesInText } from "./math";
 import {
   buildLivePreviewTaskDecorations,
   livePreviewTaskCheckboxes,
 } from "./taskCheckboxes";
-import { buildLivePreviewWikiDecorations, livePreviewWiki } from "./wiki";
+import {
+  buildLivePreviewWikiDecorations,
+  collectWikiAsyncJobs,
+  livePreviewWiki,
+  clearLivePreviewWikiCaches,
+} from "./wiki";
 import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
 import {
   buildCalloutDecorations,
@@ -268,6 +277,60 @@ describe("live preview hide formatting", () => {
     expect(widget!.ignoreEvent(new MouseEvent("mousedown"))).toBe(true);
   });
 
+  it("keeps markdown image display urls after the global preview cache drops", () => {
+    rememberCachedPreviewImageSrc(
+      "墨知正式版-1.png",
+      undefined,
+      "blob:live-image",
+    );
+    const cache = new Map<string, string>();
+    const doc = "![shot](墨知正式版-1.png)\n\naway";
+    const view = mount(doc, doc.length - 1);
+    const first = buildLivePreviewImageDecorations(
+      view,
+      cache,
+      () => undefined,
+    );
+    let resolvedSrc: string | null = null;
+    first.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        resolvedSrc = (value.spec.widget as { resolvedSrc: string | null })
+          .resolvedSrc;
+      }
+    });
+    expect(resolvedSrc).toBe("blob:live-image");
+    expect(cache.get("::墨知正式版-1.png")).toBe("blob:live-image");
+
+    invalidateCachedPreviewImageSrc();
+    view.dispatch({ selection: { anchor: 0, head: 12 } });
+    const hidden = buildLivePreviewImageDecorations(
+      view,
+      cache,
+      () => undefined,
+    );
+    let hiddenCount = 0;
+    hidden.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) hiddenCount += 1;
+    });
+    expect(hiddenCount).toBe(0);
+
+    view.dispatch({ selection: { anchor: doc.length - 1 } });
+    const restored = buildLivePreviewImageDecorations(
+      view,
+      cache,
+      () => undefined,
+    );
+    let restoredSrc: string | null = null;
+    restored.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        restoredSrc = (value.spec.widget as { resolvedSrc: string | null })
+          .resolvedSrc;
+      }
+    });
+    expect(restoredSrc).toBe("blob:live-image");
+    invalidateCachedPreviewImageSrc();
+  });
+
   it("previews markdown images whose URLs contain spaces", () => {
     const doc =
       "![M 記](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M 記-1.png)\n\naway";
@@ -419,6 +482,59 @@ describe("live preview hide formatting", () => {
       if (value.spec.widget) widgetCount += 1;
     });
     expect(widgetCount).toBe(1);
+  });
+
+  it("keeps wiki image display urls after the global preview cache drops", () => {
+    rememberCachedPreviewImageSrc(
+      "墨知正式版.png",
+      undefined,
+      "blob:wiki-image",
+    );
+    const cache = new Map<string, string>();
+    const embed = "![[墨知正式版.png]]";
+    const doc = `${embed}\n\naway`;
+    const view = mount(doc, doc.length - 1);
+    const first = buildLivePreviewWikiDecorations(view, cache);
+    let resolvedSrc: string | null = null;
+    first.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        resolvedSrc = (value.spec.widget as { resolvedSrc: string | null })
+          .resolvedSrc;
+      }
+    });
+    expect(resolvedSrc).toBe("blob:wiki-image");
+    expect(cache.get("wiki::::墨知正式版.png")).toBe("blob:wiki-image");
+
+    invalidateCachedPreviewImageSrc();
+    view.dispatch({ selection: { anchor: 0, head: embed.length } });
+    const hidden = buildLivePreviewWikiDecorations(view, cache);
+    let hiddenCount = 0;
+    hidden.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) hiddenCount += 1;
+    });
+    expect(hiddenCount).toBe(0);
+
+    view.dispatch({ selection: { anchor: doc.length - 1 } });
+    const restored = buildLivePreviewWikiDecorations(view, cache);
+    let restoredSrc: string | null = null;
+    restored.between(0, view.state.doc.length, (_from, _to, value) => {
+      if (value.spec.widget) {
+        restoredSrc = (value.spec.widget as { resolvedSrc: string | null })
+          .resolvedSrc;
+      }
+    });
+    expect(restoredSrc).toBe("blob:wiki-image");
+    invalidateCachedPreviewImageSrc();
+    clearLivePreviewWikiCaches();
+  });
+
+  it("does not skip wiki image resolves until the display url is copied into cache", () => {
+    rememberCachedPreviewImageSrc("cat.png", undefined, "blob:wiki-copy");
+    const view = mount("![[cat.png]]\n\naway", 14);
+    const jobs = collectWikiAsyncJobs(view.state);
+    expect(jobs.filter((job) => job.kind === "image")).toEqual([]);
+    invalidateCachedPreviewImageSrc();
+    clearLivePreviewWikiCaches();
   });
 
   it("replaces inactive tables with widgets", () => {

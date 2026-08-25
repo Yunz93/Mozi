@@ -26,6 +26,8 @@ import {
   previewSourceNeedsMaterialization,
   resolvePreviewSource,
   invalidateCachedPreviewImageSrc,
+  rememberCachedPreviewImageSrc,
+  refreshPreviewSource,
   warmPreviewImage,
 } from "./previewImageCache";
 
@@ -230,6 +232,40 @@ describe("warmPreviewImage", () => {
 
     fetchSpy.mockRestore();
     createObjectURL.mockRestore();
+  });
+
+  it("remembers display urls so live preview remounts can reuse them", () => {
+    rememberCachedPreviewImageSrc(
+      "墨知正式版.png",
+      "/vault/notes/a.md",
+      "blob:live-remount",
+    );
+    expect(
+      getCachedPreviewImageSrc("墨知正式版.png", "/vault/notes/a.md"),
+    ).toBe("blob:live-remount");
+    invalidateCachedPreviewImageSrc();
+    expect(
+      getCachedPreviewImageSrc("墨知正式版.png", "/vault/notes/a.md"),
+    ).toBeNull();
+  });
+
+  it("refreshes a local object url when the previous blob dies", async () => {
+    const { getFileSystem } = await import("../types/filesystem");
+    const getFileObjectUrl = vi.fn(async () => "blob:stale");
+    const refreshFileObjectUrl = vi.fn(async () => "blob:fresh");
+    vi.mocked(getFileSystem).mockResolvedValue({
+      getFileObjectUrl,
+      refreshFileObjectUrl,
+    } as never);
+
+    await expect(
+      refreshPreviewSource("resources/poster.png", "/vault/notes/a.md"),
+    ).resolves.toBe("blob:fresh");
+    expect(refreshFileObjectUrl).toHaveBeenCalled();
+    expect(
+      getCachedPreviewImageSrc("resources/poster.png", "/vault/notes/a.md"),
+    ).toBe("blob:fresh");
+    invalidateCachedPreviewImageSrc();
   });
 });
 

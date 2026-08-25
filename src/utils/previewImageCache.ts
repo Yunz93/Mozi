@@ -226,6 +226,7 @@ function registerUnloadCleanup() {
 export async function resolvePreviewSource(
   src: string,
   sourceFilePath?: string,
+  options?: { refresh?: boolean },
 ): Promise<string> {
   const trimmedSrc = src.trim();
   if (
@@ -253,6 +254,9 @@ export async function resolvePreviewSource(
 
   if (localSourceCandidate) {
     const fs = await tryGetFileSystem();
+    if (options?.refresh && typeof fs?.refreshFileObjectUrl === "function") {
+      return fs.refreshFileObjectUrl(localSourceCandidate);
+    }
     if (fs && typeof fs.getFileObjectUrl === "function") {
       // Newly pasted files can miss the first read; retry instead of falling
       // through to `asset://`, which this app cannot load for vault paths.
@@ -374,6 +378,35 @@ export function getCachedPreviewImageSrc(
   return (
     resolvedPreviewImageCache.get(getCacheKey(src, sourceFilePath)) ?? null
   );
+}
+
+/** Keep a displayable preview URL so Live Preview remounts can reuse it. */
+export function rememberCachedPreviewImageSrc(
+  src: string,
+  sourceFilePath: string | undefined,
+  displaySrc: string,
+): void {
+  if (!src.trim() || !isUsablePreviewDisplaySrc(displaySrc)) return;
+  resolvedPreviewImageCache.set(getCacheKey(src, sourceFilePath), displaySrc);
+}
+
+/**
+ * Drop a possibly-dead object URL and resolve again.
+ * Click-to-reveal destroys the Live Preview `<img>`; some webviews then fail
+ * to paint the same `blob:` on the replacement widget.
+ */
+export async function refreshPreviewSource(
+  src: string,
+  sourceFilePath?: string,
+): Promise<string> {
+  const trimmed = src.trim();
+  if (!trimmed) return trimmed;
+  invalidateCachedPreviewImageSrc(trimmed);
+  const next = await resolvePreviewSource(trimmed, sourceFilePath, {
+    refresh: true,
+  });
+  rememberCachedPreviewImageSrc(trimmed, sourceFilePath, next);
+  return next;
 }
 
 /**

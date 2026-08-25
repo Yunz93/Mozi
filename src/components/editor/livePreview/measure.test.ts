@@ -429,4 +429,28 @@ describe("live preview image click selection", () => {
       "图片分享",
     );
   });
+
+  it("restores the markdown image widget after click-to-reveal selection leaves", async () => {
+    const image = "![cat](data:image/png;base64,AAAA)";
+    const doc = `${image}\n\naway`;
+    const view = mount(doc, [livePreviewImages]);
+    expect(
+      view.dom.querySelector(".cm-live-preview-image-wrap"),
+    ).not.toBeNull();
+
+    await clickImageAndSettle(
+      view.dom.querySelector(".cm-live-preview-image-wrap") as HTMLElement,
+    );
+    expect(view.dom.querySelector(".cm-live-preview-image-wrap")).toBeNull();
+
+    view.dispatch({ selection: { anchor: doc.length - 1 } });
+    const wrap = view.dom.querySelector(
+      ".cm-live-preview-image-wrap",
+    ) as HTMLElement | null;
+    expect(wrap).not.toBeNull();
+    const img = wrap!.querySelector(
+      ".cm-live-preview-image",
+    ) as HTMLImageElement | null;
+    expect(img?.getAttribute("src") ?? img?.src).toContain("data:image/png");
+  });
 });

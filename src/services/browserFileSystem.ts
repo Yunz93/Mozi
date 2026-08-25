@@ -646,6 +646,11 @@ export class BrowserFileSystem implements IFileSystem {
     return pending;
   }
 
+  async refreshFileObjectUrl(path: string): Promise<string> {
+    this.invalidateObjectUrl(path);
+    return this.getFileObjectUrl(path);
+  }
+
   private async copyDirectoryContents(
     sourceHandle: FileSystemDirectoryHandle,
     targetHandle: FileSystemDirectoryHandle,

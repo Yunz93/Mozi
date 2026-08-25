@@ -22,6 +22,8 @@ export interface IFileSystem {
   writeFile(path: string, content: string): Promise<void>;
   writeBinaryFile?(path: string, content: Uint8Array): Promise<void>;
   getFileObjectUrl?(path: string): Promise<string>;
+  /** Drop a cached object URL and read the file again (dead blob recovery). */
+  refreshFileObjectUrl?(path: string): Promise<string>;
   saveFile(path: string | null, content: string): Promise<string | null>;
   renameFile(oldPath: string, newName: string): Promise<string>;
   renameEntry?(
