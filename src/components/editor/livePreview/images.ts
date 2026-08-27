@@ -41,7 +41,6 @@ import {
   bindLivePreviewImageMeasure,
   bindLivePreviewImageErrorRetry,
   scheduleLivePreviewMeasure,
-  isLivePreviewRevealCurrent,
   bindLivePreviewClickToReveal,
   resolveLivePreviewCachedImageSrc,
 } from "./shared";
@@ -151,27 +150,12 @@ class MarkdownImageWidget extends WidgetType {
     }
     wrap.appendChild(img);
 
-    bindLivePreviewClickToReveal(view, wrap, (generation) => {
-      const urlFrom = this.urlFrom;
-      const urlTo = this.urlTo;
-      const from = this.from;
-      const to = this.to;
-      // Cover the whole image construct so replace widgets drop on rebuild.
-      // Selecting a sub-range inside an active replace decoration collapses.
+    bindLivePreviewClickToReveal(view, wrap, () => {
+      // 选中整段 `![alt](url)`，让 replace widget 卸下，并完整选中图片链接文本。
       view.dispatch({
-        selection: { anchor: from, head: to },
+        selection: { anchor: this.from, head: this.to },
         scrollIntoView: false,
       });
-      if (urlFrom < urlTo) {
-        requestAnimationFrame(() => {
-          if (!isLivePreviewRevealCurrent(generation)) return;
-          if (!view.dom.isConnected) return;
-          view.dispatch({
-            selection: { anchor: urlFrom, head: urlTo },
-            scrollIntoView: false,
-          });
-        });
-      }
     });
 
     return wrap;
