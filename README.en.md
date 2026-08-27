@@ -4,11 +4,13 @@ Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
-A local-first Markdown editor for knowledge-base writing: tight editor–preview parity, smooth wiki and attachment workflows, desktop builds on Tauri.
+A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. The official build writes in Live mode and can publish to WeChat drafts or Simple Blog in one click.
 
-> Goal: a focused Markdown writing flow—lighter than Obsidian, smoother day-to-day than Typora for many writers.
+> Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
-![Mozi preview](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M%20%E8%A8%98-1776170252301.png)
+<p align="center">
+  <img src="./docs/assets/mozi-preview.png" alt="Mozi" width="720">
+</p>
 
 ## Download
 
@@ -36,23 +38,64 @@ xattr -cr /Applications/墨知.app
 
 If it is still in Downloads, use `~/Downloads/墨知.app` instead.
 
-See [Development guide — macOS signing & notarization](./docs/DEVELOPMENT.en.md#macos-signing--notarization) for the CI secret setup.
+See [Development guide: macOS signing and notarization](./docs/DEVELOPMENT.en.md#macos-signing--notarization) for the CI secret setup.
 
 ### Windows
 
 Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run anyway**. After install, **Settings → About** can check for newer GitHub Release builds.
 
-## Highlights
+## What's new
 
-- **Local vault**: Folder-based library with tabs, sidebar, file tree, and search; notes and assets stay as ordinary files on disk.
-- **Live Preview / Reading**: Two primary views. Live renders headings, emphasis, links, tables, tasks, math, Mermaid, callouts, embeds, and more while you type; Reading is for focused reading and shares Markdown style presets with Live.
-- **Knowledge-base Markdown**: Wiki links `[[wiki]]`, `![[embeds]]`, YAML frontmatter, and configurable note templates; paste images, manage a local asset folder, and clean unreferenced attachments in one reference flow.
-- **Excalidraw drawings**: Open and edit `.excalidraw` files and Obsidian Excalidraw `.excalidraw.md` drawings (including the default `compressed-json` format), create drawings from the sidebar, and embed static previews with `![[drawing.excalidraw]]` / `![[drawing.excalidraw.md]]` (click to edit).
-- **Rich media preview**: Images, PDF, HTML, video, and other attachments preview in Reading; HTML supports fit-to-width and zoom.
-- **Knowledge layer (Beta)**: Backlinks and outgoing links, neighborhood graph for the current note, related-notes recommendations (local semantic search), **XiaoZhi Assistant** Q&A with source citations; built-in local embedding with an optional privacy mode that blocks non-local endpoints.
-- **Export & publish**: PDF, HTML, and a single long-image share from the preview; toolbar publishing to **simple-blog** (GitHub + Vercel) or **WeChat Official Account drafts**.
-- **Optional AI assist**: Switch between Gemini and an OpenAI-compatible API for polish, summaries, tags, and generating entries from a selection; core writing works fully without an API key.
-- **Look & desktop polish**: Light / dark themes, Markdown style presets, fonts and sizes, Chinese / English UI, customizable shortcuts; Windows supports in-app update checks.
+### Live mode
+
+The official build keeps Live and Reading only. Source-only editing and split view are gone. Live renders as you type.
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787670952816.png" alt="Live mode" width="200">
+</p>
+
+### One-click publish
+
+- **WeChat Official Account drafts**: after you configure the account, Mozi sends a pre-rendered draft. Review it in WeChat's draft tools, then publish.
+- **Simple Blog**: a companion site. Deploy it on Vercel, then push posts from Mozi. Set the repo URL, public site, and GitHub token under **Settings → Publishing**.
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787151343910.png" alt="One-click publish" width="400">
+</p>
+
+### Long-image share
+
+Turn the current article into a single tall image for social posts.
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787581997392.png" alt="Long-image share" width="400">
+</p>
+
+### XiaoZhi assistant
+
+Built-in local semantic search across the vault. Optionally point at an online model for Q&A with source citations.
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669944524.png" alt="XiaoZhi assistant" width="400">
+</p>
+
+### Excalidraw
+
+Create a board from the sidebar. Obsidian `.excalidraw.md` files work too. Embed a preview with `![[drawing.excalidraw]]`.
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787152633377.png" alt="Excalidraw" width="600">
+</p>
+
+### Slash inserts
+
+Type `/` on an empty line to insert a table, callout, code fence, Mermaid diagram, or todo. Useful if you are still learning Markdown.
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669306323.png" alt="Slash menu" width="300">
+</p>
+
+Repo: [github.com/Yunz93/Mozi](https://github.com/Yunz93/Mozi). Stars and forks welcome.
 
 ## Keyboard shortcuts
 
