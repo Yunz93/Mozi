@@ -402,12 +402,9 @@ describe("live preview image click selection", () => {
     await clickImageAndSettle(wrap!);
 
     const sel = view.state.selection.main;
-    expect(sel.from).toBeGreaterThanOrEqual(0);
-    expect(sel.to).toBeLessThanOrEqual(image.length);
-    expect(sel.to).toBeGreaterThan(sel.from);
-    expect(view.state.doc.sliceString(sel.from, sel.to)).not.toContain(
-      "heading",
-    );
+    expect(view.state.doc.sliceString(sel.from, sel.to)).toBe(image);
+    expect(sel.from).toBe(0);
+    expect(sel.to).toBe(image.length);
   });
 
   it("keeps wiki image click selection inside the embed", async () => {
@@ -422,12 +419,9 @@ describe("live preview image click selection", () => {
     await clickImageAndSettle(wrap!);
 
     const sel = view.state.selection.main;
-    expect(sel.from).toBeGreaterThanOrEqual(0);
-    expect(sel.to).toBeLessThanOrEqual(embed.length);
-    expect(sel.to).toBeGreaterThan(sel.from);
-    expect(view.state.doc.sliceString(sel.from, sel.to)).not.toContain(
-      "图片分享",
-    );
+    expect(view.state.doc.sliceString(sel.from, sel.to)).toBe(embed);
+    expect(sel.from).toBe(0);
+    expect(sel.to).toBe(embed.length);
   });
 
   it("restores the markdown image widget after click-to-reveal selection leaves", async () => {

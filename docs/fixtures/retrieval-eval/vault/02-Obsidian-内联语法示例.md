@@ -6,12 +6,12 @@ tags:
 status: draft
 is_publish: false
 "date created": 2026-07-15
-"date modified": "2026-07-15 00:00:00"
+"date modified": "2026-08-25 00:00:00"
 ---
 
 # Obsidian 内联语法示例
 
-墨知 支持常用的 Wiki 双链与嵌入写法，方便从 Obsidian 知识库迁过来继续写。入门见 [[00-快速上手]]，通用 Markdown 见 [[01-Markdown-语法示例]]，发布与小知助手见 [[03-发布与问库]]。
+墨知支持常用的 Wiki 双链与嵌入写法，方便从 Obsidian 知识库迁过来继续写。入门与功能介绍见 [[00-快速上手]]，通用 Markdown 见 [[01-Markdown-语法示例]]，发布与小知助手见 [[03-发布与问库]]。
 
 ## Wiki 链接
 
@@ -37,12 +37,20 @@ is_publish: false
 
 ![[lbxx.jpeg]]
 
+指定显示宽度（像素）：
+
+![[lbxx.jpeg|300]]
+
+标准 Markdown 同样可以：`![说明|300](url)` 或 `![说明|300x200](url)`。
+
 ### 嵌入笔记片段
 
 按标题嵌入另一篇笔记的一节：
 
 ![[01-Markdown-语法示例#强调]]
 
----
+## 高亮与注释
 
-以上覆盖日常双链与嵌入；Obsidian 的 Callout、`==高亮==`、`%%注释%%` 等本应用暂不特殊处理，会按普通 Markdown 显示。
+==这段会高亮==。`%%注释%%` 在实时预览里会收起来：%%这是注释，阅读时不必看见%%。
+
+Callout 提示块见 [[01-Markdown-语法示例#Callout 提示块]]。

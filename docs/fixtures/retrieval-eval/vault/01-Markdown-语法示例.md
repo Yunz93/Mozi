@@ -5,12 +5,12 @@ tags:
 status: draft
 is_publish: false
 "date created": 2026-07-15
-"date modified": "2026-07-15 00:00:00"
+"date modified": "2026-08-25 00:00:00"
 ---
 
 # Markdown 语法示例
 
-对照左侧源码和右侧预览，看 墨知 对常见 Markdown 与扩展语法的渲染效果。Wiki 链接、附件嵌入见 [[02-Obsidian-内联语法示例]]；入门说明见 [[00-快速上手]]；发布与小知助手见 [[03-发布与问库]]。
+对照源码和预览，看墨知对常见 Markdown 与扩展语法的渲染效果。Wiki 链接、附件嵌入见 [[02-Obsidian-内联语法示例]]；入门与功能介绍见 [[00-快速上手]]；发布与小知助手见 [[03-发布与问库]]。
 
 ## 正文
 
@@ -29,6 +29,10 @@ is_publish: false
 自动链接：<https://spec.commonmark.org/>
 
 裸 URL：https://example.com/doc
+
+图片可写宽度，和 Obsidian 一样：`![说明|300](url)`。远程图也可以：
+
+![墨知界面|300](https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787670846943.png)
 
 转义：\*不是斜体\* \`不是代码\` \[不是链接\]
 
@@ -161,6 +165,16 @@ flowchart LR
   p1([入口]) --> p2[处理]
   p2 --> p3([出口])
 ```
+
+## Callout 提示块
+
+空行输入 `/` 再选提示块，或手写：
+
+> [!note] 提示
+> 空行输入 `/` 可插入这类提示块。
+
+> [!warning] 注意
+> 没有 API Key 也不影响写作和预览。
 
 ## 脚注
 

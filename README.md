@@ -4,11 +4,13 @@
 
 [English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
 
-本地优先的 Markdown 编辑器，面向知识库写作：编辑与预览一致、Wiki 与附件链路顺手，桌面端基于 Tauri。
+本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。正式版以 Live 模式写作，并可一键发到微信公众号草稿或 Simple Blog。
 
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
-![墨知-1776329034274](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M%20%E8%A8%98-1776170252301.png)
+<p align="center">
+  <img src="./docs/assets/mozi-preview.png" alt="墨知" width="720">
+</p>
 
 ## 下载安装
 
@@ -42,17 +44,58 @@ xattr -cr /Applications/墨知.app
 
 运行 `.exe` 安装。SmartScreen 提示时选「更多信息」→「仍要运行」。安装后可在 **设置 → 关于** 检查 GitHub Release 更新。
 
-## 功能亮点
+## 新功能介绍
 
-- **本地知识库**：以文件夹为仓库；多标签、侧边栏、文件树与搜索管理笔记与附件，数据始终留在本机普通文件中。
-- **实时预览 / 阅读**：两种主视图切换。Live 在编辑时即时渲染标题、强调、链接、表格、任务列表、公式、Mermaid、Callout、嵌入等；Reading 专注阅读，与 Live 共享 Markdown 样式预设与排版。
-- **知识库式 Markdown**：兼容双链 `[[wiki]]`、`![[嵌入]]`、YAML frontmatter 与可配置新建模板；图片粘贴、本地资源目录与未引用附件清理在同一条引用链路里。
-- **Excalidraw 画板**：打开与编辑 `.excalidraw`，兼容 Obsidian Excalidraw 插件的 `.excalidraw.md`（含默认 `compressed-json`）；支持侧边栏新建；笔记中可用 `![[drawing.excalidraw]]` / `![[drawing.excalidraw.md]]` 嵌入静态预览，点击进入编辑。
-- **富媒体预览**：图片、PDF、HTML、视频等附件可在阅读侧预览；HTML 支持适应宽度与缩放。
-- **知识层（Beta）**：反向链接与出链面板、当前笔记邻域图、相关笔记推荐（本地语义检索）、**小知助手**知识库问答（带来源引用）；内置本地 embedding，可开启隐私模式禁止非本地端点。
-- **导出与发布**：PDF、HTML，以及将整篇预览合成为一张长图；工具栏可发布到 **simple-blog**（GitHub + Vercel）或 **微信公众号草稿**。
-- **可选 AI 辅助**：在 Gemini 与 OpenAI 兼容接口之间切换，用于润色、摘要、标签与从选区生成词条等；无 API Key 时基础写作完整可用。
-- **外观与桌面体验**：浅色 / 深色主题、多种 Markdown 样式预设、字体与字号、中英界面、可自定义快捷键；Windows 支持应用内检查更新。
+### Live 模式
+
+正式版只保留 Live 和阅读，已去掉纯编辑和分屏。Live 边写边渲染，所见即所得。
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787670952816.png" alt="Live 模式" width="200">
+</p>
+
+### 一键发布
+
+- **微信公众号草稿**：配好公众号后，按预渲染样式发到草稿。用公众号助手查看后再发布。
+- **Simple Blog**：配套博客网页，部署到 Vercel 后即可从墨知推送上线。仓库地址、公开站点与 GitHub Token 在 **设置 → 发布** 里填写。
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787151343910.png" alt="一键发布" width="400">
+</p>
+
+### 图片分享
+
+一键把当前文章生成分享长图，适合发到社交媒体。
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787581997392.png" alt="图片分享" width="400">
+</p>
+
+### 小知助手
+
+内置本地语义检索，支持全库搜索；也可配置在线模型做智能问答，回答会带来源。
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669944524.png" alt="小知助手" width="400">
+</p>
+
+### Excalidraw 画板
+
+侧边栏新建即可使用，也兼容 Obsidian 的 `.excalidraw.md`。笔记里可用 `![[drawing.excalidraw]]` 嵌入预览。
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787152633377.png" alt="Excalidraw 画板" width="600">
+</p>
+
+### Markdown 便捷编辑
+
+空行输入 `/` 可插入表格、提示文本、代码块、Mermaid 图表和待办事项，对 Markdown 新手比较友好。
+
+<p>
+  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669306323.png" alt="斜杠菜单" width="300">
+</p>
+
+项目地址：[github.com/Yunz93/Mozi](https://github.com/Yunz93/Mozi)，欢迎 Star / Fork。
 
 ## 常用快捷键
 
