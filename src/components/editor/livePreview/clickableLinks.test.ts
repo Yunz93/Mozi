@@ -170,4 +170,53 @@ describe("tryOpenLivePreviewLinkAtPos", () => {
     );
     expect(onOpenLink).toHaveBeenCalledWith("https://example.com");
   });
+
+  it("renders markdown inside link labels (e.g. bold) instead of raw source", () => {
+    const onOpenLink = vi.fn();
+    const doc = "go [**加粗**](https://example.com)\n\naway";
+    const view = mount(
+      doc,
+      [
+        livePreviewContextFacet.of({
+          sourceFilePath: null,
+          rootFolderPath: null,
+          files: [],
+          onOpenLink,
+        }),
+        livePreviewLinks,
+      ],
+      doc.length - 1,
+    );
+
+    const link = view.dom.querySelector(
+      ".cm-live-preview-link",
+    ) as HTMLAnchorElement | null;
+    expect(link).not.toBeNull();
+    expect(link!.innerHTML).toContain("<strong>加粗</strong>");
+    expect(link!.innerHTML).not.toContain("**加粗**");
+  });
+
+  it("falls back to href when link label is empty", () => {
+    const onOpenLink = vi.fn();
+    const doc = "go [](https://example.com)\n\naway";
+    const view = mount(
+      doc,
+      [
+        livePreviewContextFacet.of({
+          sourceFilePath: null,
+          rootFolderPath: null,
+          files: [],
+          onOpenLink,
+        }),
+        livePreviewLinks,
+      ],
+      doc.length - 1,
+    );
+
+    const link = view.dom.querySelector(
+      ".cm-live-preview-link",
+    ) as HTMLAnchorElement | null;
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe("https://example.com");
+  });
 });

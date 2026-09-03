@@ -39,6 +39,7 @@ import {
 import {
   defaultKeymapWithoutEnter,
   editorImeGuardPlugin,
+  isEditorImeComposing,
 } from "../behavior/imeGuard";
 import { tryConvertHtmlPaste } from "../behavior/htmlPaste";
 import { handleStructuredPaste } from "../behavior/input";
@@ -96,6 +97,7 @@ export interface CreateEditorExtensionsContext {
   preferences: EditorPreferenceOptions;
   compartments: EditorCompartments;
   preferenceCompartments: EditorPreferenceCompartments;
+  lastEmittedContentRef: MutableRefObject<string>;
   completionSourceRef: MutableRefObject<CompletionSource | undefined>;
   onScrollRef: MutableRefObject<(() => void) | undefined>;
   onPasteImageRef: MutableRefObject<
@@ -139,6 +141,7 @@ export function createEditorExtensions(
     preferences,
     compartments,
     preferenceCompartments,
+    lastEmittedContentRef,
     completionSourceRef,
     onScrollRef,
     onPasteImageRef,
@@ -155,6 +158,39 @@ export function createEditorExtensions(
     orderedListModeRef,
     flushPendingContentChange,
   } = ctx;
+
+  const applyStrictOrderedListNormalization = () => {
+    const view = viewRef.current;
+    if (!view || isApplyingOrderedNormalizationRef.current) return;
+
+    if (isEditorImeComposing(view)) {
+      // IME 组合期间不能改写有序列表序号，否则会打断候选窗；延后到组合结束再试。
+      normalizationTimeoutRef.current = window.setTimeout(
+        applyStrictOrderedListNormalization,
+        150,
+      );
+      return;
+    }
+
+    if (isLargeEditorState(view.state)) {
+      normalizationTimeoutRef.current = null;
+      return;
+    }
+
+    const normalizationChanges = getStrictOrderedListNormalizationChanges(
+      view.state,
+    );
+    if (normalizationChanges) {
+      isApplyingOrderedNormalizationRef.current = true;
+      view.dispatch({
+        changes: normalizationChanges,
+        annotations: Transaction.addToHistory.of(false),
+        userEvent: "input",
+      });
+      isApplyingOrderedNormalizationRef.current = false;
+    }
+    normalizationTimeoutRef.current = null;
+  };
 
   const customCompletion: CompletionSource = (cmCtx: CompletionContext) => {
     const slash = markdownSlashInsertCompletion(cmCtx);
@@ -295,27 +331,10 @@ export function createEditorExtensions(
           if (normalizationTimeoutRef.current) {
             clearTimeout(normalizationTimeoutRef.current);
           }
-          normalizationTimeoutRef.current = window.setTimeout(() => {
-            const view = viewRef.current;
-            if (!view || isApplyingOrderedNormalizationRef.current) return;
-            if (isLargeEditorState(view.state)) {
-              normalizationTimeoutRef.current = null;
-              return;
-            }
-
-            const normalizationChanges =
-              getStrictOrderedListNormalizationChanges(view.state);
-            if (normalizationChanges) {
-              isApplyingOrderedNormalizationRef.current = true;
-              view.dispatch({
-                changes: normalizationChanges,
-                annotations: Transaction.addToHistory.of(false),
-                userEvent: "input",
-              });
-              isApplyingOrderedNormalizationRef.current = false;
-            }
-            normalizationTimeoutRef.current = null;
-          }, 150); // 150ms debounce
+          normalizationTimeoutRef.current = window.setTimeout(
+            applyStrictOrderedListNormalization,
+            150,
+          ); // 150ms debounce
         }
       }
 
@@ -340,7 +359,9 @@ export function createEditorExtensions(
               pendingContentChangeIsLargeRef.current ||
               isLargeEditorState(view.state);
             pendingContentChangeIsLargeRef.current = false;
-            onChangeRef.current(view.state.doc.toString(), {
+            const emitted = view.state.doc.toString();
+            lastEmittedContentRef.current = emitted;
+            onChangeRef.current(emitted, {
               skipHistory: shouldSkipHistory,
             });
           }

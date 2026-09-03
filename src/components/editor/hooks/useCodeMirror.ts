@@ -51,6 +51,7 @@ import {
   requestLivePreviewRefresh,
   scheduleLivePreviewMeasure,
 } from "../livePreview/shared";
+import { isEditorImeComposing } from "../behavior/imeGuard";
 
 export { getEditorTooltipSpace };
 
@@ -206,6 +207,28 @@ export function useCodeMirror(
 
   // Track initial content for delayed initialization
   const initialContentRef = useRef(content || "");
+  // 记录编辑器最后一次上报给 store 的内容，用来识别"store → props → 编辑器"的回声，
+  // 避免防抖窗口内的新键入被旧 prop 覆盖。
+  const lastEmittedContentRef = useRef(content || "");
+
+  // 文档切换时需要用最新的外观/偏好重配置 compartment，但这些选项不应触发内容回灌，
+  // 因此在每次渲染时同步到 ref，而不放进内容同步 effect 的 deps 里。
+  const themeModeRef = useRef(themeMode);
+  const wordWrapRef = useRef(wordWrap);
+  const livePreviewEnabledRef = useRef(livePreviewEnabled);
+  const livePreviewContextRef = useRef(livePreviewContext);
+  const placeholderRef = useRef(placeholder);
+  const preferencesRef = useRef(preferences);
+  themeModeRef.current = themeMode;
+  wordWrapRef.current = wordWrap;
+  livePreviewEnabledRef.current = livePreviewEnabled;
+  livePreviewContextRef.current = livePreviewContext;
+  placeholderRef.current = placeholder;
+  preferencesRef.current = preferences;
+
+  // IME 组合期间收到的外部内容，等 compositionend 后再应用
+  const pendingImeContentSyncRef = useRef<string | null>(null);
+  const imeSyncListenerScheduledRef = useRef(false);
 
   // Update initial content ref when content changes before initialization
   useEffect(() => {
@@ -348,7 +371,9 @@ export function useCodeMirror(
     const isLarge =
       pendingContentChangeIsLargeRef.current || isLargeEditorState(view.state);
     pendingContentChangeIsLargeRef.current = false;
-    onChangeRef.current(view.state.doc.toString(), { skipHistory: isLarge });
+    const emitted = view.state.doc.toString();
+    lastEmittedContentRef.current = emitted;
+    onChangeRef.current(emitted, { skipHistory: isLarge });
   }, []);
 
   useEffect(() => {
@@ -444,6 +469,7 @@ export function useCodeMirror(
         preferences,
         compartments,
         preferenceCompartments,
+        lastEmittedContentRef,
         completionSourceRef,
         onScrollRef,
         onPasteImageRef,
@@ -518,6 +544,68 @@ export function useCodeMirror(
     const previousKey = previousDocumentKeyRef.current;
     const isDocumentSwitch = previousKey !== documentKey;
 
+    // 真正的外部内容变化（AI 应用、磁盘重载、store 撤销）才走这里回灌编辑器；
+    // 可能被 IME 延后调用，所以所有状态都在调用时重新读取。
+    const performExternalContentSync = (safeToApply: string) => {
+      const viewNow = viewRef.current;
+      if (!viewNow || viewNow !== view) return;
+      if (safeToApply === lastEmittedContentRef.current) return;
+
+      const currentNow = viewNow.state.doc.toString();
+      if (currentNow === safeToApply) {
+        lastEmittedContentRef.current = safeToApply;
+        return;
+      }
+
+      if (restoreScrollFrameRef.current !== null) {
+        cancelAnimationFrame(restoreScrollFrameRef.current);
+        restoreScrollFrameRef.current = null;
+      }
+
+      const scrollDom = viewNow.scrollDOM;
+      const previousScrollTop = scrollDom.scrollTop;
+      const previousScrollLeft = scrollDom.scrollLeft;
+      const shouldRestoreFocus = viewNow.hasFocus;
+
+      isSyncingContentRef.current = true;
+      const replacement = getDocumentReplacementRange(currentNow, safeToApply);
+      viewNow.dispatch({
+        changes: replacement,
+        scrollIntoView: false,
+        annotations: [Transaction.addToHistory.of(false)],
+      });
+
+      const restoreScrollPosition = () => {
+        const maxScrollTop = Math.max(
+          0,
+          scrollDom.scrollHeight - scrollDom.clientHeight,
+        );
+        const maxScrollLeft = Math.max(
+          0,
+          scrollDom.scrollWidth - scrollDom.clientWidth,
+        );
+        scrollDom.scrollTo({
+          top: Math.min(previousScrollTop, maxScrollTop),
+          left: Math.min(previousScrollLeft, maxScrollLeft),
+        });
+      };
+
+      restoreScrollPosition();
+      restoreScrollFrameRef.current = requestAnimationFrame(() => {
+        restoreScrollFrameRef.current = null;
+        restoreScrollPosition();
+        if (shouldRestoreFocus && !viewNow.hasFocus) {
+          viewNow.contentDOM.focus({ preventScroll: true });
+        }
+      });
+
+      isSyncingContentRef.current = false;
+      // 回灌后编辑器与 store 一致，以此为新的基线；之后 store 若再回到更早的值
+      //（例如 store 级撤销）也能被识别为外部变化。
+      lastEmittedContentRef.current = safeToApply;
+      previousDocumentKeyRef.current = documentKey;
+    };
+
     if (isDocumentSwitch) {
       // Pending edits are flushed by the onChange-identity effect before this
       // sync runs, so the cached state already includes the latest keystrokes.
@@ -558,97 +646,74 @@ export function useCodeMirror(
       view.dispatch({
         effects: [
           compartments.darkTheme.reconfigure(
-            EditorView.darkTheme.of(themeMode === "dark"),
+            EditorView.darkTheme.of(themeModeRef.current === "dark"),
           ),
           compartments.wrap.reconfigure(
-            wordWrap ? EditorView.lineWrapping : [],
+            wordWrapRef.current ? EditorView.lineWrapping : [],
           ),
           compartments.livePreview.reconfigure(
-            livePreviewEnabled ? createLivePreviewPluginExtensions() : [],
+            livePreviewEnabledRef.current
+              ? createLivePreviewPluginExtensions()
+              : [],
           ),
           compartments.livePreviewContext.reconfigure(
-            createLivePreviewContextExtension(livePreviewContext),
+            createLivePreviewContextExtension(livePreviewContextRef.current),
           ),
           compartments.keymap.reconfigure(
-            Prec.high(keymap.of(createMarkdownKeyBindings(orderedListMode))),
+            Prec.high(
+              keymap.of(createMarkdownKeyBindings(orderedListModeRef.current)),
+            ),
           ),
-          compartments.placeholder.reconfigure(cmPlaceholder(placeholder)),
-          ...buildEditorPreferenceEffects(preferenceCompartments, preferences),
+          compartments.placeholder.reconfigure(
+            cmPlaceholder(placeholderRef.current),
+          ),
+          ...buildEditorPreferenceEffects(
+            preferenceCompartments,
+            preferencesRef.current,
+          ),
         ],
       });
       view.scrollDOM.scrollTop = scrollTop;
 
       isSyncingContentRef.current = false;
       previousDocumentKeyRef.current = documentKey;
+      lastEmittedContentRef.current = safeContent;
+      pendingImeContentSyncRef.current = null;
+      imeSyncListenerScheduledRef.current = false;
       return;
     }
 
+    // prop 只是编辑器自己刚上报内容的回声（防抖竞态）：编辑器里可能已有更新的键入，
+    // 直接忽略，绝不能用旧值覆盖。
+    if (safeContent === lastEmittedContentRef.current) return;
     if (currentContent === safeContent) return;
 
-    if (restoreScrollFrameRef.current !== null) {
-      cancelAnimationFrame(restoreScrollFrameRef.current);
-      restoreScrollFrameRef.current = null;
+    // IME 组合中不能改文档，否则会打断候选窗；等组合结束后再应用最新的外部内容。
+    if (isEditorImeComposing(view)) {
+      pendingImeContentSyncRef.current = safeContent;
+      if (!imeSyncListenerScheduledRef.current) {
+        imeSyncListenerScheduledRef.current = true;
+        view.dom.addEventListener(
+          "compositionend",
+          () => {
+            imeSyncListenerScheduledRef.current = false;
+            // CodeMirror 自己也在 compositionend 里收尾，延后一拍再 dispatch，避免嵌套更新。
+            window.setTimeout(() => {
+              const next = pendingImeContentSyncRef.current;
+              pendingImeContentSyncRef.current = null;
+              if (next != null) performExternalContentSync(next);
+            }, 0);
+          },
+          { once: true },
+        );
+      }
+      return;
     }
 
-    const scrollDom = view.scrollDOM;
-    const previousScrollTop = scrollDom.scrollTop;
-    const previousScrollLeft = scrollDom.scrollLeft;
-    const shouldRestoreFocus = view.hasFocus;
-
-    isSyncingContentRef.current = true;
-    const replacement = getDocumentReplacementRange(
-      currentContent,
-      safeContent,
-    );
-    view.dispatch({
-      changes: replacement,
-      scrollIntoView: false,
-    });
-
-    const restoreScrollPosition = () => {
-      const maxScrollTop = Math.max(
-        0,
-        scrollDom.scrollHeight - scrollDom.clientHeight,
-      );
-      const maxScrollLeft = Math.max(
-        0,
-        scrollDom.scrollWidth - scrollDom.clientWidth,
-      );
-      scrollDom.scrollTo({
-        top: Math.min(previousScrollTop, maxScrollTop),
-        left: Math.min(previousScrollLeft, maxScrollLeft),
-      });
-    };
-
-    restoreScrollPosition();
-    restoreScrollFrameRef.current = requestAnimationFrame(() => {
-      restoreScrollFrameRef.current = null;
-      restoreScrollPosition();
-      if (shouldRestoreFocus && !view.hasFocus) {
-        view.contentDOM.focus({ preventScroll: true });
-      }
-    });
-
-    isSyncingContentRef.current = false;
-    previousDocumentKeyRef.current = documentKey;
-  }, [
-    content,
-    documentKey,
-    compartments.darkTheme,
-    compartments.wrap,
-    compartments.livePreview,
-    compartments.livePreviewContext,
-    compartments.keymap,
-    compartments.placeholder,
-    preferenceCompartments,
-    preferences,
-    themeMode,
-    wordWrap,
-    livePreviewEnabled,
-    livePreviewContext,
-    orderedListMode,
-    placeholder,
-  ]);
+    performExternalContentSync(safeContent);
+    // compartments / preferenceCompartments 由 useMemo 固定，放进 deps 不会触发多余回灌；
+    // 主题、换行、偏好等外观选项则刻意通过 ref 读取，避免它们变化时重放文档替换。
+  }, [content, documentKey, compartments, preferenceCompartments]);
 
   // Update word wrap
   const setWordWrap = useCallback(

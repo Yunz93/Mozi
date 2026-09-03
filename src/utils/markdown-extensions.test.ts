@@ -563,6 +563,31 @@ describe("initKaTeX", () => {
     expect(result).toBe(false);
   });
 
+  it("returns false for inline math when `$` is escaped as `\\$`", () => {
+    const md = createMockMarkdownIt();
+    initKaTeX(md);
+
+    const rule = md.inline.ruler.rules.find(
+      (r: any) => r.name === "katex_inline_math",
+    );
+    const state = createMockInlineState("\\$x$");
+    state.pos = 1; // parser is at `$`
+    const result = rule.fn(state, false);
+    expect(result).toBe(false);
+  });
+
+  it("returns false for inline math when closing `$` is after a newline", () => {
+    const md = createMockMarkdownIt();
+    initKaTeX(md);
+
+    const rule = md.inline.ruler.rules.find(
+      (r: any) => r.name === "katex_inline_math",
+    );
+    const state = createMockInlineState("$x\n$");
+    const result = rule.fn(state, false);
+    expect(result).toBe(false);
+  });
+
   it("returns false for display math $$ in inline rule", () => {
     const md = createMockMarkdownIt();
     initKaTeX(md);

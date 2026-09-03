@@ -29,7 +29,7 @@ import {
 } from "./softOff";
 import { livePreviewContextFacet } from "./context";
 
-const CALLOUT_START = /^>\s*\[!([A-Za-z0-9_-]+)\]([+-]?)\s*(.*)$/;
+const CALLOUT_START = /^\s{0,3}>\s*\[!([A-Za-z0-9_-]+)\]([+-]?)\s*(.*)$/;
 
 export interface CalloutRange {
   from: number;
@@ -65,8 +65,8 @@ export function findCalloutRanges(docText: string): CalloutRange[] {
 
     while (j < lines.length) {
       const next = lines[j];
-      if (!next.startsWith(">")) break;
-      const content = next.replace(/^>\s?/, "");
+      if (!next.trimStart().startsWith(">")) break;
+      const content = next.replace(/^\s*>\s?/, "");
       bodyLines.push(content);
       endOffset += 1 + next.length;
       j += 1;

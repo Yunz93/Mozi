@@ -38,8 +38,6 @@ const HIDEABLE_MARK_NODES = new Set([
   "StrikethroughMark",
   "LinkMark",
   "QuoteMark",
-  "SubscriptMark",
-  "SuperscriptMark",
 ]);
 
 /** Parent constructs that should reveal their marks when selection touches them. */
@@ -50,8 +48,6 @@ const INLINE_PARENT_NODES = new Set([
   "Strikethrough",
   "Link",
   "Image",
-  "Subscript",
-  "Superscript",
   "Autolink",
 ]);
 

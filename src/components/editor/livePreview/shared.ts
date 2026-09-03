@@ -980,27 +980,48 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
 export function bindLivePreviewWidgetCaret(
   view: EditorView,
   el: HTMLElement,
-  from: number,
+  from: number | (() => number),
 ): void {
   el.addEventListener("mousedown", (event) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement | null;
-    if (
-      target?.closest(
-        "a, button, input, textarea, select, [contenteditable='true']",
-      )
-    ) {
+    // 只放过 widget 内部的交互元素；`closest` 会一路找到 `.cm-content[contenteditable=true]`，
+    // 必须限定在 widget 根节点之内，否则这个 handler 永远提前返回。
+    const interactive = target?.closest(
+      "a, button, input, textarea, select, [contenteditable='true']",
+    );
+    if (interactive && interactive !== el && el.contains(interactive)) {
       return;
     }
     cancelPendingLivePreviewReveals();
     event.preventDefault();
     event.stopPropagation();
-    const pos = Math.max(0, Math.min(from, view.state.doc.length));
+    const resolvedFrom = typeof from === "function" ? from() : from;
+    const pos = Math.max(0, Math.min(resolvedFrom, view.state.doc.length));
     view.focus();
     view.dispatch({
       selection: { anchor: pos },
       scrollIntoView: false,
     });
+  });
+}
+
+/**
+ * 与 {@link bindLivePreviewWidgetCaret} 相同，但点击时通过 `view.posAtDOM` 现算 widget 位置，
+ * 再加上 `offset`。这样 widget 不必把绝对位置写进 `eq`，文档前方增删时不会导致
+ * 大量高亮 / 列表符号 widget 被重建。
+ */
+export function bindLivePreviewWidgetCaretAtDom(
+  view: EditorView,
+  el: HTMLElement,
+  offset = 0,
+): void {
+  bindLivePreviewWidgetCaret(view, el, () => {
+    try {
+      return view.posAtDOM(el) + offset;
+    } catch {
+      return view.state.selection.main.head;
+    }
   });
 }
 

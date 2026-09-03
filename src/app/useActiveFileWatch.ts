@@ -9,6 +9,7 @@ import {
   isMarkdownFile,
   isPreviewOnlyFile,
 } from "../utils/fileTypes";
+import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
 
 interface UseActiveFileWatchOptions {
   activeTabId: string | null;
@@ -43,6 +44,7 @@ async function reloadTabFromDisk(
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string,
   options?: { notifyReload?: boolean },
 ): Promise<void> {
+  flushActiveEditorPendingChanges();
   const state = useAppStore.getState();
   if (state.hasUnsavedChanges(tabId)) {
     showNotification(t("notifications_fileChangedOnDisk"), "error");

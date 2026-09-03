@@ -15,6 +15,7 @@ import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
 import { collectMarkdownLinkRanges } from "../../../utils/markdownInlineRanges";
 import { bindLivePreviewWidgetModClick } from "./clickableLinks";
+import { renderMarkdown } from "../../../utils/markdown";
 import {
   collectVisibleWikiRanges,
   getLivePreviewDecorationRange,
@@ -24,7 +25,18 @@ import {
   selectionTouchesRange,
   shouldRebuildLivePreviewDecorations,
   ViewportDecorationWindow,
+  getCachedMarkdownHtml,
 } from "./shared";
+
+function renderInlineLinkLabel(label: string): string {
+  const trimmed = label.trim();
+  if (!trimmed) return "";
+  return getCachedMarkdownHtml(trimmed, (source) => {
+    const html = renderMarkdown(source);
+    const match = html.match(/<p>([\s\S]*?)<\/p>/i);
+    return match?.[1] ?? html;
+  });
+}
 
 class MarkdownLinkWidget extends WidgetType {
   constructor(
@@ -47,7 +59,16 @@ class MarkdownLinkWidget extends WidgetType {
     const el = document.createElement("a");
     el.className = "cm-live-preview-link";
     el.href = this.href;
-    el.textContent = this.label || this.href;
+    if (this.label.trim()) {
+      const labelHtml = renderInlineLinkLabel(this.label);
+      if (labelHtml) {
+        el.innerHTML = labelHtml;
+      } else {
+        el.textContent = this.href;
+      }
+    } else {
+      el.textContent = this.href;
+    }
     el.setAttribute("contenteditable", "false");
     bindLivePreviewWidgetModClick(el, view, this.from, () => {
       const ctx = view.state.facet(livePreviewContextFacet);
