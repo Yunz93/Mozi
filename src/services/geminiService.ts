@@ -2,6 +2,7 @@ import type { GoogleGenAI } from "@google/genai";
 import type { AIAnalysisResult, AIWikiGenerationResult } from "../types";
 import { resolveAISystemPrompt } from "./aiPrompts";
 import { buildAnalyzeMarkdownPrompt } from "./ai/prompts";
+import { AiServiceError } from "./ai/errors";
 
 let genaiModulePromise: Promise<typeof import("@google/genai")> | null = null;
 
@@ -79,7 +80,7 @@ export const analyzeContent = async (
   systemPrompt?: string,
 ): Promise<AIAnalysisResult> => {
   if (!apiKey) {
-    throw new Error("Gemini API key is required");
+    throw new AiServiceError("MISSING_API_KEY", { provider: "gemini" });
   }
 
   const { Type } = await loadGenAIModule();
@@ -121,7 +122,7 @@ export async function generateGeminiJson<T>({
   schema,
 }: GeminiJsonRequest): Promise<T> {
   if (!apiKey) {
-    throw new Error("Gemini API key is required");
+    throw new AiServiceError("MISSING_API_KEY", { provider: "gemini" });
   }
 
   const ai = await getAIInstance(apiKey);

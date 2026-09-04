@@ -22,6 +22,10 @@ import {
 import { isFollowUpQuestion } from "../../services/vault/retrieveService";
 import { hydrateSensitiveSettingsIntoStore } from "../../services/secureSettingsService";
 import { localizeKnownError } from "../../utils/i18n";
+import {
+  formatAiServiceError,
+  isAiServiceError,
+} from "../../services/ai/errors";
 import { isImeComposingEvent } from "../../utils/imeKeyboard";
 import { renderMarkdown } from "../../utils/markdown";
 import {
@@ -279,9 +283,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         return true;
       } catch (error) {
         showNotification(
-          error instanceof Error
-            ? localizeKnownError(language, error.message)
-            : t("notifications_aiConfigFirst"),
+          isAiServiceError(error)
+            ? formatAiServiceError(language, error)
+            : error instanceof Error
+              ? localizeKnownError(language, error.message)
+              : t("notifications_aiConfigFirst"),
           "error",
         );
         setSettingsOpen(true, "ai");

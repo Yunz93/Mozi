@@ -13,6 +13,7 @@ import {
   buildAnalyzeMarkdownPrompt,
   resolveProviderSystemPrompt,
 } from "./ai/prompts";
+import { AiServiceError } from "./ai/errors";
 
 interface CodexResponseContent {
   type?: string;
@@ -62,7 +63,7 @@ export async function generateCodexJson<T>(
 ): Promise<T> {
   const apiKey = settings.codexApiKey?.trim();
   if (!apiKey) {
-    throw new Error("Please configure an OpenAI API key in settings.");
+    throw new AiServiceError("MISSING_API_KEY", { provider: "openai" });
   }
 
   const baseUrl = normalizeBaseUrl(

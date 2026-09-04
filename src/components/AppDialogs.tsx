@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { SettingsModal } from "./settings/SettingsModal";
 import { ConfirmDialog, PromptDialog } from "./ui/Dialog";
 import { AiResultReviewDialog } from "./ai/AiResultReviewDialog";
@@ -18,6 +18,7 @@ import type {
   SimpleBlogPublishDefaults,
   SimpleBlogPublishInput,
 } from "../utils/simpleBlogPublish";
+import { registerBuiltinEmbeddingConsentPrompt } from "../services/vault/builtinEmbeddingConsent";
 import type { LongImageSharePayload } from "./share/longImageSharePayload";
 
 interface AppDialogsProps {
@@ -31,6 +32,7 @@ interface AppDialogsProps {
   settings: AppSettings;
   wechatDraftDefaults: WechatDraftDefaults | null;
   simpleBlogPublishDefaults: SimpleBlogPublishDefaults | null;
+  simpleBlogLocalImagesToRepo?: boolean;
   notification: Notification | null;
   attachmentContext: { files: FileNode[]; rootFolderPath: string | null };
   t: (key: string) => string;
@@ -67,6 +69,7 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   settings,
   wechatDraftDefaults,
   simpleBlogPublishDefaults,
+  simpleBlogLocalImagesToRepo = false,
   notification,
   attachmentContext,
   t,
@@ -97,6 +100,27 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
     (state) => state.setPendingDraftRestore,
   );
   const setContentForFile = useAppStore((state) => state.setContentForFile);
+  const [embeddingConsentOpen, setEmbeddingConsentOpen] = useState(false);
+  const embeddingConsentResolver = useRef<((granted: boolean) => void) | null>(
+    null,
+  );
+
+  useEffect(() => {
+    registerBuiltinEmbeddingConsentPrompt(() => {
+      return new Promise<boolean>((resolve) => {
+        embeddingConsentResolver.current = resolve;
+        setEmbeddingConsentOpen(true);
+      });
+    });
+    return () => registerBuiltinEmbeddingConsentPrompt(null);
+  }, []);
+
+  const resolveEmbeddingConsent = (granted: boolean) => {
+    const resolver = embeddingConsentResolver.current;
+    embeddingConsentResolver.current = null;
+    setEmbeddingConsentOpen(false);
+    resolver?.(granted);
+  };
 
   const handleRestoreDraft = () => {
     if (!pendingDraftRestore) return;
@@ -145,6 +169,7 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         isOpen={isSimpleBlogDialogOpen}
         isSubmitting={isPublishing}
         defaults={simpleBlogPublishDefaults}
+        localImagesToRepo={simpleBlogLocalImagesToRepo}
         onClose={onCloseSimpleBlog}
         onSubmit={(input) => {
           void onSubmitSimpleBlog(input);
@@ -203,6 +228,17 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         })}
         confirmText={tr("sidebar_cleanupUnusedAttachments")}
         variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={embeddingConsentOpen}
+        onClose={() => resolveEmbeddingConsent(false)}
+        onConfirm={() => resolveEmbeddingConsent(true)}
+        title={tr("index_embeddingDownloadConfirmTitle")}
+        message={tr("index_embeddingDownloadConfirmMessage")}
+        confirmText={tr("index_embeddingDownloadConfirm")}
+        cancelText={tr("index_embeddingDownloadSkip")}
+        variant="warning"
       />
 
       {notification && (

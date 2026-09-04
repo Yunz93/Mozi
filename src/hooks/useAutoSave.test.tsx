@@ -633,6 +633,50 @@ describe("useAutoSave", () => {
     expect(window.localStorage.getItem(`draft_${NOTE_ID}`)).toBe("edited");
   });
 
+  it("does not retry or back up drafts for ENCODING_UNSUPPORTED", async () => {
+    setupStore(60_000);
+    const encodingError = Object.assign(
+      new Error("ENCODING_UNSUPPORTED: 该文件不是 UTF-8 编码"),
+      { code: "ENCODING_UNSUPPORTED" },
+    );
+    writeFile.mockRejectedValue(encodingError);
+    const showNotification = vi.fn();
+    useAppStore.setState({ showNotification });
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({
+        debounceMs: 60_000,
+        enabled: true,
+        maxRetries: 3,
+        retryDelayMs: 10,
+      });
+      return null;
+    }
+
+    render(<SaveHarness />);
+    window.localStorage.removeItem(`draft_${NOTE_ID}`);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "edited");
+    });
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "auto" });
+    });
+
+    expect(writeFile).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem(`draft_${NOTE_ID}`)).toBeNull();
+    expect(showNotification).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "auto" });
+    });
+
+    expect(writeFile).toHaveBeenCalledTimes(2);
+    expect(showNotification).toHaveBeenCalledTimes(1);
+  });
+
   it("allows manual save to overwrite disk changes", async () => {
     setupStore(60_000);
     readFile.mockResolvedValue("changed-on-disk");

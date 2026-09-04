@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import { useFileSystem } from "./useFileSystem";
-import type { FileNode } from "../types";
+import type { AppLanguage, FileNode } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { clearAttachmentResolverCache } from "../utils/attachmentResolver";
 import { localizeKnownError, t } from "../utils/i18n";
@@ -46,6 +46,27 @@ import {
 import { packVectorSnapshot } from "../services/vault/vectorStore";
 import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
 import { importDroppedFiles } from "../services/filesystem/importDroppedFiles";
+
+async function notifyIfNonUtf8File(
+  path: string,
+  language: AppLanguage,
+  showNotification: (message: string, type: "success" | "error") => void,
+): Promise<void> {
+  try {
+    const fs = await getFileSystem();
+    const isNonUtf8 = (
+      fs as { isNonUtf8Path?: (filePath: string) => boolean }
+    ).isNonUtf8Path?.(path);
+    if (isNonUtf8) {
+      showNotification(
+        t(language, "notifications_fileEncodingReadOnly"),
+        "error",
+      );
+    }
+  } catch {
+    // 探测编码状态失败时不打断打开流程。
+  }
+}
 
 /** Prevent overlapping create calls for the same destination path. */
 const createDocumentInFlight = new Set<string>();
@@ -205,6 +226,11 @@ export function useFileOperations() {
             const text = await readFile(file);
             updateTabContent(file.id, text);
             markAsSaved(file.id);
+            await notifyIfNonUtf8File(
+              file.path,
+              settings.language,
+              showNotification,
+            );
           } else {
             updateTabContent(file.id, "");
             markAsSaved(file.id);
@@ -222,6 +248,11 @@ export function useFileOperations() {
             const text = await readFile(file);
             updateTabContent(file.id, text);
             markAsSaved(file.id);
+            await notifyIfNonUtf8File(
+              file.path,
+              settings.language,
+              showNotification,
+            );
           }
           return;
         }
@@ -235,6 +266,11 @@ export function useFileOperations() {
           const text = await readFile(file);
           updateTabContent(file.id, text);
           markAsSaved(file.id);
+          await notifyIfNonUtf8File(
+            file.path,
+            settings.language,
+            showNotification,
+          );
 
           // A draft backup exists when a previous save failed. Offer to
           // restore it instead of silently keeping the (older) disk content.

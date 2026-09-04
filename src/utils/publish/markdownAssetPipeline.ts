@@ -25,6 +25,59 @@ export function isLikelyRasterOrVectorImagePath(filePath: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico|heic|tiff?)$/i.test(filePath);
 }
 
+function decodeMarkdownImageDestination(rawDestination: string): string {
+  const trimmed = rawDestination.trim();
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("<")) {
+    const closingIndex = trimmed.indexOf(">");
+    if (closingIndex > 0) {
+      return trimmed.slice(1, closingIndex).trim();
+    }
+  }
+
+  const titleSeparated = trimmed.match(/^(.+?)(?:\s+(?:"[^"]*"|'[^']*'))?$/);
+  return (titleSeparated?.[1] || trimmed).trim();
+}
+
+/** 文档是否含尚未指向远程 URL 的本地图片引用。 */
+export function markdownHasLocalImages(markdown: string): boolean {
+  for (const match of markdown.matchAll(WIKI_EMBED_REGEX)) {
+    const target = (match[1] || "").split("|")[0]?.trim() ?? "";
+    if (
+      target &&
+      !isRemoteTarget(target) &&
+      isLikelyRasterOrVectorImagePath(target)
+    ) {
+      return true;
+    }
+  }
+
+  for (const match of markdown.matchAll(MARKDOWN_IMAGE_REGEX)) {
+    const target = decodeMarkdownImageDestination(match[2] || "");
+    if (target && !isRemoteTarget(target)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function isImageHostingConfigured(settings: {
+  imageHosting?: { provider?: string } | null;
+}): boolean {
+  const provider = settings.imageHosting?.provider;
+  return Boolean(provider && provider !== "none");
+}
+
+/** simple-blog：图床未配置时改走仓库资源管线，不再因本地图片中止。 */
+export function shouldAbortSimpleBlogPublishForMissingHosting(_input: {
+  imageHostingConfigured: boolean;
+  hasLocalImages: boolean;
+}): boolean {
+  return false;
+}
+
 /**
  * Reattach a frontmatter header (if present) to a transformed body.
  */

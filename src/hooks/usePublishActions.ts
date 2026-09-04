@@ -14,6 +14,10 @@ import {
   type WechatDraftPublishInput,
 } from "../utils/wechatPublish";
 import { replaceLocalImagesWithHostingForPublish } from "../utils/publishLocalImagesToHosting";
+import {
+  isImageHostingConfigured,
+  shouldAbortSimpleBlogPublishForMissingHosting,
+} from "../utils/publish/markdownAssetPipeline";
 import { getFileSystem, isTauriEnvironment } from "../types/filesystem";
 import {
   isValidBlogRepoUrl,
@@ -309,34 +313,41 @@ export function usePublishActions(
         const latestFiles = storeState.files;
         const latestRootFolderPath = storeState.rootFolderPath;
 
-        const hostingResult = await replaceLocalImagesWithHostingForPublish(
-          contentToPublish,
-          {
-            files: latestFiles,
-            rootFolderPath: latestRootFolderPath,
-            currentFilePath: activeFile.path,
-            settings: hydratedSettings,
-          },
-        );
+        let markdownForPublish = contentToPublish;
+        const hostingConfigured = isImageHostingConfigured(hydratedSettings);
+        if (
+          hostingConfigured ||
+          shouldAbortSimpleBlogPublishForMissingHosting({
+            imageHostingConfigured: hostingConfigured,
+            hasLocalImages: true,
+          })
+        ) {
+          const hostingResult = await replaceLocalImagesWithHostingForPublish(
+            contentToPublish,
+            {
+              files: latestFiles,
+              rootFolderPath: latestRootFolderPath,
+              currentFilePath: activeFile.path,
+              settings: hydratedSettings,
+            },
+          );
 
-        if (!hostingResult.ok) {
-          if (hostingResult.reason === "hosting_not_configured") {
-            showNotification(
-              t(language, "notifications_imageHostingNotConfigured"),
-              "error",
-            );
+          if (!hostingResult.ok) {
+            if (hostingResult.reason === "hosting_not_configured") {
+              // 图床未配置：交给仓库资源管线处理本地图片
+            } else {
+              showNotification(
+                t(language, "notifications_imageUploadFailed", {
+                  error: hostingResult.message,
+                }),
+                "error",
+              );
+              return false;
+            }
           } else {
-            showNotification(
-              t(language, "notifications_imageUploadFailed", {
-                error: hostingResult.message,
-              }),
-              "error",
-            );
+            markdownForPublish = hostingResult.markdown;
           }
-          return false;
         }
-
-        let markdownForPublish = hostingResult.markdown;
         if (markdownForPublish !== contentToPublish) {
           const beforeHostingContent =
             useAppStore.getState().fileContents[targetTabId] ??

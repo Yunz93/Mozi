@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { AppSettings } from "../types";
 import { ensureDynamicFontFaces } from "../utils/fontSettings";
-import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
+import { hydrateSensitiveSettingsSafely } from "./hydrateSensitiveSettingsSafely";
 
 interface UseAppBootstrapOptions {
   settings: AppSettings;
@@ -29,9 +29,7 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): void {
 
     const warmSecureSettings = () => {
       if (cancelled) return;
-      void hydrateSensitiveSettingsIntoStore().catch((error) => {
-        console.warn("Failed to warm secure settings:", error);
-      });
+      void hydrateSensitiveSettingsSafely();
     };
 
     if ("requestIdleCallback" in win) {

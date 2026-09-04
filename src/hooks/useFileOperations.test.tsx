@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultSettings, useAppStore } from "../store/appStore";
 import type { FileNode } from "../types";
 
-const { readFileMock } = vi.hoisted(() => ({
+const { readFileMock, isNonUtf8PathMock } = vi.hoisted(() => ({
   readFileMock: vi.fn(),
+  isNonUtf8PathMock: vi.fn((_path?: string) => false),
 }));
 
 vi.mock("./useFileSystem", () => ({
@@ -23,6 +24,14 @@ vi.mock("./useFileSystem", () => ({
     refreshFileTree: vi.fn(),
     revealInExplorer: vi.fn(),
   }),
+}));
+
+vi.mock("../types/filesystem", () => ({
+  getFileSystem: vi.fn(async () => ({
+    isNonUtf8Path: (path: string) => isNonUtf8PathMock(path),
+    writeFile: vi.fn(),
+    readFile: vi.fn(),
+  })),
 }));
 
 import { useFileOperations } from "./useFileOperations";
@@ -67,6 +76,8 @@ describe("useFileOperations", () => {
 
   beforeEach(() => {
     readFileMock.mockReset();
+    isNonUtf8PathMock.mockReset();
+    isNonUtf8PathMock.mockReturnValue(false);
     useAppStore.setState({
       files: [previousNote, targetNote],
       openTabs: [previousNote.id],
@@ -93,5 +104,27 @@ describe("useFileOperations", () => {
       expect(closeTab).toHaveBeenCalledWith(targetNote.id);
     });
     expect(useAppStore.getState().activeTabId).toBe(previousNote.id);
+  });
+
+  it("notifies once when opening a non-UTF-8 file", async () => {
+    readFileMock.mockResolvedValue("展示用乱码");
+    isNonUtf8PathMock.mockReturnValue(true);
+    const showNotification = vi.fn();
+    useAppStore.setState({ showNotification });
+    let ops: ReturnType<typeof useFileOperations> | null = null;
+
+    render(<Harness onReady={(value) => (ops = value)} />);
+
+    await act(async () => {
+      await ops!.handleFileSelect(targetNote);
+    });
+
+    expect(useAppStore.getState().fileContents[targetNote.id]).toBe(
+      "展示用乱码",
+    );
+    expect(showNotification).toHaveBeenCalledWith(
+      "该文件不是 UTF-8 编码，为避免损坏已禁用保存",
+      "error",
+    );
   });
 });

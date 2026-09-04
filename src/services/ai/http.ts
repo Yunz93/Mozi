@@ -3,6 +3,8 @@
  * (Codex `/responses` and DeepSeek `/chat/completions`).
  */
 
+import { AiServiceError } from "./errors";
+
 export class FetchTimeoutError extends Error {
   constructor(message = "Request timed out") {
     super(message);
@@ -75,6 +77,8 @@ export function parseProviderJson<T>(text: string, providerLabel: string): T {
     return JSON.parse(stripped) as T;
   } catch {
     console.error(`Failed to parse ${providerLabel} JSON response:`, stripped);
-    throw new Error(`${providerLabel} returned invalid JSON.`);
+    throw new AiServiceError("INVALID_JSON", {
+      message: `${providerLabel} returned invalid JSON.`,
+    });
   }
 }

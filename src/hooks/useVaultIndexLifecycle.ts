@@ -44,6 +44,13 @@ import {
   unpackVectorSnapshot,
 } from "../services/vault/vectorStore";
 import { invalidateLivePreviewWikiCachesForPath } from "../components/editor/livePreview/wiki";
+import { isBuiltinEmbeddingModelCached } from "../services/vault/builtinEmbedding";
+import {
+  consumeBuiltinEmbeddingSkipNotice,
+  requestBuiltinEmbeddingDownloadConsent,
+  resolveBuiltinEmbeddingDownloadAction,
+} from "../services/vault/builtinEmbeddingConsent";
+import { t } from "../utils/i18n";
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -130,6 +137,48 @@ export function useVaultIndexLifecycle(): {
         store.load(null);
         if (isCurrent()) syncSemanticStatus(0);
         return;
+      }
+
+      if (provider === "builtin") {
+        const modelCached = await isBuiltinEmbeddingModelCached();
+        const latestSettings = useAppStore.getState().settings;
+        let consent =
+          latestSettings.builtinEmbeddingDownloadConsent ?? "unknown";
+        const privacyMode = latestSettings.privacyMode === true;
+        let action = resolveBuiltinEmbeddingDownloadAction({
+          consent,
+          privacyMode,
+          modelCached,
+        });
+
+        if (action === "prompt") {
+          const granted = await requestBuiltinEmbeddingDownloadConsent();
+          if (!isCurrent()) return;
+          consent = granted ? "granted" : "denied";
+          useAppStore.getState().updateSettings({
+            builtinEmbeddingDownloadConsent: consent,
+          });
+          action = granted ? "allow" : "skip";
+        }
+
+        if (action === "skip") {
+          store.load(null);
+          if (isCurrent()) {
+            syncSemanticStatus(0);
+            if (consumeBuiltinEmbeddingSkipNotice()) {
+              useAppStore
+                .getState()
+                .showNotification(
+                  t(
+                    latestSettings.language,
+                    "notifications_builtinEmbeddingSkipped",
+                  ),
+                  "info",
+                );
+            }
+          }
+          return;
+        }
       }
 
       try {

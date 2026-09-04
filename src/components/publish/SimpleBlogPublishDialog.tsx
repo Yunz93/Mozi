@@ -10,13 +10,21 @@ interface SimpleBlogPublishDialogProps {
   isOpen: boolean;
   isSubmitting: boolean;
   defaults: SimpleBlogPublishDefaults | null;
+  localImagesToRepo?: boolean;
   onClose: () => void;
   onSubmit: (input: SimpleBlogPublishInput) => void;
 }
 
 export const SimpleBlogPublishDialog: React.FC<
   SimpleBlogPublishDialogProps
-> = ({ isOpen, isSubmitting, defaults, onClose, onSubmit }) => {
+> = ({
+  isOpen,
+  isSubmitting,
+  defaults,
+  localImagesToRepo = false,
+  onClose,
+  onSubmit,
+}) => {
   const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -67,6 +75,11 @@ export const SimpleBlogPublishDialog: React.FC<
           <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
             {t("simpleBlogDialog_desc")}
           </p>
+          {localImagesToRepo ? (
+            <p className="text-xs leading-5 text-amber-700 dark:text-amber-300">
+              {t("simpleBlogDialog_localImagesToRepo")}
+            </p>
+          ) : null}
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">

@@ -108,8 +108,8 @@ xattr -cr /Applications/墨知.app
 | `Cmd/Ctrl + 1` ~ `5`                    | 侧边栏 / Outline / 视图模式 / 主题 / AI 增强 |
 | `Cmd + Shift + F`                       | 当前文件搜索                                 |
 | `Cmd + Shift + S`                       | 侧边栏搜索                                   |
-| `Cmd + Shift + K` / `L`                 | 打开知识库 / 定位当前文件                    |
-| `Cmd + Shift + H`                       | 导出 PDF                                     |
+| `Cmd + Shift + B` / `J`                 | 打开知识库 / 定位当前文件                    |
+| `Cmd + Shift + E`                       | 导出 PDF                                     |
 | `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | 新建笔记 / 文件夹                            |
 | `Cmd/Ctrl + Shift + Alt + N`            | 新建窗口（桌面端）                           |
 | `Cmd/Ctrl + W`                          | 关闭标签                                     |

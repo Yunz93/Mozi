@@ -1,5 +1,6 @@
 import type { AIProvider, AppSettings } from "../types";
 import { fetchWithTimeout } from "./ai/http";
+import { AiServiceError } from "./ai/errors";
 
 export interface ModelOption {
   id: string;
@@ -52,7 +53,7 @@ async function fetchOpenAIModels(
 ): Promise<ModelOption[]> {
   const apiKey = settings.codexApiKey?.trim();
   if (!apiKey) {
-    throw new Error("请先配置 OpenAI API Key，再加载模型列表。");
+    throw new AiServiceError("MISSING_API_KEY", { provider: "openai" });
   }
 
   const baseUrl = (
@@ -69,10 +70,11 @@ async function fetchOpenAIModels(
   };
 
   if (!response.ok) {
-    throw new Error(
-      payload.error?.message ||
-        `加载 OpenAI 模型列表失败（${response.status}）。`,
-    );
+    throw new AiServiceError("MODEL_LIST_FAILED", {
+      provider: "openai",
+      status: response.status,
+      message: payload.error?.message,
+    });
   }
 
   return dedupeAndSortModels(
@@ -88,7 +90,7 @@ async function fetchGeminiModels(
 ): Promise<ModelOption[]> {
   const apiKey = settings.geminiApiKey?.trim();
   if (!apiKey) {
-    throw new Error("请先配置 Gemini API Key，再加载模型列表。");
+    throw new AiServiceError("MISSING_API_KEY", { provider: "gemini" });
   }
 
   const response = await fetchWithTimeout(
@@ -99,10 +101,11 @@ async function fetchGeminiModels(
   };
 
   if (!response.ok) {
-    throw new Error(
-      payload.error?.message ||
-        `加载 Gemini 模型列表失败（${response.status}）。`,
-    );
+    throw new AiServiceError("MODEL_LIST_FAILED", {
+      provider: "gemini",
+      status: response.status,
+      message: payload.error?.message,
+    });
   }
 
   return dedupeAndSortModels(
@@ -127,7 +130,7 @@ async function fetchDeepSeekModels(
 ): Promise<ModelOption[]> {
   const apiKey = settings.deepseekApiKey?.trim();
   if (!apiKey) {
-    throw new Error("请先配置 DeepSeek API Key，再加载模型列表。");
+    throw new AiServiceError("MISSING_API_KEY", { provider: "deepseek" });
   }
 
   const baseUrl = (
@@ -144,10 +147,11 @@ async function fetchDeepSeekModels(
   };
 
   if (!response.ok) {
-    throw new Error(
-      payload.error?.message ||
-        `加载 DeepSeek 模型列表失败（${response.status}）。`,
-    );
+    throw new AiServiceError("MODEL_LIST_FAILED", {
+      provider: "deepseek",
+      status: response.status,
+      message: payload.error?.message,
+    });
   }
 
   return dedupeAndSortModels(

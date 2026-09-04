@@ -61,7 +61,15 @@ import { useAppUpdater } from "./app/useAppUpdater";
 import { useWorkspaceLayout } from "./app/useWorkspaceLayout";
 import { useAttachmentCleanup } from "./app/useAttachmentCleanup";
 import { useExternalFileOpen } from "./app/useExternalFileOpen";
-import { getStartupKnowledgeBaseGate } from "./app/startupKnowledgeBaseGate";
+import {
+  getStartupKnowledgeBaseGate,
+  getStartupKnowledgeBaseRestoreFailureAction,
+} from "./app/startupKnowledgeBaseGate";
+import { hydrateSensitiveSettingsSafely } from "./app/hydrateSensitiveSettingsSafely";
+import {
+  isImageHostingConfigured,
+  markdownHasLocalImages,
+} from "./utils/publish/markdownAssetPipeline";
 import {
   extractWechatDraftDefaults,
   type WechatDraftPublishInput,
@@ -70,7 +78,6 @@ import {
   extractSimpleBlogPublishDefaults,
   type SimpleBlogPublishInput,
 } from "./utils/simpleBlogPublish";
-import { hydrateSensitiveSettingsIntoStore } from "./services/secureSettingsService";
 import { isValidBlogRepoUrl, isValidBlogSiteUrl } from "./utils/blogRepo";
 import { isTauriEnvironment, getFileSystem } from "./types/filesystem";
 import { joinFsPath } from "./utils/pathHelpers";
@@ -701,8 +708,8 @@ const App: React.FC = () => {
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
     void (async () => {
-      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
-      const language = hydratedSettings.language;
+      await hydrateSensitiveSettingsSafely();
+      const hydratedSettings = useAppStore.getState().settings;
 
       if (!hydratedSettings.blogRepoUrl.trim()) {
         showNotification(t("notifications_setBlogRepoFirst"), "error");
@@ -850,10 +857,24 @@ const App: React.FC = () => {
         if (cancelled) return;
 
         if (!restoredPath) {
-          updateSettings({
-            lastKnowledgeBasePath: "",
-            lastOpenedFilePath: "",
+          const restoreFailure = getStartupKnowledgeBaseRestoreFailureAction({
+            restoredPath,
+            lastKnowledgeBasePath,
           });
+          if (restoreFailure.shouldNotify) {
+            showNotification(
+              t("notifications_lastKnowledgeBaseUnavailable", {
+                path: restoreFailure.notifyPath,
+              }),
+              "warning",
+            );
+          }
+          if (restoreFailure.shouldClearLastPath) {
+            updateSettings({
+              lastKnowledgeBasePath: "",
+              lastOpenedFilePath: "",
+            });
+          }
         }
 
         await openPendingBootFiles();
@@ -880,6 +901,8 @@ const App: React.FC = () => {
     rootFolderPath,
     settings.lastKnowledgeBasePath,
     settingsHydrated,
+    showNotification,
+    t,
     updateSettings,
   ]);
 
@@ -1086,6 +1109,10 @@ const App: React.FC = () => {
           settings={settings}
           wechatDraftDefaults={wechatDraftDefaults}
           simpleBlogPublishDefaults={simpleBlogPublishDefaults}
+          simpleBlogLocalImagesToRepo={
+            !isImageHostingConfigured(settings) &&
+            markdownHasLocalImages(content ?? "")
+          }
           notification={notification}
           attachmentContext={{ files, rootFolderPath }}
           t={t as unknown as (key: string) => string}

@@ -290,6 +290,13 @@ async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     create_empty_window(app).await
 }
 
+fn persist_window_state(app: &tauri::AppHandle) {
+    use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+    if let Err(error) = app.save_window_state(StateFlags::all()) {
+        log::warn!("Failed to persist window state: {error}");
+    }
+}
+
 const MAX_UPLOAD_IMAGE_BYTES: usize = 20 * 1024 * 1024;
 
 #[tauri::command]
@@ -348,6 +355,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             ping,
             take_opened_files,
@@ -368,11 +376,20 @@ pub fn run() {
             write_text_file_atomic
         ])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // 只通知被关闭的那个窗口自己去刷盘并 destroy；
-                // 用 emit 会广播到所有窗口，导致其它窗口也把自己关掉。
-                api.prevent_close();
-                let _ = window.emit_to(window.label(), "app-close-requested", "window");
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // 插件默认只在 RunEvent::Exit 落盘；本应用会 preventClose
+                    // 再 destroy，必须在 CloseRequested 时显式保存。
+                    persist_window_state(window.app_handle());
+                    // 只通知被关闭的那个窗口自己去刷盘并 destroy；
+                    // 用 emit 会广播到所有窗口，导致其它窗口也把自己关掉。
+                    api.prevent_close();
+                    let _ = window.emit_to(window.label(), "app-close-requested", "window");
+                }
+                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                    persist_window_state(window.app_handle());
+                }
+                _ => {}
             }
         })
         .setup(|app| {
@@ -408,6 +425,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
+                persist_window_state(app);
                 // 仅拦截系统触发的退出（Cmd+Q / 任务栏关闭）；前端在保存完成后调用 exit(0)
                 // 会带 code，直接放行。最后一个窗口已经 destroy 时也不能再拦，否则进程会变成僵尸。
                 if code.is_none() && !app.webview_windows().is_empty() {
@@ -757,6 +775,23 @@ mod tests {
         );
 
         cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn window_state_plugin_is_registered_and_linked() {
+        use tauri_plugin_window_state::StateFlags;
+        let src = include_str!("lib.rs");
+        assert!(
+            src.contains("tauri_plugin_window_state::Builder::default().build()"),
+            "window-state plugin must be registered on the Tauri builder"
+        );
+        assert!(
+            src.contains("save_window_state"),
+            "CloseRequested path must flush window state explicitly"
+        );
+        let flags = StateFlags::all();
+        assert!(flags.contains(StateFlags::SIZE));
+        assert!(flags.contains(StateFlags::POSITION));
     }
 
     #[test]

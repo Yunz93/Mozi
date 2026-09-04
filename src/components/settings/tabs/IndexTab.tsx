@@ -271,11 +271,57 @@ export const IndexTab: React.FC<IndexTabProps> = ({
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("index_embeddingBuiltinHint")}
             </p>
+            <label className="block text-sm">
+              <span className="mb-1 block text-gray-600 dark:text-gray-300">
+                {t("index_embeddingConsentLabel")}
+              </span>
+              <AppSelect
+                aria-label={t("index_embeddingConsentLabel")}
+                value={settings.builtinEmbeddingDownloadConsent ?? "unknown"}
+                options={[
+                  {
+                    value: "unknown",
+                    label: t("index_embeddingConsentUnknown"),
+                  },
+                  {
+                    value: "granted",
+                    label: t("index_embeddingConsentGranted"),
+                  },
+                  {
+                    value: "denied",
+                    label: t("index_embeddingConsentDenied"),
+                  },
+                ]}
+                onChange={(consent) =>
+                  onUpdateSettings({
+                    builtinEmbeddingDownloadConsent:
+                      consent as typeof settings.builtinEmbeddingDownloadConsent,
+                  })
+                }
+              />
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("index_embeddingConsentHint")}
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                onUpdateSettings({
+                  builtinEmbeddingDownloadConsent: "unknown",
+                })
+              }
+              className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-black/[0.03] dark:hover:bg-white/10"
+            >
+              {t("index_embeddingConsentReset")}
+            </button>
             <button
               type="button"
               disabled={builtinStatus.phase === "loading"}
               onClick={() => {
                 const hub = settings.embeddingHub ?? "auto";
+                onUpdateSettings({
+                  builtinEmbeddingDownloadConsent: "granted",
+                });
                 // Reload / retry must drop the cached pipeline first.
                 if (
                   builtinStatus.phase === "ready" ||

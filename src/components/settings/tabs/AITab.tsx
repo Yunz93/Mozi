@@ -12,6 +12,7 @@ import {
 } from "../../../services/modelCatalogService";
 import { hydrateSensitiveSettingsIntoStore } from "../../../services/secureSettingsService";
 import { useI18n } from "../../../hooks/useI18n";
+import { formatAiServiceError } from "../../../services/ai/errors";
 import { useAppStore } from "../../../store/appStore";
 import { openExternalUrl } from "../../../utils/externalLinks";
 import type { SettingsTabProps } from "../types";
@@ -83,10 +84,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
     } catch (error) {
       setModelLoadMessage({
         type: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : t("settings_modelLoadFailed"),
+        text: formatAiServiceError(currentLanguage, error),
       });
     } finally {
       setIsLoadingModels((prev) => ({ ...prev, [provider]: false }));

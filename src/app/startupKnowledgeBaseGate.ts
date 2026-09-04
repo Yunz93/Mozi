@@ -81,3 +81,19 @@ export function getStartupKnowledgeBaseGate(input: {
     isStandaloneBootOpen,
   };
 }
+
+/** 启动恢复上次知识库失败：应通知用户，但保留路径以便下次再试。 */
+export function getStartupKnowledgeBaseRestoreFailureAction(input: {
+  restoredPath: string | null | undefined;
+  lastKnowledgeBasePath: string;
+}): {
+  shouldNotify: boolean;
+  shouldClearLastPath: boolean;
+  notifyPath: string;
+} {
+  const notifyPath = input.lastKnowledgeBasePath.trim();
+  if (input.restoredPath || !notifyPath) {
+    return { shouldNotify: false, shouldClearLastPath: false, notifyPath: "" };
+  }
+  return { shouldNotify: true, shouldClearLastPath: false, notifyPath };
+}

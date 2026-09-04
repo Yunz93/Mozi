@@ -37,10 +37,13 @@ import {
 } from "../utils/newNoteLocation";
 import { normalizeMarkdownStylePreset } from "../utils/markdownStyle";
 import {
+  APP_STORE_PERSIST_VERSION,
+  migratePersistedAppState,
   resolveLocalizedPrompts,
   resolvePersistedAISettings,
   resolvePersistedBlogRepoUrl,
   resolvePersistedBlogSiteUrl,
+  resolvePersistedEmbeddingConsent,
   resolvePersistedFontSettings,
   resolvePersistedShortcuts,
   sanitizeSettingsForPersistence,
@@ -116,6 +119,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: APP_STORE_PERSIST_NAME,
+      version: APP_STORE_PERSIST_VERSION,
+      migrate: (persistedState, version) =>
+        migratePersistedAppState(persistedState, version),
       partialize: (state) => ({
         settings: sanitizeSettingsForPersistence((state as any).settings),
       }),
@@ -189,6 +195,9 @@ export const useAppStore = create<AppState>()(
             persistedSettings.metadataFields,
           ),
           shortcuts: resolvePersistedShortcuts(persistedSettings),
+          builtinEmbeddingDownloadConsent: resolvePersistedEmbeddingConsent(
+            persistedSettings.builtinEmbeddingDownloadConsent,
+          ),
           indexExcludeGlobs: Array.isArray(persistedSettings.indexExcludeGlobs)
             ? persistedSettings.indexExcludeGlobs.filter(
                 (item): item is string =>

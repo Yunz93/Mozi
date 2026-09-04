@@ -14,6 +14,7 @@ import {
 } from "../utils/metadataFields";
 import { t } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
+import { isEncodingUnsupportedError } from "../services/filesystem/textFileEncoding";
 import {
   formatMarkdownForSave,
   isMarkdownDocumentPath,
@@ -120,6 +121,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   const pendingSaveRef = useRef<ForceSaveOptions | null>(null);
   const saveIdleResolversRef = useRef<Array<() => void>>([]);
   const previousActiveTabIdRef = useRef<string | null>(activeTabId);
+  const encodingNotifiedTabsRef = useRef<Set<string>>(new Set());
 
   const notifySaveIdle = useCallback(() => {
     const resolvers = saveIdleResolversRef.current;
@@ -447,6 +449,26 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           isSavingRef.current = false;
           setSaving(false);
           notifySaveIdle();
+          return false;
+        }
+
+        if (isEncodingUnsupportedError(error)) {
+          isSavingRef.current = false;
+          setSaving(false);
+          notifySaveIdle();
+          saveStateRef.current = {
+            status: "error",
+            lastSavedAt: saveStateRef.current.lastSavedAt,
+            error: "ENCODING_UNSUPPORTED",
+            retryCount: 0,
+          };
+          if (!encodingNotifiedTabsRef.current.has(tabId)) {
+            encodingNotifiedTabsRef.current.add(tabId);
+            showNotification(
+              t(settings.language, "notifications_fileEncodingReadOnly"),
+              "error",
+            );
+          }
           return false;
         }
 
