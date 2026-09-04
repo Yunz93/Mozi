@@ -149,12 +149,114 @@ const createMarkdownIt = () => {
     return true;
   };
 
+  // Obsidian 风格的 `==高亮==` / `%%注释%%`，Live 模式已支持，这里让 Preview 对齐。
+  // 匹配规则须与 `livePreview/listAndHighlight.ts` 保持一致（flanking、转义、不跨空行）。
+  const markHighlightRuler = (state: StateInline, silent: boolean) => {
+    const start = state.pos;
+    const src = state.src;
+    const max = state.posMax;
+
+    if (start + 3 >= max) return false;
+    if (src[start] !== "=" || src[start + 1] !== "=") return false;
+
+    // 跳过被转义的起始标记：`\==...==`
+    if (start > 0 && src[start - 1] === "\\") return false;
+
+    const first = src[start + 2];
+    // 起始侧 flanking：紧随的第一个字符不能是空白或 `=`
+    if (first === undefined || /\s/.test(first) || first === "=") return false;
+
+    const contentStart = start + 2;
+    let search = contentStart;
+    while (search < max - 1) {
+      const close = src.indexOf("==", search);
+      if (close === -1 || close + 1 >= max) return false;
+
+      // 跳过被转义的结束标记
+      if (close > 0 && src[close - 1] === "\\") {
+        search = close + 2;
+        continue;
+      }
+
+      const before = src[close - 1];
+      const after = src[close + 2];
+      // 结束侧 flanking：前一个字符不能是空白，后一个字符不能是 `=`
+      if (before === undefined || /\s/.test(before) || after === "=") {
+        search = close + 2;
+        continue;
+      }
+
+      const content = src.slice(contentStart, close);
+      // 不允许跨空行（跨段落）
+      if (/\n[ \t]*\n/.test(content)) {
+        search = close + 2;
+        continue;
+      }
+
+      if (!silent) {
+        const openToken = state.push("mark_open", "mark", 1);
+        openToken.attrs = [["class", "markdown-highlight"]];
+        const children: Token[] = [];
+        state.md.inline.parse(content, state.md, state.env, children);
+        state.tokens.push(...children);
+        state.push("mark_close", "mark", -1);
+      }
+
+      state.pos = close + 2;
+      return true;
+    }
+
+    return false;
+  };
+
+  const obsidianCommentRuler = (state: StateInline, silent: boolean) => {
+    const start = state.pos;
+    const src = state.src;
+    const max = state.posMax;
+
+    if (start + 3 >= max) return false;
+    if (src[start] !== "%" || src[start + 1] !== "%") return false;
+
+    const contentStart = start + 2;
+    let search = contentStart;
+    while (search < max - 1) {
+      const close = src.indexOf("%%", search);
+      if (close === -1 || close + 1 >= max) return false;
+
+      // 跳过被转义的结束标记（`\%%`）
+      if (close > 0 && src[close - 1] === "\\") {
+        search = close + 2;
+        continue;
+      }
+
+      const content = src.slice(contentStart, close);
+      if (/\n[ \t]*\n/.test(content)) {
+        search = close + 2;
+        continue;
+      }
+
+      // 隐藏注释：吞掉整段内容，不产出任何 token
+      if (silent) {
+        state.pos = close + 2;
+        return true;
+      }
+
+      state.pos = close + 2;
+      return true;
+    }
+
+    return false;
+  };
+
   md.inline.ruler.before("image", "wikiembed", (state, silent) =>
     parseWikiSyntax(state, silent, true),
   );
   md.inline.ruler.before("link", "wikilink", (state, silent) =>
     parseWikiSyntax(state, silent, false),
   );
+
+  md.inline.ruler.after("text", "mark_highlight", markHighlightRuler);
+  md.inline.ruler.after("text", "obsidian_comment", obsidianCommentRuler);
 
   md.renderer.rules.wikilink = (tokens, idx) => {
     const rawContent = tokens[idx].content;
@@ -283,7 +385,7 @@ let currentTheme: ThemeMode = "light";
 // LRU Cache for markdown rendering results
 const markdownCache = new LRUCache<string, string>(30);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
-const MARKDOWN_RENDERER_CACHE_VERSION = 9;
+const MARKDOWN_RENDERER_CACHE_VERSION = 10;
 const PREVIEW_BLANK_LINE_HTML =
   '<div class="preview-source-blank-line"></div>\n';
 

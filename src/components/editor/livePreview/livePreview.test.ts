@@ -1,7 +1,7 @@
 /** @vitest-environment happy-dom */
 
 import { EditorState } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { createEditorMarkdownLanguage } from "../editorMarkdown";
 import { livePreviewContextFacet } from "./context";
@@ -36,6 +36,8 @@ import { indentationGuides } from "../hooks/indentationGuides";
 import {
   buildLivePreviewBlockquoteDecorations,
   buildLivePreviewListMarkerDecorations,
+  buildHighlightDecorations,
+  buildHighlightDecorationsInScanRanges,
   findHighlightRanges,
   findCommentRanges,
   livePreviewBlockquotes,
@@ -133,6 +135,18 @@ describe("live preview hide formatting", () => {
       hidden.push([from, to]);
     });
     expect(hidden).toEqual([]);
+  });
+
+  it("does not hide subscript/superscript markers (~...~ / ^...^) when cursor is away", () => {
+    const view = mount("H~2~O", 4);
+    const deco = buildLivePreviewHideDecorations(view);
+    let hidesTilde = false;
+    deco.between(0, view.state.doc.length, (from, to) => {
+      if (view.state.doc.sliceString(from, to) === "~") {
+        hidesTilde = true;
+      }
+    });
+    expect(hidesTilde).toBe(false);
   });
 
   it("hides heading marks on inactive lines", () => {
@@ -1183,6 +1197,19 @@ describe("findMathRangesInText", () => {
     expect(findMathRangesInText("$$  $$\n$ $")).toEqual([]);
   });
 
+  it("treats inline $$ as non-math", () => {
+    expect(findMathRangesInText("文字 $$x$$ 文字")).toEqual([]);
+  });
+
+  it("finds display $$ only when fences align to line start/end", () => {
+    const ranges = findMathRangesInText("$$\nx\n$$");
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]).toMatchObject({
+      content: "\nx\n",
+      displayMode: true,
+    });
+  });
+
   it("keeps scanning after an unclosed display fence", () => {
     const ranges = findMathRangesInText("$$\nunclosed\n\nlater $x^2$ ok\n");
     expect(ranges).toHaveLength(1);
@@ -1205,6 +1232,17 @@ describe("callouts / highlight / comments", () => {
     });
   });
 
+  it("parses callouts with leading whitespace", () => {
+    const text = "  > [!note] 标题\n  > 内容";
+    const ranges = findCalloutRanges(text);
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]).toMatchObject({
+      type: "note",
+      title: "标题",
+      bodyMarkdown: "内容",
+    });
+  });
+
   it("finds highlights and comments", () => {
     expect(findHighlightRanges("a ==hi== b", 0, 10)).toEqual([
       { from: 2, to: 8, content: "hi" },
@@ -1212,6 +1250,132 @@ describe("callouts / highlight / comments", () => {
     expect(findCommentRanges("a %%hidden%% b", 0, 14)).toEqual([
       { from: 2, to: 12 },
     ]);
+  });
+
+  it("highlights/comments don't cross paragraph boundaries", () => {
+    expect(
+      findHighlightRanges(
+        "if a == b and c == d",
+        0,
+        "if a == b and c == d".length,
+      ),
+    ).toEqual([]);
+
+    const crossParagraph = "x == y\n\n中间正文\n\np == q";
+    expect(
+      findHighlightRanges(crossParagraph, 0, crossParagraph.length),
+    ).toEqual([]);
+
+    const escaped = "\\==xx==";
+    expect(findHighlightRanges(escaped, 0, escaped.length)).toEqual([]);
+
+    const commentCrossParagraph = "a %%b\n\nc%% d";
+    expect(
+      findCommentRanges(commentCrossParagraph, 0, commentCrossParagraph.length),
+    ).toEqual([]);
+  });
+
+  it("skips highlight matches whose end lands inside inline code", () => {
+    const doc = "正文==说明 `x==y`";
+    const cursor = 0;
+    const view = createView(doc, cursor, [livePreviewHighlights]);
+    try {
+      expect(
+        view.dom.querySelectorAll(".cm-live-preview-highlight"),
+      ).toHaveLength(0);
+      // Source should stay visible (no replacement happened).
+      expect(view.dom.textContent).toContain("正文");
+      expect(view.dom.textContent).toContain("x==y");
+    } finally {
+      view.destroy();
+      view.dom.parentElement?.remove();
+    }
+  });
+
+  it("keeps multi-line replacements paragraph-safe", () => {
+    const doc = "before\n%%\nmulti\nline comment\n%%\nafter";
+    // Previously this could swallow across paragraphs via a single block replace.
+    expect(() => {
+      const view = createView(doc, doc.length - 1, [livePreviewHighlights]);
+      view.destroy();
+      view.dom.parentElement?.remove();
+    }).not.toThrow();
+  });
+
+  it("keeps highlight decorations consistent for incremental paragraph scans", () => {
+    const doc = "para start ==a\nb== para end\n\nnext";
+    const view = createView(doc, doc.length - 1);
+    try {
+      const full = buildHighlightDecorations(view.state);
+      const paragraphTo = doc.indexOf("\n\n");
+      const incremental = buildHighlightDecorationsInScanRanges(view.state, [
+        { from: 0, to: paragraphTo },
+      ]);
+
+      const collect = (set: DecorationSet) => {
+        const out: Array<{ from: number; to: number; widgetText?: string }> =
+          [];
+        set.between(0, 1e9, (from: number, to: number, value: Decoration) => {
+          const widget = value.spec.widget as { text?: string } | undefined;
+          out.push({ from, to, widgetText: widget?.text });
+        });
+        return out;
+      };
+
+      expect(full.coverage).toEqual(incremental.coverage);
+      expect(collect(full.decorations)).toEqual(
+        collect(incremental.decorations),
+      );
+    } finally {
+      view.destroy();
+      view.dom.parentElement?.remove();
+    }
+  });
+
+  it("highlight/bullet widgets place caret and set contenteditable=false", () => {
+    // 高亮：光标在别处时 widget 挂载，点击后光标应落到 `==` 起点（此时源码会显示出来）
+    const highlightDoc = "a ==hi== b";
+    const highlightView = createView(highlightDoc, highlightDoc.length, [
+      livePreviewHighlights,
+    ]);
+    const markEl = highlightView.dom.querySelector(
+      ".cm-live-preview-highlight",
+    ) as HTMLElement | null;
+    expect(markEl).not.toBeNull();
+    expect(markEl!.getAttribute("contenteditable")).toBe("false");
+    markEl!.dispatchEvent(
+      new MouseEvent("mousedown", {
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    expect(highlightView.state.selection.main.anchor).toBe(
+      highlightDoc.indexOf("=="),
+    );
+    highlightView.destroy();
+    highlightView.dom.parentElement?.remove();
+
+    // 列表符号：点击后光标应落到列表内容起点（`- ` 之后）
+    const bulletDoc = "- item\n\naway";
+    const bulletView = createView(bulletDoc, bulletDoc.length - 1, [
+      livePreviewListMarkers,
+    ]);
+    const bulletEl = bulletView.dom.querySelector(
+      ".cm-live-preview-list-marker",
+    ) as HTMLElement | null;
+    expect(bulletEl).not.toBeNull();
+    expect(bulletEl!.getAttribute("contenteditable")).toBe("false");
+    bulletEl!.dispatchEvent(
+      new MouseEvent("mousedown", {
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    expect(bulletView.state.selection.main.anchor).toBe("- ".length);
+    bulletView.destroy();
+    bulletView.dom.parentElement?.remove();
   });
 
   it("allows multi-line highlight/comment replaces via StateField without crashing", () => {

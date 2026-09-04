@@ -30,6 +30,7 @@ import {
   defineLivePreviewBlockDecorationField,
   ensureLivePreviewViewportTree,
   getLivePreviewDecorationRange,
+  bindLivePreviewWidgetCaretAtDom,
   hasSkipAncestor,
   maxVisibleParseTo,
   mergeCoverageRanges,
@@ -44,24 +45,34 @@ import {
 const hideTaskListMarkDecoration = Decoration.replace({});
 
 class BulletWidget extends WidgetType {
+  /** `replacedLength`：被替换的源码长度（缩进 + 标记 + 空格），点击后光标落在列表内容起点 */
   constructor(
     readonly ordered: boolean,
     readonly label: string,
+    readonly replacedLength: number,
   ) {
     super();
   }
 
   eq(other: BulletWidget) {
-    return this.ordered === other.ordered && this.label === other.label;
+    return (
+      this.ordered === other.ordered &&
+      this.label === other.label &&
+      this.replacedLength === other.replacedLength
+    );
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const el = document.createElement("span");
     el.className = this.ordered
       ? "cm-live-preview-list-marker is-ordered"
       : "cm-live-preview-list-marker is-bullet";
     el.textContent = this.ordered ? `${this.label}.` : "•";
     el.setAttribute("aria-hidden", "true");
+    // 非可编辑节点 + 显式落标：否则浏览器会把原生 caret 放进 widget 内部，
+    // CodeMirror 再反推位置时会落到 widget 边界，表现为点哪不落哪。
+    el.setAttribute("contenteditable", "false");
+    bindLivePreviewWidgetCaretAtDom(view, el, this.replacedLength);
     return el;
   }
 
@@ -211,10 +222,13 @@ class HighlightWidget extends WidgetType {
     return this.text === other.text;
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const el = document.createElement("mark");
     el.className = "cm-live-preview-highlight";
     el.textContent = this.text;
+    // 点击高亮：光标落到该片段源码起点，触发"选区触碰即显示源码"
+    el.setAttribute("contenteditable", "false");
+    bindLivePreviewWidgetCaretAtDom(view, el, 0);
     return el;
   }
 
@@ -228,16 +242,71 @@ export function findHighlightRanges(
   from: number,
   to: number,
 ): Array<{ from: number; to: number; content: string }> {
-  const slice = text.slice(from, to);
   const ranges: Array<{ from: number; to: number; content: string }> = [];
-  const re = /==([^=\n][\s\S]*?)==/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(slice)) !== null) {
-    ranges.push({
-      from: from + match.index,
-      to: from + match.index + match[0].length,
-      content: match[1],
-    });
+
+  const start = Math.max(0, from);
+  const end = Math.min(text.length, to);
+  let i = start;
+
+  while (i < end - 1) {
+    const open = text.indexOf("==", i);
+    if (open === -1 || open + 1 >= end) break;
+
+    // 跳过被转义的起始标记：`\==...==`
+    if (open > 0 && text[open - 1] === "\\") {
+      i = open + 2;
+      continue;
+    }
+
+    const first = text[open + 2];
+    // 起始侧 flanking：紧随的第一个字符不能是空白或 `=`（排除 `a == b` 这类比较运算）
+    if (first === undefined || /\s/.test(first) || first === "=") {
+      i = open + 2;
+      continue;
+    }
+
+    const contentStart = open + 2;
+    let search = contentStart;
+    let matched = false;
+
+    while (search < end - 1) {
+      const close = text.indexOf("==", search);
+      if (close === -1 || close + 1 >= end) break;
+
+      // 跳过被转义的结束标记
+      if (close > 0 && text[close - 1] === "\\") {
+        search = close + 2;
+        continue;
+      }
+
+      // 结束侧 flanking：前一个字符不能是空白，后一个字符不能是 `=`
+      const before = text[close - 1];
+      const after = text[close + 2];
+      if (before === undefined || /\s/.test(before) || after === "=") {
+        search = close + 2;
+        continue;
+      }
+
+      const content = text.slice(contentStart, close);
+      // 不允许跨空行（跨段落）：否则前后段落会被误合并成一个高亮
+      if (/\n[ \t]*\n/.test(content)) {
+        search = close + 2;
+        continue;
+      }
+
+      ranges.push({
+        from: open,
+        to: close + 2,
+        content,
+      });
+      matched = true;
+      i = close + 2;
+      break;
+    }
+
+    if (!matched) {
+      i = open + 2;
+    }
   }
   return ranges;
 }
@@ -247,15 +316,43 @@ export function findCommentRanges(
   from: number,
   to: number,
 ): Array<{ from: number; to: number }> {
-  const slice = text.slice(from, to);
   const ranges: Array<{ from: number; to: number }> = [];
-  const re = /%%[\s\S]*?%%/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(slice)) !== null) {
-    ranges.push({
-      from: from + match.index,
-      to: from + match.index + match[0].length,
-    });
+
+  const start = Math.max(0, from);
+  const end = Math.min(text.length, to);
+  let i = start;
+
+  while (i < end - 1) {
+    const open = text.indexOf("%%", i);
+    if (open === -1 || open + 1 >= end) break;
+
+    const contentStart = open + 2;
+    let search = contentStart;
+    let matched = false;
+
+    while (search < end - 1) {
+      const close = text.indexOf("%%", search);
+      if (close === -1 || close + 1 >= end) break;
+
+      const content = text.slice(contentStart, close);
+      // 不允许跨空行（跨段落）
+      if (/\n[ \t]*\n/.test(content)) {
+        search = close + 2;
+        continue;
+      }
+
+      ranges.push({
+        from: open,
+        to: close + 2,
+      });
+      matched = true;
+      i = close + 2;
+      break;
+    }
+
+    if (!matched) {
+      i = open + 2;
+    }
   }
   return ranges;
 }
@@ -318,7 +415,7 @@ export function buildLivePreviewListMarkerDecorations(
         deco: isTaskItem
           ? hideTaskListMarkDecoration
           : Decoration.replace({
-              widget: new BulletWidget(ordered, label),
+              widget: new BulletWidget(ordered, label, end - replaceFrom),
             }),
       });
     },
@@ -356,7 +453,11 @@ export function buildLivePreviewListMarkerDecorations(
             deco: parts.isTask
               ? hideTaskListMarkDecoration
               : Decoration.replace({
-                  widget: new BulletWidget(parts.ordered, parts.label),
+                  widget: new BulletWidget(
+                    parts.ordered,
+                    parts.label,
+                    replaceTo - replaceFrom,
+                  ),
                 }),
           });
         }
@@ -374,7 +475,7 @@ export function buildLivePreviewListMarkerDecorations(
   return builder.finish();
 }
 
-function buildHighlightDecorationsInScanRanges(
+export function buildHighlightDecorationsInScanRanges(
   state: EditorState,
   scanRanges: readonly CoverageRange[],
 ): BlockDecorationBuild {
@@ -394,15 +495,33 @@ function buildHighlightDecorationsInScanRanges(
       coverage.push({ from: absFrom, to: absTo });
       if (selectionTouchesRange(state, absFrom, absTo)) continue;
       if (hasSkipAncestor(state, absFrom)) continue;
-      const spansBreak = range.content.includes("\n");
-      ranges.push({
-        from: absFrom,
-        to: absTo,
-        deco: Decoration.replace({
-          widget: new HighlightWidget(range.content),
-          block: spansBreak,
-        }),
-      });
+      // 多行高亮时结束标记可能落在代码等跳过节点内部，两端都要检查
+      if (absTo > absFrom && hasSkipAncestor(state, absTo - 1)) continue;
+
+      const contentStart = absFrom + 2;
+      const contentEnd = absTo - 2;
+
+      const firstLineNo = state.doc.lineAt(absFrom).number;
+      const lastLineNo = state.doc.lineAt(Math.max(absFrom, absTo - 1)).number;
+      for (let lineNo = firstLineNo; lineNo <= lastLineNo; lineNo += 1) {
+        const line = state.doc.line(lineNo);
+        const segFrom = Math.max(absFrom, line.from);
+        const segTo = Math.min(absTo, line.to);
+        if (segFrom >= segTo) continue;
+
+        const fragFrom = Math.max(contentStart, line.from);
+        const fragTo = Math.min(contentEnd, line.to);
+        if (fragFrom >= fragTo) continue;
+
+        const fragmentText = state.doc.sliceString(fragFrom, fragTo);
+        ranges.push({
+          from: segFrom,
+          to: segTo,
+          deco: Decoration.replace({
+            widget: new HighlightWidget(fragmentText),
+          }),
+        });
+      }
     }
 
     for (const range of findCommentRanges(text, 0, text.length)) {
@@ -411,14 +530,22 @@ function buildHighlightDecorationsInScanRanges(
       coverage.push({ from: absFrom, to: absTo });
       if (selectionTouchesRange(state, absFrom, absTo)) continue;
       if (hasSkipAncestor(state, absFrom)) continue;
-      const spansBreak = state.doc.sliceString(absFrom, absTo).includes("\n");
-      ranges.push({
-        from: absFrom,
-        to: absTo,
-        deco: Decoration.replace({
-          block: spansBreak,
-        }),
-      });
+      if (absTo > absFrom && hasSkipAncestor(state, absTo - 1)) continue;
+
+      const firstLineNo = state.doc.lineAt(absFrom).number;
+      const lastLineNo = state.doc.lineAt(Math.max(absFrom, absTo - 1)).number;
+      for (let lineNo = firstLineNo; lineNo <= lastLineNo; lineNo += 1) {
+        const line = state.doc.line(lineNo);
+        const segFrom = Math.max(absFrom, line.from);
+        const segTo = Math.min(absTo, line.to);
+        if (segFrom >= segTo) continue;
+
+        ranges.push({
+          from: segFrom,
+          to: segTo,
+          deco: Decoration.replace({}),
+        });
+      }
     }
   }
 

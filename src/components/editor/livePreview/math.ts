@@ -55,6 +55,26 @@ export function findMathRangesInText(text: string): MathRange[] {
         i += 2;
         continue;
       }
+
+      // 与 Preview 对齐：`$$...$$` 只有两侧围栏都独占行边界时才算块级公式：
+      // - 起始 `$$` 前只能有空白（位于行首）
+      // - 结束 `$$` 后只能有空白（位于行尾）
+      // 行内的 `$$x$$` 不渲染，避免 Live 显示块公式而 Preview 显示原文
+      const lineStart = text.lastIndexOf("\n", i - 1) + 1;
+      const openerPrefix = text.slice(lineStart, i);
+      if (!/^\s*$/.test(openerPrefix)) {
+        i = close + 2;
+        continue;
+      }
+
+      const lineEndIdx = text.indexOf("\n", close + 2);
+      const absoluteLineEnd = lineEndIdx === -1 ? text.length : lineEndIdx;
+      const closerSuffix = text.slice(close + 2, absoluteLineEnd);
+      if (!/^\s*$/.test(closerSuffix)) {
+        i = close + 2;
+        continue;
+      }
+
       const content = text.slice(i + 2, close);
       if (content.trim()) {
         ranges.push({

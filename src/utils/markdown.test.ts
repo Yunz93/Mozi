@@ -99,6 +99,43 @@ describe("renderMarkdown", () => {
     expect(html).toContain("katex");
   });
 
+  it("renders Obsidian Live `==highlight==` and `%%comment%%` syntaxes", () => {
+    const html = renderMarkdown("==重点==");
+    expect(html).toContain("<mark");
+    expect(html).toContain("markdown-highlight");
+
+    const noMark = renderMarkdown("a == b and c == d");
+    expect(noMark).not.toContain("<mark");
+
+    const twoMarks = renderMarkdown("==a==\n\n==b==");
+    expect(twoMarks.match(/<mark/g)?.length ?? 0).toBe(2);
+
+    const nested = renderMarkdown("==**加粗**==");
+    expect(nested).toContain("<mark");
+    expect(nested).toContain("<strong>加粗</strong>");
+
+    const hidden = renderMarkdown("%%hidden%%");
+    expect(hidden).not.toContain("hidden");
+    expect(hidden).not.toContain("%%");
+  });
+
+  it("does not parse highlight/comment inside code blocks", () => {
+    const html = renderMarkdown("```\n==code==\n%%comment%%\n```");
+    expect(html).not.toContain("<mark");
+    expect(html).toContain("==code==");
+    expect(html).toContain("%%comment%%");
+
+    const inlineCode = renderMarkdown("`==no==` and `%%no%%`");
+    expect(inlineCode).not.toContain("<mark");
+    expect(inlineCode).toContain("==no==");
+    expect(inlineCode).toContain("%%no%%");
+  });
+
+  it("does not render inline KaTeX when `$...$` crosses a newline", () => {
+    const html = renderMarkdown("价格 $5 和\n另一个 $6");
+    expect(html).not.toContain("katex");
+  });
+
   it("consumes multiline $$ blocks so LaTeX is not escaped as paragraph text", () => {
     const md = [
       "极限与级数：",

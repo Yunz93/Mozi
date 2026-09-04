@@ -262,11 +262,28 @@ export function initKaTeX(md: any) {
       const start = state.pos;
       if (state.src[start] !== "$") return false;
 
-      const end = state.src.indexOf("$", start + 1);
-      if (end === -1 || end === start + 1) return false;
+      // 跳过被转义的 `\$`
+      if (start > 0 && state.src[start - 1] === "\\") return false;
 
       // Check it's not $$ (display math)
       if (state.src[start + 1] === "$") return false;
+
+      // 行内公式不跨行：遇到换行即停止；同时跳过 `\$` 转义，与 Live 端行为一致
+      let end = -1;
+      let j = start + 1;
+      while (j < state.src.length) {
+        if (state.src[j] === "\n") break;
+        if (state.src[j] === "\\" && j + 1 < state.src.length) {
+          j += 2;
+          continue;
+        }
+        if (state.src[j] === "$") {
+          end = j;
+          break;
+        }
+        j += 1;
+      }
+      if (end === -1 || end === start + 1) return false;
 
       const content = state.src.slice(start + 1, end);
 

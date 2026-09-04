@@ -87,4 +87,10 @@ describe("createEditorMarkdownLanguage", () => {
     const html = highlightedHtml("# 标题");
     expect(html).toContain("mp-tok-heading-1");
   });
+
+  it("does not parse subscript / superscript into syntax nodes", () => {
+    const names = collectNodeNames("H~2~O and X^2^");
+    expect(names).not.toContain("Subscript");
+    expect(names).not.toContain("Superscript");
+  });
 });
