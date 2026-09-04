@@ -84,10 +84,37 @@ export function detectOpenTabPathRemaps(
   const unmappedRemoved = removedTabIds.filter((id) => !remaps[id]);
   const unusedAdded = addedPaths.filter((path) => !usedAdded.has(path));
   if (unmappedRemoved.length === 1 && unusedAdded.length === 1) {
-    remaps[unmappedRemoved[0]] = unusedAdded[0];
+    const removedNode = findFileInTree(previousTree, unmappedRemoved[0]);
+    const addedPath = unusedAdded[0];
+    if (
+      removedNode &&
+      canRemapByBasenameAndExtension(removedNode.path, addedPath)
+    ) {
+      remaps[unmappedRemoved[0]] = addedPath;
+    }
   }
 
   return remaps;
+}
+
+function canRemapByBasenameAndExtension(
+  previousPath: string,
+  nextPath: string,
+): boolean {
+  const previousName = getPathBasename(previousPath);
+  const nextName = getPathBasename(nextPath);
+  const sameBasename =
+    previousName === nextName ||
+    previousName.toLowerCase() === nextName.toLowerCase();
+  if (!sameBasename) return false;
+
+  const previousExt = previousName.includes(".")
+    ? previousName.slice(previousName.lastIndexOf(".")).toLowerCase()
+    : "";
+  const nextExt = nextName.includes(".")
+    ? nextName.slice(nextName.lastIndexOf(".")).toLowerCase()
+    : "";
+  return previousExt === nextExt;
 }
 
 /**
@@ -122,6 +149,43 @@ export function buildFileMap(
     }
   }
   return map;
+}
+
+/**
+ * 刷新或 watcher 覆盖树之后，把仍打开但不在新树里的节点追加回去。
+ * tab id 即绝对路径。
+ */
+export function preserveOpenTabNodes(
+  tree: FileNode[],
+  openTabs: string[],
+  prevFiles: FileNode[],
+): FileNode[] {
+  const presentIds = new Set<string>();
+  const collectIds = (nodes: FileNode[]) => {
+    for (const node of nodes) {
+      presentIds.add(node.id);
+      if (node.children) collectIds(node.children);
+    }
+  };
+  collectIds(tree);
+
+  const extras: FileNode[] = [];
+  for (const tabId of openTabs) {
+    if (presentIds.has(tabId)) continue;
+    const previous = findFileInTree(prevFiles, tabId);
+    if (previous) {
+      extras.push(previous);
+      continue;
+    }
+    extras.push({
+      id: tabId,
+      name: getPathBasename(tabId),
+      type: "file",
+      path: tabId,
+    });
+  }
+
+  return extras.length === 0 ? tree : [...tree, ...extras];
 }
 
 /**

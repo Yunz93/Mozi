@@ -327,6 +327,7 @@ export default {
 
   tab_closeTab: "关闭文件",
   tab_closeBlockedUnsaved: "保存失败，已保留当前文件以避免丢失未保存内容",
+  notifications_fileExists: "已存在同名文件或文件夹",
   notifications_moveToTrashSaveFailed:
     "无法移入回收站：未保存的修改保存失败，已保留文件",
   notifications_renameSaveFailed:
@@ -867,6 +868,8 @@ export default {
   notifications_publishSuccessWithMissingImages:
     "已发布到博客，但有 {count} 张本地图片未找到、已被跳过。请检查图片路径。",
   notifications_publishFailed: "发布博客失败",
+  notifications_publishContentChangedDuring: "发布期间内容已修改，未自动写回",
+  notifications_imageMarkdownNotFound: "图片已上传，但原文已变动，未替换",
   notifications_wechatDraftSuccess:
     "已发布到微信公众号草稿箱，并更新了笔记草稿标识。",
   notifications_wechatDraftBackfillFailed:
@@ -1042,4 +1045,31 @@ export default {
   excalidraw_loading: "正在加载画板...",
   excalidraw_loadFailed: "无法加载 Excalidraw 编辑器",
   excalidraw_invalidDocument: "无法解析此 Excalidraw 文件",
+  notifications_fileEncodingReadOnly:
+    "该文件不是 UTF-8 编码，为避免损坏已禁用保存",
+  notifications_lastKnowledgeBaseUnavailable:
+    "上次的知识库「{path}」当前不可用，可能是磁盘未挂载或目录已移动",
+  simpleBlogDialog_localImagesToRepo: "本地图片将随文章上传到博客仓库",
+  aiError_missingApiKey: "请先配置 {provider} API Key。",
+  aiError_invalidModel:
+    "当前选择的是 {provider}，但模型名看起来不匹配。请从列表重新选择。",
+  aiError_modelListFailed: "加载 {provider} 模型列表失败（{status}）。",
+  aiError_requestTimeout: "请求超时，请稍后重试。",
+  aiError_invalidJson: "{provider} 返回了无效的 JSON。",
+  aiError_emptyResponse: "{provider} 返回了空响应。",
+  aiError_httpFailed: "{provider} 请求失败（{status}）。",
+  index_embeddingConsentLabel: "内置模型下载同意",
+  index_embeddingConsentUnknown: "尚未决定（首次需要时会询问）",
+  index_embeddingConsentGranted: "已允许下载",
+  index_embeddingConsentDenied: "已拒绝（仅关键词检索）",
+  index_embeddingConsentReset: "重置同意状态",
+  index_embeddingConsentHint:
+    "首次使用内置语义模型会从 Hugging Face 或镜像下载约 120 MB 权重到本机。可随时在此重置。",
+  index_embeddingDownloadConfirmTitle: "下载内置语义模型？",
+  index_embeddingDownloadConfirmMessage:
+    "将从 Hugging Face 或国内镜像下载约 120 MB 的内置 embedding 模型到本机，用于语义检索。可在设置 → 索引中更改。",
+  index_embeddingDownloadConfirm: "下载",
+  index_embeddingDownloadSkip: "暂不",
+  notifications_builtinEmbeddingSkipped:
+    "已跳过内置语义模型下载，当前仅使用关键词检索。",
 } as const;

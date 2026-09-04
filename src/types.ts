@@ -119,6 +119,7 @@ export type MarkdownStylePreset =
   | "solarized";
 export type SearchMode = "keyword" | "semantic" | "hybrid";
 export type EmbeddingProviderId = "none" | "builtin" | "openai-compatible";
+export type BuiltinEmbeddingDownloadConsent = "unknown" | "granted" | "denied";
 
 export type ImageHostingProvider =
   | "none"
@@ -244,6 +245,8 @@ export interface AppSettings {
   embeddingModel?: string;
   /** Hub used to download builtin embedding weights */
   embeddingHub?: "auto" | "huggingface" | "hf-mirror";
+  /** 首次下载内置 embedding 权重前的用户同意状态 */
+  builtinEmbeddingDownloadConsent?: BuiltinEmbeddingDownloadConsent;
   privacyMode?: boolean;
   /** Vault-relative globs skipped by Ask Vault / chunk index. */
   indexExcludeGlobs?: string[];

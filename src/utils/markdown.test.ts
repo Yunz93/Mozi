@@ -5,6 +5,7 @@ import MarkdownIt from "markdown-it";
 import { shouldUseAsyncPreviewEnhancement } from "../components/editor/preview/previewRenderCore";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
 import {
+  angleBracketBareMarkdownDestinations,
   clearMarkdownCache,
   renderMarkdown,
   configureMarkdownClasses,
@@ -517,5 +518,21 @@ describe("renderMarkdown", () => {
     const linkHtml = renderMarkdown("See [[docs/完整 PRD]]");
     expect(linkHtml).toContain("markdown-wikilink");
     expect(linkHtml).toContain('data-wikilink="docs/完整 PRD"');
+  });
+
+  it("does not rewrite x[i](a, b) inside fenced or inline code", () => {
+    const fenced = "```js\nhandlers[type](event, data)\n```";
+    expect(angleBracketBareMarkdownDestinations(fenced)).toBe(fenced);
+    expect(renderMarkdown(fenced)).toContain("handlers[type](event, data)");
+
+    const inline = "see `[a](b c)` here";
+    expect(angleBracketBareMarkdownDestinations(inline)).toBe(inline);
+  });
+
+  it("still wraps bare destinations with spaces in body text", () => {
+    expect(angleBracketBareMarkdownDestinations("[a](b c)")).toBe("[a](<b c>)");
+    const html = renderMarkdown("[a](b c)");
+    expect(html).toContain("<a ");
+    expect(html).toMatch(/b(?: |%20)c/);
   });
 });

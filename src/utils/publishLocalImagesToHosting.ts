@@ -11,6 +11,7 @@ import {
 import { normalizeRemoteImageUrl } from "./remoteImageUrl";
 import { parseWikiLinkReference } from "./wikiLinks";
 import { uploadImageToHosting } from "../services/imageHostingService";
+import { buildHostedImageFilename } from "./imageHostingFilename";
 import type { AppSettings, FileNode } from "../types";
 import {
   MARKDOWN_IMAGE_REGEX,
@@ -111,9 +112,10 @@ export async function replaceLocalImagesWithHostingForPublish(
     if (cached) return cached;
 
     const bytes = await readFile(sourcePath);
+    const hostedName = await buildHostedImageFilename(filename, bytes);
     const result = await uploadImageToHosting(
       bytes.buffer as ArrayBuffer,
-      filename,
+      hostedName,
       settings,
     );
     pathToUrl.set(sourcePath, result.url);

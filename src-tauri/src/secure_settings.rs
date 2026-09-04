@@ -20,6 +20,7 @@ const SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN: &str = "imageHostingGithubToken";
 const SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY: &str = "imageHostingS3SecretAccessKey";
 const SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET: &str = "imageHostingOssAccessKeySecret";
 const SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY: &str = "imageHostingQiniuSecretKey";
+const SECRET_KEY_EMBEDDING_API_KEY: &str = "embeddingApiKey";
 
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +34,7 @@ pub(crate) struct SecureSettingsResult {
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
     image_hosting_qiniu_secret_key: Option<String>,
+    embedding_api_key: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -47,6 +49,7 @@ struct SecureSettingsFile {
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
     image_hosting_qiniu_secret_key: Option<String>,
+    embedding_api_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -322,7 +325,8 @@ fn write_secure_settings_file(
         || settings.image_hosting_github_token.is_some()
         || settings.image_hosting_s3_secret_access_key.is_some()
         || settings.image_hosting_oss_access_key_secret.is_some()
-        || settings.image_hosting_qiniu_secret_key.is_some();
+        || settings.image_hosting_qiniu_secret_key.is_some()
+        || settings.embedding_api_key.is_some();
 
     if !has_secrets {
         match fs::remove_file(&path) {
@@ -378,6 +382,7 @@ fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String
             settings.image_hosting_oss_access_key_secret
         }
         SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => settings.image_hosting_qiniu_secret_key,
+        SECRET_KEY_EMBEDDING_API_KEY => settings.embedding_api_key,
         _ => None,
     })
 }
@@ -409,6 +414,7 @@ fn write_secure_secret(
             SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => {
                 settings.image_hosting_qiniu_secret_key = normalized
             }
+            SECRET_KEY_EMBEDDING_API_KEY => settings.embedding_api_key = normalized,
             _ => return Err(format!("Unsupported secure setting key: {}", key)),
         }
 
@@ -433,6 +439,7 @@ fn resolve_secret_key(key: &str) -> Option<&'static str> {
         SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => {
             Some(SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY)
         }
+        SECRET_KEY_EMBEDDING_API_KEY => Some(SECRET_KEY_EMBEDDING_API_KEY),
         _ => None,
     }
 }
@@ -471,6 +478,7 @@ fn get_secure_settings_blocking(app: &tauri::AppHandle) -> Result<SecureSettings
             &app,
             SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY,
         )?,
+        embedding_api_key: read_secure_secret(&app, SECRET_KEY_EMBEDDING_API_KEY)?,
     })
 }
 
@@ -491,4 +499,27 @@ pub(crate) async fn set_secure_secret(
     })
     .await
     .map_err(|e| format!("Failed to join secure settings write task: {}", e))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_secret_key_accepts_embedding_api_key() {
+        assert_eq!(
+            resolve_secret_key(SECRET_KEY_EMBEDDING_API_KEY),
+            Some(SECRET_KEY_EMBEDDING_API_KEY)
+        );
+    }
+
+    #[test]
+    fn embedding_api_key_set_then_get_reads_back() {
+        let mut settings = SecureSettingsFile::default();
+        settings.embedding_api_key = normalize_secret_value(Some("sk-embed-test"));
+        let json = serde_json::to_string(&settings).expect("serialize");
+        let parsed: SecureSettingsFile = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.embedding_api_key.as_deref(), Some("sk-embed-test"));
+        assert!(parsed.embedding_api_key.is_some());
+    }
 }

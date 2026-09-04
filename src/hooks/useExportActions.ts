@@ -1,4 +1,27 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
+
+type ExportFlightListener = () => void;
+let exportInFlight = false;
+const exportFlightListeners = new Set<ExportFlightListener>();
+
+export function getExportInFlight(): boolean {
+  return exportInFlight;
+}
+
+export function subscribeExportInFlight(
+  listener: ExportFlightListener,
+): () => void {
+  exportFlightListeners.add(listener);
+  return () => {
+    exportFlightListeners.delete(listener);
+  };
+}
+
+function setExportInFlight(next: boolean): void {
+  if (exportInFlight === next) return;
+  exportInFlight = next;
+  exportFlightListeners.forEach((listener) => listener());
+}
 import { useAppStore, selectContent } from "../store/appStore";
 import { exportToHtml, downloadHtml, exportToPdf } from "../utils/export";
 import type { LongImageSharePayload } from "../components/share/longImageSharePayload";
@@ -41,6 +64,25 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
   const content = useAppStore(selectContent);
   const previewFontFamily = buildPreviewExportFontFamily(settings);
   const codeFontFamily = buildCodeExportFontFamily(settings);
+  const exportInFlightRef = useRef(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const beginExport = useCallback((): boolean => {
+    if (exportInFlightRef.current) {
+      showNotification(t(settings.language, "export_exporting"), "info");
+      return false;
+    }
+    exportInFlightRef.current = true;
+    setExportInFlight(true);
+    setIsExporting(true);
+    return true;
+  }, [settings.language, showNotification]);
+
+  const endExport = useCallback(() => {
+    exportInFlightRef.current = false;
+    setExportInFlight(false);
+    setIsExporting(false);
+  }, []);
 
   const handleExportToPdf = useCallback(async () => {
     if (
@@ -70,6 +112,8 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       );
       return;
     }
+
+    if (!beginExport()) return;
 
     try {
       const htmlContent = await exportToHtml(content, {
@@ -132,10 +176,14 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         ),
         "error",
       );
+    } finally {
+      endExport();
     }
   }, [
     activeTabId,
+    beginExport,
     content,
+    endExport,
     files,
     rootFolderPath,
     previewFontFamily,
@@ -180,6 +228,8 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       );
       return;
     }
+
+    if (!beginExport()) return;
 
     try {
       const htmlContent = await exportToHtml(content, {
@@ -236,10 +286,14 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         ),
         "error",
       );
+    } finally {
+      endExport();
     }
   }, [
     activeTabId,
+    beginExport,
     content,
+    endExport,
     files,
     rootFolderPath,
     previewFontFamily,
@@ -275,37 +329,45 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         return null;
       }
 
-      const htmlContent = await exportToHtml(content, {
-        title: activeFile.name.replace(".md", ""),
-        theme: settings.themeMode,
-        includeTOC: false,
-        fontFamily: previewFontFamily,
-        codeFontFamily,
-        fontSettings: settings,
-        fontSize: getScaledEditorFontSize(
-          settings.fontSize,
-          settings.uiFontSize,
-        ),
-        codeFontSize: getScaledCodeFontSize(
-          settings.fontSize,
-          settings.uiFontSize,
-        ),
-        includeProperties: false,
-        highlighter,
-        markdownStylePreset: settings.markdownStylePreset,
-        orderedListMode: settings.orderedListMode,
-        language: settings.language,
-      });
+      if (!beginExport()) return null;
 
-      return {
-        html: htmlContent,
-        filenameBase: activeFile.name.replace(/\.md$/i, ""),
-        sourceFilePath: activeFile.path,
-      };
+      try {
+        const htmlContent = await exportToHtml(content, {
+          title: activeFile.name.replace(".md", ""),
+          theme: settings.themeMode,
+          includeTOC: false,
+          fontFamily: previewFontFamily,
+          codeFontFamily,
+          fontSettings: settings,
+          fontSize: getScaledEditorFontSize(
+            settings.fontSize,
+            settings.uiFontSize,
+          ),
+          codeFontSize: getScaledCodeFontSize(
+            settings.fontSize,
+            settings.uiFontSize,
+          ),
+          includeProperties: false,
+          highlighter,
+          markdownStylePreset: settings.markdownStylePreset,
+          orderedListMode: settings.orderedListMode,
+          language: settings.language,
+        });
+
+        return {
+          html: htmlContent,
+          filenameBase: activeFile.name.replace(/\.md$/i, ""),
+          sourceFilePath: activeFile.path,
+        };
+      } finally {
+        endExport();
+      }
     }, [
       activeTabId,
+      beginExport,
       codeFontFamily,
       content,
+      endExport,
       files,
       highlighter,
       previewFontFamily,
@@ -322,5 +384,6 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     handleExportToPdf,
     handleExportToHtml,
     buildLongImageSharePayload,
+    isExporting,
   };
 }

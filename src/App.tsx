@@ -15,6 +15,8 @@ import { useUiFontSizeKeyboardShortcuts } from "./hooks/useUiFontSizeKeyboardSho
 import { getScaledEditorFontSize } from "./utils/uiFontSize";
 import { UiZoomHint } from "./components/ui/UiZoomHint";
 import { useAutoSave } from "./hooks/useAutoSave";
+import { useCloseGuard } from "./app/useCloseGuard";
+import { closeTabSafely } from "./hooks/closeTabSafely";
 import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useStoreHydration } from "./hooks/useStoreHydration";
@@ -59,7 +61,15 @@ import { useAppUpdater } from "./app/useAppUpdater";
 import { useWorkspaceLayout } from "./app/useWorkspaceLayout";
 import { useAttachmentCleanup } from "./app/useAttachmentCleanup";
 import { useExternalFileOpen } from "./app/useExternalFileOpen";
-import { getStartupKnowledgeBaseGate } from "./app/startupKnowledgeBaseGate";
+import {
+  getStartupKnowledgeBaseGate,
+  getStartupKnowledgeBaseRestoreFailureAction,
+} from "./app/startupKnowledgeBaseGate";
+import { hydrateSensitiveSettingsSafely } from "./app/hydrateSensitiveSettingsSafely";
+import {
+  isImageHostingConfigured,
+  markdownHasLocalImages,
+} from "./utils/publish/markdownAssetPipeline";
 import {
   extractWechatDraftDefaults,
   type WechatDraftPublishInput,
@@ -68,7 +78,6 @@ import {
   extractSimpleBlogPublishDefaults,
   type SimpleBlogPublishInput,
 } from "./utils/simpleBlogPublish";
-import { hydrateSensitiveSettingsIntoStore } from "./services/secureSettingsService";
 import { isValidBlogRepoUrl, isValidBlogSiteUrl } from "./utils/blogRepo";
 import { isTauriEnvironment, getFileSystem } from "./types/filesystem";
 import { joinFsPath } from "./utils/pathHelpers";
@@ -189,6 +198,22 @@ const App: React.FC = () => {
   });
 
   const { forceSave } = useAutoSave({ enabled: true });
+  useCloseGuard(forceSave);
+
+  const closeActiveTabSafely = useCallback(() => {
+    const tabToClose = useAppStore.getState().activeTabId;
+    if (!tabToClose) return;
+
+    void closeTabSafely({
+      tabId: tabToClose,
+      forceSave,
+      closeTab,
+      hasUnsavedChanges: (tabId) =>
+        useAppStore.getState().hasUnsavedChanges(tabId),
+      isTabOpen: (tabId) => useAppStore.getState().openTabs.includes(tabId),
+      onBlocked: () => showNotification(t("tab_closeBlockedUnsaved"), "error"),
+    });
+  }, [closeTab, forceSave, showNotification, t]);
   const { handleExportToPdf, handleExportToHtml, buildLongImageSharePayload } =
     useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
@@ -380,24 +405,7 @@ const App: React.FC = () => {
         void handleOpenNewWindow();
       },
       onCloseTab: () => {
-        if (!activeTabId) return;
-
-        const tabToClose = activeTabId;
-        void (async () => {
-          const state = useAppStore.getState();
-          if (state.hasUnsavedChanges(tabToClose)) {
-            const saved = await forceSave(undefined, { trigger: "system" });
-            if (!saved) {
-              showNotification(t("tab_closeBlockedUnsaved"), "error");
-              return;
-            }
-          }
-
-          const latestState = useAppStore.getState();
-          if (latestState.openTabs.includes(tabToClose)) {
-            closeTab(tabToClose);
-          }
-        })();
+        closeActiveTabSafely();
       },
       onOpenKnowledgeBase: () => {
         void handleSwitchKnowledgeBase();
@@ -635,8 +643,7 @@ const App: React.FC = () => {
           void handleOpenNewWindow();
         },
         closeTab: () => {
-          if (!activeTabId) return;
-          closeTab(activeTabId);
+          closeActiveTabSafely();
         },
         toggleView: () => {
           if (isNonMarkdownWorkspaceFile) return;
@@ -674,6 +681,7 @@ const App: React.FC = () => {
       }),
     [
       activeTabId,
+      closeActiveTabSafely,
       closeTab,
       currentFilePath,
       fileOps,
@@ -700,8 +708,8 @@ const App: React.FC = () => {
   const handleSelectSimpleBlogPublish = useCallback(() => {
     setIsPublishTargetDialogOpen(false);
     void (async () => {
-      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
-      const language = hydratedSettings.language;
+      await hydrateSensitiveSettingsSafely();
+      const hydratedSettings = useAppStore.getState().settings;
 
       if (!hydratedSettings.blogRepoUrl.trim()) {
         showNotification(t("notifications_setBlogRepoFirst"), "error");
@@ -849,10 +857,24 @@ const App: React.FC = () => {
         if (cancelled) return;
 
         if (!restoredPath) {
-          updateSettings({
-            lastKnowledgeBasePath: "",
-            lastOpenedFilePath: "",
+          const restoreFailure = getStartupKnowledgeBaseRestoreFailureAction({
+            restoredPath,
+            lastKnowledgeBasePath,
           });
+          if (restoreFailure.shouldNotify) {
+            showNotification(
+              t("notifications_lastKnowledgeBaseUnavailable", {
+                path: restoreFailure.notifyPath,
+              }),
+              "warning",
+            );
+          }
+          if (restoreFailure.shouldClearLastPath) {
+            updateSettings({
+              lastKnowledgeBasePath: "",
+              lastOpenedFilePath: "",
+            });
+          }
         }
 
         await openPendingBootFiles();
@@ -879,6 +901,8 @@ const App: React.FC = () => {
     rootFolderPath,
     settings.lastKnowledgeBasePath,
     settingsHydrated,
+    showNotification,
+    t,
     updateSettings,
   ]);
 
@@ -1085,6 +1109,10 @@ const App: React.FC = () => {
           settings={settings}
           wechatDraftDefaults={wechatDraftDefaults}
           simpleBlogPublishDefaults={simpleBlogPublishDefaults}
+          simpleBlogLocalImagesToRepo={
+            !isImageHostingConfigured(settings) &&
+            markdownHasLocalImages(content ?? "")
+          }
           notification={notification}
           attachmentContext={{ files, rootFolderPath }}
           t={t as unknown as (key: string) => string}
@@ -1097,11 +1125,15 @@ const App: React.FC = () => {
           onClosePublishTarget={() => setIsPublishTargetDialogOpen(false)}
           onSelectSimpleBlog={handleSelectSimpleBlogPublish}
           onSelectWechatDraft={handleSelectWechatDraftPublish}
-          onCloseSimpleBlog={() => setIsSimpleBlogDialogOpen(false)}
+          onCloseSimpleBlog={() => {
+            if (!isPublishing) setIsSimpleBlogDialogOpen(false);
+          }}
           onSubmitSimpleBlog={(input) => {
             void handleSubmitSimpleBlog(input);
           }}
-          onCloseWechatDraft={() => setIsWechatDraftDialogOpen(false)}
+          onCloseWechatDraft={() => {
+            if (!isPublishing) setIsWechatDraftDialogOpen(false);
+          }}
           onSubmitWechatDraft={(input) => {
             void handleSubmitWechatDraft(input);
           }}

@@ -12,7 +12,7 @@ export function isPotentialMarkdownTableRow(line: string): boolean {
 }
 
 function separatorLineToAsciiHyphens(line: string): string {
-  return line.replace(UNICODE_DASH, '-');
+  return line.replace(UNICODE_DASH, "-");
 }
 
 /**
@@ -29,7 +29,9 @@ export function normalizeMarkdownTableSeparatorLine(line: string): string {
 }
 
 function isMarkdownTablePartLine(line: string): boolean {
-  return isPotentialMarkdownTableRow(line) || isMarkdownTableSeparatorLine(line);
+  return (
+    isPotentialMarkdownTableRow(line) || isMarkdownTableSeparatorLine(line)
+  );
 }
 
 function collapseBlankLinesBetweenTableRows(lines: string[]): string[] {
@@ -38,14 +40,22 @@ function collapseBlankLinesBetweenTableRows(lines: string[]): string[] {
 
   while (i < lines.length) {
     const line = lines[i];
-    if (line.trim() === '') {
+    if (line.trim() === "") {
       let j = i;
-      while (j < lines.length && lines[j].trim() === '') {
+      while (j < lines.length && lines[j].trim() === "") {
         j += 1;
       }
-      const prev = result.length > 0 ? result[result.length - 1] : '';
-      const next = j < lines.length ? lines[j] : '';
-      if (prev && next && isMarkdownTablePartLine(prev) && isMarkdownTablePartLine(next)) {
+      const prev = result.length > 0 ? result[result.length - 1] : "";
+      const next = j < lines.length ? lines[j] : "";
+      // 仅当空行两侧至少一侧紧邻分隔行时才折叠，避免把「绝对值 |x|」这类段落空行吃掉
+      if (
+        prev &&
+        next &&
+        isMarkdownTablePartLine(prev) &&
+        isMarkdownTablePartLine(next) &&
+        (isMarkdownTableSeparatorLine(prev) ||
+          isMarkdownTableSeparatorLine(next))
+      ) {
         i = j;
         continue;
       }
@@ -60,18 +70,22 @@ function collapseBlankLinesBetweenTableRows(lines: string[]): string[] {
   return result;
 }
 
-const FENCE_OPEN_RE = /^(\s*)(`{3,}|~{3,})/;
+export const FENCE_OPEN_RE = /^(\s*)(`{3,}|~{3,})/;
 
 function isClosingFenceLine(line: string, fenceMarker: string): boolean {
   const match = line.match(FENCE_OPEN_RE);
   return Boolean(
-    match && match[2][0] === fenceMarker[0] && match[2].length >= fenceMarker.length,
+    match &&
+    match[2][0] === fenceMarker[0] &&
+    match[2].length >= fenceMarker.length,
   );
 }
 
 /** Normalize separator dashes and drop blank lines between GFM-style pipe table rows. */
 export function preprocessMarkdownTableLines(lines: string[]): string[] {
-  const withSeparators = lines.map((ln) => normalizeMarkdownTableSeparatorLine(ln));
+  const withSeparators = lines.map((ln) =>
+    normalizeMarkdownTableSeparatorLine(ln),
+  );
   return collapseBlankLinesBetweenTableRows(withSeparators);
 }
 
@@ -80,9 +94,9 @@ export function preprocessMarkdownTableLines(lines: string[]): string[] {
  * Skips fenced code blocks.
  */
 export function normalizeMarkdownTablesForRender(markdown: string): string {
-  const lines = markdown.split('\n');
+  const lines = markdown.split("\n");
   const out: string[] = [];
-  let fenceMarker = '';
+  let fenceMarker = "";
   let i = 0;
 
   while (i < lines.length) {
@@ -91,7 +105,7 @@ export function normalizeMarkdownTablesForRender(markdown: string): string {
     if (fenceMarker) {
       out.push(line);
       if (isClosingFenceLine(line, fenceMarker)) {
-        fenceMarker = '';
+        fenceMarker = "";
       }
       i += 1;
       continue;
@@ -115,5 +129,5 @@ export function normalizeMarkdownTablesForRender(markdown: string): string {
     out.push(...preprocessMarkdownTableLines(lines.slice(start, i)));
   }
 
-  return out.join('\n');
+  return out.join("\n");
 }

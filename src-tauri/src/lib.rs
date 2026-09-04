@@ -163,7 +163,7 @@ fn queue_opened_file_paths(app: &tauri::AppHandle, paths: Vec<String>) {
         }
     }
 
-    let _ = app.emit("opened-files", paths);
+    let _ = app.emit_to("main", "opened-files", paths);
 }
 
 /// Matches `app.windows[main].width/height` in tauri.conf.json.
@@ -290,6 +290,13 @@ async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     create_empty_window(app).await
 }
 
+fn persist_window_state(app: &tauri::AppHandle) {
+    use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+    if let Err(error) = app.save_window_state(StateFlags::all()) {
+        log::warn!("Failed to persist window state: {error}");
+    }
+}
+
 const MAX_UPLOAD_IMAGE_BYTES: usize = 20 * 1024 * 1024;
 
 #[tauri::command]
@@ -348,6 +355,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             ping,
             take_opened_files,
@@ -364,8 +372,26 @@ pub fn run() {
             publishing::publish_wechat_draft,
             upload_image_to_hosting,
             check_macos_update,
-            install_macos_update
+            install_macos_update,
+            write_text_file_atomic
         ])
+        .on_window_event(|window, event| {
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // 插件默认只在 RunEvent::Exit 落盘；本应用会 preventClose
+                    // 再 destroy，必须在 CloseRequested 时显式保存。
+                    persist_window_state(window.app_handle());
+                    // 只通知被关闭的那个窗口自己去刷盘并 destroy；
+                    // 用 emit 会广播到所有窗口，导致其它窗口也把自己关掉。
+                    api.prevent_close();
+                    let _ = window.emit_to(window.label(), "app-close-requested", "window");
+                }
+                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                    persist_window_state(window.app_handle());
+                }
+                _ => {}
+            }
+        })
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -382,11 +408,31 @@ pub fn run() {
                     log::error!("Failed to install Dock new-window menu: {error}");
                 }
             }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let args: Vec<String> = std::env::args().skip(1).collect();
+                if let Ok(cwd) = std::env::current_dir() {
+                    let cwd = cwd.to_string_lossy().into_owned();
+                    queue_opened_file_paths(
+                        app.handle(),
+                        opened_file_paths_from_args(&args, &cwd),
+                    );
+                }
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
+                persist_window_state(app);
+                // 仅拦截系统触发的退出（Cmd+Q / 任务栏关闭）；前端在保存完成后调用 exit(0)
+                // 会带 code，直接放行。最后一个窗口已经 destroy 时也不能再拦，否则进程会变成僵尸。
+                if code.is_none() && !app.webview_windows().is_empty() {
+                    api.prevent_exit();
+                    let _ = app.emit("app-close-requested", "exit");
+                }
+            }
             #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
             {
                 if let tauri::RunEvent::Opened { urls } = event {
@@ -395,6 +441,65 @@ pub fn run() {
                 }
             }
         });
+}
+
+fn write_text_file_atomic_at(path: &Path, content: &str) -> Result<(), String> {
+    let parent = path.parent().ok_or_else(|| {
+        format!("Failed to resolve parent directory for {}", path.display())
+    })?;
+    let basename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("file");
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let temp_path = parent.join(format!(
+        ".{}.tmp-{}-{}",
+        basename,
+        std::process::id(),
+        nanos
+    ));
+
+    let write_result = (|| {
+        fs::write(&temp_path, content).map_err(|error| {
+            format!(
+                "Failed to write temporary file {}: {}",
+                temp_path.display(),
+                error
+            )
+        })?;
+        fs::rename(&temp_path, path).map_err(|error| {
+            format!(
+                "Failed to replace {} with temporary file: {}",
+                path.display(),
+                error
+            )
+        })?;
+        Ok(())
+    })();
+
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+    write_result
+}
+
+/// Must stay `async`: disk I/O on the main thread freezes every window.
+#[tauri::command]
+async fn write_text_file_atomic(
+    app: tauri::AppHandle,
+    path: String,
+    content: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let canonical = canonicalize_scope_path(&path)?;
+        ensure_path_allowed(app.state::<SecurityState>().inner(), &canonical)?;
+        write_text_file_atomic_at(&canonical, &content)
+    })
+    .await
+    .map_err(|error| format!("Failed to join atomic write task: {}", error))?
 }
 
 #[tauri::command]
@@ -673,6 +778,23 @@ mod tests {
     }
 
     #[test]
+    fn window_state_plugin_is_registered_and_linked() {
+        use tauri_plugin_window_state::StateFlags;
+        let src = include_str!("lib.rs");
+        assert!(
+            src.contains("tauri_plugin_window_state::Builder::default().build()"),
+            "window-state plugin must be registered on the Tauri builder"
+        );
+        assert!(
+            src.contains("save_window_state"),
+            "CloseRequested path must flush window state explicitly"
+        );
+        let flags = StateFlags::all();
+        assert!(flags.contains(StateFlags::SIZE));
+        assert!(flags.contains(StateFlags::POSITION));
+    }
+
+    #[test]
     fn resolve_file_window_size_uses_defaults_when_main_size_is_missing() {
         assert_eq!(
             resolve_file_window_size(None),
@@ -682,6 +804,30 @@ mod tests {
             resolve_file_window_size(Some((0.0, 100.0))),
             (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         );
+    }
+
+    #[test]
+    fn write_text_file_atomic_at_writes_content_and_leaves_no_tmp() {
+        let temp_dir = create_test_directory("atomic-write");
+        let target = temp_dir.join("note.md");
+
+        write_text_file_atomic_at(&target, "# hello\n").expect("atomic write");
+
+        let written = fs::read_to_string(&target).expect("read written file");
+        assert_eq!(written, "# hello\n");
+
+        let leftover_tmp = fs::read_dir(&temp_dir)
+            .expect("read temp dir")
+            .filter_map(|entry| entry.ok())
+            .any(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".tmp-")
+            });
+        assert!(!leftover_tmp, "temporary file should be removed after rename");
+
+        cleanup_test_directory(&temp_dir);
     }
 
     #[test]

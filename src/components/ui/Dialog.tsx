@@ -14,6 +14,8 @@ interface DialogProps {
   className?: string;
   contentClassName?: string;
   contentScroll?: boolean;
+  /** 为 false 时 Esc / 遮罩 / 关闭按钮均不可关闭（发布进行中） */
+  closable?: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export const Dialog: React.FC<DialogProps> = ({
   className = "",
   contentClassName = "",
   contentScroll = true,
+  closable = true,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -41,7 +44,7 @@ export const Dialog: React.FC<DialogProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        if (closable) onClose();
       }
     };
 
@@ -55,7 +58,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, closable]);
 
   // Restore focus on close
   useEffect(() => {
@@ -67,11 +70,11 @@ export const Dialog: React.FC<DialogProps> = ({
   // Handle click outside
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
+      if (closable && e.target === e.currentTarget) {
         onClose();
       }
     },
-    [onClose],
+    [closable, onClose],
   );
 
   if (!isOpen) return null;
@@ -119,7 +122,8 @@ export const Dialog: React.FC<DialogProps> = ({
             </h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+              disabled={!closable}
+              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200 disabled:pointer-events-none disabled:opacity-40"
               aria-label="Close dialog"
             >
               <svg

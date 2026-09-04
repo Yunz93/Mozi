@@ -339,6 +339,31 @@ async function loadPipeline(
   return pipelinePromise;
 }
 
+/** 本地浏览器缓存里是否已有内置模型权重（有则无需再下载）。 */
+export async function isBuiltinEmbeddingModelCached(): Promise<boolean> {
+  if (extractor) return true;
+  if (typeof caches === "undefined") return false;
+
+  const markers = [BUILTIN_EMBEDDING_MODEL, "paraphrase-multilingual-MiniLM"];
+  try {
+    const names = await caches.keys();
+    for (const name of names) {
+      const cache = await caches.open(name);
+      const requests = await cache.keys();
+      if (
+        requests.some((request) =>
+          markers.some((marker) => request.url.includes(marker)),
+        )
+      ) {
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 /** Warm the model (download + init). Safe to call from settings UI. */
 export async function ensureBuiltinEmbeddingReady(
   hubPreference?: BuiltinEmbeddingHub,

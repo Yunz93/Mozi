@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./src/App";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
+import { reportUnhandledRuntimeError } from "./src/utils/errorHandler";
 import { ensureExcalidrawAssetPath } from "./src/utils/excalidrawAssetPath";
 import {
   ensureDynamicFontFaces,
@@ -26,6 +28,15 @@ if (typeof window !== "undefined" && !window.process) {
   };
 }
 
+if (typeof window !== "undefined") {
+  window.addEventListener("unhandledrejection", (event) => {
+    reportUnhandledRuntimeError(event.reason, "unhandledrejection");
+  });
+  window.addEventListener("error", (event) => {
+    reportUnhandledRuntimeError(event.error ?? event.message, "error");
+  });
+}
+
 const rootElement = document.getElementById("root");
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
@@ -41,7 +52,9 @@ async function bootstrap() {
   const root = ReactDOM.createRoot(rootElement!);
   root.render(
     <React.StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>,
   );
 }

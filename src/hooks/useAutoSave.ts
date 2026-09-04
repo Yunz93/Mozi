@@ -14,6 +14,7 @@ import {
 } from "../utils/metadataFields";
 import { t } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
+import { isEncodingUnsupportedError } from "../services/filesystem/textFileEncoding";
 import {
   formatMarkdownForSave,
   isMarkdownDocumentPath,
@@ -120,6 +121,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   const pendingSaveRef = useRef<ForceSaveOptions | null>(null);
   const saveIdleResolversRef = useRef<Array<() => void>>([]);
   const previousActiveTabIdRef = useRef<string | null>(activeTabId);
+  const encodingNotifiedTabsRef = useRef<Set<string>>(new Set());
 
   const notifySaveIdle = useCallback(() => {
     const resolvers = saveIdleResolversRef.current;
@@ -148,7 +150,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         return true;
       }
 
-      if (pathRef.current !== path) {
+      if (pathRef.current && pathRef.current !== path) {
         return true;
       }
 
@@ -203,22 +205,23 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
       const tabContent = state.fileContents[tabId];
       const node = findFileInTree(state.files, tabId);
-      if (tabContent === undefined || !node || node.type !== "file") {
+      const savePath = node?.type === "file" ? node.path : tabId;
+      if (tabContent === undefined || !savePath) {
         return false;
       }
 
-      if (!isSavableDocumentPath(node.path)) {
+      if (!isSavableDocumentPath(savePath)) {
         return true;
       }
 
       try {
         const fs = await getFileSystem();
-        await fs.writeFile(node.path, tabContent);
+        await fs.writeFile(savePath, tabContent);
         state.markAsSaved(tabId, tabContent);
         clearDraftBackup(tabId);
         void import("../services/vault/linkIndexEvents").then(
           ({ notifyVaultFileSaved }) => {
-            notifyVaultFileSaved(node.path, tabContent);
+            notifyVaultFileSaved(savePath, tabContent);
           },
         );
         return true;
@@ -280,7 +283,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       const resolvedNode = tabId
         ? findFileInTree(stateAtStart.files, tabId)
         : undefined;
-      const savePath = resolvedNode?.path ?? pathRef.current;
+      const savePath = resolvedNode?.path ?? tabId ?? pathRef.current;
 
       if (!savePath || !tabId) return false;
       if (resolvedNode && resolvedNode.id !== tabId) return false;
@@ -363,8 +366,33 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           return true;
         }
 
+        const fs = await getFileSystem();
+        try {
+          const diskContent = await fs.readFile(savePath);
+          const lastSaved =
+            lastSavedContentRef.current ||
+            useAppStore.getState().lastSavedContent[tabId] ||
+            "";
+          if (
+            diskContent !== lastSaved &&
+            diskContent !== contentToSave &&
+            options?.trigger !== "manual"
+          ) {
+            writeDraftBackup(tabId, contentToSave);
+            showNotification(
+              t(settings.language, "notifications_fileChangedOnDisk"),
+              "error",
+            );
+            isSavingRef.current = false;
+            setSaving(false);
+            notifySaveIdle();
+            return false;
+          }
+        } catch {
+          // 读盘失败（文件不存在等）不阻塞保存
+        }
+
         await withErrorHandling(async () => {
-          const fs = await getFileSystem();
           await fs.writeFile(savePath, contentToSave);
         }, "Auto-save failed");
 
@@ -421,6 +449,26 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           isSavingRef.current = false;
           setSaving(false);
           notifySaveIdle();
+          return false;
+        }
+
+        if (isEncodingUnsupportedError(error)) {
+          isSavingRef.current = false;
+          setSaving(false);
+          notifySaveIdle();
+          saveStateRef.current = {
+            status: "error",
+            lastSavedAt: saveStateRef.current.lastSavedAt,
+            error: "ENCODING_UNSUPPORTED",
+            retryCount: 0,
+          };
+          if (!encodingNotifiedTabsRef.current.has(tabId)) {
+            encodingNotifiedTabsRef.current.add(tabId);
+            showNotification(
+              t(settings.language, "notifications_fileEncodingReadOnly"),
+              "error",
+            );
+          }
           return false;
         }
 

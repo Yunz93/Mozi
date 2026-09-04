@@ -1,6 +1,5 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
-  readTextFile,
   readFile as readBinaryFile,
   writeTextFile,
   writeFile,
@@ -21,6 +20,11 @@ import type {
 import { useAppStore } from "../store/appStore";
 import { sanitizeTrashFolder } from "../utils/trashFolder";
 import { buildFileTreeSignature } from "../utils/fileTree";
+import { isFileNotFoundError } from "./filesystem/fileWatchErrors";
+import {
+  createEncodingUnsupportedError,
+  decodeTextFileBytes,
+} from "./filesystem/textFileEncoding";
 
 /**
  * Supported file extensions
@@ -63,6 +67,7 @@ export class TauriFileSystem implements IFileSystem {
   private showConfigFiles: boolean = false;
   private fileFormatStates: Map<string, FileFormatState> = new Map();
   private objectUrls: Map<string, string> = new Map();
+  private nonUtf8Paths: Set<string> = new Set();
 
   private getMimeType(path: string): string {
     const normalized = path.toLowerCase();
@@ -227,13 +232,27 @@ export class TauriFileSystem implements IFileSystem {
     }
   }
 
+  isNonUtf8Path(path: string): boolean {
+    return this.nonUtf8Paths.has(path);
+  }
+
+  private rememberDecodedText(path: string, bytes: Uint8Array): string {
+    const { text, isUtf8 } = decodeTextFileBytes(bytes);
+    if (isUtf8) {
+      this.nonUtf8Paths.delete(path);
+    } else {
+      this.nonUtf8Paths.add(path);
+    }
+    return this.captureFileFormat(path, text);
+  }
+
   /**
    * Read a text file
    */
   async readFile(path: string): Promise<string> {
     try {
-      const raw = await readTextFile(path);
-      return this.captureFileFormat(path, raw);
+      const bytes = await readBinaryFile(path);
+      return this.rememberDecodedText(path, bytes);
     } catch (error) {
       console.error(`Failed to read file ${path}:`, error);
       throw error;
@@ -253,14 +272,23 @@ export class TauriFileSystem implements IFileSystem {
    * Write content to a file
    */
   async writeFile(path: string, content: string): Promise<void> {
+    if (this.nonUtf8Paths.has(path)) {
+      throw createEncodingUnsupportedError(path);
+    }
+    const prepared = this.prepareContentForWrite(path, content);
     try {
-      const prepared = this.prepareContentForWrite(path, content);
-      await writeTextFile(path, prepared);
+      await invoke("write_text_file_atomic", { path, content: prepared });
       this.captureFileFormat(path, prepared);
       this.invalidateObjectUrl(path);
     } catch (error) {
-      console.error(`Failed to write file ${path}:`, error);
-      throw error;
+      try {
+        await writeTextFile(path, prepared);
+        this.captureFileFormat(path, prepared);
+        this.invalidateObjectUrl(path);
+      } catch (fallbackError) {
+        console.error(`Failed to write file ${path}:`, fallbackError);
+        throw fallbackError;
+      }
     }
   }
 
@@ -279,6 +307,9 @@ export class TauriFileSystem implements IFileSystem {
    */
   async saveFile(path: string | null, content: string): Promise<string | null> {
     try {
+      if (path && this.nonUtf8Paths.has(path)) {
+        throw createEncodingUnsupportedError(path);
+      }
       if (!path) {
         const savePath = await save({
           filters: [{ name: "Markdown", extensions: ["md"] }],
@@ -319,6 +350,10 @@ export class TauriFileSystem implements IFileSystem {
       if (format) {
         this.fileFormatStates.set(newPath, format);
         this.fileFormatStates.delete(oldPath);
+      }
+      if (this.nonUtf8Paths.has(oldPath)) {
+        this.nonUtf8Paths.add(newPath);
+        this.nonUtf8Paths.delete(oldPath);
       }
       this.invalidateObjectUrl(oldPath);
       this.invalidateObjectUrl(newPath);
@@ -362,6 +397,10 @@ export class TauriFileSystem implements IFileSystem {
         this.fileFormatStates.set(destPath, format);
         this.fileFormatStates.delete(sourcePath);
       }
+      if (this.nonUtf8Paths.has(sourcePath)) {
+        this.nonUtf8Paths.add(destPath);
+        this.nonUtf8Paths.delete(sourcePath);
+      }
       this.invalidateObjectUrl(sourcePath);
       this.invalidateObjectUrl(destPath);
       return destPath;
@@ -378,6 +417,7 @@ export class TauriFileSystem implements IFileSystem {
     try {
       await invoke("delete_path_recursively", { path });
       this.fileFormatStates.delete(path);
+      this.nonUtf8Paths.delete(path);
       this.invalidateObjectUrl(path);
     } catch (error) {
       console.error("Failed to delete file:", error);
@@ -504,6 +544,11 @@ export class TauriFileSystem implements IFileSystem {
       return nodes;
     } catch (error) {
       console.error(`Failed to read directory ${dirPath}:`, error);
+      const normalizedDir = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
+      const normalizedRoot = rootPath.replace(/\\/g, "/").replace(/\/+$/, "");
+      if (normalizedDir === normalizedRoot) {
+        throw error;
+      }
       return [];
     }
   }
@@ -514,7 +559,7 @@ export class TauriFileSystem implements IFileSystem {
   async createFile(path: string, content: string = ""): Promise<string> {
     try {
       const prepared = this.prepareContentForWrite(path, content);
-      await writeTextFile(path, prepared);
+      await writeTextFile(path, prepared, { createNew: true });
       this.captureFileFormat(path, prepared);
       return path;
     } catch (error) {
@@ -573,8 +618,8 @@ export class TauriFileSystem implements IFileSystem {
 
       if (previous === undefined) {
         try {
-          const initialRaw = await readTextFile(path);
-          previous = this.captureFileFormat(path, initialRaw);
+          const initialBytes = await readBinaryFile(path);
+          previous = this.rememberDecodedText(path, initialBytes);
         } catch {
           previous = "";
         }
@@ -599,8 +644,8 @@ export class TauriFileSystem implements IFileSystem {
             previous = latestKnown;
           }
 
-          const currentRaw = await readTextFile(path);
-          const current = this.captureFileFormat(path, currentRaw);
+          const currentBytes = await readBinaryFile(path);
+          const current = this.rememberDecodedText(path, currentBytes);
           if (disposed) return;
 
           if (current !== previous) {
@@ -613,12 +658,7 @@ export class TauriFileSystem implements IFileSystem {
             error instanceof Error
               ? error.message.toLowerCase()
               : String(error).toLowerCase();
-          const isMissingFile =
-            message.includes("not found") ||
-            message.includes("no such file") ||
-            message.includes("cannot find the path") ||
-            (message.includes("路径") && message.includes("找不到"));
-          if (isMissingFile) {
+          if (isFileNotFoundError(error)) {
             callback({ path, type: "deleted" });
             disposed = true;
             return;

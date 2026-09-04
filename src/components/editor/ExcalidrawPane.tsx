@@ -16,7 +16,16 @@ import { ensureExcalidrawAssetPath } from "../../utils/excalidrawAssetPath";
 
 interface ExcalidrawPaneProps {
   onContentChange?: (content: string) => void;
+  onContentChangeForTab?: (tabId: string, content: string) => void;
 }
+
+type PendingExcalidrawWrite = {
+  tabId: string | null;
+  lastSerialized: string;
+  elements: readonly unknown[];
+  appState: Record<string, unknown>;
+  files: Record<string, unknown>;
+};
 
 type ExcalidrawModule = typeof import("@excalidraw/excalidraw");
 
@@ -26,6 +35,7 @@ function resolveUiTheme(themeMode: string): "light" | "dark" {
 
 export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
   onContentChange,
+  onContentChangeForTab,
 }) => {
   const { t } = useI18n();
   const content = useAppStore(selectContent);
@@ -41,6 +51,8 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
   const [sceneKey, setSceneKey] = useState(() => `${activeTabId ?? "none"}:0`);
   const lastSerializedRef = useRef<string>(content);
   const changeTimerRef = useRef<number | null>(null);
+  const pendingWriteRef = useRef<PendingExcalidrawWrite | null>(null);
+  const excalidrawModuleRef = useRef<ExcalidrawModule | null>(null);
   const previousTabIdRef = useRef(activeTabId);
   const baselineContentRef = useRef(content);
   const sceneContentRef = useRef(content);
@@ -52,6 +64,7 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
       .then(async (mod) => {
         await import("@excalidraw/excalidraw/index.css");
         if (!cancelled) {
+          excalidrawModuleRef.current = mod;
           setExcalidrawModule(mod);
           setLoadError(null);
         }
@@ -67,8 +80,61 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
     };
   }, [t]);
 
+  const flushPendingWrite = useCallback(
+    (pending: PendingExcalidrawWrite) => {
+      const mod = excalidrawModuleRef.current;
+      if (!mod) return;
+
+      const serialized = mod.serializeAsJSON(
+        pending.elements as never,
+        pending.appState as never,
+        pending.files as never,
+        "local",
+      );
+
+      let sceneJson = serialized;
+      try {
+        const json = JSON.parse(serialized) as Record<string, unknown>;
+        if (!json.source) {
+          json.source = EXCALIDRAW_SOURCE;
+        }
+        sceneJson = JSON.stringify(json, null, 2);
+      } catch {
+        // keep serializeAsJSON output
+      }
+
+      const next = serializeExcalidrawContent(
+        sceneJson,
+        pending.lastSerialized,
+      );
+      if (next === pending.lastSerialized) return;
+
+      if (previousTabIdRef.current === pending.tabId) {
+        lastSerializedRef.current = next;
+        baselineContentRef.current = next;
+      }
+
+      if (pending.tabId && onContentChangeForTab) {
+        onContentChangeForTab(pending.tabId, next);
+      } else if (pending.tabId) {
+        useAppStore.getState().setContentForFile(pending.tabId, next);
+      } else {
+        onContentChange?.(next);
+      }
+    },
+    [onContentChange, onContentChangeForTab],
+  );
+
   useEffect(() => {
     if (activeTabId !== previousTabIdRef.current) {
+      if (changeTimerRef.current !== null) {
+        window.clearTimeout(changeTimerRef.current);
+        changeTimerRef.current = null;
+      }
+      if (pendingWriteRef.current) {
+        flushPendingWrite(pendingWriteRef.current);
+        pendingWriteRef.current = null;
+      }
       previousTabIdRef.current = activeTabId;
       baselineContentRef.current = content;
       sceneContentRef.current = content;
@@ -84,7 +150,7 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
       lastSerializedRef.current = content;
       setSceneKey(`${activeTabId ?? "none"}:${Date.now()}`);
     }
-  }, [activeTabId, content, hasUnsavedChanges]);
+  }, [activeTabId, content, hasUnsavedChanges, flushPendingWrite]);
 
   useEffect(() => {
     return () => {
@@ -138,38 +204,22 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
         window.clearTimeout(changeTimerRef.current);
       }
 
+      pendingWriteRef.current = {
+        tabId: activeTabId,
+        lastSerialized: lastSerializedRef.current,
+        elements,
+        appState,
+        files,
+      };
+
       changeTimerRef.current = window.setTimeout(() => {
-        const serialized = excalidrawModule.serializeAsJSON(
-          elements as never,
-          appState as never,
-          files as never,
-          "local",
-        );
-
-        let sceneJson = serialized;
-        try {
-          const json = JSON.parse(serialized) as Record<string, unknown>;
-          if (!json.source) {
-            json.source = EXCALIDRAW_SOURCE;
-          }
-          sceneJson = JSON.stringify(json, null, 2);
-        } catch {
-          // keep serializeAsJSON output
-        }
-
-        // Preserve Obsidian `.excalidraw.md` wrappers (frontmatter / text sections).
-        const next = serializeExcalidrawContent(
-          sceneJson,
-          lastSerializedRef.current,
-        );
-
-        if (next === lastSerializedRef.current) return;
-        lastSerializedRef.current = next;
-        baselineContentRef.current = next;
-        onContentChange(next);
+        const pending = pendingWriteRef.current;
+        pendingWriteRef.current = null;
+        changeTimerRef.current = null;
+        if (pending) flushPendingWrite(pending);
       }, 400);
     },
-    [excalidrawModule, onContentChange],
+    [excalidrawModule, onContentChange, activeTabId, flushPendingWrite],
   );
 
   if (loadError) {

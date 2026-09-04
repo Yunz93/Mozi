@@ -5,6 +5,7 @@ import type {
 } from "../types";
 import {
   buildProviderHttpErrorMessage,
+  fetchWithTimeout,
   normalizeBaseUrl,
   parseProviderJson,
 } from "./ai/http";
@@ -12,6 +13,7 @@ import {
   buildAnalyzeMarkdownPrompt,
   resolveProviderSystemPrompt,
 } from "./ai/prompts";
+import { AiServiceError } from "./ai/errors";
 
 interface DeepSeekChatCompletionPayload {
   error?: {
@@ -46,7 +48,7 @@ export async function generateDeepSeekJson<T>(
 ): Promise<T> {
   const apiKey = settings.deepseekApiKey?.trim();
   if (!apiKey) {
-    throw new Error("Please configure DeepSeek API Key in settings.");
+    throw new AiServiceError("MISSING_API_KEY", { provider: "deepseek" });
   }
 
   const model = settings.deepseekModel?.trim() || "deepseek-v4-flash";
@@ -54,7 +56,7 @@ export async function generateDeepSeekJson<T>(
     settings.deepseekApiBaseUrl,
     "https://api.deepseek.com",
   );
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

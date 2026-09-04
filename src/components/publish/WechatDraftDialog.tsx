@@ -201,6 +201,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
       className="max-w-5xl h-[88vh]"
       contentClassName="flex min-h-0 flex-col overflow-hidden py-3"
       contentScroll={false}
+      closable={!isSubmitting}
     >
       <div className="publish-form-panel flex min-h-0 h-full flex-col">
         <div className="wechat-draft-layout">

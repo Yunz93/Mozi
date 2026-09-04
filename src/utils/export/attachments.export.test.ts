@@ -2,7 +2,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as attachmentResolver from "../attachmentResolver";
-import { enhanceExportAttachmentEmbeds } from "./attachments";
+import {
+  enhanceExportAttachmentEmbeds,
+  prepareHtmlForDownload,
+} from "./attachments";
+import * as shikiSnapshots from "../../components/editor/preview/shikiHtmlSnapshots";
 
 describe("enhanceExportAttachmentEmbeds", () => {
   beforeEach(() => {
@@ -56,5 +60,37 @@ describe("enhanceExportAttachmentEmbeds", () => {
     ) as HTMLImageElement | null;
     expect(img?.style.width).toBe("200px");
     expect(img?.getAttribute("data-wiki-embed-w")).toBe("200");
+  });
+});
+
+describe("prepareHtmlForDownload shiki snapshots", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("protects and restores shiki inline styles across innerHTML readback", async () => {
+    vi.spyOn(
+      await import("../markdown-extensions"),
+      "renderMermaidDiagrams",
+    ).mockResolvedValue(undefined as never);
+    vi.spyOn(await import("./images"), "prepareExportImages").mockResolvedValue(
+      undefined as never,
+    );
+    vi.spyOn(await import("./images"), "waitForImages").mockResolvedValue(
+      undefined as never,
+    );
+    vi.spyOn(await import("./images"), "waitForNextPaint").mockResolvedValue(
+      undefined as never,
+    );
+
+    const protect = vi.spyOn(shikiSnapshots, "protectShikiPresInHtmlString");
+    const restore = vi.spyOn(shikiSnapshots, "restoreShikiPresFromSnapshots");
+
+    const html = `<!DOCTYPE html><html><head></head><body><pre class="shiki"><span style="color:#f00">x</span></pre></body></html>`;
+    const out = await prepareHtmlForDownload(html);
+
+    expect(protect).toHaveBeenCalled();
+    expect(restore).toHaveBeenCalled();
+    expect(out).toContain('style="color:#f00"');
   });
 });

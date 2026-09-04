@@ -32,6 +32,15 @@ fn publish_log_file_path() -> Option<PathBuf> {
         .clone()
 }
 
+const PUBLISH_DEBUG_LOG_MAX_BYTES: u64 = 5 * 1024 * 1024;
+
+fn publish_debug_file_enabled() -> bool {
+    cfg!(debug_assertions)
+        || std::env::var("MOZI_PUBLISH_DEBUG")
+            .map(|value| value == "1")
+            .unwrap_or(false)
+}
+
 fn publish_log(message: impl AsRef<str>) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -44,9 +53,20 @@ fn publish_log(message: impl AsRef<str>) {
     );
     println!("{}", line);
     log::info!("{}", line);
+    if !publish_debug_file_enabled() {
+        return;
+    }
     if let Some(path) = publish_log_file_path() {
         if let Some(parent) = path.parent() {
             let _ = fs::create_dir_all(parent);
+        }
+        if let Ok(meta) = fs::metadata(&path) {
+            if meta.len() > PUBLISH_DEBUG_LOG_MAX_BYTES {
+                let _ = OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(&path);
+            }
         }
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
             let _ = writeln!(file, "{}", line);

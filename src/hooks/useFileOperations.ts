@@ -1,10 +1,11 @@
 import { useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import { useFileSystem } from "./useFileSystem";
-import type { FileNode } from "../types";
+import type { AppLanguage, FileNode } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { clearAttachmentResolverCache } from "../utils/attachmentResolver";
-import { t } from "../utils/i18n";
+import { localizeKnownError, t } from "../utils/i18n";
+import { isFileSystemError } from "../utils/errorHandler";
 import { findAndRewriteAffectedFiles } from "../utils/linkRewriter";
 import { buildFrontmatterFromMetadataTemplate } from "../utils/metadataFields";
 import { findFileInTree } from "../utils/fileTree";
@@ -45,6 +46,27 @@ import {
 import { packVectorSnapshot } from "../services/vault/vectorStore";
 import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
 import { importDroppedFiles } from "../services/filesystem/importDroppedFiles";
+
+async function notifyIfNonUtf8File(
+  path: string,
+  language: AppLanguage,
+  showNotification: (message: string, type: "success" | "error") => void,
+): Promise<void> {
+  try {
+    const fs = await getFileSystem();
+    const isNonUtf8 = (
+      fs as { isNonUtf8Path?: (filePath: string) => boolean }
+    ).isNonUtf8Path?.(path);
+    if (isNonUtf8) {
+      showNotification(
+        t(language, "notifications_fileEncodingReadOnly"),
+        "error",
+      );
+    }
+  } catch {
+    // 探测编码状态失败时不打断打开流程。
+  }
+}
 
 /** Prevent overlapping create calls for the same destination path. */
 const createDocumentInFlight = new Set<string>();
@@ -160,6 +182,16 @@ export function useFileOperations() {
     async (file: FileNode) => {
       if (file.type === "folder") return;
 
+      const previousState = useAppStore.getState();
+      const previousId = previousState.activeTabId;
+      const previousContent = previousId
+        ? previousState.fileContents[previousId]
+        : undefined;
+      const previousSaved = previousId
+        ? previousState.lastSavedContent[previousId]
+        : undefined;
+      const previousPath = previousState.currentFilePath;
+
       try {
         if (
           !isMarkdownFile(file.name) &&
@@ -175,7 +207,6 @@ export function useFileOperations() {
           return;
         }
 
-        const previousId = useAppStore.getState().activeTabId;
         if (previousId && previousId !== file.id) {
           const flushed = await flushActiveDocumentIfDirty();
           if (!flushed) {
@@ -195,6 +226,11 @@ export function useFileOperations() {
             const text = await readFile(file);
             updateTabContent(file.id, text);
             markAsSaved(file.id);
+            await notifyIfNonUtf8File(
+              file.path,
+              settings.language,
+              showNotification,
+            );
           } else {
             updateTabContent(file.id, "");
             markAsSaved(file.id);
@@ -212,6 +248,11 @@ export function useFileOperations() {
             const text = await readFile(file);
             updateTabContent(file.id, text);
             markAsSaved(file.id);
+            await notifyIfNonUtf8File(
+              file.path,
+              settings.language,
+              showNotification,
+            );
           }
           return;
         }
@@ -225,6 +266,11 @@ export function useFileOperations() {
           const text = await readFile(file);
           updateTabContent(file.id, text);
           markAsSaved(file.id);
+          await notifyIfNonUtf8File(
+            file.path,
+            settings.language,
+            showNotification,
+          );
 
           // A draft backup exists when a previous save failed. Offer to
           // restore it instead of silently keeping the (older) disk content.
@@ -249,11 +295,24 @@ export function useFileOperations() {
           }),
           "error",
         );
+        closeTab(file.id);
+        if (
+          previousId &&
+          previousId !== file.id &&
+          previousContent !== undefined
+        ) {
+          addTab(previousId, previousContent);
+          if (previousSaved !== undefined) {
+            markAsSaved(previousId, previousSaved);
+          }
+          setCurrentFilePath(previousPath);
+        }
       }
     },
     [
       readFile,
       addTab,
+      closeTab,
       setCurrentFilePath,
       updateTabContent,
       markAsSaved,
@@ -309,6 +368,15 @@ export function useFileOperations() {
           addTab(newFile.id, initialContent);
           setCurrentFilePath(newFile.path);
         }
+      } catch (error) {
+        if (isFileSystemError(error) && error.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, error.toUserMessage()),
+            "error",
+          );
+          return;
+        }
+        throw error;
       } finally {
         createDocumentInFlight.delete(createKey);
       }
@@ -365,6 +433,15 @@ export function useFileOperations() {
           addTab(newFile.id, initialContent);
           setCurrentFilePath(newFile.path);
         }
+      } catch (error) {
+        if (isFileSystemError(error) && error.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, error.toUserMessage()),
+            "error",
+          );
+          return;
+        }
+        throw error;
       } finally {
         createDocumentInFlight.delete(createKey);
       }
@@ -622,7 +699,14 @@ export function useFileOperations() {
         remapPathReferencesAfterMove(pathMap);
         await refreshFileTree();
         await updateLinksAfterMove(pathMap);
-      } catch {
+      } catch (error) {
+        if (isFileSystemError(error) && error.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, error.toUserMessage()),
+            "error",
+          );
+          return;
+        }
         showNotification(
           t(settings.language, "notifications_renameFailed"),
           "error",
@@ -710,6 +794,13 @@ export function useFileOperations() {
           "success",
         );
       } catch (e) {
+        if (isFileSystemError(e) && e.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, e.toUserMessage()),
+            "error",
+          );
+          return;
+        }
         console.error("Failed to move item:", e);
         showNotification(
           t(

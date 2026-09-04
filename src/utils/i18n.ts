@@ -41,6 +41,7 @@ const knownErrorMessages: Record<string, TranslationKey> = {
   "WeChat AppSecret is required for publishing.":
     "notifications_setWechatAppSecretFirst",
   "WeChat draft title is required.": "notifications_wechatTitleRequired",
+  "A file with this name already exists.": "notifications_fileExists",
 };
 
 const wechatPublishErrorKeys: Record<

@@ -21,6 +21,7 @@ import {
 import { generateGeminiJson, buildAskVaultGeminiSchema } from "./geminiService";
 import { generateCodexJson } from "./codexService";
 import { generateDeepSeekJson } from "./deepseekService";
+import { AiServiceError } from "./ai/errors";
 
 export { buildWikiPrompt };
 
@@ -59,15 +60,13 @@ const PROVIDERS: Record<AIProviderId, AIProvider> = {
   gemini: {
     validateConfig(settings) {
       if (!settings.geminiApiKey?.trim()) {
-        throw new Error("Please configure Gemini API Key in settings.");
+        throw new AiServiceError("MISSING_API_KEY", { provider: "gemini" });
       }
       if (
         settings.geminiModel?.trim() &&
         !looksLikeGeminiModel(settings.geminiModel)
       ) {
-        throw new Error(
-          "当前选择的是 Gemini provider，但模型名看起来不是 Gemini 模型。请从列表重新选择。",
-        );
+        throw new AiServiceError("INVALID_MODEL", { provider: "gemini" });
       }
     },
     analyze(content, settings) {
@@ -90,15 +89,13 @@ const PROVIDERS: Record<AIProviderId, AIProvider> = {
   codex: {
     validateConfig(settings) {
       if (!settings.codexApiKey?.trim()) {
-        throw new Error("Please configure OpenAI API Key in settings.");
+        throw new AiServiceError("MISSING_API_KEY", { provider: "openai" });
       }
       if (
         settings.codexModel?.trim() &&
         !looksLikeCodexModel(settings.codexModel)
       ) {
-        throw new Error(
-          "当前选择的是 Codex provider，但模型名看起来不是 OpenAI/Codex 模型。请从列表重新选择。",
-        );
+        throw new AiServiceError("INVALID_MODEL", { provider: "openai" });
       }
     },
     analyze: analyzeContentWithCodex,
@@ -107,15 +104,13 @@ const PROVIDERS: Record<AIProviderId, AIProvider> = {
   deepseek: {
     validateConfig(settings) {
       if (!settings.deepseekApiKey?.trim()) {
-        throw new Error("Please configure DeepSeek API Key in settings.");
+        throw new AiServiceError("MISSING_API_KEY", { provider: "deepseek" });
       }
       if (
         settings.deepseekModel?.trim() &&
         !looksLikeDeepSeekModel(settings.deepseekModel)
       ) {
-        throw new Error(
-          "当前选择的是 DeepSeek provider，但模型名看起来不是 DeepSeek 模型。请从列表重新选择。",
-        );
+        throw new AiServiceError("INVALID_MODEL", { provider: "deepseek" });
       }
     },
     analyze: analyzeContentWithDeepSeek,

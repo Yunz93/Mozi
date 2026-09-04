@@ -60,8 +60,13 @@ pub(super) async fn publish_remote_wechat_draft(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
-        update_wechat_draft(&client, &access_token, existing_media_id, &article).await?;
-        existing_media_id.to_string()
+        let updated =
+            update_wechat_draft(&client, &access_token, existing_media_id, &article).await?;
+        if updated {
+            existing_media_id.to_string()
+        } else {
+            create_wechat_draft(&client, &access_token, &article).await?
+        }
     } else {
         create_wechat_draft(&client, &access_token, &article).await?
     };
@@ -79,7 +84,11 @@ fn create_wechat_api_client() -> Result<Client, String> {
         .timeout(Duration::from_secs(WECHAT_API_REQUEST_TIMEOUT_SECS))
         .user_agent("markdown-press")
         .build()
-        .map_err(|e| format!("Failed to create WeChat API client: {}", e))
+        .map_err(|e| wechat_request_error("Failed to create WeChat API client", e))
+}
+
+fn wechat_request_error(context: &str, e: reqwest::Error) -> String {
+    format!("{}: {}", context, e.without_url())
 }
 
 fn wechat_api_error(
@@ -112,12 +121,14 @@ async fn fetch_wechat_access_token(
         ])
         .send()
         .await
-        .map_err(|e| format!("Failed to request WeChat access token: {}", e))?;
+        .map_err(|e| wechat_request_error("Failed to request WeChat access token", e))?;
 
     let payload = response
         .json::<WechatAccessTokenResponse>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat access token response: {}", e))?;
+        .map_err(|e| {
+            wechat_request_error("Failed to decode WeChat access token response", e)
+        })?;
 
     wechat_api_error(payload.errcode, payload.errmsg, "fetching access token")?;
     payload
@@ -171,7 +182,9 @@ async fn wechat_api_upload_bytes<T: DeserializeOwned>(
     let media = reqwest::multipart::Part::bytes(bytes)
         .file_name(file_name)
         .mime_str(mime_type)
-        .map_err(|e| format!("Failed to prepare {} multipart upload: {}", context, e))?;
+        .map_err(|e| {
+            wechat_request_error(&format!("Failed to prepare {} multipart upload", context), e)
+        })?;
     let form = reqwest::multipart::Form::new().part("media", media);
 
     client
@@ -179,10 +192,17 @@ async fn wechat_api_upload_bytes<T: DeserializeOwned>(
         .multipart(form)
         .send()
         .await
-        .map_err(|e| format!("Failed to upload {} to WeChat API: {}", context, e))?
+        .map_err(|e| {
+            wechat_request_error(&format!("Failed to upload {} to WeChat API", context), e)
+        })?
         .json::<T>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat {} upload response: {}", context, e))
+        .map_err(|e| {
+            wechat_request_error(
+                &format!("Failed to decode WeChat {} upload response", context),
+                e,
+            )
+        })
 }
 
 async fn wechat_api_upload_file<T: DeserializeOwned>(
@@ -224,9 +244,9 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
     validate_wechat_remote_image_url(remote_url)?;
 
     let response = client.get(remote_url).send().await.map_err(|e| {
-        format!(
-            "Failed to download remote {} {}: {}",
-            context, remote_url, e
+        wechat_request_error(
+            &format!("Failed to download remote {} {}", context, remote_url),
+            e,
         )
     })?;
     let status = response.status();
@@ -256,9 +276,9 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
         .bytes()
         .await
         .map_err(|e| {
-            format!(
-                "Failed to read remote {} bytes {}: {}",
-                context, remote_url, e
+            wechat_request_error(
+                &format!("Failed to read remote {} bytes {}", context, remote_url),
+                e,
             )
         })?
         .to_vec();
@@ -413,12 +433,14 @@ async fn create_wechat_draft(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| format!("Failed to create WeChat draft: {}", e))?;
+        .map_err(|e| wechat_request_error("Failed to create WeChat draft", e))?;
 
     let payload = response
         .json::<WechatDraftAddResponse>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat draft/create response: {}", e))?;
+        .map_err(|e| {
+            wechat_request_error("Failed to decode WeChat draft/create response", e)
+        })?;
     wechat_api_error(payload.errcode, payload.errmsg, "creating draft")?;
     payload
         .media_id
@@ -426,12 +448,28 @@ async fn create_wechat_draft(
         .ok_or_else(|| "WeChat draft/create response did not include media_id.".to_string())
 }
 
+/// 草稿 `media_id` 已失效 / 草稿不存在时应回退新建。
+///
+/// 来源：
+/// - `40007` `invalid media_id`：微信通用错误码；`draft/update` 在草稿
+///   media_id 无效或草稿已被后台删除时返回。
+///   https://developers.weixin.qq.com/doc/offiaccount/Getting_Started/Global_Return_Code.html
+/// - `draft/update` 文档列出的 `53404`/`53405` 实际是带货能力限制
+///   （账号被限制带货 / 商品信息有误），不是草稿不存在，回退新建会再次失败，
+///   因此不纳入本集合。
+///   https://developers.weixin.qq.com/doc/subscription/api/draftbox/draftmanage/api_draft_update
+const STALE_DRAFT_MEDIA_ERRCODES: &[i64] = &[40007];
+
+fn is_stale_draft_media_error(errcode: i64) -> bool {
+    STALE_DRAFT_MEDIA_ERRCODES.contains(&errcode)
+}
+
 async fn update_wechat_draft(
     client: &Client,
     access_token: &str,
     media_id: &str,
     article: &WechatDraftArticleRequest,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let url = format!(
         "https://api.weixin.qq.com/cgi-bin/draft/update?access_token={}",
         access_token
@@ -455,12 +493,42 @@ async fn update_wechat_draft(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| format!("Failed to update WeChat draft: {}", e))?;
+        .map_err(|e| wechat_request_error("Failed to update WeChat draft", e))?;
 
     let payload = response
         .json::<WechatCommonResponse>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat draft/update response: {}", e))?;
-    wechat_api_error(payload.errcode, payload.errmsg, "updating draft")
+        .map_err(|e| {
+            wechat_request_error("Failed to decode WeChat draft/update response", e)
+        })?;
+    let code = payload.errcode.unwrap_or(0);
+    if code == 0 {
+        return Ok(true);
+    }
+    if is_stale_draft_media_error(code) {
+        publish_log(format!(
+            "publish_wechat_draft: stale media_id errcode={code}, falling back to create"
+        ));
+        return Ok(false);
+    }
+    wechat_api_error(payload.errcode, payload.errmsg, "updating draft")?;
+    Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classifies_stale_draft_media_errors() {
+        assert!(is_stale_draft_media_error(40007));
+        // 官方 draft/update 文档：53404/53405 是带货限制，不是草稿不存在。
+        assert!(!is_stale_draft_media_error(53404));
+        assert!(!is_stale_draft_media_error(53405));
+        assert!(!is_stale_draft_media_error(53406));
+        assert!(!is_stale_draft_media_error(45166));
+        assert!(!is_stale_draft_media_error(40114));
+        assert!(!is_stale_draft_media_error(0));
+    }
 }
 

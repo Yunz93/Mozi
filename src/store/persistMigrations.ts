@@ -1,4 +1,4 @@
-import type { AppSettings } from "../types";
+import type { AppSettings, BuiltinEmbeddingDownloadConsent } from "../types";
 import { defaultSettings } from "./uiStore";
 import {
   DEFAULT_CODE_FONT_FAMILY,
@@ -427,8 +427,9 @@ export function resolvePersistedShortcuts(
     toggleOutline: ["Ctrl+O", "Cmd+Shift+O", "Ctrl+Shift+O"],
     toggleSidebar: ["Ctrl+B", "Cmd+Shift+B", "Ctrl+Shift+B"],
     toggleTheme: ["Ctrl+T", "Cmd+Shift+T", "Ctrl+Shift+T"],
-    openKnowledgeBase: ["Ctrl+Shift+O"],
-    exportPdf: ["Ctrl+Shift+E"],
+    openKnowledgeBase: ["Ctrl+Shift+O", "Cmd+Shift+K", "Ctrl+Shift+K"],
+    locateCurrentFile: ["Cmd+Shift+L", "Ctrl+Shift+L"],
+    exportPdf: ["Ctrl+Shift+E", "Cmd+Shift+H", "Ctrl+Shift+H"],
   };
 
   (
@@ -449,4 +450,45 @@ export function resolvePersistedShortcuts(
   });
 
   return normalizeShortcutConfigForPlatform(mergedShortcuts);
+}
+
+/** Zustand persist 版本：无 version 的旧数据视为 0。 */
+export const APP_STORE_PERSIST_VERSION = 1;
+
+export function resolvePersistedEmbeddingConsent(
+  value: unknown,
+): BuiltinEmbeddingDownloadConsent {
+  if (value === "granted" || value === "denied" || value === "unknown") {
+    return value;
+  }
+  return defaultSettings.builtinEmbeddingDownloadConsent ?? "unknown";
+}
+
+/**
+ * persist version 0 → 1：仅把仍等于旧默认值的快捷键换成新默认，
+ * 并补齐 embedding 下载同意字段。
+ */
+export function migratePersistedAppState(
+  persistedState: unknown,
+  fromVersion: number,
+): unknown {
+  if (!persistedState || typeof persistedState !== "object") {
+    return persistedState;
+  }
+
+  const state = persistedState as { settings?: Record<string, unknown> };
+  if (fromVersion >= APP_STORE_PERSIST_VERSION || !state.settings) {
+    return persistedState;
+  }
+
+  return {
+    ...state,
+    settings: {
+      ...state.settings,
+      shortcuts: resolvePersistedShortcuts(state.settings),
+      builtinEmbeddingDownloadConsent: resolvePersistedEmbeddingConsent(
+        state.settings.builtinEmbeddingDownloadConsent,
+      ),
+    },
+  };
 }

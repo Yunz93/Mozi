@@ -77,8 +77,10 @@ import {
   findWikiLinkNearPosition,
   isPreviewModifierKey,
   isPreviewModifierPressed,
+  relocateImageMarkdown,
   type LocalImageMatch,
 } from "./editorPaneHelpers";
+import { buildHostedImageFilename } from "../../utils/imageHostingFilename";
 
 interface EditorPaneProps {
   placeholder?: string;
@@ -479,6 +481,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       const { match } = menu;
       closeImageMenu();
 
+      const startedTabId = useAppStore.getState().activeTabId;
+      const originalMarkdown = view.state.doc.sliceString(match.from, match.to);
+
       const currentSettings = useAppStore.getState().settings;
       if (
         !currentSettings.imageHosting?.provider ||
@@ -513,18 +518,43 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
         const { path: resolvedPath, name: resolvedName } = resolved;
         const data = await tauriReadFile(resolvedPath);
-        const filename =
+        const originalName =
           resolvedName || match.src.split(/[/\\]/).pop() || "image.png";
+        const filename = await buildHostedImageFilename(
+          originalName,
+          data.buffer as ArrayBuffer,
+        );
         const result = await uploadImageToHosting(
           data.buffer as ArrayBuffer,
           filename,
           currentSettings,
         );
 
+        const currentTabId = useAppStore.getState().activeTabId;
+        if (currentTabId !== startedTabId) {
+          showNotification(t("notifications_imageUploaded"), "success");
+          return;
+        }
+
+        const currentDoc = view.state.doc.toString();
+        const relocated = relocateImageMarkdown(
+          currentDoc,
+          originalMarkdown,
+          match.from,
+        );
+        if (relocated < 0) {
+          showNotification(t("notifications_imageMarkdownNotFound"), "warning");
+          return;
+        }
+
         const replacement = `![${match.alt}](${result.url})`;
         view.dispatch({
-          changes: { from: match.from, to: match.to, insert: replacement },
-          selection: { anchor: match.from + replacement.length },
+          changes: {
+            from: relocated,
+            to: relocated + originalMarkdown.length,
+            insert: replacement,
+          },
+          selection: { anchor: relocated + replacement.length },
         });
         showNotification(t("notifications_imageUploaded"), "success");
       } catch (err) {

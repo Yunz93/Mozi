@@ -344,6 +344,7 @@ export default {
   tab_closeTab: "Close file",
   tab_closeBlockedUnsaved:
     "Save failed. The current file was kept open to avoid losing unsaved changes.",
+  notifications_fileExists: "A file with this name already exists.",
   notifications_moveToTrashSaveFailed:
     "Could not move to trash: saving unsaved changes failed, the file was kept.",
   notifications_renameSaveFailed:
@@ -944,6 +945,10 @@ export default {
   notifications_publishSuccessWithMissingImages:
     "Published to the blog, but {count} local image(s) could not be found and were skipped. Please check the image paths.",
   notifications_publishFailed: "Failed to publish blog",
+  notifications_publishContentChangedDuring:
+    "Content was edited during publish and was not written back automatically",
+  notifications_imageMarkdownNotFound:
+    "Image uploaded, but the original markdown could not be found and was not replaced",
   notifications_wechatDraftSuccess:
     "Published to the WeChat draft box and updated the note draft marker.",
   notifications_wechatDraftBackfillFailed:
@@ -1139,4 +1144,33 @@ export default {
   excalidraw_loading: "Loading drawing…",
   excalidraw_loadFailed: "Failed to load the Excalidraw editor",
   excalidraw_invalidDocument: "Could not parse this Excalidraw file",
+  notifications_fileEncodingReadOnly:
+    "This file is not UTF-8 encoded; saving is disabled to avoid corruption",
+  notifications_lastKnowledgeBaseUnavailable:
+    "The last knowledge base “{path}” is currently unavailable. The disk may be unmounted or the folder may have moved.",
+  simpleBlogDialog_localImagesToRepo:
+    "Local images will be uploaded to the blog repository with the article",
+  aiError_missingApiKey: "Please configure a {provider} API key first.",
+  aiError_invalidModel:
+    "The current provider is {provider}, but the model name does not look like a {provider} model. Please pick one from the list.",
+  aiError_modelListFailed: "Failed to load {provider} models ({status}).",
+  aiError_requestTimeout: "The request timed out. Please try again.",
+  aiError_invalidJson: "{provider} returned invalid JSON.",
+  aiError_emptyResponse: "{provider} returned an empty response.",
+  aiError_httpFailed: "{provider} request failed ({status}).",
+  index_embeddingConsentLabel: "Built-in model download consent",
+  index_embeddingConsentUnknown:
+    "Not decided yet (you will be asked when needed)",
+  index_embeddingConsentGranted: "Download allowed",
+  index_embeddingConsentDenied: "Declined (keyword search only)",
+  index_embeddingConsentReset: "Reset consent",
+  index_embeddingConsentHint:
+    "The first use of the built-in semantic model downloads about 120 MB of weights from Hugging Face or a mirror. You can reset this anytime.",
+  index_embeddingDownloadConfirmTitle: "Download the built-in semantic model?",
+  index_embeddingDownloadConfirmMessage:
+    "This will download about 120 MB of built-in embedding weights from Hugging Face or a mirror to this computer for semantic search. You can change this later in Settings → Index.",
+  index_embeddingDownloadConfirm: "Download",
+  index_embeddingDownloadSkip: "Not now",
+  notifications_builtinEmbeddingSkipped:
+    "Skipped downloading the built-in semantic model. Keyword search is still available.",
 } as const;

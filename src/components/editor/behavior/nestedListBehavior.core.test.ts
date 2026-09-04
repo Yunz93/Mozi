@@ -5,6 +5,7 @@ import {
   calculateOrderedListNumbers,
   formatOrderedMarkerValue,
   getOrderedListParentForContinuation,
+  getStrictOrderedListNormalizationChanges,
   parseListItem,
 } from "./nestedListBehavior";
 
@@ -104,5 +105,32 @@ describe("calculateOrderedListNumbers", () => {
     expect(nums.get(2)).toBe(1);
     expect(nums.get(3)).toBe(2);
     expect(nums.get(4)).toBe(2);
+  });
+});
+
+describe("getStrictOrderedListNormalizationChanges Latin abbreviations", () => {
+  it("does not rewrite i.e. / e.g. paragraphs", () => {
+    const doc = "Some intro.\n\ne.g. this one\n\ni.e. that one";
+    const state = EditorState.create({ doc });
+    expect(getStrictOrderedListNormalizationChanges(state)).toBeNull();
+  });
+
+  it("still recognizes compact decimal 1.foo", () => {
+    const doc = "1.foo\n3.bar";
+    const state = EditorState.create({ doc });
+    const changes = getStrictOrderedListNormalizationChanges(state);
+    expect(changes).not.toBeNull();
+    const next = state.update({ changes: changes! }).state.doc.toString();
+    expect(next).toBe("1.foo\n2.bar");
+  });
+
+  it("normalizes a 1000-item flat list within 200ms", () => {
+    const lines = Array.from({ length: 1000 }, () => "1. item");
+    const state = EditorState.create({ doc: lines.join("\n") });
+    const started = performance.now();
+    const changes = getStrictOrderedListNormalizationChanges(state);
+    const elapsed = performance.now() - started;
+    expect(elapsed).toBeLessThan(200);
+    expect(changes?.length).toBeGreaterThan(0);
   });
 });

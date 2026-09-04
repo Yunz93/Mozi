@@ -1,3 +1,6 @@
+import { useAppStore } from "../store/appStore";
+import { t } from "./i18n";
+
 /**
  * Error codes for file system operations
  */
@@ -109,6 +112,22 @@ export async function withErrorHandling<T>(
 /**
  * Create an error handler for async operations
  */
+/** 顶层未捕获错误：尽量提示用户，store 未就绪时只打日志。 */
+export function reportUnhandledRuntimeError(
+  error: unknown,
+  source = "runtime",
+): void {
+  console.error(`[${source}]`, error);
+  try {
+    const language = useAppStore.getState().settings.language;
+    useAppStore
+      .getState()
+      .showNotification(t(language, "errorBoundary_fallbackMessage"), "error");
+  } catch {
+    // store / i18n 可能尚未就绪
+  }
+}
+
 export function createErrorHandler(context: string) {
   return {
     withErrorHandling: <T>(operation: () => Promise<T>): Promise<T> =>

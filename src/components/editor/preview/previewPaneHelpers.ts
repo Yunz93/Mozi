@@ -13,7 +13,12 @@ export function isExternalLink(href: string): boolean {
 export function isValidExternalUrl(href: string): boolean {
   try {
     const url = new URL(href);
-    return url.protocol === "https:" || url.protocol === "http:";
+    return (
+      url.protocol === "https:" ||
+      url.protocol === "http:" ||
+      url.protocol === "mailto:" ||
+      url.protocol === "tel:"
+    );
   } catch {
     return false;
   }

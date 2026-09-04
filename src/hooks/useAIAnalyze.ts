@@ -25,6 +25,27 @@ import {
   stripDuplicateWikiSupplementSections,
 } from "../utils/wikiGeneration";
 import { localizeKnownError, t } from "../utils/i18n";
+import { formatAiServiceError, isAiServiceError } from "../services/ai/errors";
+
+function localizeAiOrKnownError(
+  language: AppLanguage,
+  error: unknown,
+  fallbackKey:
+    | "notifications_aiConfigFirst"
+    | "notifications_aiEnhanceFailed"
+    | "notifications_wikiCreateFailed",
+): string {
+  if (
+    isAiServiceError(error) ||
+    (error instanceof Error && error.name === "FetchTimeoutError")
+  ) {
+    return formatAiServiceError(language, error);
+  }
+  if (error instanceof Error) {
+    return localizeKnownError(language, error.message);
+  }
+  return t(language, fallbackKey);
+}
 
 function getFrontmatterBlockLength(content: string): number {
   const match = content.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/);
@@ -243,9 +264,11 @@ export function useAIAnalyze() {
       ensureAIConfiguration(hydratedSettings);
     } catch (error) {
       showNotification(
-        error instanceof Error
-          ? localizeKnownError(hydratedSettings.language, error.message)
-          : t(hydratedSettings.language, "notifications_aiConfigFirst"),
+        localizeAiOrKnownError(
+          hydratedSettings.language,
+          error,
+          "notifications_aiConfigFirst",
+        ),
         "error",
       );
       setSettingsOpen(true);
@@ -279,9 +302,11 @@ export function useAIAnalyze() {
     } catch (error) {
       console.error("AI analysis failed:", error);
       showNotification(
-        error instanceof Error
-          ? localizeKnownError(hydratedSettings.language, error.message)
-          : t(hydratedSettings.language, "notifications_aiEnhanceFailed"),
+        localizeAiOrKnownError(
+          hydratedSettings.language,
+          error,
+          "notifications_aiEnhanceFailed",
+        ),
         "error",
       );
     } finally {
@@ -314,9 +339,11 @@ export function useAIAnalyze() {
         ensureAIConfiguration(hydratedSettings);
       } catch (error) {
         showNotification(
-          error instanceof Error
-            ? localizeKnownError(hydratedSettings.language, error.message)
-            : t(hydratedSettings.language, "notifications_aiConfigFirst"),
+          localizeAiOrKnownError(
+            hydratedSettings.language,
+            error,
+            "notifications_aiConfigFirst",
+          ),
           "error",
         );
         setSettingsOpen(true);
@@ -408,9 +435,11 @@ export function useAIAnalyze() {
       } catch (error) {
         console.error("AI wiki generation failed:", error);
         showNotification(
-          error instanceof Error
-            ? localizeKnownError(hydratedSettings.language, error.message)
-            : t(hydratedSettings.language, "notifications_wikiCreateFailed"),
+          localizeAiOrKnownError(
+            hydratedSettings.language,
+            error,
+            "notifications_wikiCreateFailed",
+          ),
           "error",
         );
         return null;

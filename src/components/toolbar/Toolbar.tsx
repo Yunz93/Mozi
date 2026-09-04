@@ -1,4 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  getExportInFlight,
+  subscribeExportInFlight,
+} from "../../hooks/useExportActions";
 import { ViewMode, type ThemeMode } from "../../types";
 import { ViewModeToggle } from "../toolbar/ViewModeToggle";
 import { AIButton } from "../toolbar/AIButton";
@@ -72,7 +81,12 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
       };
     }, [isExportMenuOpen]);
 
-    const exportDisabled = isPreviewOnlyFile || !fileName;
+    const isExporting = useSyncExternalStore(
+      subscribeExportInFlight,
+      getExportInFlight,
+      getExportInFlight,
+    );
+    const exportDisabled = isPreviewOnlyFile || !fileName || isExporting;
     const canShowExport = Boolean(onExportPdf || onExportHtml);
 
     return (
@@ -350,7 +364,8 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                         <button
                           type="button"
                           role="menuitem"
-                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                          disabled={isExporting}
+                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
                           onClick={() => {
                             setIsExportMenuOpen(false);
                             onExportPdf();
@@ -363,7 +378,8 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                         <button
                           type="button"
                           role="menuitem"
-                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+                          disabled={isExporting}
+                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
                           onClick={() => {
                             setIsExportMenuOpen(false);
                             onExportHtml();

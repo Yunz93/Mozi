@@ -1,6 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useAppStore, selectContent } from "../../store/appStore";
-import { focusEditorRangeByOffset } from "../../utils/editorSelectionBridge";
+import {
+  focusEditorRangeByOffset,
+  getActiveEditorView,
+} from "../../utils/editorSelectionBridge";
 import { useI18n } from "../../hooks/useI18n";
 import { isLargeFile } from "../../utils/performance";
 import { ViewMode } from "../../types";
@@ -10,16 +13,14 @@ interface ContentSearchProps {
   onClose: () => void;
 }
 
-interface SearchMatch {
+export interface SearchMatch {
   index: number;
   length: number;
-  line: number;
-  column: number;
 }
 
-const MAX_MATCHES = 5000;
+export const MAX_MATCHES = 5000;
 
-function buildSearchRegex(
+export function buildSearchRegex(
   text: string,
   options: { caseSensitive: boolean; useRegex: boolean; wholeWord: boolean },
 ): RegExp | null {
@@ -34,6 +35,58 @@ function buildSearchRegex(
   } catch {
     return null;
   }
+}
+
+/** 在文档中查找匹配，不做逐匹配的 split("\\n")，避免大文档卡死。 */
+export function findContentSearchMatches(
+  content: string,
+  searchText: string,
+  options: { caseSensitive: boolean; useRegex: boolean; wholeWord: boolean },
+): { matches: SearchMatch[]; truncated: boolean } {
+  if (!searchText || !content) return { matches: [], truncated: false };
+
+  const regex = buildSearchRegex(searchText, options);
+  if (!regex) return { matches: [], truncated: false };
+
+  const matches: SearchMatch[] = [];
+  let truncated = false;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content)) !== null) {
+    if (match[0].length === 0) {
+      regex.lastIndex += 1;
+      continue;
+    }
+
+    matches.push({
+      index: match.index,
+      length: match[0].length,
+    });
+
+    if (matches.length >= MAX_MATCHES) {
+      truncated = true;
+      break;
+    }
+  }
+
+  return { matches, truncated };
+}
+
+/** 内容变化后保留最接近旧 offset 的匹配下标。 */
+export function findClosestMatchIndex(
+  matches: SearchMatch[],
+  targetOffset: number,
+): number {
+  if (matches.length === 0) return 0;
+  let best = 0;
+  let bestDist = Math.abs(matches[0].index - targetOffset);
+  for (let i = 1; i < matches.length; i++) {
+    const dist = Math.abs(matches[i].index - targetOffset);
+    if (dist < bestDist) {
+      best = i;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 /**
@@ -54,6 +107,10 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   const [resultsTruncated, setResultsTruncated] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const navigationSourceRef = useRef<"search" | "nav" | null>(null);
+  const prevSearchIdentityRef = useRef("");
+  const currentMatchIndexRef = useRef(0);
+  const matchesRef = useRef<SearchMatch[]>([]);
 
   // Focus search input on mount
   useEffect(() => {
@@ -69,78 +126,65 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
     // Only on open — avoid fighting other view-mode controllers while searching.
   }, []);
 
-  // Find all matches
-  const findMatches = useCallback(
-    (text: string): { matches: SearchMatch[]; truncated: boolean } => {
-      if (!text || !content) return { matches: [], truncated: false };
+  currentMatchIndexRef.current = currentMatchIndex;
+  matchesRef.current = matches;
 
-      const regex = buildSearchRegex(text, {
-        caseSensitive,
-        useRegex,
-        wholeWord,
-      });
-      if (!regex) return { matches: [], truncated: false };
-
-      const matches: SearchMatch[] = [];
-      let truncated = false;
-      let match;
-      while ((match = regex.exec(content)) !== null) {
-        // Zero-length regex matches (e.g. `a*`) would loop forever.
-        if (match[0].length === 0) {
-          regex.lastIndex += 1;
-          continue;
-        }
-
-        const line = content.substring(0, match.index).split("\n").length;
-        const lineStart = content.lastIndexOf("\n", match.index - 1) + 1;
-        const column = match.index - lineStart + 1;
-
-        matches.push({
-          index: match.index,
-          length: match[0].length,
-          line,
-          column,
-        });
-
-        if (matches.length >= MAX_MATCHES) {
-          truncated = true;
-          break;
-        }
-      }
-
-      return { matches, truncated };
-    },
-    [content, caseSensitive, useRegex, wholeWord],
-  );
-
-  // Update matches when search text changes (debounced; larger delay for big docs)
+  // Update matches when search text / content / options change
   useEffect(() => {
+    const searchIdentity = `${searchText}\0${caseSensitive}\0${useRegex}\0${wholeWord}`;
     if (!searchText) {
+      prevSearchIdentityRef.current = searchIdentity;
       setMatches([]);
       setCurrentMatchIndex(0);
       setResultsTruncated(false);
       return;
     }
 
+    const searchChanged = prevSearchIdentityRef.current !== searchIdentity;
+    prevSearchIdentityRef.current = searchIdentity;
+
     const delay = isLargeFile(content) ? 300 : 120;
     const timer = window.setTimeout(() => {
-      const { matches: newMatches, truncated } = findMatches(searchText);
+      const { matches: newMatches, truncated } = findContentSearchMatches(
+        content,
+        searchText,
+        { caseSensitive, useRegex, wholeWord },
+      );
       setMatches(newMatches);
       setResultsTruncated(truncated);
-      setCurrentMatchIndex(0);
+      if (searchChanged) {
+        setCurrentMatchIndex(0);
+        navigationSourceRef.current = "search";
+      } else {
+        const oldMatches = matchesRef.current;
+        const oldIndex = currentMatchIndexRef.current;
+        const oldOffset = oldMatches[oldIndex]?.index ?? 0;
+        setCurrentMatchIndex(findClosestMatchIndex(newMatches, oldOffset));
+      }
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [searchText, findMatches, content]);
+  }, [searchText, content, caseSensitive, useRegex, wholeWord]);
+
+  const focusCurrentMatch = useCallback((match: SearchMatch) => {
+    focusEditorRangeByOffset(match.index, match.index + match.length, {
+      alignTopRatio: 0.3,
+      focus: false,
+    });
+  }, []);
 
   // Navigate to next match
+  // 只标记「用户导航」并更新下标，实际定位交给下面的 effect 统一处理，
+  // 避免在 setState updater 里做副作用（StrictMode 下会执行两次）。
   const goToNextMatch = useCallback(() => {
     if (matches.length === 0) return;
+    navigationSourceRef.current = "nav";
     setCurrentMatchIndex((prev) => (prev + 1) % matches.length);
   }, [matches.length]);
 
   // Navigate to previous match
   const goToPrevMatch = useCallback(() => {
     if (matches.length === 0) return;
+    navigationSourceRef.current = "nav";
     setCurrentMatchIndex(
       (prev) => (prev - 1 + matches.length) % matches.length,
     );
@@ -151,6 +195,18 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
     if (matches.length === 0 || !activeTabId) return;
 
     const match = matches[currentMatchIndex];
+    const view = getActiveEditorView();
+    if (view) {
+      view.dispatch({
+        changes: {
+          from: match.index,
+          to: match.index + match.length,
+          insert: replaceText,
+        },
+        userEvent: "input.replace",
+      });
+      return;
+    }
     const newContent =
       content.substring(0, match.index) +
       replaceText +
@@ -175,6 +231,27 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
       wholeWord,
     });
     if (!regex) return;
+
+    const view = getActiveEditorView();
+    if (view) {
+      const source = view.state.doc.toString();
+      // 正则模式下对每个匹配片段单独求值替换串（支持 $1 等引用），保留原 flags 但去掉 g
+      const singleMatchRegex = useRegex
+        ? new RegExp(regex.source, regex.flags.replace("g", ""))
+        : null;
+      const changes = matches.map((m) => {
+        const slice = source.slice(m.index, m.index + m.length);
+        const insert = singleMatchRegex
+          ? slice.replace(singleMatchRegex, replaceText)
+          : replaceText;
+        return { from: m.index, to: m.index + m.length, insert };
+      });
+      view.dispatch({
+        changes,
+        userEvent: "input.replace",
+      });
+      return;
+    }
 
     // When not in regex mode the replacement text must be literal, so escape
     // `$` which String.replace would otherwise treat as a pattern reference.
@@ -211,16 +288,14 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
     [onClose, goToNextMatch, goToPrevMatch],
   );
 
-  // Scroll to current match in editor
+  // 仅在用户导航或输入新搜索词时定位，避免内容变化把选区拽回第 1 个匹配
   useEffect(() => {
-    if (matches.length > 0) {
-      const match = matches[currentMatchIndex];
-      focusEditorRangeByOffset(match.index, match.index + match.length, {
-        alignTopRatio: 0.3,
-        focus: false,
-      });
-    }
-  }, [matches, currentMatchIndex]);
+    if (matches.length === 0 || !navigationSourceRef.current) return;
+    const match = matches[currentMatchIndex];
+    if (!match) return;
+    focusCurrentMatch(match);
+    navigationSourceRef.current = null;
+  }, [matches, currentMatchIndex, focusCurrentMatch]);
 
   return (
     <div

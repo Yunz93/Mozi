@@ -67,7 +67,7 @@ describe("macOS script updater", () => {
     });
   });
 
-  it("installs through the bundled macOS install script command", async () => {
+  it("installs through the signed macOS updater command", async () => {
     mockInvoke.mockResolvedValue(undefined);
 
     await downloadAndInstallUpdate({

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getStartupKnowledgeBaseGate } from "./startupKnowledgeBaseGate";
+import {
+  getStartupKnowledgeBaseGate,
+  getStartupKnowledgeBaseRestoreFailureAction,
+} from "./startupKnowledgeBaseGate";
 
 describe("getStartupKnowledgeBaseGate", () => {
   it("shows loading during bootstrap before settings hydration/external file check completes", () => {
@@ -102,5 +105,28 @@ describe("getStartupKnowledgeBaseGate", () => {
 
     expect(result.shouldShowKnowledgeBaseLoading).toBe(true);
     expect(result.isStandaloneBootOpen).toBe(false);
+  });
+});
+
+describe("getStartupKnowledgeBaseRestoreFailureAction", () => {
+  it("恢复失败 → 应通知且不清路径", () => {
+    const result = getStartupKnowledgeBaseRestoreFailureAction({
+      restoredPath: null,
+      lastKnowledgeBasePath: "/Volumes/Disk/kb",
+    });
+
+    expect(result.shouldNotify).toBe(true);
+    expect(result.shouldClearLastPath).toBe(false);
+    expect(result.notifyPath).toBe("/Volumes/Disk/kb");
+  });
+
+  it("恢复成功 → 不通知", () => {
+    const result = getStartupKnowledgeBaseRestoreFailureAction({
+      restoredPath: "/Volumes/Disk/kb",
+      lastKnowledgeBasePath: "/Volumes/Disk/kb",
+    });
+
+    expect(result.shouldNotify).toBe(false);
+    expect(result.shouldClearLastPath).toBe(false);
   });
 });
