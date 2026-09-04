@@ -344,6 +344,7 @@ export default {
   tab_closeTab: "Close file",
   tab_closeBlockedUnsaved:
     "Save failed. The current file was kept open to avoid losing unsaved changes.",
+  notifications_fileExists: "A file with this name already exists.",
   notifications_moveToTrashSaveFailed:
     "Could not move to trash: saving unsaved changes failed, the file was kept.",
   notifications_renameSaveFailed:
@@ -944,6 +945,10 @@ export default {
   notifications_publishSuccessWithMissingImages:
     "Published to the blog, but {count} local image(s) could not be found and were skipped. Please check the image paths.",
   notifications_publishFailed: "Failed to publish blog",
+  notifications_publishContentChangedDuring:
+    "Content was edited during publish and was not written back automatically",
+  notifications_imageMarkdownNotFound:
+    "Image uploaded, but the original markdown could not be found and was not replaced",
   notifications_wechatDraftSuccess:
     "Published to the WeChat draft box and updated the note draft marker.",
   notifications_wechatDraftBackfillFailed:

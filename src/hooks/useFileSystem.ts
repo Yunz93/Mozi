@@ -15,6 +15,7 @@ import {
   joinFsPath,
   normalizeSlashes,
   getPathBasename,
+  getPathDirname,
 } from "../utils/pathHelpers";
 import { openKnowledgeBaseWorkspace } from "../services/filesystem/knowledgeBaseService";
 import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
@@ -40,9 +41,40 @@ import {
   writeBinaryFileContent,
   writeFileContent,
 } from "../services/filesystem/ioService";
-import { findFileInTree } from "../utils/fileTree";
+import { findFileInTree, preserveOpenTabNodes } from "../utils/fileTree";
 
 const TRASH_ROOT_MARKER = "__root__";
+
+/** 目标等于自身，或仅大小写不同时不视为同名冲突。 */
+export function isSamePathAllowingCaseChange(
+  source: string,
+  target: string,
+): boolean {
+  const normalizedSource = normalizeSlashes(source);
+  const normalizedTarget = normalizeSlashes(target);
+  return (
+    normalizedSource === normalizedTarget ||
+    normalizedSource.toLowerCase() === normalizedTarget.toLowerCase()
+  );
+}
+
+/** 目标路径已存在则抛 FILE_EXISTS，避免静默覆盖。 */
+export async function assertTargetPathAvailable(
+  fs: { fileExists: (path: string) => Promise<boolean> },
+  targetPath: string,
+  sourcePath?: string,
+): Promise<void> {
+  if (sourcePath && isSamePathAllowingCaseChange(sourcePath, targetPath)) {
+    return;
+  }
+  if (await fs.fileExists(targetPath)) {
+    throw new FileSystemError(
+      "A file with this name already exists.",
+      "FILE_EXISTS",
+      targetPath,
+    );
+  }
+}
 
 function hasOpenedKnowledgeBaseBefore(path: string): boolean {
   const normalizedPath = normalizeSlashes(path);
@@ -242,7 +274,8 @@ export function useFileSystem() {
       () => fs.readDirectory(rootPath),
       "Failed to refresh knowledge base",
     );
-    setFiles(fileNodes);
+    const state = useAppStore.getState();
+    setFiles(preserveOpenTabNodes(fileNodes, state.openTabs, state.files));
   }, [setFiles]);
 
   /**
@@ -571,6 +604,7 @@ export function useFileSystem() {
         }
 
         const fullPath = joinFsPath(basePath, fileName);
+        await assertTargetPathAvailable(fs, fullPath);
         const newFile = await createFileNode(
           fs,
           fullPath,
@@ -584,6 +618,9 @@ export function useFileSystem() {
 
         return newFile;
       } catch (error) {
+        if (error instanceof FileSystemError && error.code === "FILE_EXISTS") {
+          throw error;
+        }
         handleFileSystemError(error, "Failed to create file");
         return null;
       }
@@ -611,6 +648,7 @@ export function useFileSystem() {
         }
 
         const fullPath = joinFsPath(basePath, folderName);
+        await assertTargetPathAvailable(fs, fullPath);
         const newNode = await createFolderNode(
           fs,
           fullPath,
@@ -621,6 +659,9 @@ export function useFileSystem() {
         useAppStore.getState().addFile(newNode);
         return newNode;
       } catch (error) {
+        if (error instanceof FileSystemError && error.code === "FILE_EXISTS") {
+          throw error;
+        }
         handleFileSystemError(error, "Failed to create folder");
         return null;
       }
@@ -656,6 +697,8 @@ export function useFileSystem() {
     async (file: FileNode, newName: string): Promise<string | null> => {
       try {
         const fs = await getFileSystem();
+        const targetPath = joinFsPath(getPathDirname(file.path), newName);
+        await assertTargetPathAvailable(fs, targetPath, file.path);
         const newPath = await withErrorHandling(
           () =>
             fs.renameEntry
@@ -674,6 +717,9 @@ export function useFileSystem() {
         }
         return newPath;
       } catch (error) {
+        if (error instanceof FileSystemError && error.code === "FILE_EXISTS") {
+          throw error;
+        }
         handleFileSystemError(error, `Failed to rename ${file.type}`);
         return null;
       }
@@ -894,6 +940,11 @@ export function useFileSystem() {
     ): Promise<string | null> => {
       try {
         const fs = await getFileSystem();
+        const targetPath = joinFsPath(
+          targetFolderPath,
+          getPathBasename(sourceFile.path),
+        );
+        await assertTargetPathAvailable(fs, targetPath, sourceFile.path);
         const newPath = await moveFilePath(
           fs,
           sourceFile.path,
@@ -902,6 +953,9 @@ export function useFileSystem() {
         );
         return newPath;
       } catch (error) {
+        if (error instanceof FileSystemError && error.code === "FILE_EXISTS") {
+          throw error;
+        }
         handleFileSystemError(error, "Failed to move file");
         return null;
       }

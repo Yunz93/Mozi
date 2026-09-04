@@ -1,9 +1,7 @@
 import { useCallback, useRef } from "react";
 import { useAppStore } from "../store/appStore";
 import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
-import {
-  updateFrontmatter,
-} from "../utils/frontmatter";
+import { updateFrontmatter } from "../utils/frontmatter";
 import { type Frontmatter } from "../types";
 import {
   applySimpleBlogPublishInput,
@@ -32,6 +30,14 @@ import { isMarkdownFile } from "../utils/fileTypes";
 // writes). Keep the timeout generous - a premature timeout is worse than a
 // slow publish because the backend command keeps running either way.
 const PUBLISH_TIMEOUT_MS = 120000;
+
+/** 发布写回前比对：当前内容已偏离快照则放弃覆盖。 */
+export function shouldApplyPublishWriteback(
+  currentContent: string | undefined,
+  expectedContent: string,
+): boolean {
+  return currentContent === expectedContent;
+}
 
 /**
  * Thrown when the UI stops waiting for a publish command. The backend
@@ -137,6 +143,19 @@ export function usePublishActions(
           return true;
         }
 
+        if (
+          !shouldApplyPublishWriteback(
+            stateAfterWrite.fileContents[fileId],
+            latestContent,
+          )
+        ) {
+          stateAfterWrite.showNotification(
+            t(settings.language, "notifications_publishContentChangedDuring"),
+            "warning",
+          );
+          return true;
+        }
+
         stateAfterWrite.updateTabContent(fileId, linkedContent);
         stateAfterWrite.markAsSaved(fileId, linkedContent);
         return true;
@@ -158,10 +177,7 @@ export function usePublishActions(
       const language = hydratedSettings.language;
 
       if (!targetTabId) {
-        showNotification(
-          t(language, "notifications_noFileToPublish"),
-          "error",
-        );
+        showNotification(t(language, "notifications_noFileToPublish"), "error");
         return false;
       }
 
@@ -232,10 +248,7 @@ export function usePublishActions(
 
       const activeFile = findFileInTree(files, targetTabId);
       if (!activeFile) {
-        showNotification(
-          t(language, "notifications_noFileToPublish"),
-          "error",
-        );
+        showNotification(t(language, "notifications_noFileToPublish"), "error");
         return false;
       }
 
@@ -257,6 +270,7 @@ export function usePublishActions(
 
       setPublishing(true);
       let publishCheckpointContent: string | null = null;
+      let lastWrittenByUs = currentContent;
 
       try {
         // Keep the local note unpublished until the remote publish succeeds.
@@ -268,7 +282,17 @@ export function usePublishActions(
           currentContent,
           input,
         );
-        setContentForFile(targetTabId, contentWithMeta);
+        const contentBeforeMeta =
+          useAppStore.getState().fileContents[targetTabId] ?? currentContent;
+        if (shouldApplyPublishWriteback(contentBeforeMeta, currentContent)) {
+          setContentForFile(targetTabId, contentWithMeta);
+          lastWrittenByUs = contentWithMeta;
+        } else {
+          showNotification(
+            t(language, "notifications_publishContentChangedDuring"),
+            "warning",
+          );
+        }
 
         const saved = await forceSave(contentWithMeta, { trigger: "system" });
         if (!saved) {
@@ -315,23 +339,41 @@ export function usePublishActions(
         let markdownForPublish = hostingResult.markdown;
         if (markdownForPublish !== contentToPublish) {
           const beforeHostingContent =
-            useAppStore.getState().fileContents[targetTabId] ?? contentToPublish;
-
-          setContentForFile(targetTabId, markdownForPublish);
-          const savedHosting = await forceSave(markdownForPublish, {
-            trigger: "system",
-          });
-          if (!savedHosting) {
-            setContentForFile(targetTabId, beforeHostingContent);
-            showNotification(
-              t(language, "notifications_saveBeforePublishFailed"),
-              "error",
-            );
-            return false;
-          }
-          markdownForPublish =
             useAppStore.getState().fileContents[targetTabId] ??
-            markdownForPublish;
+            contentToPublish;
+
+          if (
+            !shouldApplyPublishWriteback(beforeHostingContent, contentToPublish)
+          ) {
+            showNotification(
+              t(language, "notifications_publishContentChangedDuring"),
+              "warning",
+            );
+          } else {
+            setContentForFile(targetTabId, markdownForPublish);
+            lastWrittenByUs = markdownForPublish;
+            const savedHosting = await forceSave(markdownForPublish, {
+              trigger: "system",
+            });
+            if (!savedHosting) {
+              if (
+                shouldApplyPublishWriteback(
+                  useAppStore.getState().fileContents[targetTabId],
+                  markdownForPublish,
+                )
+              ) {
+                setContentForFile(targetTabId, beforeHostingContent);
+              }
+              showNotification(
+                t(language, "notifications_saveBeforePublishFailed"),
+                "error",
+              );
+              return false;
+            }
+            markdownForPublish =
+              useAppStore.getState().fileContents[targetTabId] ??
+              markdownForPublish;
+          }
         }
 
         const prepared = await prepareSimpleBlogPublish({
@@ -416,9 +458,17 @@ export function usePublishActions(
         }
         if (publishCheckpointContent !== null && targetTabId) {
           const latest = useAppStore.getState().fileContents[targetTabId];
-          if (latest !== publishCheckpointContent) {
+          if (
+            shouldApplyPublishWriteback(latest, lastWrittenByUs) &&
+            latest !== publishCheckpointContent
+          ) {
             setContentForFile(targetTabId, publishCheckpointContent);
             await forceSave(publishCheckpointContent, { trigger: "system" });
+          } else if (!shouldApplyPublishWriteback(latest, lastWrittenByUs)) {
+            showNotification(
+              t(language, "notifications_publishContentChangedDuring"),
+              "warning",
+            );
           }
         }
         const message =

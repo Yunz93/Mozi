@@ -3,6 +3,35 @@
  * (Codex `/responses` and DeepSeek `/chat/completions`).
  */
 
+export class FetchTimeoutError extends Error {
+  constructor(message = "Request timed out") {
+    super(message);
+    this.name = "FetchTimeoutError";
+  }
+}
+
+export async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = 60000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    const aborted =
+      (error instanceof DOMException && error.name === "AbortError") ||
+      (error instanceof Error && error.name === "AbortError");
+    if (aborted) {
+      throw new FetchTimeoutError(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export function normalizeBaseUrl(
   rawBaseUrl: string | undefined,
   fallback: string,

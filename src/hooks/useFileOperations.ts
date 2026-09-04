@@ -4,7 +4,8 @@ import { useFileSystem } from "./useFileSystem";
 import type { FileNode } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { clearAttachmentResolverCache } from "../utils/attachmentResolver";
-import { t } from "../utils/i18n";
+import { localizeKnownError, t } from "../utils/i18n";
+import { isFileSystemError } from "../utils/errorHandler";
 import { findAndRewriteAffectedFiles } from "../utils/linkRewriter";
 import { buildFrontmatterFromMetadataTemplate } from "../utils/metadataFields";
 import { findFileInTree } from "../utils/fileTree";
@@ -160,6 +161,16 @@ export function useFileOperations() {
     async (file: FileNode) => {
       if (file.type === "folder") return;
 
+      const previousState = useAppStore.getState();
+      const previousId = previousState.activeTabId;
+      const previousContent = previousId
+        ? previousState.fileContents[previousId]
+        : undefined;
+      const previousSaved = previousId
+        ? previousState.lastSavedContent[previousId]
+        : undefined;
+      const previousPath = previousState.currentFilePath;
+
       try {
         if (
           !isMarkdownFile(file.name) &&
@@ -175,7 +186,6 @@ export function useFileOperations() {
           return;
         }
 
-        const previousId = useAppStore.getState().activeTabId;
         if (previousId && previousId !== file.id) {
           const flushed = await flushActiveDocumentIfDirty();
           if (!flushed) {
@@ -249,11 +259,24 @@ export function useFileOperations() {
           }),
           "error",
         );
+        closeTab(file.id);
+        if (
+          previousId &&
+          previousId !== file.id &&
+          previousContent !== undefined
+        ) {
+          addTab(previousId, previousContent);
+          if (previousSaved !== undefined) {
+            markAsSaved(previousId, previousSaved);
+          }
+          setCurrentFilePath(previousPath);
+        }
       }
     },
     [
       readFile,
       addTab,
+      closeTab,
       setCurrentFilePath,
       updateTabContent,
       markAsSaved,
@@ -309,6 +332,15 @@ export function useFileOperations() {
           addTab(newFile.id, initialContent);
           setCurrentFilePath(newFile.path);
         }
+      } catch (error) {
+        if (isFileSystemError(error) && error.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, error.toUserMessage()),
+            "error",
+          );
+          return;
+        }
+        throw error;
       } finally {
         createDocumentInFlight.delete(createKey);
       }
@@ -365,6 +397,15 @@ export function useFileOperations() {
           addTab(newFile.id, initialContent);
           setCurrentFilePath(newFile.path);
         }
+      } catch (error) {
+        if (isFileSystemError(error) && error.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, error.toUserMessage()),
+            "error",
+          );
+          return;
+        }
+        throw error;
       } finally {
         createDocumentInFlight.delete(createKey);
       }
@@ -622,7 +663,14 @@ export function useFileOperations() {
         remapPathReferencesAfterMove(pathMap);
         await refreshFileTree();
         await updateLinksAfterMove(pathMap);
-      } catch {
+      } catch (error) {
+        if (isFileSystemError(error) && error.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, error.toUserMessage()),
+            "error",
+          );
+          return;
+        }
         showNotification(
           t(settings.language, "notifications_renameFailed"),
           "error",
@@ -710,6 +758,13 @@ export function useFileOperations() {
           "success",
         );
       } catch (e) {
+        if (isFileSystemError(e) && e.code === "FILE_EXISTS") {
+          showNotification(
+            localizeKnownError(settings.language, e.toUserMessage()),
+            "error",
+          );
+          return;
+        }
         console.error("Failed to move item:", e);
         showNotification(
           t(

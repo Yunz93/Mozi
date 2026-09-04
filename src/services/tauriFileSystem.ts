@@ -253,14 +253,20 @@ export class TauriFileSystem implements IFileSystem {
    * Write content to a file
    */
   async writeFile(path: string, content: string): Promise<void> {
+    const prepared = this.prepareContentForWrite(path, content);
     try {
-      const prepared = this.prepareContentForWrite(path, content);
-      await writeTextFile(path, prepared);
+      await invoke("write_text_file_atomic", { path, content: prepared });
       this.captureFileFormat(path, prepared);
       this.invalidateObjectUrl(path);
     } catch (error) {
-      console.error(`Failed to write file ${path}:`, error);
-      throw error;
+      try {
+        await writeTextFile(path, prepared);
+        this.captureFileFormat(path, prepared);
+        this.invalidateObjectUrl(path);
+      } catch (fallbackError) {
+        console.error(`Failed to write file ${path}:`, fallbackError);
+        throw fallbackError;
+      }
     }
   }
 
@@ -504,6 +510,11 @@ export class TauriFileSystem implements IFileSystem {
       return nodes;
     } catch (error) {
       console.error(`Failed to read directory ${dirPath}:`, error);
+      const normalizedDir = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
+      const normalizedRoot = rootPath.replace(/\\/g, "/").replace(/\/+$/, "");
+      if (normalizedDir === normalizedRoot) {
+        throw error;
+      }
       return [];
     }
   }
@@ -514,7 +525,7 @@ export class TauriFileSystem implements IFileSystem {
   async createFile(path: string, content: string = ""): Promise<string> {
     try {
       const prepared = this.prepareContentForWrite(path, content);
-      await writeTextFile(path, prepared);
+      await writeTextFile(path, prepared, { createNew: true });
       this.captureFileFormat(path, prepared);
       return path;
     } catch (error) {

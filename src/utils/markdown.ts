@@ -15,7 +15,10 @@ import { getMarkdownPressShikiTheme } from "./shikiTheme";
 import { parseWikiLinkReference, splitObsidianImageAlt } from "./wikiLinks";
 import type { MarkdownStylePreset, OrderedListMode, ThemeMode } from "../types";
 import { LRUCache, hashContent } from "./performance";
-import { normalizeMarkdownTablesForRender } from "./markdownTableNormalize";
+import {
+  FENCE_OPEN_RE,
+  normalizeMarkdownTablesForRender,
+} from "./markdownTableNormalize";
 import {
   parseMarkdownDestination,
   buildMarkdownDestination,
@@ -553,7 +556,7 @@ function createCacheKey(
  * contain spaces in angle brackets so markdown-it keeps the full path (local vault paths and
  * http(s) URLs). Editor source can keep literal spaces; this is render-time only.
  */
-function angleBracketBareMarkdownDestinations(markdown: string): string {
+function applyAngleBracketDestinations(chunk: string): string {
   const wrap = (prefix: string, dest: string, suffix: string): string => {
     const parsed = parseMarkdownDestination(dest);
     if (!parsed.path) return `${prefix}${dest}${suffix}`;
@@ -561,7 +564,7 @@ function angleBracketBareMarkdownDestinations(markdown: string): string {
   };
 
   // Images: ![alt](dest with spaces)
-  let out = markdown.replace(
+  let out = chunk.replace(
     /(!\[[^\]]*\]\()\s*(?!<)([^)\n]+)\s*(\))/g,
     (_full, open: string, url: string, close: string) => wrap(open, url, close),
   );
@@ -573,6 +576,92 @@ function angleBracketBareMarkdownDestinations(markdown: string): string {
   );
 
   return out;
+}
+
+/** 对非围栏段内的行内代码 span 之外的文本做变换。 */
+function mapOutsideInlineCode(
+  text: string,
+  transform: (chunk: string) => string,
+): string {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === "`") {
+      let n = 1;
+      while (i + n < text.length && text[i + n] === "`") n += 1;
+      const closer = "`".repeat(n);
+      const closeAt = text.indexOf(closer, i + n);
+      if (closeAt === -1) {
+        out += transform(text.slice(i));
+        break;
+      }
+      out += text.slice(i, closeAt + n);
+      i = closeAt + n;
+      continue;
+    }
+    const nextTick = text.indexOf("`", i);
+    const end = nextTick === -1 ? text.length : nextTick;
+    out += transform(text.slice(i, end));
+    i = end;
+  }
+  return out;
+}
+
+/** 按 fence 分段，只变换非代码块内容。 */
+function mapOutsideFencedBlocks(
+  markdown: string,
+  transform: (chunk: string) => string,
+): string {
+  const lines = markdown.split("\n");
+  const out: string[] = [];
+  let fenceMarker = "";
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (fenceMarker) {
+      out.push(line);
+      const match = line.match(FENCE_OPEN_RE);
+      if (
+        match &&
+        match[2][0] === fenceMarker[0] &&
+        match[2].length >= fenceMarker.length
+      ) {
+        fenceMarker = "";
+      }
+      i += 1;
+      continue;
+    }
+
+    const open = line.match(FENCE_OPEN_RE);
+    if (open) {
+      out.push(line);
+      fenceMarker = open[2];
+      i += 1;
+      continue;
+    }
+
+    const start = i;
+    while (i < lines.length && !FENCE_OPEN_RE.test(lines[i])) {
+      i += 1;
+    }
+    out.push(transform(lines.slice(start, i).join("\n")));
+  }
+
+  return out.join("\n");
+}
+
+/**
+ * CommonMark ends a bare link/image destination at the first space. Wrap destinations that
+ * contain spaces in angle brackets so markdown-it keeps the full path (local vault paths and
+ * http(s) URLs). Editor source can keep literal spaces; this is render-time only.
+ * 跳过围栏代码块与行内代码，避免改写 `handlers[type](event, data)` 这类源码。
+ */
+export function angleBracketBareMarkdownDestinations(markdown: string): string {
+  return mapOutsideFencedBlocks(markdown, (segment) =>
+    mapOutsideInlineCode(segment, applyAngleBracketDestinations),
+  );
 }
 
 function countBlankSourceLines(

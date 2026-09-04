@@ -5,6 +5,7 @@ import type {
 } from "../types";
 import {
   buildProviderHttpErrorMessage,
+  fetchWithTimeout,
   normalizeBaseUrl,
   parseProviderJson,
 } from "./ai/http";
@@ -54,7 +55,7 @@ export async function generateDeepSeekJson<T>(
     settings.deepseekApiBaseUrl,
     "https://api.deepseek.com",
   );
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await fetchWithTimeout(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

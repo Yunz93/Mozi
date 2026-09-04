@@ -11,6 +11,10 @@ import {
   waitForNextPaint,
   isImageAttachmentName,
 } from "./images";
+import {
+  protectShikiPresInHtmlString,
+  restoreShikiPresFromSnapshots,
+} from "../../components/editor/preview/shikiHtmlSnapshots";
 
 export type { ExportAttachmentContext } from "./types";
 
@@ -104,7 +108,11 @@ export async function prepareHtmlForDownload(
   host.style.visibility = "hidden";
   host.style.opacity = "0";
   host.style.overflow = "visible";
-  host.innerHTML = `<style>${styleContent}</style>${parsed.body.innerHTML}`;
+  const shikiSnapshots: string[] = [];
+  host.innerHTML = protectShikiPresInHtmlString(
+    `<style>${styleContent}</style>${parsed.body.innerHTML}`,
+    shikiSnapshots,
+  );
   document.body.appendChild(host);
 
   try {
@@ -129,9 +137,9 @@ export async function prepareHtmlForDownload(
     }
     await waitForNextPaint(2);
 
-    const processedBody = host.innerHTML.replace(
-      /^[\s]*<style>[\s\S]*?<\/style>/,
-      "",
+    const processedBody = restoreShikiPresFromSnapshots(
+      host.innerHTML.replace(/^[\s]*<style>[\s\S]*?<\/style>/, ""),
+      shikiSnapshots,
     );
     return `<!DOCTYPE html>
 <html lang="${parsed.documentElement.lang || "en"}" data-theme="${theme}">

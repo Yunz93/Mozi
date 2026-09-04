@@ -19,9 +19,18 @@ export const LIST_INDENT_SIZE = 4;
 
 // 保持向后兼容的正则导出
 export const UNORDERED_LIST_REGEX = /^([ \t]*)([-+*]) (.*)$/;
-// 有序：标准 `1. 正文`；另支持 `2.AIGC`（点号后无空格）；`1.2` 等数字开头仍视为非列表，避免版本号误判
-export const ORDERED_LIST_REGEX =
-  /^([ \t]*)(\d+|[a-z]|[ivxlcdm]+)([.)])(?:\s+(.*)|([A-Za-z\u4e00-\u9fff].*)|())$/i;
+// 数字 marker：`1. 正文` / 紧凑 `2.AIGC` / 空 `1.`；字母与罗马必须点号后空白或行尾（避免 `i.e.` / `e.g.`）
+// 第 5 组紧凑正文用 lookbehind 限定「仅数字 + 分隔符」之后，保持既有捕获组序号不变
+export const ORDERED_LIST_HEAD_SOURCE =
+  "(\\d+|[a-z]|[ivxlcdm]+)([.)])(?:\\s+(.*)|((?<=\\d[.)])[A-Za-z\\u4e00-\\u9fff].*)|())";
+export const ORDERED_LIST_HEAD_REGEX = new RegExp(
+  `^${ORDERED_LIST_HEAD_SOURCE}$`,
+  "i",
+);
+export const ORDERED_LIST_REGEX = new RegExp(
+  `^([ \\t]*)${ORDERED_LIST_HEAD_SOURCE}$`,
+  "i",
+);
 export const TASK_LIST_REGEX = /^([ \t]*)([-+*]) (\[[ xX]\])(?: (.*)|$)$/;
 export const BLOCKQUOTE_REGEX = /^([ \t]*)(>+(?:\s*>+)*\s*)(.*)$/;
 export const HEADING_REGEX = /^([ \t]*)(#{1,6})( +)(.*)$/;

@@ -29,6 +29,7 @@ import {
   getLevelFromIndent as getLevelFromIndentFromCore,
   getIndentFromLevel as getIndentFromLevelFromCore,
   ORDERED_LIST_REGEX,
+  ORDERED_LIST_HEAD_REGEX,
   UNORDERED_LIST_REGEX,
   TASK_LIST_REGEX,
   BLOCKQUOTE_REGEX,
@@ -479,13 +480,49 @@ export function buildListHierarchy(
  * - 单个空行 + 后续 number !== 1：视为同组延续（兼容 CommonMark 的 lazy 续行）
  * - 缩进延续段（` continuation`）：不打断
  */
-export function calculateOrderedListNumbers(
+type ParentStackEntry = {
+  lineNumber: number;
+  type: ListType;
+  indentWidth: number;
+  continuationMinIndent: number;
+};
+
+function findParentKeyFromStack(
+  stack: ParentStackEntry[],
+  depth: number,
+): string {
+  if (depth === 0) return "root";
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
+    if (entry.indentWidth >= depth) continue;
+    if (entry.continuationMinIndent <= depth) {
+      return `${entry.lineNumber}:${entry.type}`;
+    }
+  }
+  return "root";
+}
+
+interface OrderedListNumberingResult {
+  numbers: Map<number, number>;
+  previousSiblingStyles: Map<number, OrderedListMarkerStyle | null>;
+}
+
+/**
+ * 单遍计算有序编号与同组前一项 marker 样式。
+ * 用各引用前缀下的缩进栈代替逐项回溯，避免 O(n²)。
+ */
+function computeOrderedListNumbering(
   state: EditorState,
-  changes?: ChangeSpec[],
-): Map<number, number> {
+): OrderedListNumberingResult {
   const numbers = new Map<number, number>();
+  const previousSiblingStyles = new Map<
+    number,
+    OrderedListMarkerStyle | null
+  >();
   const counters = new Map<string, number>(); // key: "quoteKey:parentKey:itemDepth"
-  const counterDepths = new Map<string, number>(); // 与 counters 同 key，记录其 itemDepth
+  const counterDepths = new Map<string, number>();
+  const lastStyleByKey = new Map<string, OrderedListMarkerStyle>();
+  const parentStacks = new Map<string, ParentStackEntry[]>();
   let consecutiveBlankLines = 0;
   let pendingBlankReset = false;
 
@@ -494,6 +531,7 @@ export function calculateOrderedListNumbers(
       if (d >= minDepth) {
         counters.delete(k);
         counterDepths.delete(k);
+        lastStyleByKey.delete(k);
       }
     }
   };
@@ -503,69 +541,103 @@ export function calculateOrderedListNumbers(
     counterDepths.clear();
   };
 
+  const getStack = (quoteKey: string): ParentStackEntry[] => {
+    let stack = parentStacks.get(quoteKey);
+    if (!stack) {
+      stack = [];
+      parentStacks.set(quoteKey, stack);
+    }
+    return stack;
+  };
+
   for (let i = 1; i <= state.doc.lines; i++) {
     const line = state.doc.line(i);
     const item = parseListItem(line.text, i, line.from);
 
-    if (!item || item.type !== "ordered") {
-      if (isBlankLine(line.text)) {
-        consecutiveBlankLines++;
-        pendingBlankReset = true;
-        // 两个连续空行清空所有计数器（段落级断开）
-        if (consecutiveBlankLines >= 2) {
-          clearAllCounters();
-          pendingBlankReset = false;
+    if (item) {
+      const itemDepth = getIndentColumnWidth(item.indent);
+      const quoteKey = item.quotePrefix ?? "";
+      const stack = getStack(quoteKey);
+      while (
+        stack.length > 0 &&
+        stack[stack.length - 1].indentWidth >= itemDepth
+      ) {
+        stack.pop();
+      }
+
+      if (item.type === "ordered") {
+        consecutiveBlankLines = 0;
+        const parentKey = findParentKeyFromStack(stack, itemDepth);
+        const key = `${quoteKey}:${parentKey}:${itemDepth}`;
+
+        if (pendingBlankReset && item.number === 1) {
+          counters.delete(key);
+          counterDepths.delete(key);
         }
-      } else if (!item && getOrderedListParentForContinuation(state, i)) {
-        // 有序列表项下的缩进延续段，不应打断编号序列（与 CommonMark 懒延续一致）
-        consecutiveBlankLines = 0;
         pendingBlankReset = false;
-      } else if (item && (item.type === "unordered" || item.type === "task")) {
-        // 无序/任务列表项：仅清空同级或更深的有序计数（更深嵌套的兄弟不影响顶层计数继承）
-        clearCountersAtOrBelow(getIndentColumnWidth(item.indent));
-        consecutiveBlankLines = 0;
-        pendingBlankReset = false;
+
+        let current: number;
+        const stored = counters.get(key);
+        if (stored === undefined) {
+          const isTopLevel = parentKey === "root";
+          const seed = isTopLevel ? Math.max(1, item.number ?? 1) : 1;
+          current = seed;
+        } else {
+          current = stored + 1;
+        }
+        counters.set(key, current);
+        counterDepths.set(key, itemDepth);
+        numbers.set(i, current);
+
+        previousSiblingStyles.set(i, lastStyleByKey.get(key) ?? null);
+        const raw = extractOrderedMarkerRawPartFromLineText(line.text);
+        lastStyleByKey.set(
+          key,
+          raw
+            ? inferOrderedMarkerStyleFromRawPart(raw)
+            : (item.markerStyle ?? "decimal"),
+        );
       } else {
-        // 真正的非列表非空非续行（段落、代码块等）：清空所有计数
-        clearAllCounters();
+        clearCountersAtOrBelow(itemDepth);
         consecutiveBlankLines = 0;
         pendingBlankReset = false;
       }
+
+      stack.push({
+        lineNumber: i,
+        type: item.type,
+        indentWidth: itemDepth,
+        continuationMinIndent: getContinuationMinIndent(item),
+      });
       continue;
     }
 
-    // 是有序列表项
-    consecutiveBlankLines = 0;
-
-    // 构建计数器 key: 基于父级上下文。用真实缩进列宽，避免 `1.` 子项的 3 空格缩进被当作同级。
-    const itemDepth = getIndentColumnWidth(item.indent);
-    const quoteKey = item.quotePrefix ?? "";
-    const parentKey = findParentCounterKey(state, i, itemDepth, quoteKey);
-    const key = `${quoteKey}:${parentKey}:${itemDepth}`;
-
-    // 单空行后若用户显式写了起始编号 1，认为是新分组，重置同 key 的计数
-    if (pendingBlankReset && item.number === 1) {
-      counters.delete(key);
-      counterDepths.delete(key);
-    }
-    pendingBlankReset = false;
-
-    let current: number;
-    const stored = counters.get(key);
-    if (stored === undefined) {
-      // 首次出现：顶层组保留用户的起始编号；嵌套层级强制从 1 开始
-      const isTopLevel = parentKey === "root";
-      const seed = isTopLevel ? Math.max(1, item.number ?? 1) : 1;
-      current = seed;
+    if (isBlankLine(line.text)) {
+      consecutiveBlankLines++;
+      pendingBlankReset = true;
+      if (consecutiveBlankLines >= 2) {
+        clearAllCounters();
+        pendingBlankReset = false;
+      }
+    } else if (getOrderedListParentForContinuation(state, i)) {
+      consecutiveBlankLines = 0;
+      pendingBlankReset = false;
     } else {
-      current = stored + 1;
+      clearAllCounters();
+      lastStyleByKey.clear();
+      consecutiveBlankLines = 0;
+      pendingBlankReset = false;
     }
-    counters.set(key, current);
-    counterDepths.set(key, itemDepth);
-    numbers.set(i, current);
   }
 
-  return numbers;
+  return { numbers, previousSiblingStyles };
+}
+
+export function calculateOrderedListNumbers(
+  state: EditorState,
+  _changes?: ChangeSpec[],
+): Map<number, number> {
+  return computeOrderedListNumbering(state).numbers;
 }
 
 /**
@@ -580,6 +652,7 @@ function findParentCounterKey(
   depth: number,
   quotePrefix: string,
 ): string {
+  if (depth === 0) return "root";
   for (let i = lineNumber - 1; i >= 1; i--) {
     const line = state.doc.line(i);
     const item = parseListItem(line.text, i, line.from);
@@ -627,57 +700,6 @@ export function orderedListCounterKey(
   return `${quoteKey}:${parentKey}:${itemDepth}`;
 }
 
-function previousSiblingMarkerStyleInGroup(
-  state: EditorState,
-  lineNumber: number,
-  currentItem: ListItemInfo,
-): OrderedListMarkerStyle | null {
-  const currentKey = orderedListCounterKey(state, lineNumber);
-  if (!currentKey) return null;
-
-  const currentDepth = getIndentColumnWidth(currentItem.indent);
-
-  for (let j = lineNumber - 1; j >= 1; j--) {
-    const line = state.doc.line(j);
-    const item = parseListItem(line.text, j, line.from);
-
-    if (!item) {
-      if (isBlankLine(line.text)) continue;
-      // 懒延续段不应打断同一 ListItem 的上下文
-      if (getOrderedListParentForContinuation(state, j)) continue;
-      break;
-    }
-
-    if ((item.quotePrefix ?? "") !== (currentItem.quotePrefix ?? "")) {
-      continue;
-    }
-
-    const depth = getIndentColumnWidth(item.indent);
-    if (depth < currentDepth) {
-      break; // 到达父级或更高级别，说明没有同级前项
-    }
-
-    if (item.type !== "ordered") {
-      // 同级或更浅的无序项视为兄弟打断；更深嵌套的无序项是其他列表的子内容，可跨越
-      if (depth <= currentDepth) {
-        break;
-      }
-      continue;
-    }
-
-    if (orderedListCounterKey(state, j) !== currentKey) {
-      continue;
-    }
-
-    const raw = extractOrderedMarkerRawPartFromLineText(line.text);
-    return raw
-      ? inferOrderedMarkerStyleFromRawPart(raw)
-      : (item.markerStyle ?? "decimal");
-  }
-
-  return null;
-}
-
 /**
  * 获取严格模式下的标准化更改
  */
@@ -685,7 +707,8 @@ export function getStrictOrderedListNormalizationChanges(
   state: EditorState,
 ): ChangeSpec[] | null {
   const changes: ChangeSpec[] = [];
-  const correctNumbers = calculateOrderedListNumbers(state);
+  const { numbers: correctNumbers, previousSiblingStyles } =
+    computeOrderedListNumbering(state);
 
   for (let i = 1; i <= state.doc.lines; i++) {
     const line = state.doc.line(i);
@@ -698,15 +721,10 @@ export function getStrictOrderedListNormalizationChanges(
 
     const markerColumn = (item.quotePrefix?.length ?? 0) + item.indent.length;
     const slice = line.text.slice(markerColumn);
-    const headMatch = slice.match(
-      /^(\d+|[a-z]|[ivxlcdm]+)([.)])(?:\s+(.*)|([A-Za-z\u4e00-\u9fff].*)|())$/i,
-    );
+    const headMatch = slice.match(ORDERED_LIST_HEAD_REGEX);
     if (!headMatch) continue;
 
-    const style =
-      previousSiblingMarkerStyleInGroup(state, i, item) ??
-      item.markerStyle ??
-      "decimal";
+    const style = previousSiblingStyles.get(i) ?? item.markerStyle ?? "decimal";
     const delim = item.delimiter ?? ".";
     const desired = formatOrderedMarkerValue(correctNumber, style, delim);
     const currentMarker = `${headMatch[1]}${headMatch[2]}`;

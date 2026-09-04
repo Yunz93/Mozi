@@ -60,6 +60,7 @@ export const SimpleBlogPublishDialog: React.FC<
       className="max-w-2xl"
       contentClassName="py-3"
       contentScroll
+      closable={!isSubmitting}
     >
       <div className="publish-form-panel flex min-h-0 h-full flex-col">
         <div className="-mx-1 space-y-3 px-1">

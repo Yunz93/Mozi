@@ -327,6 +327,7 @@ export default {
 
   tab_closeTab: "关闭文件",
   tab_closeBlockedUnsaved: "保存失败，已保留当前文件以避免丢失未保存内容",
+  notifications_fileExists: "已存在同名文件或文件夹",
   notifications_moveToTrashSaveFailed:
     "无法移入回收站：未保存的修改保存失败，已保留文件",
   notifications_renameSaveFailed:
@@ -867,6 +868,8 @@ export default {
   notifications_publishSuccessWithMissingImages:
     "已发布到博客，但有 {count} 张本地图片未找到、已被跳过。请检查图片路径。",
   notifications_publishFailed: "发布博客失败",
+  notifications_publishContentChangedDuring: "发布期间内容已修改，未自动写回",
+  notifications_imageMarkdownNotFound: "图片已上传，但原文已变动，未替换",
   notifications_wechatDraftSuccess:
     "已发布到微信公众号草稿箱，并更新了笔记草稿标识。",
   notifications_wechatDraftBackfillFailed:

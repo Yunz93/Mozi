@@ -155,6 +155,67 @@ describe("useKnowledgeBaseWatch", () => {
     });
   });
 
+  it("does not clear the file tree when the watcher reports a root read error", async () => {
+    const watched = {
+      callback: null as ((event: DirectoryWatchEvent) => void) | null,
+    };
+    const showNotification = vi.fn();
+    const watchDirectory = vi.fn(
+      async (
+        _dirPath: string,
+        callback: (event: DirectoryWatchEvent) => void,
+      ) => {
+        watched.callback = callback;
+        return vi.fn();
+      },
+    );
+
+    useAppStore.setState({
+      files: [note, otherNote],
+      rootFolderPath: "/vault",
+      openTabs: [note.id],
+      activeTabId: note.id,
+      fileContents: {
+        [note.id]: "# Note\n",
+      },
+      lastSavedContent: {
+        [note.id]: "# Note\n",
+      },
+    });
+
+    function Harness() {
+      useKnowledgeBaseWatch({
+        rootFolderPath: "/vault",
+        watchDirectory,
+        showNotification,
+        t: (key) => key,
+      });
+
+      return null;
+    }
+
+    render(React.createElement(Harness));
+
+    await waitFor(() => {
+      expect(watched.callback).not.toBeNull();
+    });
+
+    const emitDirectoryEvent = watched.callback as (
+      event: DirectoryWatchEvent,
+    ) => void;
+    emitDirectoryEvent({ type: "error", error: new Error("read failed") });
+
+    await waitFor(() => {
+      expect(showNotification).toHaveBeenCalledWith(
+        "notifications_watchDirectoryFailed",
+        "error",
+      );
+    });
+    expect(useAppStore.getState().files).toEqual([note, otherNote]);
+    expect(useAppStore.getState().openTabs).toEqual([note.id]);
+    expect(useAppStore.getState().activeTabId).toBe(note.id);
+  });
+
   it("does not leave a watcher active after unmounting during async setup", async () => {
     let resolveWatch: (unwatch: () => void) => void = () => {};
     const unwatch = vi.fn();

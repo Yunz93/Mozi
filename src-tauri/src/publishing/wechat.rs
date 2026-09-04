@@ -79,7 +79,11 @@ fn create_wechat_api_client() -> Result<Client, String> {
         .timeout(Duration::from_secs(WECHAT_API_REQUEST_TIMEOUT_SECS))
         .user_agent("markdown-press")
         .build()
-        .map_err(|e| format!("Failed to create WeChat API client: {}", e))
+        .map_err(|e| wechat_request_error("Failed to create WeChat API client", e))
+}
+
+fn wechat_request_error(context: &str, e: reqwest::Error) -> String {
+    format!("{}: {}", context, e.without_url())
 }
 
 fn wechat_api_error(
@@ -112,12 +116,14 @@ async fn fetch_wechat_access_token(
         ])
         .send()
         .await
-        .map_err(|e| format!("Failed to request WeChat access token: {}", e))?;
+        .map_err(|e| wechat_request_error("Failed to request WeChat access token", e))?;
 
     let payload = response
         .json::<WechatAccessTokenResponse>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat access token response: {}", e))?;
+        .map_err(|e| {
+            wechat_request_error("Failed to decode WeChat access token response", e)
+        })?;
 
     wechat_api_error(payload.errcode, payload.errmsg, "fetching access token")?;
     payload
@@ -171,7 +177,9 @@ async fn wechat_api_upload_bytes<T: DeserializeOwned>(
     let media = reqwest::multipart::Part::bytes(bytes)
         .file_name(file_name)
         .mime_str(mime_type)
-        .map_err(|e| format!("Failed to prepare {} multipart upload: {}", context, e))?;
+        .map_err(|e| {
+            wechat_request_error(&format!("Failed to prepare {} multipart upload", context), e)
+        })?;
     let form = reqwest::multipart::Form::new().part("media", media);
 
     client
@@ -179,10 +187,17 @@ async fn wechat_api_upload_bytes<T: DeserializeOwned>(
         .multipart(form)
         .send()
         .await
-        .map_err(|e| format!("Failed to upload {} to WeChat API: {}", context, e))?
+        .map_err(|e| {
+            wechat_request_error(&format!("Failed to upload {} to WeChat API", context), e)
+        })?
         .json::<T>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat {} upload response: {}", context, e))
+        .map_err(|e| {
+            wechat_request_error(
+                &format!("Failed to decode WeChat {} upload response", context),
+                e,
+            )
+        })
 }
 
 async fn wechat_api_upload_file<T: DeserializeOwned>(
@@ -224,9 +239,9 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
     validate_wechat_remote_image_url(remote_url)?;
 
     let response = client.get(remote_url).send().await.map_err(|e| {
-        format!(
-            "Failed to download remote {} {}: {}",
-            context, remote_url, e
+        wechat_request_error(
+            &format!("Failed to download remote {} {}", context, remote_url),
+            e,
         )
     })?;
     let status = response.status();
@@ -256,9 +271,9 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
         .bytes()
         .await
         .map_err(|e| {
-            format!(
-                "Failed to read remote {} bytes {}: {}",
-                context, remote_url, e
+            wechat_request_error(
+                &format!("Failed to read remote {} bytes {}", context, remote_url),
+                e,
             )
         })?
         .to_vec();
@@ -413,12 +428,14 @@ async fn create_wechat_draft(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| format!("Failed to create WeChat draft: {}", e))?;
+        .map_err(|e| wechat_request_error("Failed to create WeChat draft", e))?;
 
     let payload = response
         .json::<WechatDraftAddResponse>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat draft/create response: {}", e))?;
+        .map_err(|e| {
+            wechat_request_error("Failed to decode WeChat draft/create response", e)
+        })?;
     wechat_api_error(payload.errcode, payload.errmsg, "creating draft")?;
     payload
         .media_id
@@ -455,12 +472,14 @@ async fn update_wechat_draft(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| format!("Failed to update WeChat draft: {}", e))?;
+        .map_err(|e| wechat_request_error("Failed to update WeChat draft", e))?;
 
     let payload = response
         .json::<WechatCommonResponse>()
         .await
-        .map_err(|e| format!("Failed to decode WeChat draft/update response: {}", e))?;
+        .map_err(|e| {
+            wechat_request_error("Failed to decode WeChat draft/update response", e)
+        })?;
     wechat_api_error(payload.errcode, payload.errmsg, "updating draft")
 }
 

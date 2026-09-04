@@ -1,8 +1,18 @@
 import { createHeadingSlug, type HeadingNode } from "./outline";
 import { flushPendingPreviewHeadingScroll } from "./previewNavigationBridge";
 
+function stripInlineMarkdown(text: string): string {
+  return text
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1");
+}
+
 function normalizeHeadingText(text: string): string {
-  return text.trim().replace(/\s+/g, " ");
+  return stripInlineMarkdown(text).trim().replace(/\s+/g, " ");
 }
 
 /**
@@ -19,7 +29,10 @@ export function applyPreviewHeadingAttributes(
     container.querySelectorAll<HTMLElement>(
       "article.markdown-body h1, article.markdown-body h2, article.markdown-body h3, article.markdown-body h4, article.markdown-body h5, article.markdown-body h6",
     ),
-  );
+  ).filter((element) => {
+    const embed = element.closest(".preview-note-embed-body");
+    return !embed || embed === container;
+  });
 
   const assigned = new Set<HeadingNode>();
 

@@ -5,6 +5,7 @@ import type {
 } from "../types";
 import {
   buildProviderHttpErrorMessage,
+  fetchWithTimeout,
   normalizeBaseUrl,
   parseProviderJson,
 } from "./ai/http";
@@ -68,7 +69,7 @@ export async function generateCodexJson<T>(
     settings.codexApiBaseUrl,
     "https://api.openai.com/v1",
   );
-  const response = await fetch(`${baseUrl}/responses`, {
+  const response = await fetchWithTimeout(`${baseUrl}/responses`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

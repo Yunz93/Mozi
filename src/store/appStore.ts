@@ -48,6 +48,19 @@ import {
 } from "./persistMigrations";
 import { DEFAULT_INDEX_EXCLUDE_GLOBS } from "../utils/pathGlob";
 
+export const APP_STORE_PERSIST_NAME = "markdown-press-settings";
+
+let appStoreHydrationFailed = false;
+
+/** persist 反序列化失败时标记，避免启动页永远卡住。 */
+export function markAppStoreHydrationFailed(): void {
+  appStoreHydrationFailed = true;
+}
+
+export function didAppStoreHydrationFail(): boolean {
+  return appStoreHydrationFailed;
+}
+
 // Re-export types from slice stores
 export type {
   FileState,
@@ -102,10 +115,22 @@ export const useAppStore = create<AppState>()(
       ...createVaultIndexSlice(set as any, get as any),
     }),
     {
-      name: "markdown-press-settings",
+      name: APP_STORE_PERSIST_NAME,
       partialize: (state) => ({
         settings: sanitizeSettingsForPersistence((state as any).settings),
       }),
+      onRehydrateStorage: () => (_state, error) => {
+        if (!error) return;
+        console.error("Failed to rehydrate app settings", error);
+        try {
+          if (typeof localStorage !== "undefined") {
+            localStorage.removeItem(APP_STORE_PERSIST_NAME);
+          }
+        } catch {
+          // localStorage 可能不可用
+        }
+        markAppStoreHydrationFailed();
+      },
       merge: (persistedState, currentState) => {
         const persistedSettings = stripNonRuntimeSettings(
           (persistedState as any)?.settings ?? {},

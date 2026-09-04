@@ -65,11 +65,16 @@ export function useExternalFileOpen({
           import("@tauri-apps/api/core"),
         ]);
 
-        unlisten = await listen("opened-files", (event) => {
+        const unlistenFn = await listen("opened-files", (event) => {
           const paths = uniquePaths(normalizeOpenedFilePayload(event.payload));
           if (paths.length === 0) return;
           void onRuntimePaths(paths);
         });
+        if (cancelled) {
+          unlistenFn();
+          return;
+        }
+        unlisten = unlistenFn;
 
         const bootQuery = takeBootOpenFileQuery();
         const initialPaths = normalizeOpenedFilePayload(

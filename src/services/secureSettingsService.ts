@@ -1,14 +1,13 @@
 import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import type { AppSettings } from "../types";
 import { useAppStore } from "../store/appStore";
-import { isTauriEnvironment, waitForTauri } from "../types/filesystem";
+import { isTauriEnvironment } from "../types/filesystem";
 import {
   SENSITIVE_SETTING_KEYS,
   type SensitiveSettingKey,
 } from "./sensitiveSettingKeys";
 
 const SETTINGS_STORAGE_KEY = "markdown-press-settings";
-const SECURE_SETTINGS_WAIT_MS = 5000;
 
 export { SENSITIVE_SETTING_KEYS, type SensitiveSettingKey };
 export type SensitiveSettings = Pick<AppSettings, SensitiveSettingKey>;
@@ -23,6 +22,7 @@ interface SecureSettingsPayload {
   imageHostingS3SecretAccessKey?: string | null;
   imageHostingOssAccessKeySecret?: string | null;
   imageHostingQiniuSecretKey?: string | null;
+  embeddingApiKey?: string | null;
 }
 
 const secureWriteQueue = new Map<SensitiveSettingKey, Promise<void>>();
@@ -39,11 +39,11 @@ async function ensureSecureSettingsBackendReady(): Promise<boolean> {
     return false;
   }
 
-  if (isTauriEnvironment()) {
-    return true;
+  if (!isTauriEnvironment()) {
+    return false;
   }
 
-  return waitForTauri(SECURE_SETTINGS_WAIT_MS);
+  return true;
 }
 
 async function invokeSecureSettingsCommand<T>(
@@ -144,6 +144,7 @@ export async function loadSecureSettings(): Promise<
       imageHostingQiniuSecretKey: normalizeSecretValue(
         payload.imageHostingQiniuSecretKey,
       ),
+      embeddingApiKey: normalizeSecretValue(payload.embeddingApiKey),
     };
     hasLoadedSecureSettingsFromBackend = true;
     return { ...secureSettingsCache };

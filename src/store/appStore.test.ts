@@ -1,3 +1,5 @@
+/** @vitest-environment happy-dom */
+
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_AI_SYSTEM_PROMPT,
@@ -6,7 +8,9 @@ import {
   DEFAULT_WIKI_PROMPT_TEMPLATE_EN,
 } from "../services/aiPrompts";
 import {
+  APP_STORE_PERSIST_NAME,
   defaultSettings,
+  didAppStoreHydrationFail,
   resolveLocalizedPrompts,
   resolvePersistedFontSettings,
   resolvePersistedAISettings,
@@ -200,5 +204,29 @@ describe("tab saved baseline", () => {
     expect(state.activeTabId).toBe("/vault/b.md");
     expect(state.fileContents).toEqual({ "/vault/b.md": "B" });
     expect(state.fileContents["/vault/a.md"]).toBeUndefined();
+  });
+});
+
+describe("app store hydration recovery", () => {
+  it("finishes hydration with defaults when persisted JSON is corrupt", async () => {
+    localStorage.setItem(APP_STORE_PERSIST_NAME, '{"state":');
+    const persist = (
+      useAppStore as unknown as {
+        persist: {
+          rehydrate: () => Promise<void> | void;
+          hasHydrated: () => boolean;
+        };
+      }
+    ).persist;
+
+    await persist.rehydrate();
+
+    expect(persist.hasHydrated() || didAppStoreHydrationFail()).toBe(true);
+    expect(useAppStore.getState().settings.language).toBe(
+      defaultSettings.language,
+    );
+    expect(useAppStore.getState().settings.aiProvider).toBe(
+      defaultSettings.aiProvider,
+    );
   });
 });

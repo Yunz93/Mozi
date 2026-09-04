@@ -4,6 +4,7 @@ import {
   buildFileTreeSignature,
   collectRemovedOpenTabIds,
   detectOpenTabPathRemaps,
+  preserveOpenTabNodes,
 } from "./fileTree";
 
 const folder: FileNode = {
@@ -57,9 +58,29 @@ describe("collectRemovedOpenTabIds", () => {
 });
 
 describe("detectOpenTabPathRemaps", () => {
-  it("pairs a single removed open tab with a single added file path", () => {
+  it("does not remap a 1:1 pair when basename or extension differs", () => {
     const remaps = detectOpenTabPathRemaps([note], [renamedNote], [note.id]);
 
-    expect(remaps).toEqual({ [note.id]: renamedNote.path });
+    expect(remaps).toEqual({});
+  });
+
+  it("remaps a 1:1 pair when basename and extension match ignoring case", () => {
+    const moved: FileNode = {
+      id: "/vault/docs/note.md",
+      name: "note.md",
+      path: "/vault/docs/note.md",
+      type: "file",
+    };
+    const remaps = detectOpenTabPathRemaps([note], [moved], [note.id]);
+
+    expect(remaps).toEqual({ [note.id]: moved.path });
+  });
+});
+
+describe("preserveOpenTabNodes", () => {
+  it("re-appends open tabs that disappeared from the refreshed tree", () => {
+    const preserved = preserveOpenTabNodes([folder], [note.id], [folder, note]);
+
+    expect(preserved).toEqual([folder, note]);
   });
 });

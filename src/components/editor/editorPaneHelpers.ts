@@ -102,3 +102,28 @@ export function findLocalImageAtPos(
 
   return null;
 }
+
+/**
+ * 上传完成后在当前文档中重新定位原始图片 markdown。
+ * 优先从 hintFrom 附近搜索，找不到再全篇 indexOf。
+ */
+export function relocateImageMarkdown(
+  doc: string,
+  original: string,
+  hintFrom: number,
+): number {
+  if (!original) return -1;
+  if (
+    hintFrom >= 0 &&
+    hintFrom + original.length <= doc.length &&
+    doc.slice(hintFrom, hintFrom + original.length) === original
+  ) {
+    return hintFrom;
+  }
+  const radius = Math.max(original.length * 2, 64);
+  const from = Math.max(0, hintFrom - radius);
+  const to = Math.min(doc.length, hintFrom + radius + original.length);
+  const local = doc.slice(from, to).indexOf(original);
+  if (local >= 0) return from + local;
+  return doc.indexOf(original);
+}

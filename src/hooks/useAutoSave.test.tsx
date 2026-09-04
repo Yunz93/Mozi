@@ -6,15 +6,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore, defaultSettings } from "../store/appStore";
 import { useAutoSave } from "./useAutoSave";
 
-const { writeFile } = vi.hoisted(() => ({
+const { writeFile, readFile } = vi.hoisted(() => ({
   writeFile: vi.fn(async () => {}),
+  readFile: vi.fn(async (): Promise<string> => {
+    throw new Error("ENOENT");
+  }),
 }));
 
 vi.mock("../types/filesystem", () => ({
-  getFileSystem: vi.fn(async () => ({ writeFile })),
+  getFileSystem: vi.fn(async () => ({ writeFile, readFile })),
 }));
 
 const NOTE_ID = "/vault/note.md";
+
+async function flushMicrotasks(times = 6): Promise<void> {
+  for (let i = 0; i < times; i += 1) {
+    await Promise.resolve();
+  }
+}
 
 function setupStore(autoSaveInterval: number) {
   useAppStore.setState({
@@ -69,6 +78,10 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
   writeFile.mockClear();
   writeFile.mockImplementation(async () => {});
+  readFile.mockClear();
+  readFile.mockImplementation(async (): Promise<string> => {
+    throw new Error("ENOENT");
+  });
 });
 
 afterEach(() => {
@@ -348,7 +361,7 @@ describe("useAutoSave", () => {
 
     await act(async () => {
       const pending = saveHook!.forceSave(undefined, { trigger: "manual" });
-      await Promise.resolve();
+      await flushMicrotasks();
       act(() => {
         useAppStore.getState().updateTabContent(NOTE_ID, "edited during save");
       });
@@ -508,7 +521,7 @@ describe("useAutoSave", () => {
 
     const pendingSave = act(async () => {
       const promise = saveHook!.forceSave(undefined, { trigger: "manual" });
-      await Promise.resolve();
+      await flushMicrotasks();
       act(() => {
         useAppStore.getState().addTab(NOTE_B, "tab-b");
         useAppStore.getState().markAsSaved(NOTE_B, "tab-b");
@@ -552,7 +565,7 @@ describe("useAutoSave", () => {
 
     const firstSave = saveHook!.forceSave(undefined, { trigger: "manual" });
     await act(async () => {
-      await Promise.resolve();
+      await flushMicrotasks();
     });
 
     act(() => {
@@ -591,5 +604,58 @@ describe("useAutoSave", () => {
     });
 
     expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite disk changes during auto-save and writes a draft", async () => {
+    setupStore(60_000);
+    readFile.mockResolvedValue("changed-on-disk");
+    const showNotification = vi.fn();
+    useAppStore.setState({ showNotification });
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "edited");
+    });
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "auto" });
+    });
+
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(showNotification).toHaveBeenCalled();
+    expect(window.localStorage.getItem(`draft_${NOTE_ID}`)).toBe("edited");
+  });
+
+  it("allows manual save to overwrite disk changes", async () => {
+    setupStore(60_000);
+    readFile.mockResolvedValue("changed-on-disk");
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "edited");
+    });
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "manual" });
+    });
+
+    expect(writeFile).toHaveBeenCalled();
+    expect((writeFile.mock.calls[0] as unknown as [string, string])[0]).toBe(
+      NOTE_ID,
+    );
   });
 });

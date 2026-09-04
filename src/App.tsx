@@ -15,6 +15,8 @@ import { useUiFontSizeKeyboardShortcuts } from "./hooks/useUiFontSizeKeyboardSho
 import { getScaledEditorFontSize } from "./utils/uiFontSize";
 import { UiZoomHint } from "./components/ui/UiZoomHint";
 import { useAutoSave } from "./hooks/useAutoSave";
+import { useCloseGuard } from "./app/useCloseGuard";
+import { closeTabSafely } from "./hooks/closeTabSafely";
 import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useStoreHydration } from "./hooks/useStoreHydration";
@@ -189,6 +191,22 @@ const App: React.FC = () => {
   });
 
   const { forceSave } = useAutoSave({ enabled: true });
+  useCloseGuard(forceSave);
+
+  const closeActiveTabSafely = useCallback(() => {
+    const tabToClose = useAppStore.getState().activeTabId;
+    if (!tabToClose) return;
+
+    void closeTabSafely({
+      tabId: tabToClose,
+      forceSave,
+      closeTab,
+      hasUnsavedChanges: (tabId) =>
+        useAppStore.getState().hasUnsavedChanges(tabId),
+      isTabOpen: (tabId) => useAppStore.getState().openTabs.includes(tabId),
+      onBlocked: () => showNotification(t("tab_closeBlockedUnsaved"), "error"),
+    });
+  }, [closeTab, forceSave, showNotification, t]);
   const { handleExportToPdf, handleExportToHtml, buildLongImageSharePayload } =
     useExportActions(highlighter);
   const { handlePublishSimpleBlog, handlePublishWechatDraft } =
@@ -380,24 +398,7 @@ const App: React.FC = () => {
         void handleOpenNewWindow();
       },
       onCloseTab: () => {
-        if (!activeTabId) return;
-
-        const tabToClose = activeTabId;
-        void (async () => {
-          const state = useAppStore.getState();
-          if (state.hasUnsavedChanges(tabToClose)) {
-            const saved = await forceSave(undefined, { trigger: "system" });
-            if (!saved) {
-              showNotification(t("tab_closeBlockedUnsaved"), "error");
-              return;
-            }
-          }
-
-          const latestState = useAppStore.getState();
-          if (latestState.openTabs.includes(tabToClose)) {
-            closeTab(tabToClose);
-          }
-        })();
+        closeActiveTabSafely();
       },
       onOpenKnowledgeBase: () => {
         void handleSwitchKnowledgeBase();
@@ -635,8 +636,7 @@ const App: React.FC = () => {
           void handleOpenNewWindow();
         },
         closeTab: () => {
-          if (!activeTabId) return;
-          closeTab(activeTabId);
+          closeActiveTabSafely();
         },
         toggleView: () => {
           if (isNonMarkdownWorkspaceFile) return;
@@ -674,6 +674,7 @@ const App: React.FC = () => {
       }),
     [
       activeTabId,
+      closeActiveTabSafely,
       closeTab,
       currentFilePath,
       fileOps,
@@ -1097,11 +1098,15 @@ const App: React.FC = () => {
           onClosePublishTarget={() => setIsPublishTargetDialogOpen(false)}
           onSelectSimpleBlog={handleSelectSimpleBlogPublish}
           onSelectWechatDraft={handleSelectWechatDraftPublish}
-          onCloseSimpleBlog={() => setIsSimpleBlogDialogOpen(false)}
+          onCloseSimpleBlog={() => {
+            if (!isPublishing) setIsSimpleBlogDialogOpen(false);
+          }}
           onSubmitSimpleBlog={(input) => {
             void handleSubmitSimpleBlog(input);
           }}
-          onCloseWechatDraft={() => setIsWechatDraftDialogOpen(false)}
+          onCloseWechatDraft={() => {
+            if (!isPublishing) setIsWechatDraftDialogOpen(false);
+          }}
           onSubmitWechatDraft={(input) => {
             void handleSubmitWechatDraft(input);
           }}

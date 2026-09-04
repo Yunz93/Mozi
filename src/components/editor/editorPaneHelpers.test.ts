@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   findLocalImageAtPos,
   findWikiLinkNearPosition,
@@ -6,6 +6,7 @@ import {
   isPreviewModifierKey,
   isPreviewModifierPressed,
   isRemoteUrl,
+  relocateImageMarkdown,
 } from "./editorPaneHelpers";
 
 describe("editorPaneHelpers", () => {
@@ -16,7 +17,30 @@ describe("editorPaneHelpers", () => {
     expect(isMacPlatform({ platform: "Win32", userAgent: "Mozilla" })).toBe(
       false,
     );
+    expect(isMacPlatform({ platform: "Win32", userAgent: "" })).toBe(false);
+  });
+
+  it("falls back to global navigator when argument is undefined", () => {
+    vi.stubGlobal("navigator", { platform: "Win32", userAgent: "" });
     expect(isMacPlatform(undefined)).toBe(false);
+    vi.stubGlobal("navigator", { platform: "MacIntel", userAgent: "" });
+    expect(isMacPlatform(undefined)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("relocates image markdown near the original offset", () => {
+    const original = "![cover](assets/photo.png)";
+    const doc = `intro\n${original}\nmore`;
+    const hint = doc.indexOf(original);
+    expect(relocateImageMarkdown(doc, original, hint)).toBe(hint);
+    expect(relocateImageMarkdown(`xx${doc}`, original, hint)).toBe(
+      `xx${doc}`.indexOf(original),
+    );
+    expect(relocateImageMarkdown("no image here", original, 0)).toBe(-1);
   });
 
   it("maps preview modifier keys by platform", () => {

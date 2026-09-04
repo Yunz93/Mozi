@@ -132,4 +132,37 @@ describe("applyPreviewHeadingAttributes", () => {
     expect(second.dataset.headingId).toBeUndefined();
     expect(third.dataset.headingId).toBe("chapter-two");
   });
+
+  it("ignores headings inside embedded notes and strips outline inline marks", () => {
+    const container = document.createElement("div");
+    container.innerHTML = `
+      <article class="markdown-body">
+        <h1>Main Title</h1>
+        <article class="markdown-body preview-note-embed-body">
+          <h1>Embedded Title</h1>
+        </article>
+      </article>
+    `;
+
+    const headings: HeadingNode[] = [
+      {
+        id: "main-title",
+        level: 1,
+        text: "**Main Title**",
+        children: [],
+        line: 1,
+      },
+    ];
+
+    applyPreviewHeadingAttributes(container, headings);
+
+    const main = container.querySelector(
+      "article.markdown-body > h1",
+    ) as HTMLElement;
+    const embedded = container.querySelector(
+      ".preview-note-embed-body h1",
+    ) as HTMLElement;
+    expect(main.dataset.headingId).toBe("main-title");
+    expect(embedded.dataset.headingId).toBeUndefined();
+  });
 });
