@@ -68,6 +68,8 @@ export interface UIState {
   pendingDraftRestore: PendingDraftRestore | null;
   /** AI enhancement output awaiting an apply/discard decision. */
   pendingAiResult: PendingAiResult | null;
+  /** Close was blocked because save failed; user can discard and quit. */
+  pendingCloseDespiteSaveFailure: "window" | "exit" | null;
 }
 
 /**
@@ -96,6 +98,9 @@ export interface UIActions {
   setActiveHeadingId: (id: string | null) => void;
   setPendingDraftRestore: (pending: PendingDraftRestore | null) => void;
   setPendingAiResult: (pending: PendingAiResult | null) => void;
+  setPendingCloseDespiteSaveFailure: (
+    pending: "window" | "exit" | null,
+  ) => void;
 }
 
 /**
@@ -247,6 +252,7 @@ export const initialUIState: UIState = {
   notification: null,
   pendingDraftRestore: null,
   pendingAiResult: null,
+  pendingCloseDespiteSaveFailure: null,
   uiZoomHintPercent: null,
   activeHeadingId: null,
 };
@@ -383,6 +389,9 @@ export function createUISlice(
       set(() => ({ pendingDraftRestore: pending })),
 
     setPendingAiResult: (pending) => set(() => ({ pendingAiResult: pending })),
+
+    setPendingCloseDespiteSaveFailure: (pending) =>
+      set(() => ({ pendingCloseDespiteSaveFailure: pending })),
   };
 }
 

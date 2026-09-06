@@ -327,6 +327,10 @@ export default {
 
   tab_closeTab: "关闭文件",
   tab_closeBlockedUnsaved: "保存失败，已保留当前文件以避免丢失未保存内容",
+  tab_closeSaveFailedTitle: "无法保存，应用无法关闭",
+  tab_closeSaveFailedMessage:
+    "关闭前写入磁盘失败。可以取消继续编辑，或放弃未保存更改并关闭。本地草稿备份仍会保留，下次打开该笔记时可恢复。",
+  tab_closeSaveFailedConfirm: "放弃更改并关闭",
   notifications_fileExists: "已存在同名文件或文件夹",
   notifications_moveToTrashSaveFailed:
     "无法移入回收站：未保存的修改保存失败，已保留文件",

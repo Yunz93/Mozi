@@ -3,6 +3,7 @@ import { useAppStore } from "../store/appStore";
 import { isTauriEnvironment } from "../types/filesystem";
 import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
 import { flushAllDirtyOpenTabs } from "../services/filesystem/flushActiveDocument";
+import { writeDraftBackup } from "../utils/draftBackup";
 import { t } from "../utils/i18n";
 
 type ForceSaveFn = (
@@ -10,15 +11,49 @@ type ForceSaveFn = (
   options?: { trigger?: "auto" | "manual" | "system" },
 ) => Promise<boolean>;
 
-type CloseRequestSource = "window" | "exit";
+export type CloseRequestSource = "window" | "exit";
 
 function normalizeCloseSource(payload: unknown): CloseRequestSource {
   if (payload === "exit") return "exit";
   return "window";
 }
 
+function backupDirtyOpenTabs(): void {
+  const state = useAppStore.getState();
+  for (const tabId of state.openTabs) {
+    if (!state.hasUnsavedChanges(tabId)) continue;
+    const content = state.fileContents[tabId];
+    if (content !== undefined) {
+      writeDraftBackup(tabId, content);
+    }
+  }
+}
+
+export async function completeAppClose(
+  source: CloseRequestSource,
+): Promise<void> {
+  if (source === "exit") {
+    const { exit } = await import("@tauri-apps/plugin-process");
+    await exit(0);
+    return;
+  }
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().destroy();
+}
+
+function requestCloseDespiteSaveFailure(source: CloseRequestSource): void {
+  backupDirtyOpenTabs();
+  const language = useAppStore.getState().settings.language;
+  useAppStore
+    .getState()
+    .showNotification(t(language, "tab_closeBlockedUnsaved"), "error");
+  useAppStore.getState().setPendingCloseDespiteSaveFailure(source);
+}
+
 /**
- * 拦截关窗 / Cmd+Q：先刷出编辑器待写入内容并尽量全部落盘，失败则不关闭。
+ * 拦截关窗 / Cmd+Q：先刷出编辑器待写入内容并尽量全部落盘。
+ * 保存失败时弹出确认框，允许放弃更改后关闭，避免窗口被永久卡住。
  */
 export function useCloseGuard(forceSave: ForceSaveFn): void {
   const isClosingRef = useRef(false);
@@ -64,44 +99,22 @@ export function useCloseGuard(forceSave: ForceSaveFn): void {
               trigger: "system",
             });
             if (!saved) {
-              const language = useAppStore.getState().settings.language;
-              useAppStore
-                .getState()
-                .showNotification(
-                  t(language, "tab_closeBlockedUnsaved"),
-                  "error",
-                );
+              requestCloseDespiteSaveFailure(source);
               return;
             }
           }
 
           const flushed = await flushAllDirtyOpenTabs();
           if (!flushed) {
-            const language = useAppStore.getState().settings.language;
-            useAppStore
-              .getState()
-              .showNotification(
-                t(language, "tab_closeBlockedUnsaved"),
-                "error",
-              );
+            requestCloseDespiteSaveFailure(source);
             return;
           }
         }
 
-        if (source === "exit") {
-          const { exit } = await import("@tauri-apps/plugin-process");
-          await exit(0);
-          return;
-        }
-
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        await getCurrentWindow().destroy();
+        await completeAppClose(source);
       } catch (error) {
         console.error("Failed to handle app close request:", error);
-        const language = useAppStore.getState().settings.language;
-        useAppStore
-          .getState()
-          .showNotification(t(language, "tab_closeBlockedUnsaved"), "error");
+        requestCloseDespiteSaveFailure(source);
       } finally {
         isClosingRef.current = false;
       }

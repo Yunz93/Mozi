@@ -19,6 +19,7 @@ import type {
   SimpleBlogPublishInput,
 } from "../utils/simpleBlogPublish";
 import { registerBuiltinEmbeddingConsentPrompt } from "../services/vault/builtinEmbeddingConsent";
+import { completeAppClose } from "../app/useCloseGuard";
 import type { LongImageSharePayload } from "./share/longImageSharePayload";
 
 interface AppDialogsProps {
@@ -98,6 +99,12 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   const pendingDraftRestore = useAppStore((state) => state.pendingDraftRestore);
   const setPendingDraftRestore = useAppStore(
     (state) => state.setPendingDraftRestore,
+  );
+  const pendingCloseDespiteSaveFailure = useAppStore(
+    (state) => state.pendingCloseDespiteSaveFailure,
+  );
+  const setPendingCloseDespiteSaveFailure = useAppStore(
+    (state) => state.setPendingCloseDespiteSaveFailure,
   );
   const setContentForFile = useAppStore((state) => state.setContentForFile);
   const [embeddingConsentOpen, setEmbeddingConsentOpen] = useState(false);
@@ -239,6 +246,20 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         confirmText={tr("index_embeddingDownloadConfirm")}
         cancelText={tr("index_embeddingDownloadSkip")}
         variant="warning"
+      />
+
+      <ConfirmDialog
+        isOpen={pendingCloseDespiteSaveFailure !== null}
+        onClose={() => setPendingCloseDespiteSaveFailure(null)}
+        onConfirm={() => {
+          const source = pendingCloseDespiteSaveFailure ?? "window";
+          setPendingCloseDespiteSaveFailure(null);
+          void completeAppClose(source);
+        }}
+        title={tr("tab_closeSaveFailedTitle")}
+        message={tr("tab_closeSaveFailedMessage")}
+        confirmText={tr("tab_closeSaveFailedConfirm")}
+        variant="danger"
       />
 
       {notification && (

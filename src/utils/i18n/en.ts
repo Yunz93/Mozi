@@ -344,6 +344,10 @@ export default {
   tab_closeTab: "Close file",
   tab_closeBlockedUnsaved:
     "Save failed. The current file was kept open to avoid losing unsaved changes.",
+  tab_closeSaveFailedTitle: "Save failed — the app could not close",
+  tab_closeSaveFailedMessage:
+    "The file could not be written to disk before closing. Cancel to keep editing, or discard unsaved changes and quit. A local draft backup is kept and can be restored the next time you open this note.",
+  tab_closeSaveFailedConfirm: "Discard and close",
   notifications_fileExists: "A file with this name already exists.",
   notifications_moveToTrashSaveFailed:
     "Could not move to trash: saving unsaved changes failed, the file was kept.",

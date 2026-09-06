@@ -20,6 +20,7 @@ import {
   isMarkdownDocumentPath,
   isSavableDocumentPath,
 } from "../utils/markdownFormat";
+import { sameDocumentText } from "../utils/documentText";
 
 interface UseAutoSaveOptions {
   debounceMs?: number;
@@ -287,7 +288,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
       if (!savePath || !tabId) return false;
       if (resolvedNode && resolvedNode.id !== tabId) return false;
-      if (!isSavableDocumentPath(savePath)) return false;
+      if (!isSavableDocumentPath(savePath)) return true;
       if (!isTabContentLoaded(tabId)) return false;
 
       const shouldFormatBeforeSave =
@@ -359,7 +360,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         }
 
         // Check if content has changed (compare post-transform payload for manual saves)
-        if (contentToSave === lastSavedContentRef.current) {
+        if (sameDocumentText(contentToSave, lastSavedContentRef.current)) {
+          markAsSaved(tabId, contentToSave);
           isSavingRef.current = false;
           setSaving(false);
           notifySaveIdle();
@@ -373,10 +375,19 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
             lastSavedContentRef.current ||
             useAppStore.getState().lastSavedContent[tabId] ||
             "";
+          // Line endings / BOM must not count as an external edit: the editor
+          // emits LF while disk may still be CRLF from the original file.
+          // Close/system saves overwrite real conflicts so the window can quit.
+          const diskMatchesBaseline = sameDocumentText(diskContent, lastSaved);
+          const diskMatchesPayload = sameDocumentText(
+            diskContent,
+            contentToSave,
+          );
           if (
-            diskContent !== lastSaved &&
-            diskContent !== contentToSave &&
-            options?.trigger !== "manual"
+            !diskMatchesBaseline &&
+            !diskMatchesPayload &&
+            options?.trigger !== "manual" &&
+            options?.trigger !== "system"
           ) {
             writeDraftBackup(tabId, contentToSave);
             showNotification(
