@@ -11,7 +11,7 @@ const { listenMock, destroyMock, exitMock, flushAllDirtyMock, invokeMock } =
     destroyMock: vi.fn(async () => {}),
     exitMock: vi.fn(async () => {}),
     flushAllDirtyMock: vi.fn(async () => true),
-    invokeMock: vi.fn(async () => {}),
+    invokeMock: vi.fn(async (_cmd?: string) => {}),
   }));
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -128,7 +128,7 @@ describe("useCloseGuard", () => {
 
   it("exits the process when rust force-close also fails", async () => {
     destroyMock.mockRejectedValueOnce(new Error("destroy not allowed"));
-    invokeMock.mockImplementation(async (cmd: string) => {
+    invokeMock.mockImplementation(async (cmd?: string) => {
       if (cmd === "force_close_window") {
         throw new Error("force close failed");
       }
