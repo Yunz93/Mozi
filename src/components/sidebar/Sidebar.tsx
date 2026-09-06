@@ -25,6 +25,7 @@ import {
 } from "./hooks";
 
 import { ContextMenu } from "./components";
+import { KnowledgeBaseHeader } from "./KnowledgeBaseHeader";
 import { ConfirmDialog, PromptDialog } from "../ui/Dialog";
 
 import {
@@ -58,6 +59,7 @@ export interface SidebarProps {
   currentKnowledgeBaseName?: string;
   currentKnowledgeBasePath?: string;
   onSwitchKnowledgeBase: () => void;
+  onOpenSettings: () => void;
   /** Disable open/switch vault when launched as a standalone OS file open. */
   disableOpenKnowledgeBase?: boolean;
   isOpen: boolean;
@@ -244,6 +246,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     currentKnowledgeBaseName,
     currentKnowledgeBasePath,
     onSwitchKnowledgeBase,
+    onOpenSettings,
     disableOpenKnowledgeBase = false,
     isOpen,
     searchFocusRequestKey = 0,
@@ -796,46 +799,13 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={onSwitchKnowledgeBase}
+            <KnowledgeBaseHeader
+              name={currentKnowledgeBaseName}
+              path={currentKnowledgeBasePath}
               disabled={disableOpenKnowledgeBase}
-              aria-disabled={disableOpenKnowledgeBase}
-              className={`flex items-center justify-between gap-2 w-full px-3 py-2.5 rounded-xl border border-gray-200/70 dark:border-white/10 transition-colors ${
-                disableOpenKnowledgeBase
-                  ? "cursor-not-allowed bg-gray-100/70 text-gray-400 dark:bg-[#0f141c] dark:text-gray-600"
-                  : "bg-white/60 text-gray-700 hover:bg-white/90 dark:bg-[#121923] dark:text-gray-200 dark:hover:bg-[#18212e]"
-              }`}
-              title={
-                disableOpenKnowledgeBase
-                  ? t("sidebar_openKnowledgeBaseDisabledStandalone")
-                  : currentKnowledgeBasePath || t("app_openKnowledgeBase")
-              }
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <svg
-                  className="w-4 h-4 shrink-0"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
-                <p className="text-sm font-semibold truncate min-w-0">
-                  {currentKnowledgeBaseName || t("app_openKnowledgeBase")}
-                </p>
-              </div>
-              <svg
-                className="w-4 h-4 shrink-0 text-gray-400"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
+              onSwitch={onSwitchKnowledgeBase}
+              onOpenSettings={onOpenSettings}
+            />
           </div>
 
           {isOpen && (
