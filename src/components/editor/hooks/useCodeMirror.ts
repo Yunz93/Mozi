@@ -680,6 +680,9 @@ export function useCodeMirror(
       lastEmittedContentRef.current = safeContent;
       pendingImeContentSyncRef.current = null;
       imeSyncListenerScheduledRef.current = false;
+      if (livePreviewEnabledRef.current) {
+        scheduleLivePreviewMeasure(view);
+      }
       return;
     }
 

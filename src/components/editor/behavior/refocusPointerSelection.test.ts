@@ -2,21 +2,35 @@
 
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createRefocusPointerSelectionExtension,
+  pointerMovedEnoughForDrag,
   refocusPointerTracker,
   resolveRefocusMouseSelectionStyle,
   shouldForceSingleClickSelection,
+  singleClickSelectionStyle,
 } from "./refocusPointerSelection";
 
 describe("shouldForceSingleClickSelection", () => {
-  it("ignores non-left clicks and genuine single clicks", () => {
+  it("ignores non-left clicks", () => {
     expect(
       shouldForceSingleClickSelection(false, { button: 2, detail: 3 }, true),
     ).toBe(false);
+  });
+
+  it("takes over the first click after opening or leaving the editor", () => {
     expect(
-      shouldForceSingleClickSelection(false, { button: 0, detail: 1 }, true),
+      shouldForceSingleClickSelection(false, { button: 0, detail: 1 }, false),
+    ).toBe(true);
+    expect(
+      shouldForceSingleClickSelection(true, { button: 0, detail: 1 }, true),
+    ).toBe(true);
+  });
+
+  it("keeps a focused in-editor single click on the default CM path", () => {
+    expect(
+      shouldForceSingleClickSelection(true, { button: 0, detail: 1 }, false),
     ).toBe(false);
   });
 
@@ -103,5 +117,45 @@ describe("refocus pointer tracker", () => {
     expect(style).not.toBeNull();
     const selection = style!.get(event, false, false);
     expect(selection.main.empty).toBe(true);
+  });
+
+  it("does not treat height-map drift as a drag when the pointer barely moved", () => {
+    const view = mount("alpha\nbeta\ngamma\ndelta\n");
+    const down = new MouseEvent("mousedown", {
+      button: 0,
+      detail: 1,
+      clientX: 12,
+      clientY: 40,
+    });
+    const style = singleClickSelectionStyle(view, down);
+    const coords = vi.spyOn(view, "posAndSideAtCoords");
+    coords
+      .mockImplementationOnce(() => ({ pos: 0, assoc: 1 }))
+      .mockImplementationOnce(() => ({ pos: 18, assoc: 1 }));
+
+    const up = new MouseEvent("mouseup", {
+      button: 0,
+      detail: 1,
+      clientX: 13,
+      clientY: 42,
+    });
+    const selection = style.get(up, false, false);
+    expect(selection.main.empty).toBe(true);
+    expect(selection.main.head).toBe(18);
+  });
+
+  it("keeps a real drag when the pointer moves far enough", () => {
+    expect(
+      pointerMovedEnoughForDrag(
+        { clientX: 10, clientY: 10 },
+        { clientX: 12, clientY: 12 },
+      ),
+    ).toBe(false);
+    expect(
+      pointerMovedEnoughForDrag(
+        { clientX: 10, clientY: 10 },
+        { clientX: 10, clientY: 20 },
+      ),
+    ).toBe(true);
   });
 });

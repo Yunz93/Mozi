@@ -929,8 +929,11 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
     private resizeObserver: ResizeObserver | null = null;
     private lastWidth = 0;
     private raf = 0;
+    private readonly scrollDOM: HTMLElement;
+    private readonly onScroll: () => void;
 
     constructor(view: EditorView) {
+      this.scrollDOM = view.scrollDOM;
       scheduleLivePreviewMeasure(view);
       requestLivePreviewRefresh(view);
       queueMicrotask(() => {
@@ -944,6 +947,19 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
           scheduleLivePreviewMeasure(view);
         });
       }
+
+      this.onScroll = () => {
+        if (this.disposed || !view.dom.isConnected) return;
+        if (this.raf) return;
+        this.raf = window.requestAnimationFrame(() => {
+          this.raf = 0;
+          if (this.disposed || !view.dom.isConnected) return;
+          scheduleLivePreviewMeasure(view);
+        });
+      };
+      this.scrollDOM.addEventListener("scroll", this.onScroll, {
+        passive: true,
+      });
 
       this.lastWidth = view.scrollDOM.clientWidth;
       if (typeof ResizeObserver === "undefined") return;
@@ -967,6 +983,7 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
     destroy() {
       this.disposed = true;
       if (this.raf) window.cancelAnimationFrame(this.raf);
+      this.scrollDOM.removeEventListener("scroll", this.onScroll);
       this.resizeObserver?.disconnect();
       this.resizeObserver = null;
     }

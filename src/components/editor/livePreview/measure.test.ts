@@ -13,6 +13,7 @@ import {
   bindLivePreviewWidgetResizeMeasure,
   cancelPendingLivePreviewReveals,
   isLivePreviewRevealCurrent,
+  livePreviewGeometryRemeasure,
   scheduleLivePreviewMeasure,
   scheduleLivePreviewReveal,
 } from "./shared";
@@ -28,6 +29,26 @@ describe("live preview geometry remasure", () => {
       view?.dom.parentElement?.remove();
     }
     vi.restoreAllMocks();
+  });
+
+  it("remasures after the editor scroller moves", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "hello\n".repeat(40),
+        extensions: [livePreviewGeometryRemeasure],
+      }),
+      parent,
+    });
+    views.push(view);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const spy = vi.spyOn(view, "requestMeasure");
+    view.scrollDOM.dispatchEvent(new Event("scroll"));
+    expect(spy).not.toHaveBeenCalled();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(spy).toHaveBeenCalled();
   });
 
   it("scheduleLivePreviewMeasure coalesces to one rAF requestMeasure", async () => {

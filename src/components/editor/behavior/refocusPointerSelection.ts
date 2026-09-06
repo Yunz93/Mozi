@@ -1,11 +1,19 @@
 /**
- * Clicks on chrome (sidebar, toolbar, page padding) increment the document
- * click count. The next mousedown in CodeMirror then arrives with
- * `event.detail` 2 or 3, which CM treats as word/line selection — the caret
- * jumps and a large range lights up.
+ * Two pointer-selection bugs share this extension:
+ *
+ * 1. Clicks on chrome (sidebar, toolbar, page padding) increment the document
+ *    click count. The next mousedown in CodeMirror then arrives with
+ *    `event.detail` 2 or 3, which CM treats as word/line selection.
+ *
+ * 2. After opening a file the user often scrolls (wheel) before the first
+ *    editor click. Live Preview widgets are still settling, so the height map
+ *    is stale: mousedown `posAtCoords` lands near the document start, then
+ *    mouseup / remasure maps the same pixels to the real click site. CM treats
+ *    that as a drag and selects everything in between.
  *
  * If the previous pointer-down was outside the editor (or the editor is
- * blurred), force a single-click caret/drag instead of inheriting that count.
+ * blurred), force a single-click caret/drag, re-resolve positions from pixel
+ * coordinates, and ignore tiny pointer jitter as a drag.
  */
 
 import { EditorSelection, type Extension } from "@codemirror/state";
@@ -13,7 +21,11 @@ import {
   EditorView,
   ViewPlugin,
   type MouseSelectionStyle,
+  type ViewUpdate,
 } from "@codemirror/view";
+
+/** Pixel movement below this is a click, not a drag — height-map drift is larger. */
+export const CLICK_DRAG_THRESHOLD_PX = 4;
 
 export function shouldForceSingleClickSelection(
   viewHasFocus: boolean,
@@ -21,36 +33,51 @@ export function shouldForceSingleClickSelection(
   previousPointerWasOutsideEditor: boolean,
 ): boolean {
   if (event.button !== 0) return false;
-  if (event.detail <= 1) return false;
   return previousPointerWasOutsideEditor || !viewHasFocus;
 }
 
-function singleClickSelectionStyle(
+export function pointerMovedEnoughForDrag(
+  start: Pick<MouseEvent, "clientX" | "clientY">,
+  current: Pick<MouseEvent, "clientX" | "clientY">,
+): boolean {
+  const dx = current.clientX - start.clientX;
+  const dy = current.clientY - start.clientY;
+  return Math.hypot(dx, dy) >= CLICK_DRAG_THRESHOLD_PX;
+}
+
+export function mouseStyleShouldReselect(update: ViewUpdate): boolean {
+  return update.geometryChanged || update.heightChanged;
+}
+
+function posAtEvent(
+  view: EditorView,
+  event: Pick<MouseEvent, "clientX" | "clientY">,
+): { pos: number; assoc: number } {
+  return view.posAndSideAtCoords({ x: event.clientX, y: event.clientY }, false);
+}
+
+export function singleClickSelectionStyle(
   view: EditorView,
   event: MouseEvent,
 ): MouseSelectionStyle {
-  let start = view.posAndSideAtCoords(
-    { x: event.clientX, y: event.clientY },
-    false,
-  );
+  const startEvent = {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  };
   let startSel = view.state.selection;
   return {
     update(update) {
       if (update.docChanged) {
-        start = {
-          pos: update.changes.mapPos(start.pos),
-          assoc: start.assoc,
-        };
         startSel = startSel.map(update.changes);
       }
+      return mouseStyleShouldReselect(update);
     },
     get(curEvent, extend, multiple) {
-      const cur = view.posAndSideAtCoords(
-        { x: curEvent.clientX, y: curEvent.clientY },
-        false,
-      );
+      const cur = posAtEvent(view, curEvent);
+      const isDrag = pointerMovedEnoughForDrag(startEvent, curEvent);
+      const start = isDrag ? posAtEvent(view, startEvent) : cur;
       const range =
-        start.pos === cur.pos
+        !isDrag || start.pos === cur.pos
           ? EditorSelection.cursor(cur.pos, cur.assoc)
           : EditorSelection.range(start.pos, cur.pos);
       if (extend) {
