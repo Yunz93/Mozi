@@ -606,6 +606,86 @@ describe("useAutoSave", () => {
     expect(writeFile).not.toHaveBeenCalled();
   });
 
+  it("does not treat CRLF disk content as an external change during auto-save", async () => {
+    setupStore(60_000);
+    readFile.mockResolvedValue("original\r\n");
+    useAppStore.setState({
+      fileContents: { [NOTE_ID]: "original\n" },
+      lastSavedContent: { [NOTE_ID]: "original\n" },
+    });
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "edited\n");
+    });
+
+    await act(async () => {
+      await saveHook!.forceSave(undefined, { trigger: "auto" });
+    });
+
+    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, "edited\n");
+  });
+
+  it("lets a system/close save overwrite real disk changes", async () => {
+    setupStore(60_000);
+    readFile.mockResolvedValue("changed-on-disk");
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    act(() => {
+      useAppStore.getState().updateTabContent(NOTE_ID, "edited");
+    });
+
+    await act(async () => {
+      const saved = await saveHook!.forceSave(undefined, { trigger: "system" });
+      expect(saved).toBe(true);
+    });
+
+    expect(writeFile).toHaveBeenCalledWith(NOTE_ID, "edited");
+  });
+
+  it("treats a non-savable active path as a successful no-op save", async () => {
+    const pdfPath = "/vault/doc.pdf";
+    const base = useAppStore.getState();
+    useAppStore.setState({
+      files: [],
+      openTabs: [pdfPath],
+      activeTabId: pdfPath,
+      currentFilePath: pdfPath,
+      fileContents: { [pdfPath]: "" },
+      lastSavedContent: { [pdfPath]: "stale" },
+      settings: { ...base.settings, autoSaveInterval: 60_000 },
+    });
+    let saveHook: ReturnType<typeof useAutoSave>;
+
+    function SaveHarness() {
+      saveHook = useAutoSave({ debounceMs: 60_000, enabled: true });
+      return null;
+    }
+
+    render(<SaveHarness />);
+
+    await act(async () => {
+      const saved = await saveHook!.forceSave(undefined, { trigger: "system" });
+      expect(saved).toBe(true);
+    });
+
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
   it("does not overwrite disk changes during auto-save and writes a draft", async () => {
     setupStore(60_000);
     readFile.mockResolvedValue("changed-on-disk");

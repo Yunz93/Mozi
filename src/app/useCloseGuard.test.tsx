@@ -40,7 +40,7 @@ vi.mock("../utils/editorSelectionBridge", () => ({
   flushActiveEditorPendingChanges: vi.fn(),
 }));
 
-import { useCloseGuard } from "./useCloseGuard";
+import { completeAppClose, useCloseGuard } from "./useCloseGuard";
 
 const NOTE_ID = "/vault/note.md";
 
@@ -80,6 +80,7 @@ describe("useCloseGuard", () => {
       fileContents: { [NOTE_ID]: "edited" },
       lastSavedContent: { [NOTE_ID]: "saved" },
       settings: defaultSettings,
+      pendingCloseDespiteSaveFailure: null,
     });
   });
 
@@ -90,7 +91,14 @@ describe("useCloseGuard", () => {
       fileContents: {},
       lastSavedContent: {},
       settings: defaultSettings,
+      pendingCloseDespiteSaveFailure: null,
     });
+  });
+
+  it("destroys the window after the user discards unsaved changes", async () => {
+    await completeAppClose("window");
+    expect(destroyMock).toHaveBeenCalledTimes(1);
+    expect(exitMock).not.toHaveBeenCalled();
   });
 
   it("force-saves dirty tabs then destroys the window", async () => {
@@ -112,10 +120,13 @@ describe("useCloseGuard", () => {
     });
   });
 
-  it("does not destroy when forceSave fails and shows a notification", async () => {
+  it("does not destroy when forceSave fails and asks to discard and close", async () => {
     const forceSave = vi.fn(async () => false);
     const showNotification = vi.fn();
-    useAppStore.setState({ showNotification });
+    useAppStore.setState({
+      showNotification,
+      pendingCloseDespiteSaveFailure: null,
+    });
 
     render(<Harness forceSave={forceSave} />);
     await waitFor(() => {
@@ -131,6 +142,33 @@ describe("useCloseGuard", () => {
       expect(showNotification).toHaveBeenCalled();
     });
     expect(destroyMock).not.toHaveBeenCalled();
+    expect(useAppStore.getState().pendingCloseDespiteSaveFailure).toBe(
+      "window",
+    );
+  });
+
+  it("closes without saving when the only difference is CRLF vs LF", async () => {
+    useAppStore.setState({
+      fileContents: { [NOTE_ID]: "# Title\n\nBody\n" },
+      lastSavedContent: { [NOTE_ID]: "# Title\r\n\r\nBody\r\n" },
+    });
+    const forceSave = vi.fn(async () => false);
+
+    render(<Harness forceSave={forceSave} />);
+    await waitFor(() => {
+      expect(closeListener).not.toBeNull();
+    });
+
+    await act(async () => {
+      closeListener?.({ payload: "window" });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(destroyMock).toHaveBeenCalledTimes(1);
+    });
+    expect(forceSave).not.toHaveBeenCalled();
+    expect(useAppStore.getState().pendingCloseDespiteSaveFailure).toBeNull();
   });
 
   it("destroys immediately when there are no dirty tabs", async () => {

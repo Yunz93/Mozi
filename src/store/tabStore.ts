@@ -1,3 +1,5 @@
+import { sameDocumentText } from "../utils/documentText";
+
 /**
  * Document buffer state (single open document).
  * `openTabs` is kept as a 0-or-1 array so path remaps and legacy call sites
@@ -179,7 +181,8 @@ export function createTabSlice(
       const content = state.fileContents[fileId];
       const saved = state.lastSavedContent[fileId];
       if (content === undefined) return false;
-      return content !== saved;
+      if (saved === undefined) return true;
+      return !sameDocumentText(content, saved);
     },
   };
 }

@@ -195,6 +195,14 @@ describe("tab saved baseline", () => {
     expect(useAppStore.getState().hasUnsavedChanges(fileId)).toBe(false);
   });
 
+  it("does not treat CRLF vs LF as unsaved changes", () => {
+    const fileId = "/vault/crlf.md";
+    useAppStore.getState().addTab(fileId, "# Title\r\n\r\nBody\r\n");
+    useAppStore.getState().updateTabContent(fileId, "# Title\n\nBody\n");
+
+    expect(useAppStore.getState().hasUnsavedChanges(fileId)).toBe(false);
+  });
+
   it("replaces the previous open document instead of stacking tabs", () => {
     useAppStore.getState().addTab("/vault/a.md", "A");
     useAppStore.getState().addTab("/vault/b.md", "B");

@@ -222,6 +222,7 @@ export const useAppStore = create<AppState>()(
             mergedSettings.defaultViewMode,
           ),
           viewModeBeforePreviewOnly: null,
+          pendingCloseDespiteSaveFailure: null,
         };
       },
     },
