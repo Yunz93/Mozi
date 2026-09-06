@@ -29,17 +29,46 @@ function backupDirtyOpenTabs(): void {
   }
 }
 
+async function invokeForceClose(source: CloseRequestSource): Promise<void> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  if (source === "exit") {
+    await invoke("force_exit_app");
+    return;
+  }
+  await invoke("force_close_window");
+}
+
 export async function completeAppClose(
   source: CloseRequestSource,
 ): Promise<void> {
-  if (source === "exit") {
-    const { exit } = await import("@tauri-apps/plugin-process");
-    await exit(0);
-    return;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("allow_next_window_close");
+  } catch {
+    // Command may be missing on older builds; keep trying JS close paths.
   }
 
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  await getCurrentWindow().destroy();
+  try {
+    if (source === "exit") {
+      const { exit } = await import("@tauri-apps/plugin-process");
+      await exit(0);
+      return;
+    }
+
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().destroy();
+    return;
+  } catch (error) {
+    console.warn("Primary close path failed, forcing shutdown:", error);
+  }
+
+  try {
+    await invokeForceClose(source);
+  } catch (error) {
+    console.error("Forced close failed:", error);
+    const { exit } = await import("@tauri-apps/plugin-process");
+    await exit(0);
+  }
 }
 
 function requestCloseDespiteSaveFailure(source: CloseRequestSource): void {

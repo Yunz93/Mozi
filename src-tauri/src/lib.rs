@@ -13,6 +13,7 @@ use secure_settings::{get_secure_settings, set_secure_secret};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
@@ -290,6 +291,27 @@ async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     create_empty_window(app).await
 }
 
+/// When the frontend has already flushed (or the user discarded), the next
+/// CloseRequested must not `prevent_close` again — otherwise `destroy()` /
+/// `close()` bounce back into the JS save dialog and the window never dies.
+static ALLOW_NEXT_WINDOW_CLOSE: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+fn allow_next_window_close() {
+    ALLOW_NEXT_WINDOW_CLOSE.store(true, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn force_close_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    ALLOW_NEXT_WINDOW_CLOSE.store(true, Ordering::SeqCst);
+    window.destroy().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn force_exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 fn persist_window_state(app: &tauri::AppHandle) {
     use tauri_plugin_window_state::{AppHandleExt, StateFlags};
     if let Err(error) = app.save_window_state(StateFlags::all()) {
@@ -373,14 +395,20 @@ pub fn run() {
             upload_image_to_hosting,
             check_macos_update,
             install_macos_update,
-            write_text_file_atomic
+            write_text_file_atomic,
+            allow_next_window_close,
+            force_close_window,
+            force_exit_app
         ])
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
+                    persist_window_state(window.app_handle());
+                    if ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst) {
+                        return;
+                    }
                     // 插件默认只在 RunEvent::Exit 落盘；本应用会 preventClose
                     // 再 destroy，必须在 CloseRequested 时显式保存。
-                    persist_window_state(window.app_handle());
                     // 只通知被关闭的那个窗口自己去刷盘并 destroy；
                     // 用 emit 会广播到所有窗口，导致其它窗口也把自己关掉。
                     api.prevent_close();
@@ -828,6 +856,41 @@ mod tests {
         assert!(!leftover_tmp, "temporary file should be removed after rename");
 
         cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn allow_next_window_close_is_consumed_once() {
+        ALLOW_NEXT_WINDOW_CLOSE.store(false, Ordering::SeqCst);
+        allow_next_window_close();
+        assert!(
+            ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst),
+            "the first CloseRequested after allow must proceed"
+        );
+        assert!(
+            !ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst),
+            "later CloseRequested events must be intercepted again"
+        );
+    }
+
+    #[test]
+    fn close_commands_are_registered_and_honor_allow_flag() {
+        let src = include_str!("lib.rs");
+        assert!(
+            src.contains("allow_next_window_close,"),
+            "frontend must be able to mark the next close as intentional"
+        );
+        assert!(
+            src.contains("force_close_window,"),
+            "frontend must have a rust-side destroy fallback"
+        );
+        assert!(
+            src.contains("force_exit_app"),
+            "frontend must have a rust-side exit fallback"
+        );
+        assert!(
+            src.contains("if ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst)"),
+            "CloseRequested must skip prevent_close after a successful flush/discard"
+        );
     }
 
     #[test]

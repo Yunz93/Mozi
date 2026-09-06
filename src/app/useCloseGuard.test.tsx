@@ -5,17 +5,21 @@ import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultSettings, useAppStore } from "../store/appStore";
 
-const { listenMock, destroyMock, exitMock, flushAllDirtyMock } = vi.hoisted(
-  () => ({
+const { listenMock, destroyMock, exitMock, flushAllDirtyMock, invokeMock } =
+  vi.hoisted(() => ({
     listenMock: vi.fn(),
     destroyMock: vi.fn(async () => {}),
     exitMock: vi.fn(async () => {}),
     flushAllDirtyMock: vi.fn(async () => true),
-  }),
-);
+    invokeMock: vi.fn(async () => {}),
+  }));
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: listenMock,
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: invokeMock,
 }));
 
 vi.mock("@tauri-apps/api/window", () => ({
@@ -71,7 +75,11 @@ describe("useCloseGuard", () => {
       },
     );
     destroyMock.mockClear();
+    destroyMock.mockResolvedValue(undefined);
     exitMock.mockClear();
+    exitMock.mockResolvedValue(undefined);
+    invokeMock.mockClear();
+    invokeMock.mockResolvedValue(undefined);
     flushAllDirtyMock.mockClear();
     flushAllDirtyMock.mockResolvedValue(true);
     useAppStore.setState({
@@ -97,8 +105,42 @@ describe("useCloseGuard", () => {
 
   it("destroys the window after the user discards unsaved changes", async () => {
     await completeAppClose("window");
+    expect(invokeMock).toHaveBeenCalledWith("allow_next_window_close");
     expect(destroyMock).toHaveBeenCalledTimes(1);
     expect(exitMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalledWith("force_close_window");
+  });
+
+  it("exits the process when the close source is exit", async () => {
+    await completeAppClose("exit");
+    expect(invokeMock).toHaveBeenCalledWith("allow_next_window_close");
+    expect(exitMock).toHaveBeenCalledWith(0);
+    expect(destroyMock).not.toHaveBeenCalled();
+  });
+
+  it("force-closes via rust when javascript destroy is denied", async () => {
+    destroyMock.mockRejectedValueOnce(new Error("destroy not allowed"));
+    await completeAppClose("window");
+    expect(destroyMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledWith("force_close_window");
+    expect(exitMock).not.toHaveBeenCalled();
+  });
+
+  it("exits the process when rust force-close also fails", async () => {
+    destroyMock.mockRejectedValueOnce(new Error("destroy not allowed"));
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "force_close_window") {
+        throw new Error("force close failed");
+      }
+    });
+    await completeAppClose("window");
+    expect(exitMock).toHaveBeenCalledWith(0);
+  });
+
+  it("force-exits via rust when javascript exit is denied", async () => {
+    exitMock.mockRejectedValueOnce(new Error("exit not allowed"));
+    await completeAppClose("exit");
+    expect(invokeMock).toHaveBeenCalledWith("force_exit_app");
   });
 
   it("force-saves dirty tabs then destroys the window", async () => {
