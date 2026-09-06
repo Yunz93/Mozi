@@ -128,10 +128,12 @@ describe("refocus pointer tracker", () => {
       clientY: 40,
     });
     const style = singleClickSelectionStyle(view, down);
-    const coords = vi.spyOn(view, "posAndSideAtCoords");
-    coords
-      .mockImplementationOnce(() => ({ pos: 0, assoc: 1 }))
-      .mockImplementationOnce(() => ({ pos: 18, assoc: 1 }));
+    // Stale mousedown mapping would have been 0; after remasure the same
+    // pixels resolve to 18. A 2px mouseup must stay a caret, not 0–18.
+    vi.spyOn(view, "posAndSideAtCoords").mockReturnValue({
+      pos: 18,
+      assoc: 1,
+    });
 
     const up = new MouseEvent("mouseup", {
       button: 0,
