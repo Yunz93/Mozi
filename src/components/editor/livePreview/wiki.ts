@@ -53,8 +53,8 @@ import {
   bindLivePreviewImageMeasure,
   bindLivePreviewImageErrorRetry,
   bindLivePreviewMediaMeasure,
-  bindLivePreviewWidgetCaret,
-  bindLivePreviewClickToReveal,
+  bindLivePreviewWidgetCaretAtDom,
+  bindLivePreviewClickToRevealRange,
   bindLivePreviewWidgetResizeMeasure,
   resolveLivePreviewCachedImageSrc,
   scheduleLivePreviewMeasure,
@@ -178,12 +178,7 @@ class WikiImageWidget extends WidgetType {
     }
     wrap.appendChild(img);
 
-    bindLivePreviewClickToReveal(view, wrap, () => {
-      view.dispatch({
-        selection: { anchor: this.from, head: this.to },
-        scrollIntoView: false,
-      });
-    });
+    bindLivePreviewClickToRevealRange(view, wrap, this.from, this.to);
 
     return wrap;
   }
@@ -243,7 +238,7 @@ class WikiNoteEmbedWidget extends WidgetType {
     }
 
     bindLivePreviewWidgetResizeMeasure(view, wrap);
-    bindLivePreviewWidgetCaret(view, wrap, this.from);
+    bindLivePreviewWidgetCaretAtDom(view, wrap);
     return wrap;
   }
 

@@ -15,11 +15,13 @@ interface PendingEditorFocusRequest {
   start: number;
   end: number;
   options?: FocusOptions;
+  gestureGeneration: number;
 }
 
 const EDITOR_FOCUS_RETRY_DELAYS_MS = [16, 64, 180, 360];
 let pendingEditorFocusRequest: PendingEditorFocusRequest | null = null;
 let pendingEditorFocusRetryTimers: number[] = [];
+let editorUserGestureGeneration = 0;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -66,6 +68,13 @@ function applyEditorRangeFocus(
 
 function tryFlushPendingEditorFocus(): boolean {
   if (!pendingEditorFocusRequest) return false;
+  if (
+    pendingEditorFocusRequest.gestureGeneration !== editorUserGestureGeneration
+  ) {
+    clearPendingEditorFocusRetries();
+    pendingEditorFocusRequest = null;
+    return false;
+  }
   if (
     pendingEditorFocusRequest.tabId != null &&
     activeEditorTabId != null &&
@@ -196,6 +205,7 @@ export function requestEditorRangeFocus(
     start,
     end,
     options,
+    gestureGeneration: editorUserGestureGeneration,
   };
 
   const didFocus = tryFlushPendingEditorFocus();
@@ -219,4 +229,14 @@ export function requestEditorRangeFocus(
 export function clearPendingEditorRangeFocus(): void {
   clearPendingEditorFocusRetries();
   pendingEditorFocusRequest = null;
+}
+
+/**
+ * User started interacting with the editor (pointer or key). Drop any
+ * outline/search jump that has not applied yet so a late retry cannot yank
+ * the caret after the user has already placed it.
+ */
+export function noteEditorUserGesture(): void {
+  editorUserGestureGeneration += 1;
+  clearPendingEditorRangeFocus();
 }

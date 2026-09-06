@@ -184,7 +184,13 @@ class MermaidWidget extends WidgetType {
       event.preventDefault();
       event.stopPropagation();
       if (wrap.getAttribute("data-mermaid-status") === "error") return;
-      const pos = Math.max(0, Math.min(this.from, view.state.doc.length));
+      let pos: number;
+      try {
+        pos = view.posAtDOM(wrap);
+      } catch {
+        return;
+      }
+      pos = Math.max(0, Math.min(pos, view.state.doc.length));
       view.focus();
       view.dispatch({
         selection: { anchor: pos },

@@ -136,4 +136,7 @@ export {
   cancelPendingLivePreviewReveals,
   livePreviewGeometryRemeasure,
   bindLivePreviewClickToReveal,
+  bindLivePreviewClickToRevealRange,
+  posAtClientPoint,
+  resolveWidgetDocRange,
 } from "./shared";

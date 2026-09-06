@@ -2,22 +2,34 @@
 
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createRefocusPointerSelectionExtension,
+  pointerMovedEnoughForDrag,
   refocusPointerTracker,
   resolveRefocusMouseSelectionStyle,
   shouldForceSingleClickSelection,
+  singleClickSelectionStyle,
 } from "./refocusPointerSelection";
+import { setEditorPointerSelecting } from "../livePreview/shared";
 
 describe("shouldForceSingleClickSelection", () => {
-  it("ignores non-left clicks and genuine single clicks", () => {
+  it("ignores non-left clicks", () => {
     expect(
       shouldForceSingleClickSelection(false, { button: 2, detail: 3 }, true),
     ).toBe(false);
+  });
+
+  it("takes over every single left click, including a focused in-editor click", () => {
     expect(
-      shouldForceSingleClickSelection(false, { button: 0, detail: 1 }, true),
-    ).toBe(false);
+      shouldForceSingleClickSelection(true, { button: 0, detail: 1 }, false),
+    ).toBe(true);
+    expect(
+      shouldForceSingleClickSelection(false, { button: 0, detail: 1 }, false),
+    ).toBe(true);
+    expect(
+      shouldForceSingleClickSelection(true, { button: 0, detail: 1 }, true),
+    ).toBe(true);
   });
 
   it("treats a multi-click after chrome / blur as a single caret click", () => {
@@ -43,6 +55,7 @@ describe("refocus pointer tracker", () => {
   const views: EditorView[] = [];
 
   afterEach(() => {
+    setEditorPointerSelecting(false);
     while (views.length) {
       const view = views.pop();
       view?.destroy();
@@ -103,5 +116,62 @@ describe("refocus pointer tracker", () => {
     expect(style).not.toBeNull();
     const selection = style!.get(event, false, false);
     expect(selection.main.empty).toBe(true);
+  });
+
+  it("uses the pixel-stable style for a focused in-editor single click", () => {
+    const view = mount();
+    view.focus();
+    const event = new MouseEvent("mousedown", {
+      button: 0,
+      detail: 1,
+      bubbles: true,
+      cancelable: true,
+      clientX: 8,
+      clientY: 8,
+    });
+    const style = resolveRefocusMouseSelectionStyle(view, event, false);
+    expect(style).not.toBeNull();
+  });
+
+  it("does not treat height-map drift as a drag when the pointer barely moved", () => {
+    const view = mount("alpha\nbeta\ngamma\ndelta\n");
+    const down = new MouseEvent("mousedown", {
+      button: 0,
+      detail: 1,
+      clientX: 12,
+      clientY: 40,
+    });
+    const style = singleClickSelectionStyle(view, down);
+    // Stale mousedown mapping would have been 0; after remasure the same
+    // pixels resolve to 18. A 2px mouseup must stay a caret, not 0–18.
+    vi.spyOn(view, "posAndSideAtCoords").mockReturnValue({
+      pos: 18,
+      assoc: 1,
+    });
+
+    const up = new MouseEvent("mouseup", {
+      button: 0,
+      detail: 1,
+      clientX: 13,
+      clientY: 42,
+    });
+    const selection = style.get(up, false, false);
+    expect(selection.main.empty).toBe(true);
+    expect(selection.main.head).toBe(18);
+  });
+
+  it("keeps a real drag when the pointer moves far enough", () => {
+    expect(
+      pointerMovedEnoughForDrag(
+        { clientX: 10, clientY: 10 },
+        { clientX: 12, clientY: 12 },
+      ),
+    ).toBe(false);
+    expect(
+      pointerMovedEnoughForDrag(
+        { clientX: 10, clientY: 10 },
+        { clientX: 10, clientY: 20 },
+      ),
+    ).toBe(true);
   });
 });

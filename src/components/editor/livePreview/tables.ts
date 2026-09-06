@@ -373,7 +373,17 @@ class TableWidget extends WidgetType {
       const target = event.target as HTMLElement | null;
       if (target?.closest?.("th, td")) return;
       event.preventDefault();
-      this.activateCell(view, 0, 0, null);
+      event.stopPropagation();
+      try {
+        const pos = view.posAtDOM(wrap);
+        view.focus();
+        view.dispatch({
+          selection: { anchor: pos },
+          scrollIntoView: false,
+        });
+      } catch {
+        // Keep the current caret if the widget is mid-detach.
+      }
     });
 
     return wrap;

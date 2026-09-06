@@ -71,6 +71,7 @@ import {
   resolveAttachmentTarget,
 } from "../../utils/attachmentResolver";
 import { buildWikiPreviewMarkup } from "../../utils/wikiPreviewMarkup";
+import { posAtClientPoint } from "./livePreview/shared";
 import { countLines, LARGE_FILE_THRESHOLDS } from "../../utils/performance";
 import {
   findLocalImageAtPos,
@@ -269,10 +270,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
     const handleSelectionContextMenu = useCallback(
       (event: MouseEvent, view: EditorView) => {
-        const clickPos = view.posAtCoords({
-          x: event.clientX,
-          y: event.clientY,
-        });
+        const clickPos = posAtClientPoint(view, event.clientX, event.clientY);
         const selection = view.state.selection.main;
 
         if (clickPos != null) {
@@ -710,7 +708,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           return;
         }
 
-        const pos = view.posAtCoords({ x: clientX, y: clientY });
+        const pos = posAtClientPoint(view, clientX, clientY);
         if (pos == null) {
           hideHoverPreview();
           return;

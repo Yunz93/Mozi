@@ -17,7 +17,7 @@ import {
   hasSkipAncestor,
   selectionTouchesRange,
   bindLivePreviewMediaMeasure,
-  bindLivePreviewWidgetCaret,
+  bindLivePreviewWidgetCaretAtDom,
   bindLivePreviewWidgetResizeMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
@@ -129,7 +129,7 @@ class CalloutWidget extends WidgetType {
     }
 
     bindLivePreviewWidgetResizeMeasure(view, wrap);
-    bindLivePreviewWidgetCaret(view, wrap, this.from);
+    bindLivePreviewWidgetCaretAtDom(view, wrap);
     return wrap;
   }
 
@@ -150,7 +150,7 @@ class HorizontalRuleWidget extends WidgetType {
   toDOM(view: EditorView) {
     const hr = document.createElement("hr");
     hr.className = "cm-live-preview-hr";
-    bindLivePreviewWidgetCaret(view, hr, this.from);
+    bindLivePreviewWidgetCaretAtDom(view, hr);
     return hr;
   }
 

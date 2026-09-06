@@ -697,6 +697,25 @@ describe("live preview hide formatting", () => {
     ]);
   });
 
+  it("does not force cell 0,0 when clicking table chrome", () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const away = doc.length - 1;
+    const view = mount(doc, away, [livePreviewTables]);
+    const wrap = view.dom.querySelector(
+      ".cm-live-preview-table-wrap",
+    ) as HTMLElement | null;
+    expect(wrap).not.toBeNull();
+
+    wrap!.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+
+    expect(
+      view.dom.querySelector(".cm-live-preview-table-cell-editing"),
+    ).toBeNull();
+    expect(view.state.selection.main.empty).toBe(true);
+  });
+
   it("escapes pipes and newlines when committing a live table cell", async () => {
     const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
     const view = mount(doc, doc.length - 1, [livePreviewTables]);

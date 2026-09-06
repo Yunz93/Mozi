@@ -41,7 +41,7 @@ import {
   bindLivePreviewImageMeasure,
   bindLivePreviewImageErrorRetry,
   scheduleLivePreviewMeasure,
-  bindLivePreviewClickToReveal,
+  bindLivePreviewClickToRevealRange,
   resolveLivePreviewCachedImageSrc,
 } from "./shared";
 
@@ -150,13 +150,7 @@ class MarkdownImageWidget extends WidgetType {
     }
     wrap.appendChild(img);
 
-    bindLivePreviewClickToReveal(view, wrap, () => {
-      // 选中整段 `![alt](url)`，让 replace widget 卸下，并完整选中图片链接文本。
-      view.dispatch({
-        selection: { anchor: this.from, head: this.to },
-        scrollIntoView: false,
-      });
-    });
+    bindLivePreviewClickToRevealRange(view, wrap, this.from, this.to);
 
     return wrap;
   }
