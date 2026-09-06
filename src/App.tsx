@@ -998,6 +998,7 @@ const App: React.FC = () => {
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
+            onOpenSettings={() => setSettingsOpen(true)}
             disableOpenKnowledgeBase={standaloneDocumentSession}
             isOpen={isSidebarOpen}
             searchFocusRequestKey={sidebarSearchRequestKey}
