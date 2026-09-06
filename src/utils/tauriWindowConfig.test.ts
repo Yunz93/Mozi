@@ -24,6 +24,7 @@ type TauriConfig = {
 
 type TauriCapabilityConfig = {
   windows?: string[];
+  permissions?: string[];
 };
 
 const MAIN_WINDOW_CHROME_KEYS = [
@@ -191,5 +192,12 @@ describe("Tauri window config", () => {
     expect(capability.windows).toContain("main");
     expect(capability.windows).toContain("file-*");
     expect(capability.windows).toContain("win-*");
+    expect(capability.permissions).toEqual(
+      expect.arrayContaining([
+        "core:window:allow-close",
+        "core:window:allow-destroy",
+        "process:allow-exit",
+      ]),
+    );
   });
 });

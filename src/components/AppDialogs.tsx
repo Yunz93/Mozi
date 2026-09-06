@@ -253,8 +253,15 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         onClose={() => setPendingCloseDespiteSaveFailure(null)}
         onConfirm={() => {
           const source = pendingCloseDespiteSaveFailure ?? "window";
-          setPendingCloseDespiteSaveFailure(null);
-          void completeAppClose(source);
+          void completeAppClose(source).catch((error) => {
+            console.error(
+              "Failed to close after discarding unsaved changes:",
+              error,
+            );
+            // ConfirmDialog closes itself after confirm; restore the prompt if
+            // every close path still failed so the user is not stuck silently.
+            useAppStore.getState().setPendingCloseDespiteSaveFailure(source);
+          });
         }}
         title={tr("tab_closeSaveFailedTitle")}
         message={tr("tab_closeSaveFailedMessage")}
