@@ -10,9 +10,13 @@ import {
   bindLivePreviewClickToReveal,
   bindLivePreviewImageMeasure,
   bindLivePreviewWidgetCaret,
+  bindLivePreviewWidgetCaretAtDom,
   bindLivePreviewWidgetResizeMeasure,
   cancelPendingLivePreviewReveals,
   isLivePreviewRevealCurrent,
+  livePreviewGeometryRemeasure,
+  posAtClientPoint,
+  resolveWidgetDocRange,
   scheduleLivePreviewMeasure,
   scheduleLivePreviewReveal,
 } from "./shared";
@@ -28,6 +32,26 @@ describe("live preview geometry remasure", () => {
       view?.dom.parentElement?.remove();
     }
     vi.restoreAllMocks();
+  });
+
+  it("remasures after the editor scroller moves", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "hello\n".repeat(40),
+        extensions: [livePreviewGeometryRemeasure],
+      }),
+      parent,
+    });
+    views.push(view);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const spy = vi.spyOn(view, "requestMeasure");
+    view.scrollDOM.dispatchEvent(new Event("scroll"));
+    expect(spy).not.toHaveBeenCalled();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(spy).toHaveBeenCalled();
   });
 
   it("scheduleLivePreviewMeasure coalesces to one rAF requestMeasure", async () => {
@@ -227,6 +251,64 @@ describe("live preview click-to-reveal races", () => {
 
     expect(view.state.selection.main.empty).toBe(true);
     expect(view.state.selection.main.head).toBe(8);
+  });
+
+  it("does not yank the caret when posAtDOM cannot resolve a widget", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "one\ntwo\nthree",
+        selection: { anchor: 0, head: 3 },
+      }),
+      parent,
+    });
+    views.push(view);
+
+    const el = document.createElement("div");
+    parent.appendChild(el);
+    bindLivePreviewWidgetCaretAtDom(view, el);
+    vi.spyOn(view, "posAtDOM").mockImplementation(() => {
+      throw new Error("detached");
+    });
+
+    el.dispatchEvent(
+      new MouseEvent("mousedown", {
+        button: 0,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+    expect(view.state.selection.main.from).toBe(0);
+    expect(view.state.selection.main.to).toBe(3);
+  });
+
+  it("resolves a widget range from posAtDOM plus the source length", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({ doc: "abcdefghij" }),
+      parent,
+    });
+    views.push(view);
+    const el = document.createElement("div");
+    parent.appendChild(el);
+    vi.spyOn(view, "posAtDOM").mockReturnValue(4);
+    expect(resolveWidgetDocRange(view, el, 0, 3)).toEqual({ from: 4, to: 7 });
+  });
+
+  it("falls back to posAtCoords when the browser has no caret-from-point API", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({ doc: "abcdefghij" }),
+      parent,
+    });
+    views.push(view);
+    const spy = vi.spyOn(view, "posAtCoords").mockReturnValue(6);
+    expect(posAtClientPoint(view, 12, 20)).toBe(6);
+    expect(spy).toHaveBeenCalledWith({ x: 12, y: 20 });
   });
 
   it("does not move the caret on mousedown; click reveals after timeout", async () => {

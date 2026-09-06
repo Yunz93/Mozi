@@ -7,7 +7,11 @@ import type { EditorView } from "@codemirror/view";
 import { collectMarkdownLinkRanges } from "../../../utils/markdownInlineRanges";
 import { parseWikiLinkReference } from "../../../utils/wikiLinks";
 import { livePreviewContextFacet } from "./context";
-import { collectWikiLinkRanges, hasSkipAncestor } from "./shared";
+import {
+  collectWikiLinkRanges,
+  hasSkipAncestor,
+  posAtClientPoint,
+} from "./shared";
 
 export type ClickableEditorLink =
   | { kind: "href"; href: string }
@@ -103,7 +107,12 @@ export function bindLivePreviewWidgetModClick(
     event.preventDefault();
     event.stopPropagation();
     if (isModMouseEvent(event)) return;
-    const pos = Math.max(0, Math.min(from, view.state.doc.length));
+    let pos: number;
+    try {
+      pos = view.posAtDOM(el);
+    } catch {
+      pos = Math.max(0, Math.min(from, view.state.doc.length));
+    }
     view.focus();
     view.dispatch({
       selection: { anchor: pos },
@@ -157,7 +166,7 @@ export function tryOpenLivePreviewLinkOnModClick(
   view: EditorView,
 ): boolean {
   if (!isModMouseEvent(event)) return false;
-  const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+  const pos = posAtClientPoint(view, event.clientX, event.clientY);
   if (pos == null) return false;
   if (!tryOpenLivePreviewLinkAtPos(view, pos)) return false;
   event.preventDefault();

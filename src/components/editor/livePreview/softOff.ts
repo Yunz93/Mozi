@@ -9,7 +9,7 @@ import {
   isHeavyLivePreviewState,
   isLargeEditorState,
 } from "../hooks/codeMirrorHelpers";
-import { bindLivePreviewWidgetCaret } from "./shared";
+import { bindLivePreviewWidgetCaretAtDom } from "./shared";
 import { useAppStore } from "../../../store/appStore";
 import { t, type TranslationKey } from "../../../utils/i18n";
 
@@ -115,7 +115,7 @@ export class SoftOffPlaceholderWidget extends WidgetType {
     wrap.appendChild(hint);
 
     if (this.from != null) {
-      bindLivePreviewWidgetCaret(view, wrap, this.from);
+      bindLivePreviewWidgetCaretAtDom(view, wrap);
     }
 
     return wrap;

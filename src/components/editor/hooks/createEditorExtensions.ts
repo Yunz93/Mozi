@@ -59,7 +59,7 @@ import {
   createLivePreviewPluginExtensions,
 } from "../livePreview";
 import type { LivePreviewContext } from "../livePreview";
-import { clearPendingEditorRangeFocus } from "../../../utils/editorSelectionBridge";
+import { noteEditorUserGesture } from "../../../utils/editorSelectionBridge";
 import { tryOpenLivePreviewLinkOnModClick } from "../livePreview/clickableLinks";
 import { cancelPendingLivePreviewReveals } from "../livePreview/shared";
 import type { OrderedListMode, ThemeMode } from "../../../types";
@@ -246,7 +246,7 @@ export function createEditorExtensions(
       mousedown: (event, view) => {
         // User intent wins over stale outline/search focus requests and
         // deferred Live Preview image/wiki click-to-reveal selections.
-        clearPendingEditorRangeFocus();
+        noteEditorUserGesture();
         cancelPendingLivePreviewReveals();
         if (tryOpenLivePreviewLinkOnModClick(event, view)) {
           return true;
@@ -305,6 +305,15 @@ export function createEditorExtensions(
         return false;
       },
       keydown: (event) => {
+        const isModifierOnly =
+          event.key === "Shift" ||
+          event.key === "Control" ||
+          event.key === "Alt" ||
+          event.key === "Meta";
+        if (!isModifierOnly) {
+          noteEditorUserGesture();
+          cancelPendingLivePreviewReveals();
+        }
         const isSaveShortcut =
           (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s";
         if (isSaveShortcut) {

@@ -20,7 +20,7 @@ import {
   rangesOverlap,
   selectionTouchesRange,
   scheduleLivePreviewMeasure,
-  bindLivePreviewWidgetCaret,
+  bindLivePreviewWidgetCaretAtDom,
   bindLivePreviewWidgetResizeMeasure,
   type BlockDecorationBuild,
   type CoverageRange,
@@ -150,7 +150,7 @@ class MathWidget extends WidgetType {
       : "cm-live-preview-math is-inline";
     wrap.setAttribute("contenteditable", "false");
     wrap.innerHTML = this.html;
-    bindLivePreviewWidgetCaret(view, wrap, this.from);
+    bindLivePreviewWidgetCaretAtDom(view, wrap);
     queueMicrotask(() => scheduleLivePreviewMeasure(view));
     if (typeof document !== "undefined" && document.fonts?.ready) {
       void document.fonts.ready.then(() => scheduleLivePreviewMeasure(view));

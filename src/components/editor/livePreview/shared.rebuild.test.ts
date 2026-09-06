@@ -1,11 +1,12 @@
 /** @vitest-environment happy-dom */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
   livePreviewShouldRebuild,
   selectionAffectsCoverage,
+  setEditorPointerSelecting,
   shouldRebuildLivePreviewDecorations,
   ViewportDecorationWindow,
   getLivePreviewDecorationRange,
@@ -13,6 +14,10 @@ import {
 } from "./shared";
 
 describe("livePreviewShouldRebuild", () => {
+  afterEach(() => {
+    setEditorPointerSelecting(false);
+  });
+
   it("rebuilds marks on any selection change, but not widgets on same-line caret moves", () => {
     const start = EditorState.create({
       doc: "hello world\n\nmore",
@@ -52,6 +57,31 @@ describe("livePreviewShouldRebuild", () => {
       state: view.state,
     } as never;
     expect(livePreviewShouldRebuild(shim, "widgets")).toBe(true);
+    view.destroy();
+    parent.remove();
+  });
+
+  it("skips mark rebuilds while a pointer gesture is in progress", () => {
+    const start = EditorState.create({
+      doc: "hello **world**\n\nmore",
+      selection: { anchor: 1 },
+    });
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({ state: start, parent });
+    view.dispatch({ selection: { anchor: 10 } });
+    setEditorPointerSelecting(true);
+    const shim = {
+      docChanged: false,
+      viewportChanged: false,
+      selectionSet: true,
+      startState: start,
+      state: view.state,
+    } as never;
+    expect(livePreviewShouldRebuild(shim, "marks")).toBe(false);
+    expect(livePreviewShouldRebuild(shim, "widgets")).toBe(false);
+    setEditorPointerSelecting(false);
+    expect(livePreviewShouldRebuild(shim, "marks")).toBe(true);
     view.destroy();
     parent.remove();
   });

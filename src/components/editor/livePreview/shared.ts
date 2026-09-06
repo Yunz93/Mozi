@@ -195,6 +195,36 @@ export function livePreviewContextChanged(update: ViewUpdate): boolean {
  * {@link ViewportDecorationWindow} so decorations only rebuild when the
  * visible range escapes a padded window (avoids per-frame scroll jank).
  */
+/**
+ * True while a left-button gesture is active inside the editor. Hide-marks
+ * rebuilds are deferred until mouseup so `**` / headings do not shift layout
+ * mid-click and turn a caret into a drag.
+ */
+let editorPointerSelecting = false;
+let pendingMarkRefreshAfterPointer = false;
+
+export function isEditorPointerSelecting(): boolean {
+  return editorPointerSelecting;
+}
+
+export function setEditorPointerSelecting(
+  active: boolean,
+  view?: EditorView,
+): void {
+  if (editorPointerSelecting === active) {
+    if (!active) flushDeferredMarkRefresh(view);
+    return;
+  }
+  editorPointerSelecting = active;
+  if (!active) flushDeferredMarkRefresh(view);
+}
+
+function flushDeferredMarkRefresh(view?: EditorView): void {
+  if (!pendingMarkRefreshAfterPointer) return;
+  pendingMarkRefreshAfterPointer = false;
+  if (view?.dom.isConnected) requestLivePreviewRefresh(view);
+}
+
 export function livePreviewShouldRebuild(
   update: ViewUpdate,
   mode: "marks" | "widgets" = "widgets",
@@ -202,7 +232,13 @@ export function livePreviewShouldRebuild(
   if (update.docChanged) return true;
   if (syntaxTree(update.startState) !== syntaxTree(update.state)) return true;
   if (!update.selectionSet) return false;
-  if (mode === "marks") return true;
+  if (mode === "marks") {
+    if (editorPointerSelecting) {
+      pendingMarkRefreshAfterPointer = true;
+      return false;
+    }
+    return true;
+  }
 
   const prev = update.startState.selection.main;
   const next = update.state.selection.main;
@@ -929,8 +965,11 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
     private resizeObserver: ResizeObserver | null = null;
     private lastWidth = 0;
     private raf = 0;
+    private readonly scrollDOM: HTMLElement;
+    private readonly onScroll: () => void;
 
     constructor(view: EditorView) {
+      this.scrollDOM = view.scrollDOM;
       scheduleLivePreviewMeasure(view);
       requestLivePreviewRefresh(view);
       queueMicrotask(() => {
@@ -944,6 +983,19 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
           scheduleLivePreviewMeasure(view);
         });
       }
+
+      this.onScroll = () => {
+        if (this.disposed || !view.dom.isConnected) return;
+        if (this.raf) return;
+        this.raf = window.requestAnimationFrame(() => {
+          this.raf = 0;
+          if (this.disposed || !view.dom.isConnected) return;
+          scheduleLivePreviewMeasure(view);
+        });
+      };
+      this.scrollDOM.addEventListener("scroll", this.onScroll, {
+        passive: true,
+      });
 
       this.lastWidth = view.scrollDOM.clientWidth;
       if (typeof ResizeObserver === "undefined") return;
@@ -967,6 +1019,7 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
     destroy() {
       this.disposed = true;
       if (this.raf) window.cancelAnimationFrame(this.raf);
+      this.scrollDOM.removeEventListener("scroll", this.onScroll);
       this.resizeObserver?.disconnect();
       this.resizeObserver = null;
     }
@@ -980,7 +1033,7 @@ export const livePreviewGeometryRemeasure = ViewPlugin.fromClass(
 export function bindLivePreviewWidgetCaret(
   view: EditorView,
   el: HTMLElement,
-  from: number | (() => number),
+  from: number | (() => number | null),
 ): void {
   el.addEventListener("mousedown", (event) => {
     if (event.button !== 0) return;
@@ -997,6 +1050,7 @@ export function bindLivePreviewWidgetCaret(
     event.preventDefault();
     event.stopPropagation();
     const resolvedFrom = typeof from === "function" ? from() : from;
+    if (resolvedFrom == null || !Number.isFinite(resolvedFrom)) return;
     const pos = Math.max(0, Math.min(resolvedFrom, view.state.doc.length));
     view.focus();
     view.dispatch({
@@ -1020,9 +1074,80 @@ export function bindLivePreviewWidgetCaretAtDom(
     try {
       return view.posAtDOM(el) + offset;
     } catch {
-      return view.state.selection.main.head;
+      return null;
     }
   });
+}
+
+/**
+ * Live document range for a replace widget. Prefer `posAtDOM` so edits above
+ * the widget cannot leave a stale `from`/`to` baked into the WidgetType.
+ */
+export function resolveWidgetDocRange(
+  view: EditorView,
+  el: HTMLElement,
+  fallbackFrom: number,
+  fallbackTo: number,
+): { from: number; to: number } {
+  const length = Math.max(0, fallbackTo - fallbackFrom);
+  try {
+    const from = Math.max(
+      0,
+      Math.min(view.posAtDOM(el), view.state.doc.length),
+    );
+    return {
+      from,
+      to: Math.max(from, Math.min(from + length, view.state.doc.length)),
+    };
+  } catch {
+    const from = Math.max(0, Math.min(fallbackFrom, view.state.doc.length));
+    const to = Math.max(from, Math.min(fallbackTo, view.state.doc.length));
+    return { from, to };
+  }
+}
+
+/**
+ * Map a client point to a document position using the live DOM caret when
+ * the browser exposes it. Falls back to CodeMirror's height map.
+ */
+export function posAtClientPoint(
+  view: EditorView,
+  clientX: number,
+  clientY: number,
+): number | null {
+  const doc = view.dom.ownerDocument ?? document;
+  const caretPosition = (
+    doc as Document & {
+      caretPositionFromPoint?: (
+        x: number,
+        y: number,
+      ) => { offsetNode: Node; offset: number } | null;
+    }
+  ).caretPositionFromPoint?.(clientX, clientY);
+  if (
+    caretPosition?.offsetNode &&
+    view.dom.contains(caretPosition.offsetNode)
+  ) {
+    try {
+      return view.posAtDOM(caretPosition.offsetNode, caretPosition.offset);
+    } catch {
+      // Height-map fallback below.
+    }
+  }
+
+  const caretRange = doc.caretRangeFromPoint?.(clientX, clientY);
+  if (
+    caretRange?.startContainer &&
+    view.dom.contains(caretRange.startContainer)
+  ) {
+    try {
+      return view.posAtDOM(caretRange.startContainer, caretRange.startOffset);
+    } catch {
+      // Height-map fallback below.
+    }
+  }
+
+  return view.posAtCoords({ x: clientX, y: clientY });
 }
 
 /**
@@ -1103,4 +1228,32 @@ export function bindLivePreviewClickToReveal(
     },
     true,
   );
+}
+
+/**
+ * Click-to-reveal that snapshots the widget's live document range on
+ * mousedown (via `posAtDOM`) so delayed apply/reassert cannot use a stale
+ * `WidgetType.from` after edits above the widget.
+ */
+export function bindLivePreviewClickToRevealRange(
+  view: EditorView,
+  el: HTMLElement,
+  fallbackFrom: number,
+  fallbackTo: number,
+): void {
+  let range = resolveWidgetDocRange(view, el, fallbackFrom, fallbackTo);
+  el.addEventListener(
+    "mousedown",
+    (event) => {
+      if (event.button !== 0) return;
+      range = resolveWidgetDocRange(view, el, fallbackFrom, fallbackTo);
+    },
+    true,
+  );
+  bindLivePreviewClickToReveal(view, el, () => {
+    view.dispatch({
+      selection: { anchor: range.from, head: range.to },
+      scrollIntoView: false,
+    });
+  });
 }
