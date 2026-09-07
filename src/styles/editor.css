@@ -845,6 +845,25 @@
   padding: var(--pane-backdrop-py) var(--pane-backdrop-px);
 }
 
+.editor-pane-chrome {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  pointer-events: none;
+}
+
+.editor-pane-chrome > * {
+  pointer-events: auto;
+}
+
+.editor-source-toggle {
+  pointer-events: auto;
+}
+
 .editor-pane-scroll {
   height: 100%;
   overflow: auto;

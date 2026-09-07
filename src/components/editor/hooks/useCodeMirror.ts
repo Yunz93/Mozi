@@ -266,6 +266,9 @@ export function useCodeMirror(
     });
     // Remounting widgets changes document height; keep the user's place.
     view.scrollDOM.scrollTop = scrollTop;
+    // Turning widgets off drops heading/list CSS; remasure so the caret
+    // does not sit on a stale height map.
+    view.requestMeasure();
     if (!livePreviewEnabled) return undefined;
     scheduleLivePreviewMeasure(view);
     requestLivePreviewRefresh(view);

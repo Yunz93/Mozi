@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ViewMode } from "../../types";
 import {
   findLocalImageAtPos,
   findWikiLinkNearPosition,
+  isLivePreviewWidgetsEnabled,
   isMacPlatform,
   isPreviewModifierKey,
   isPreviewModifierPressed,
   isRemoteUrl,
   relocateImageMarkdown,
+  shouldShowLiveSourceToggle,
 } from "./editorPaneHelpers";
 
 describe("editorPaneHelpers", () => {
@@ -96,5 +99,28 @@ describe("editorPaneHelpers", () => {
     expect(findWikiLinkNearPosition(text, openAt - 1)?.pathQuery).toContain(
       "Markdown",
     );
+  });
+
+  it("enables Live Preview widgets only in Live without source chrome", () => {
+    expect(isLivePreviewWidgetsEnabled(ViewMode.LIVE, false)).toBe(true);
+    expect(isLivePreviewWidgetsEnabled(ViewMode.LIVE, true)).toBe(false);
+    expect(isLivePreviewWidgetsEnabled(ViewMode.PREVIEW, false)).toBe(false);
+    expect(isLivePreviewWidgetsEnabled(ViewMode.PREVIEW, true)).toBe(false);
+  });
+
+  it("shows the source toggle only for markdown notes in Live", () => {
+    expect(shouldShowLiveSourceToggle(ViewMode.LIVE, "/vault/note.md")).toBe(
+      true,
+    );
+    expect(shouldShowLiveSourceToggle(ViewMode.PREVIEW, "/vault/note.md")).toBe(
+      false,
+    );
+    expect(shouldShowLiveSourceToggle(ViewMode.LIVE, "/vault/scan.pdf")).toBe(
+      false,
+    );
+    expect(
+      shouldShowLiveSourceToggle(ViewMode.LIVE, "drawing.excalidraw.md"),
+    ).toBe(false);
+    expect(shouldShowLiveSourceToggle(ViewMode.LIVE, null)).toBe(false);
   });
 });

@@ -20,7 +20,6 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { useAppStore, selectContent } from "../../store/appStore";
-import { ViewMode } from "../../types";
 import {
   getPaneLayoutMetrics,
   scalePaneLayoutMetrics,
@@ -73,11 +72,14 @@ import {
 import { buildWikiPreviewMarkup } from "../../utils/wikiPreviewMarkup";
 import { posAtClientPoint } from "./livePreview/shared";
 import { countLines, LARGE_FILE_THRESHOLDS } from "../../utils/performance";
+import { LiveSourceToggle } from "./LiveSourceToggle";
 import {
   findLocalImageAtPos,
   findWikiLinkNearPosition,
+  isLivePreviewWidgetsEnabled,
   isPreviewModifierKey,
   isPreviewModifierPressed,
+  shouldShowLiveSourceToggle,
   relocateImageMarkdown,
   type LocalImageMatch,
 } from "./editorPaneHelpers";
@@ -136,7 +138,19 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const isSaving = useAppStore((state) => state.isSaving);
     const activeTabId = useAppStore((state) => state.activeTabId);
     const viewMode = useAppStore((state) => state.viewMode);
+    const liveSourceMarkdown = useAppStore((state) => state.liveSourceMarkdown);
+    const toggleLiveSourceMarkdown = useAppStore(
+      (state) => state.toggleLiveSourceMarkdown,
+    );
     const currentFilePath = useAppStore((state) => state.currentFilePath);
+    const liveWidgetsOn = isLivePreviewWidgetsEnabled(
+      viewMode,
+      liveSourceMarkdown,
+    );
+    const showLiveSourceToggle = shouldShowLiveSourceToggle(
+      viewMode,
+      currentFilePath,
+    );
     const rootFolderPath = useAppStore((state) => state.rootFolderPath);
     const showNotification = useAppStore((state) => state.showNotification);
     const files = useAppStore((state) => state.files);
@@ -394,14 +408,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       wordWrap: settings.wordWrap,
       orderedListMode: settings.orderedListMode,
       themeMode: settings.themeMode as "light" | "dark",
-      livePreviewEnabled: viewMode === ViewMode.LIVE,
+      livePreviewEnabled: liveWidgetsOn,
       livePreviewContext,
       autoPairBrackets: settings.autoPairBrackets,
       autoPairMarkdown: settings.autoPairMarkdown,
       showLineNumbers: settings.showLineNumbers,
       // Live Preview renders fenced code as source lines; fold gutters there
       // only collapse raw fences and are more noise than help.
-      enableFolding: settings.enableFolding && viewMode !== ViewMode.LIVE,
+      enableFolding: settings.enableFolding && !liveWidgetsOn,
       tabSize: settings.tabSize,
       useTabs: settings.useTabs,
       showIndentationGuides: settings.showIndentationGuides,
@@ -657,8 +671,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
           "--editor-content-bottom": `max(${layoutMetrics.contentPaddingBottom}px, 40vh)`,
           "--editor-font-family": editorFontFamily,
           "--editor-font-size": `${scaledEditorFontSize}px`,
-          "--preview-font-family":
-            viewMode === ViewMode.LIVE ? previewFontFamily : editorFontFamily,
+          "--preview-font-family": liveWidgetsOn
+            ? previewFontFamily
+            : editorFontFamily,
           "--preview-font-size": `${scaledEditorFontSize}px`,
           // Live inline/fenced code should match Reading preview code fonts.
           "--preview-code-font-family": codeFontFamily,
@@ -677,7 +692,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         codeFontFamily,
         settings.readableLineLength,
         settings.tabSize,
-        viewMode,
+        liveWidgetsOn,
       ],
     );
 
@@ -894,50 +909,57 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       <div
         ref={layoutRef}
         className={`editor-pane-layout h-full min-w-0 flex flex-col relative${
-          settings.showLineNumbers ||
-          (settings.enableFolding && viewMode !== ViewMode.LIVE)
+          settings.showLineNumbers || (settings.enableFolding && !liveWidgetsOn)
             ? " show-editor-gutters"
             : ""
         }`}
-        data-live-preview={viewMode === ViewMode.LIVE ? "true" : undefined}
+        data-live-preview={liveWidgetsOn ? "true" : undefined}
         style={layoutStyle}
       >
-        {isSaving && (
-          <div className="absolute top-2 right-4 z-10 flex items-center gap-1 text-xs text-gray-400 animate-pulse">
-            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            {t("toolbar_saving")}
+        {liveWidgetsOn && livePreviewOptimizationMode !== "normal" && (
+          <div
+            className="live-preview-opt-banner"
+            role="status"
+            data-mode={livePreviewOptimizationMode}
+          >
+            {livePreviewOptimizationMode === "large"
+              ? t("editor_livePreviewLargeFileMode")
+              : t("editor_livePreviewHeavyFileMode")}
           </div>
         )}
 
-        {viewMode === ViewMode.LIVE &&
-          livePreviewOptimizationMode !== "normal" && (
-            <div
-              className="live-preview-opt-banner"
-              role="status"
-              data-mode={livePreviewOptimizationMode}
-            >
-              {livePreviewOptimizationMode === "large"
-                ? t("editor_livePreviewLargeFileMode")
-                : t("editor_livePreviewHeavyFileMode")}
+        <div className="editor-pane-backdrop flex-1 min-h-0 overflow-hidden">
+          {(isSaving || showLiveSourceToggle) && (
+            <div className="editor-pane-chrome">
+              {isSaving && (
+                <div className="flex items-center gap-1 text-xs text-gray-400 animate-pulse">
+                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  {t("toolbar_saving")}
+                </div>
+              )}
+              {showLiveSourceToggle && (
+                <LiveSourceToggle
+                  sourceMode={liveSourceMarkdown}
+                  onToggle={toggleLiveSourceMarkdown}
+                />
+              )}
             </div>
           )}
-
-        <div className="editor-pane-backdrop flex-1 min-h-0 overflow-hidden">
           <div className="editor-pane-scroll h-full overflow-hidden">
             <div className="editor-pane-frame h-full w-full">
               <div className="editor-pane-sheet h-full w-full">

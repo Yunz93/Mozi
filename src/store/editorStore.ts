@@ -26,6 +26,11 @@ export interface EditorState {
   lastViewModeChangeSource: "direct" | "toggle";
   /** Mode to restore after leaving a preview-only file (PDF/image/HTML). */
   viewModeBeforePreviewOnly: ViewMode | null;
+  /**
+   * Live-only chrome: show raw Markdown source instead of Live Preview widgets.
+   * Session-scoped so it does not revive the retired source-only view mode.
+   */
+  liveSourceMarkdown: boolean;
   fileHistories: Record<string, HistoryState>; // Per open document
 }
 
@@ -41,6 +46,8 @@ export interface EditorActions {
   ) => void;
   setViewMode: (mode: ViewMode, source?: "direct" | "toggle") => void;
   setViewModeBeforePreviewOnly: (mode: ViewMode | null) => void;
+  setLiveSourceMarkdown: (enabled: boolean) => void;
+  toggleLiveSourceMarkdown: () => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -56,6 +63,7 @@ export const initialEditorState: EditorState = {
   lastNonSplitViewMode: ViewMode.LIVE,
   lastViewModeChangeSource: "direct",
   viewModeBeforePreviewOnly: null,
+  liveSourceMarkdown: false,
   fileHistories: {}, // Initialize as empty object, histories created per file
 };
 
@@ -152,6 +160,16 @@ export function createEditorSlice(
       set(() => ({
         viewModeBeforePreviewOnly:
           mode === null ? null : normalizeSessionViewMode(mode),
+      })),
+
+    setLiveSourceMarkdown: (enabled) =>
+      set(() => ({
+        liveSourceMarkdown: enabled,
+      })),
+
+    toggleLiveSourceMarkdown: () =>
+      set((state) => ({
+        liveSourceMarkdown: !state.liveSourceMarkdown,
       })),
 
     undo: () =>

@@ -979,6 +979,8 @@ export default {
 
   editor_emptyState: "选择文件开始编辑",
   editor_placeholder: "开始输入...",
+  editor_showPlainText: "显示纯文本",
+  editor_showLivePreview: "显示实时预览",
   editor_livePreviewHeavyFileMode:
     "已进入大文件优化模式：表格 / Callout / Mermaid 显示占位，详情见组件提示。",
   editor_livePreviewLargeFileMode:
