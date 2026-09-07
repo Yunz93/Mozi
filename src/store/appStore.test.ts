@@ -22,6 +22,7 @@ import {
   SYSTEM_DEFAULT_FONT_FAMILY,
 } from "../utils/fontSettings";
 import { resolvePersistedShortcuts } from "./persistMigrations";
+import { ViewMode } from "../types";
 
 afterEach(() => {
   useAppStore.setState({
@@ -29,6 +30,8 @@ afterEach(() => {
     activeTabId: null,
     fileContents: {},
     lastSavedContent: {},
+    liveSourceMarkdown: false,
+    viewMode: ViewMode.LIVE,
   });
 });
 
@@ -236,5 +239,20 @@ describe("app store hydration recovery", () => {
     expect(useAppStore.getState().settings.aiProvider).toBe(
       defaultSettings.aiProvider,
     );
+  });
+});
+
+describe("liveSourceMarkdown", () => {
+  it("defaults off and does not change the primary view mode", () => {
+    expect(useAppStore.getState().liveSourceMarkdown).toBe(false);
+    expect(useAppStore.getState().viewMode).toBe(ViewMode.LIVE);
+
+    useAppStore.getState().toggleLiveSourceMarkdown();
+    expect(useAppStore.getState().liveSourceMarkdown).toBe(true);
+    expect(useAppStore.getState().viewMode).toBe(ViewMode.LIVE);
+
+    useAppStore.getState().setLiveSourceMarkdown(false);
+    expect(useAppStore.getState().liveSourceMarkdown).toBe(false);
+    expect(useAppStore.getState().viewMode).toBe(ViewMode.LIVE);
   });
 });

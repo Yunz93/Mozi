@@ -1075,6 +1075,8 @@ export default {
 
   editor_emptyState: "Select a file to start editing",
   editor_placeholder: "Start writing...",
+  editor_showPlainText: "Show plain text",
+  editor_showLivePreview: "Show live preview",
   editor_livePreviewHeavyFileMode:
     "Large-file optimization: tables, callouts, and Mermaid show placeholders.",
   editor_livePreviewLargeFileMode:

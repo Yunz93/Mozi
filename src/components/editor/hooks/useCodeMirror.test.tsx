@@ -12,6 +12,7 @@ function Harness(props: {
   placeholder: string;
   documentKey?: string;
   themeMode?: "light" | "dark";
+  livePreviewEnabled?: boolean;
   onChange?: (content: string) => void;
   onView?: (view: EditorView | null) => void;
 }) {
@@ -20,6 +21,7 @@ function Harness(props: {
     documentKey: props.documentKey ?? "file-1",
     placeholder: props.placeholder,
     themeMode: props.themeMode ?? "light",
+    livePreviewEnabled: props.livePreviewEnabled,
     onChange: props.onChange ?? (() => {}),
   });
 
@@ -184,5 +186,65 @@ describe("useCodeMirror", () => {
     expect(docAfterApply).not.toContain("\n3.");
 
     vi.useRealTimers();
+  });
+
+  it("keeps the same editor view and selection when live preview toggles", async () => {
+    let view: EditorView | null = null;
+    const content = "# Title\n\n**bold**";
+
+    const { rerender } = render(
+      <Harness
+        content={content}
+        placeholder="x"
+        livePreviewEnabled
+        onView={(instance) => {
+          view = instance;
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(view).not.toBeNull());
+    const firstView = view!;
+    act(() => {
+      firstView.dispatch({
+        selection: { anchor: firstView.state.doc.length },
+      });
+    });
+    const selection = firstView.state.selection.main;
+
+    await act(async () => {
+      rerender(
+        <Harness
+          content={content}
+          placeholder="x"
+          livePreviewEnabled={false}
+          onView={(instance) => {
+            view = instance;
+          }}
+        />,
+      );
+    });
+
+    expect(view).toBe(firstView);
+    expect(view!.state.doc.toString()).toBe(content);
+    expect(view!.state.selection.main.anchor).toBe(selection.anchor);
+    expect(view!.state.selection.main.head).toBe(selection.head);
+
+    await act(async () => {
+      rerender(
+        <Harness
+          content={content}
+          placeholder="x"
+          livePreviewEnabled
+          onView={(instance) => {
+            view = instance;
+          }}
+        />,
+      );
+    });
+
+    expect(view).toBe(firstView);
+    expect(view!.state.doc.toString()).toBe(content);
+    expect(view!.state.selection.main.anchor).toBe(selection.anchor);
   });
 });

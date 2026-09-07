@@ -1,5 +1,22 @@
+import { ViewMode } from "../../types";
+import { isMarkdownFile } from "../../utils/fileTypes";
 import { findOpenWikiLinkAt } from "../../utils/wikiLinkEditor";
 import { parseMarkdownDestination } from "../../utils/markdownDestination";
+
+export function isLivePreviewWidgetsEnabled(
+  viewMode: ViewMode,
+  liveSourceMarkdown: boolean,
+): boolean {
+  return viewMode === ViewMode.LIVE && !liveSourceMarkdown;
+}
+
+export function shouldShowLiveSourceToggle(
+  viewMode: ViewMode,
+  fileName: string | null | undefined,
+): boolean {
+  if (viewMode !== ViewMode.LIVE || !fileName) return false;
+  return isMarkdownFile(fileName);
+}
 
 export function isMacPlatform(
   navigatorLike:
