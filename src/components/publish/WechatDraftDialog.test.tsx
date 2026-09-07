@@ -65,6 +65,7 @@ const defaults = {
   digest: "摘要",
   contentSourceUrl: "",
   showCoverPic: true,
+  coverImagePath: "",
   existingDraftMediaId: "",
 };
 
@@ -178,5 +179,86 @@ describe("WechatDraftDialog", () => {
         coverImagePath: "/covers/thumb.jpg",
       }),
     );
+  });
+
+  it("keeps the chosen cover when publish defaults are rebuilt", async () => {
+    const { rerender } = render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "选择封面图" }));
+    await waitFor(() => {
+      expect(screen.getByText("/covers/thumb.jpg")).toBeTruthy();
+    });
+
+    rerender(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={{ ...defaults, title: "草稿标题" }}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("/covers/thumb.jpg")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "发布到草稿箱" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+  });
+
+  it("restores a persisted cover from note defaults", async () => {
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={{ ...defaults, coverImagePath: "/covers/saved.jpg" }}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("/covers/saved.jpg")).toBeTruthy();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "发布到草稿箱" }),
+      ).toHaveProperty("disabled", false);
+    });
+  });
+
+  it("persists the form when the dialog closes", () => {
+    const onPersist = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={onClose}
+        onPersist={onPersist}
+        onSubmit={() => {}}
+      />,
+    );
+
+    fireEvent.change(screen.getByDisplayValue("草稿标题"), {
+      target: { value: "改过的标题" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(onPersist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "改过的标题",
+        author: "作者",
+        digest: "摘要",
+      }),
+    );
+    expect(onClose).toHaveBeenCalled();
   });
 });

@@ -216,8 +216,11 @@ const App: React.FC = () => {
   }, [closeTab, forceSave, showNotification, t]);
   const { handleExportToPdf, handleExportToHtml, buildLongImageSharePayload } =
     useExportActions(highlighter);
-  const { handlePublishSimpleBlog, handlePublishWechatDraft } =
-    usePublishActions(forceSave);
+  const {
+    handlePublishSimpleBlog,
+    handlePublishWechatDraft,
+    persistWechatDraftForm,
+  } = usePublishActions(forceSave);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
@@ -1135,8 +1138,13 @@ const App: React.FC = () => {
           onCloseWechatDraft={() => {
             if (!isPublishing) setIsWechatDraftDialogOpen(false);
           }}
+          onPersistWechatDraft={(input) => {
+            void persistWechatDraftForm(input);
+          }}
           onSubmitWechatDraft={(input) => {
-            void handleSubmitWechatDraft(input);
+            void handleSubmitWechatDraft(input).catch((error) => {
+              console.error("Failed to submit WeChat draft:", error);
+            });
           }}
           onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
           isAiEnhanceConfirmOpen={isAiEnhanceConfirmOpen}

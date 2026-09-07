@@ -84,7 +84,7 @@ export default {
 
   wechatDraftDialog_title: "Publish to WeChat drafts",
   wechatDraftDialog_desc:
-    "Review the article metadata and pick a cover image before publishing.",
+    "Review the article metadata before publishing. Title, author, digest, and cover are saved on this note so you do not have to re-enter them.",
   wechatDraftDialog_updateHint:
     "This note is already linked to a WeChat draft, so publishing will update that draft.",
   wechatDraftDialog_titleLabel: "Title",
@@ -96,6 +96,8 @@ export default {
     "The cover image is uploaded as a WeChat thumbnail asset. Local body images are converted into WeChat-hosted article images automatically.",
   wechatDraftDialog_showCover: "Show cover in article",
   wechatDraftDialog_pickCover: "Choose cover image",
+  wechatDraftDialog_pickCoverFailed:
+    "Could not choose a cover image. Try again.",
   wechatDraftDialog_coverEmpty: "No cover image selected yet",
   wechatDraftDialog_coverRequired: "Choose a cover image before publishing.",
   wechatDraftDialog_submit: "Publish to drafts",

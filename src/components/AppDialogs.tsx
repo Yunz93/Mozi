@@ -50,6 +50,7 @@ interface AppDialogsProps {
   onSubmitSimpleBlog: (input: SimpleBlogPublishInput) => void;
   onCloseWechatDraft: () => void;
   onSubmitWechatDraft: (input: WechatDraftPublishInput) => void;
+  onPersistWechatDraft?: (input: WechatDraftPublishInput) => void;
   onCloseShareLongImage: () => void;
   isAiEnhanceConfirmOpen?: boolean;
   onConfirmAiEnhance?: () => void;
@@ -87,6 +88,7 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   onSubmitSimpleBlog,
   onCloseWechatDraft,
   onSubmitWechatDraft,
+  onPersistWechatDraft,
   onCloseShareLongImage,
   isAiEnhanceConfirmOpen = false,
   onConfirmAiEnhance,
@@ -188,8 +190,11 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         isSubmitting={isPublishing}
         defaults={wechatDraftDefaults}
         onClose={onCloseWechatDraft}
+        onPersist={onPersistWechatDraft}
         onSubmit={(input) => {
-          void onSubmitWechatDraft(input);
+          void Promise.resolve(onSubmitWechatDraft(input)).catch((error) => {
+            console.error("Failed to submit WeChat draft:", error);
+          });
         }}
       />
 

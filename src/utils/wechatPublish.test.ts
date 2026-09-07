@@ -22,6 +22,7 @@ vi.mock("./previewImageCache", async (importOriginal) => {
 });
 
 import {
+  applyWechatDraftPublishInput,
   extractWechatDraftDefaults,
   hydrateWechatPreviewImages,
   prepareWechatDraftPublish,
@@ -37,6 +38,7 @@ author: 张三
 digest: 自定义摘要
 content_source_url: https://example.com/source
 show_cover_pic: false
+wechat_cover_image: /covers/thumb.jpg
 wechat_draft_media_id: MEDIA123
 ---
 
@@ -51,6 +53,7 @@ wechat_draft_media_id: MEDIA123
       digest: "自定义摘要",
       contentSourceUrl: "https://example.com/source",
       showCoverPic: false,
+      coverImagePath: "/covers/thumb.jpg",
       existingDraftMediaId: "MEDIA123",
     });
   });
@@ -71,6 +74,46 @@ wechat_draft_media_id: MEDIA123
     expect(defaults.digest).toContain("第一段正文会被用来生成摘要");
     expect(defaults.existingDraftMediaId).toBe("");
     expect(defaults.showCoverPic).toBe(true);
+    expect(defaults.coverImagePath).toBe("");
+  });
+});
+
+describe("applyWechatDraftPublishInput", () => {
+  it("writes draft form fields into frontmatter and keeps the body", () => {
+    const next = applyWechatDraftPublishInput(
+      `---
+title: old
+---
+
+正文
+`,
+      {
+        title: "新标题",
+        author: "李四",
+        digest: "新摘要",
+        contentSourceUrl: "https://example.com",
+        showCoverPic: false,
+        coverImagePath: "/covers/a.jpg",
+      },
+    );
+
+    expect(next).toContain("title: 新标题");
+    expect(next).toContain("author: 李四");
+    expect(next).toContain("digest: 新摘要");
+    expect(next).toContain("content_source_url: https://example.com");
+    expect(next).toContain("show_cover_pic: false");
+    expect(next).toContain("wechat_cover_image: /covers/a.jpg");
+    expect(next).toContain("正文");
+
+    expect(extractWechatDraftDefaults(next, "/tmp/post.md")).toEqual({
+      title: "新标题",
+      author: "李四",
+      digest: "新摘要",
+      contentSourceUrl: "https://example.com",
+      showCoverPic: false,
+      coverImagePath: "/covers/a.jpg",
+      existingDraftMediaId: "",
+    });
   });
 });
 

@@ -22,6 +22,7 @@ interface WechatDraftDialogProps {
   defaults: WechatDraftDefaults | null;
   onClose: () => void;
   onSubmit: (input: WechatDraftPublishInput) => void;
+  onPersist?: (input: WechatDraftPublishInput) => void;
 }
 
 export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
@@ -30,8 +31,10 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   defaults,
   onClose,
   onSubmit,
+  onPersist,
 }) => {
   const { t } = useI18n();
+  const showNotification = useAppStore((state) => state.showNotification);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [digest, setDigest] = useState("");
@@ -46,6 +49,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   const [unresolvedImages, setUnresolvedImages] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const previewRequestId = useRef(0);
+  const hydratedNoteKeyRef = useRef<string | null>(null);
 
   const files = useAppStore((state) => state.files);
   const rootFolderPath = useAppStore((state) => state.rootFolderPath);
@@ -53,24 +57,58 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   const markdownContent = useAppStore(selectContent);
   const settings = useAppStore((state) => state.settings);
 
+  const buildInput = (): WechatDraftPublishInput => ({
+    title: title.trim(),
+    author: author.trim(),
+    digest: digest.trim(),
+    contentSourceUrl: contentSourceUrl.trim(),
+    showCoverPic,
+    coverImagePath: coverImagePath.trim(),
+    existingDraftMediaId: defaults?.existingDraftMediaId || "",
+  });
+
   useEffect(() => {
-    if (!isOpen || !defaults) {
+    if (!isOpen) {
+      hydratedNoteKeyRef.current = null;
       return;
     }
+    if (!defaults) {
+      return;
+    }
+
+    const noteKey = currentFilePath ?? "__none__";
+    // Re-applying defaults whenever `content` changes would wipe the cover
+    // the user just picked (publish forceSave / tree refresh).
+    if (hydratedNoteKeyRef.current === noteKey) {
+      return;
+    }
+    hydratedNoteKeyRef.current = noteKey;
 
     setTitle(defaults.title);
     setAuthor(defaults.author);
     setDigest(defaults.digest);
     setContentSourceUrl(defaults.contentSourceUrl);
     setShowCoverPic(defaults.showCoverPic);
-    setCoverImagePath("");
+    setCoverImagePath(defaults.coverImagePath || "");
     setCoverPreviewSrc("");
 
     requestAnimationFrame(() => {
       titleInputRef.current?.focus();
       titleInputRef.current?.select();
     });
-  }, [defaults, isOpen]);
+  }, [currentFilePath, defaults, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !coverImagePath || !isTauriEnvironment()) {
+      return;
+    }
+    void invoke("register_allowed_path", {
+      path: coverImagePath,
+      recursive: false,
+    }).catch(() => {
+      // Preview/publish will surface a real error if the path is unusable.
+    });
+  }, [coverImagePath, isOpen]);
 
   useEffect(() => {
     if (!isOpen || !currentFilePath || !markdownContent) {
@@ -156,35 +194,42 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
       return;
     }
 
-    const selected = await open({
-      multiple: false,
-      filters: [
-        {
-          name: "Images",
-          extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp"],
-        },
-      ],
-    });
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: "Images",
+            extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp"],
+          },
+        ],
+      });
 
-    const path = typeof selected === "string" ? selected : null;
-    if (!path) {
+      const path = typeof selected === "string" ? selected : null;
+      if (!path) {
+        return;
+      }
+
+      await invoke("register_allowed_path", { path, recursive: false });
+      setCoverImagePath(path);
+    } catch (error) {
+      console.error("Failed to pick WeChat cover image:", error);
+      showNotification(t("wechatDraftDialog_pickCoverFailed"), "error");
+    }
+  };
+
+  const handleClose = () => {
+    if (isSubmitting) {
       return;
     }
-
-    await invoke("register_allowed_path", { path, recursive: false });
-    setCoverImagePath(path);
+    onPersist?.(buildInput());
+    onClose();
   };
 
   const handleSubmit = () => {
-    onSubmit({
-      title: title.trim(),
-      author: author.trim(),
-      digest: digest.trim(),
-      contentSourceUrl: contentSourceUrl.trim(),
-      showCoverPic,
-      coverImagePath: coverImagePath.trim(),
-      existingDraftMediaId: defaults?.existingDraftMediaId || "",
-    });
+    const input = buildInput();
+    onPersist?.(input);
+    onSubmit(input);
   };
 
   const canSubmit =
@@ -196,7 +241,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   return (
     <Dialog
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={t("wechatDraftDialog_title")}
       className="max-w-5xl h-[88vh]"
       contentClassName="flex min-h-0 flex-col overflow-hidden py-3"
@@ -381,7 +426,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
           <div className="flex justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isSubmitting}
               className="inline-flex items-center gap-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
             >

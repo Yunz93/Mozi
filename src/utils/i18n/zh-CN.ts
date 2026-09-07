@@ -78,7 +78,8 @@ export default {
   publish_targetWechatDraftDesc: "创建或更新公众号草稿箱中的单图文草稿。",
 
   wechatDraftDialog_title: "发布到微信公众号草稿箱",
-  wechatDraftDialog_desc: "发布前可编辑图文信息，并临时选择本次使用的封面图。",
+  wechatDraftDialog_desc:
+    "发布前可编辑图文信息。标题、作者、摘要、封面图会写入当前笔记，下次打开无需重填。",
   wechatDraftDialog_updateHint:
     "检测到当前笔记已经关联公众号草稿，这次会直接更新原草稿。",
   wechatDraftDialog_titleLabel: "标题",
@@ -90,6 +91,7 @@ export default {
     "封面图会上传为公众号缩略图素材。正文里的本地图片会自动转换为公众号可用图片。",
   wechatDraftDialog_showCover: "正文显示封面",
   wechatDraftDialog_pickCover: "选择封面图",
+  wechatDraftDialog_pickCoverFailed: "选择封面图失败，请重试。",
   wechatDraftDialog_coverEmpty: "尚未选择封面图",
   wechatDraftDialog_coverRequired: "请先选择封面图后再发布。",
   wechatDraftDialog_submit: "发布到草稿箱",

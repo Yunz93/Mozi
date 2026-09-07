@@ -10,6 +10,7 @@ import {
   type SimpleBlogPublishInput,
 } from "../utils/simpleBlogPublish";
 import {
+  applyWechatDraftPublishInput,
   prepareWechatDraftPublish,
   type WechatDraftPublishInput,
 } from "../utils/wechatPublish";
@@ -94,6 +95,10 @@ export function usePublishActions(
       let timeoutId: number | null = null;
       const publishPromise = invoke<T>(command, payload);
       publishInFlightRef.current = publishPromise;
+      void publishPromise.catch(() => {
+        // If the UI timeout wins the race, the later invoke reject must not
+        // become an unhandledrejection toast.
+      });
       void publishPromise.finally(() => {
         if (publishInFlightRef.current === publishPromise) {
           publishInFlightRef.current = null;
@@ -172,6 +177,45 @@ export function usePublishActions(
       }
     },
     [settings.language],
+  );
+
+  const persistWechatDraftForm = useCallback(
+    async (input: WechatDraftPublishInput) => {
+      const state = useAppStore.getState();
+      const tabId = state.activeTabId;
+      if (!tabId) {
+        return;
+      }
+      const latestContent = state.fileContents[tabId];
+      if (latestContent === undefined) {
+        return;
+      }
+      const nextContent = applyWechatDraftPublishInput(latestContent, input);
+      if (nextContent === latestContent) {
+        return;
+      }
+
+      const activeFile = findFileInTree(state.files, tabId);
+      if (!activeFile) {
+        state.setContentForFile(tabId, nextContent);
+        return;
+      }
+
+      try {
+        const fs = await getFileSystem();
+        await fs.writeFile(activeFile.path, nextContent);
+        const afterWrite = useAppStore.getState();
+        if (!afterWrite.openTabs.includes(tabId)) {
+          return;
+        }
+        afterWrite.updateTabContent(tabId, nextContent);
+        afterWrite.markAsSaved(tabId, nextContent);
+      } catch (error) {
+        console.error("Failed to persist WeChat draft form:", error);
+        useAppStore.getState().setContentForFile(tabId, nextContent);
+      }
+    },
+    [],
   );
 
   const handlePublishSimpleBlog = useCallback(
@@ -506,7 +550,20 @@ export function usePublishActions(
 
   const handlePublishWechatDraft = useCallback(
     async (input: WechatDraftPublishInput) => {
-      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      let hydratedSettings;
+      try {
+        hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      } catch (error) {
+        console.error("Failed to load WeChat publish settings:", error);
+        showNotification(
+          t(
+            useAppStore.getState().settings.language,
+            "notifications_wechatPublishFailed",
+          ),
+          "error",
+        );
+        return false;
+      }
       const targetTabId = activeTabId;
 
       if (!targetTabId) {
@@ -577,7 +634,15 @@ export function usePublishActions(
 
       setPublishing(true);
       try {
-        const saved = await forceSave(undefined, { trigger: "system" });
+        const contentWithMeta = applyWechatDraftPublishInput(
+          currentContent,
+          input,
+        );
+        if (contentWithMeta !== currentContent) {
+          setContentForFile(targetTabId, contentWithMeta);
+        }
+
+        const saved = await forceSave(contentWithMeta, { trigger: "system" });
         if (!saved) {
           showNotification(
             t(
@@ -591,7 +656,7 @@ export function usePublishActions(
 
         const storeState = useAppStore.getState();
         const latestContent =
-          storeState.fileContents[targetTabId] ?? currentContent;
+          storeState.fileContents[targetTabId] ?? contentWithMeta;
         const prepared = await prepareWechatDraftPublish({
           files: storeState.files,
           rootFolderPath: storeState.rootFolderPath,
@@ -672,6 +737,7 @@ export function usePublishActions(
       files,
       forceSave,
       invokePublishWithTimeout,
+      setContentForFile,
       setPublishing,
       showNotification,
     ],
@@ -680,5 +746,6 @@ export function usePublishActions(
   return {
     handlePublishSimpleBlog,
     handlePublishWechatDraft,
+    persistWechatDraftForm,
   };
 }
