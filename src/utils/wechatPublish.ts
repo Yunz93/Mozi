@@ -2,7 +2,7 @@ import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
 } from "./attachmentResolver";
-import { parseFrontmatter } from "./frontmatter";
+import { generateFrontmatter, parseFrontmatter } from "./frontmatter";
 import { renderMarkdown } from "./markdown";
 import {
   getResolvedCodeFontFamily,
@@ -26,6 +26,7 @@ export interface WechatDraftDefaults {
   digest: string;
   contentSourceUrl: string;
   showCoverPic: boolean;
+  coverImagePath: string;
   existingDraftMediaId: string;
 }
 
@@ -126,11 +127,54 @@ export function extractWechatDraftDefaults(
         ? frontmatter.content_source_url.trim()
         : "",
     showCoverPic: frontmatter?.show_cover_pic === false ? false : true,
+    coverImagePath:
+      typeof frontmatter?.wechat_cover_image === "string"
+        ? frontmatter.wechat_cover_image.trim()
+        : "",
     existingDraftMediaId:
       typeof frontmatter?.wechat_draft_media_id === "string"
         ? frontmatter.wechat_draft_media_id.trim()
         : "",
   };
+}
+
+export function applyWechatDraftPublishInput(
+  markdownContent: string,
+  input: Pick<
+    WechatDraftPublishInput,
+    | "title"
+    | "author"
+    | "digest"
+    | "contentSourceUrl"
+    | "showCoverPic"
+    | "coverImagePath"
+  >,
+): string {
+  const { frontmatter, body } = parseFrontmatter(markdownContent);
+  const nextFrontmatter: Frontmatter = {
+    ...(frontmatter || {}),
+    title: input.title.trim(),
+    author: input.author.trim(),
+    digest: input.digest.trim(),
+    content_source_url: input.contentSourceUrl.trim(),
+    show_cover_pic: input.showCoverPic,
+    wechat_cover_image: input.coverImagePath.trim(),
+  };
+
+  if (!nextFrontmatter.author) {
+    delete nextFrontmatter.author;
+  }
+  if (!nextFrontmatter.digest) {
+    delete nextFrontmatter.digest;
+  }
+  if (!nextFrontmatter.content_source_url) {
+    delete nextFrontmatter.content_source_url;
+  }
+  if (!nextFrontmatter.wechat_cover_image) {
+    delete nextFrontmatter.wechat_cover_image;
+  }
+
+  return `${generateFrontmatter(nextFrontmatter)}${body}`;
 }
 
 function isWechatPublishableHref(value: string): boolean {
