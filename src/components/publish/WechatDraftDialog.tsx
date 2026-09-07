@@ -15,6 +15,11 @@ import {
   isUsablePreviewDisplaySrc,
   resolvePreviewSource,
 } from "../../utils/previewImageCache";
+import {
+  getClipboardImageFile,
+  savePastedCoverImage,
+  shouldApplyPastedCoverImage,
+} from "../../utils/wechatCoverImage";
 
 interface WechatDraftDialogProps {
   isOpen: boolean;
@@ -189,6 +194,48 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
     };
   }, [coverImagePath]);
 
+  const applyCoverFile = async (file: File) => {
+    if (!rootFolderPath) {
+      showNotification(t("wechatDraftDialog_pasteCoverNeedVault"), "error");
+      return;
+    }
+
+    try {
+      const path = await savePastedCoverImage({
+        file,
+        rootFolderPath,
+        currentFilePath,
+        resourceFolder: settings.resourceFolder,
+        attachmentLocation: settings.attachmentLocation,
+      });
+      if (isTauriEnvironment()) {
+        await invoke("register_allowed_path", { path, recursive: false });
+      }
+      setCoverImagePath(path);
+    } catch (error) {
+      console.error("Failed to paste WeChat cover image:", error);
+      showNotification(t("wechatDraftDialog_pasteCoverFailed"), "error");
+    }
+  };
+
+  const handleCoverPaste = (event: React.ClipboardEvent<HTMLElement>) => {
+    if (!shouldApplyPastedCoverImage(event.clipboardData, event.target)) {
+      return;
+    }
+    const image = getClipboardImageFile(event.clipboardData);
+    if (!image) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void applyCoverFile(image);
+  };
+
+  const handleCoverDrop = (event: React.DragEvent<HTMLElement>) => {
+    const image = getClipboardImageFile(event.dataTransfer);
+    if (!image) return;
+    event.preventDefault();
+    void applyCoverFile(image);
+  };
+
   const handlePickCover = async () => {
     if (!isTauriEnvironment()) {
       return;
@@ -248,42 +295,17 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
       contentScroll={false}
       closable={!isSubmitting}
     >
-      <div className="publish-form-panel flex min-h-0 h-full flex-col">
+      <div
+        className="publish-form-panel flex min-h-0 h-full flex-col"
+        onPaste={handleCoverPaste}
+      >
         <div className="wechat-draft-layout">
           <div className="wechat-draft-form -mx-1 min-w-0 space-y-3 px-1">
-            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-              {t("wechatDraftDialog_desc")}
-            </p>
-            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-              {t("wechatDraftDialog_ipHint")}
-            </p>
-
             {defaults?.existingDraftMediaId && (
               <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                 {t("wechatDraftDialog_updateHint")}
               </div>
             )}
-
-            {unresolvedImages.length > 0 ? (
-              <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-                <p>
-                  {t("wechatDraftDialog_unresolvedImages", {
-                    count: unresolvedImages.length,
-                  })}
-                </p>
-                <ul className="mt-1 list-disc pl-4">
-                  {unresolvedImages.slice(0, 6).map((src) => (
-                    <li key={src} className="break-all">
-                      {src}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : imageCount > 0 ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t("wechatDraftDialog_imageCount", { count: imageCount })}
-              </p>
-            ) : null}
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -337,7 +359,16 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
               />
             </div>
 
-            <div className="rounded-xl border border-gray-200/70 bg-white/70 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <div
+              className="rounded-xl border border-gray-200/70 bg-white/70 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]"
+              data-wechat-cover-drop
+              onDragOver={(event) => {
+                if (getClipboardImageFile(event.dataTransfer)) {
+                  event.preventDefault();
+                }
+              }}
+              onDrop={handleCoverDrop}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex-1 min-w-56">
                   <div className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -345,6 +376,9 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                   </div>
                   <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
                     {t("wechatDraftDialog_coverDesc")}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                    {t("wechatDraftDialog_coverPasteHint")}
                   </p>
                 </div>
                 <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -418,6 +452,34 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
         </div>
 
         <div className="wechat-draft-footer mt-3 flex shrink-0 flex-col items-end gap-2 border-t border-gray-200/50 pt-3 dark:border-white/10">
+          <div className="wechat-draft-tips w-full space-y-1.5 text-left">
+            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
+              {t("wechatDraftDialog_desc")}
+            </p>
+            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
+              {t("wechatDraftDialog_ipHint")}
+            </p>
+            {unresolvedImages.length > 0 ? (
+              <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+                <p>
+                  {t("wechatDraftDialog_unresolvedImages", {
+                    count: unresolvedImages.length,
+                  })}
+                </p>
+                <ul className="mt-1 list-disc pl-4">
+                  {unresolvedImages.slice(0, 6).map((src) => (
+                    <li key={src} className="break-all">
+                      {src}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : imageCount > 0 ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t("wechatDraftDialog_imageCount", { count: imageCount })}
+              </p>
+            ) : null}
+          </div>
           {!coverImagePath.trim() ? (
             <p className="w-full text-right text-xs leading-5 text-amber-700 dark:text-amber-200">
               {t("wechatDraftDialog_coverRequired")}

@@ -94,6 +94,12 @@ export default {
   wechatDraftDialog_coverLabel: "Cover image",
   wechatDraftDialog_coverDesc:
     "The cover image is uploaded as a WeChat thumbnail asset. Local body images are converted into WeChat-hosted article images automatically.",
+  wechatDraftDialog_coverPasteHint:
+    "You can also paste or drop an image as the cover.",
+  wechatDraftDialog_pasteCoverFailed:
+    "Could not paste the cover image. Try again.",
+  wechatDraftDialog_pasteCoverNeedVault:
+    "Open a knowledge base before pasting a cover image.",
   wechatDraftDialog_showCover: "Show cover in article",
   wechatDraftDialog_pickCover: "Choose cover image",
   wechatDraftDialog_pickCoverFailed:

@@ -11,14 +11,19 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore, defaultSettings } from "../../store/appStore";
 
-const { mockOpen, mockPrepare, mockHydrate, mockResolvePreview } = vi.hoisted(
-  () => ({
-    mockOpen: vi.fn(async () => "/covers/thumb.jpg"),
-    mockPrepare: vi.fn(),
-    mockHydrate: vi.fn(),
-    mockResolvePreview: vi.fn(async (src: string) => `blob:cover-${src}`),
-  }),
-);
+const {
+  mockOpen,
+  mockPrepare,
+  mockHydrate,
+  mockResolvePreview,
+  mockSaveCover,
+} = vi.hoisted(() => ({
+  mockOpen: vi.fn(async () => "/covers/thumb.jpg"),
+  mockPrepare: vi.fn(),
+  mockHydrate: vi.fn(),
+  mockResolvePreview: vi.fn(async (src: string) => `blob:cover-${src}`),
+  mockSaveCover: vi.fn(async () => "/notes/resources/pasted-cover.png"),
+}));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: mockOpen,
@@ -54,6 +59,15 @@ vi.mock("../../utils/previewImageCache", async (importOriginal) => {
   return {
     ...actual,
     resolvePreviewSource: mockResolvePreview,
+  };
+});
+
+vi.mock("../../utils/wechatCoverImage", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../utils/wechatCoverImage")>();
+  return {
+    ...actual,
+    savePastedCoverImage: mockSaveCover,
   };
 });
 
@@ -110,6 +124,7 @@ describe("WechatDraftDialog", () => {
     mockResolvePreview.mockImplementation(
       async (src: string) => `blob:cover-${src}`,
     );
+    mockSaveCover.mockResolvedValue("/notes/resources/pasted-cover.png");
   });
 
   afterEach(() => {
@@ -260,5 +275,56 @@ describe("WechatDraftDialog", () => {
       }),
     );
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("keeps helper tips below the form fields", async () => {
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    const title = await screen.findByText("标题");
+    const tips = document.querySelector(".wechat-draft-tips");
+    expect(tips).toBeTruthy();
+    expect(tips?.textContent).toContain("IP 不在白名单");
+    expect(tips?.textContent).toContain("将上传");
+    expect(
+      title.compareDocumentPosition(tips as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("accepts a pasted image as the cover", async () => {
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    const panel = document.querySelector(".publish-form-panel") as HTMLElement;
+    const image = new File(["png"], "shot.png", { type: "image/png" });
+    fireEvent.paste(panel, {
+      clipboardData: {
+        files: [image],
+        items: [{ type: "image/png", getAsFile: () => image }],
+        getData: () => "",
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockSaveCover).toHaveBeenCalled();
+      expect(
+        screen.getByText("/notes/resources/pasted-cover.png"),
+      ).toBeTruthy();
+    });
   });
 });

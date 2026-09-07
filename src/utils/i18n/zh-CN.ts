@@ -89,6 +89,9 @@ export default {
   wechatDraftDialog_coverLabel: "封面图",
   wechatDraftDialog_coverDesc:
     "封面图会上传为公众号缩略图素材。正文里的本地图片会自动转换为公众号可用图片。",
+  wechatDraftDialog_coverPasteHint: "也可直接粘贴或拖入图片作为封面。",
+  wechatDraftDialog_pasteCoverFailed: "粘贴封面图失败，请重试。",
+  wechatDraftDialog_pasteCoverNeedVault: "请先打开知识库，再粘贴封面图。",
   wechatDraftDialog_showCover: "正文显示封面",
   wechatDraftDialog_pickCover: "选择封面图",
   wechatDraftDialog_pickCoverFailed: "选择封面图失败，请重试。",
