@@ -114,7 +114,7 @@ export default {
   wechatDraftDialog_previewFailed:
     "Could not build the preview. You can still try to publish.",
   wechatDraftDialog_unresolvedImages:
-    "{count} image(s) could not be resolved. Fix the paths before publishing:",
+    "Some images could not be resolved. Fix the paths before publishing.",
   wechatDraftDialog_ipHint:
     "If the IP is not allowlisted, add it under Official Account Settings → Basic Configuration → IP whitelist.",
 

@@ -27,7 +27,7 @@ interface WechatDraftDialogProps {
   defaults: WechatDraftDefaults | null;
   onClose: () => void;
   onSubmit: (input: WechatDraftPublishInput) => void;
-  onPersist?: (input: WechatDraftPublishInput) => void;
+  onPersist?: (input: WechatDraftPublishInput) => void | Promise<void>;
 }
 
 export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
@@ -274,8 +274,14 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
 
   const handleSubmit = () => {
     const input = buildInput();
-    onPersist?.(input);
-    onSubmit(input);
+    void (async () => {
+      try {
+        await onPersist?.(input);
+      } catch (error) {
+        console.error("Failed to persist WeChat draft form:", error);
+      }
+      onSubmit(input);
+    })();
   };
 
   const canSubmit =
@@ -456,20 +462,9 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
               {t("wechatDraftDialog_desc")} {t("wechatDraftDialog_ipHint")}
             </p>
             {unresolvedImages.length > 0 ? (
-              <div className="mt-1.5 rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-                <p>
-                  {t("wechatDraftDialog_unresolvedImages", {
-                    count: unresolvedImages.length,
-                  })}
-                </p>
-                <ul className="mt-1 list-disc pl-4">
-                  {unresolvedImages.slice(0, 6).map((src) => (
-                    <li key={src} className="break-all">
-                      {src}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <p className="mt-1 text-[11px] leading-4 text-amber-700 dark:text-amber-200">
+                {t("wechatDraftDialog_unresolvedImages")}
+              </p>
             ) : null}
           </div>
           {!coverImagePath.trim() ? (

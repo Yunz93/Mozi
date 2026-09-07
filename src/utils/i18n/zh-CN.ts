@@ -101,8 +101,7 @@ export default {
   wechatDraftDialog_previewHint: "接近公众号图文宽度，发布前先看排版和图片。",
   wechatDraftDialog_previewLoading: "正在生成预览…",
   wechatDraftDialog_previewFailed: "预览生成失败，仍可尝试发布。",
-  wechatDraftDialog_unresolvedImages:
-    "有 {count} 张图片找不到，请先修好路径再发布：",
+  wechatDraftDialog_unresolvedImages: "有图片找不到，修好路径后才能发布。",
   wechatDraftDialog_ipHint:
     "IP 不在白名单时，请到公众平台「基本配置 → IP 白名单」添加本机出口 IP。",
 

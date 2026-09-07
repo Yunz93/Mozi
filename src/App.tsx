@@ -1138,9 +1138,7 @@ const App: React.FC = () => {
           onCloseWechatDraft={() => {
             if (!isPublishing) setIsWechatDraftDialogOpen(false);
           }}
-          onPersistWechatDraft={(input) => {
-            void persistWechatDraftForm(input);
-          }}
+          onPersistWechatDraft={(input) => persistWechatDraftForm(input)}
           onSubmitWechatDraft={(input) => {
             void handleSubmitWechatDraft(input).catch((error) => {
               console.error("Failed to submit WeChat draft:", error);
