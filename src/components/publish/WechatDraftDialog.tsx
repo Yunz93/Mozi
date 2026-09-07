@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { Dialog } from "../ui/Dialog";
@@ -50,7 +50,6 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(false);
-  const [imageCount, setImageCount] = useState(0);
   const [unresolvedImages, setUnresolvedImages] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const previewRequestId = useRef(0);
@@ -118,7 +117,6 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   useEffect(() => {
     if (!isOpen || !currentFilePath || !markdownContent) {
       setPreviewHtml("");
-      setImageCount(0);
       setUnresolvedImages([]);
       setPreviewError(false);
       setPreviewLoading(false);
@@ -146,12 +144,10 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
         );
         if (previewRequestId.current !== requestId) return;
         setPreviewHtml(hydrated);
-        setImageCount(prepared.imageAssets.length);
         setUnresolvedImages(prepared.unresolvedImages.filter(Boolean));
       } catch {
         if (previewRequestId.current !== requestId) return;
         setPreviewHtml("");
-        setImageCount(0);
         setUnresolvedImages([]);
         setPreviewError(true);
       } finally {
@@ -265,13 +261,16 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
     }
   };
 
-  const handleClose = () => {
+  const persistInputRef = useRef(buildInput());
+  persistInputRef.current = buildInput();
+
+  const handleClose = useCallback(() => {
     if (isSubmitting) {
       return;
     }
-    onPersist?.(buildInput());
+    onPersist?.(persistInputRef.current);
     onClose();
-  };
+  }, [isSubmitting, onClose, onPersist]);
 
   const handleSubmit = () => {
     const input = buildInput();
@@ -296,11 +295,11 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
       closable={!isSubmitting}
     >
       <div
-        className="publish-form-panel flex min-h-0 h-full flex-col"
+        className="publish-form-panel flex min-h-0 flex-1 flex-col overflow-hidden"
         onPaste={handleCoverPaste}
       >
         <div className="wechat-draft-layout">
-          <div className="wechat-draft-form -mx-1 min-w-0 space-y-3 px-1">
+          <div className="wechat-draft-form -mx-1 min-h-0 min-w-0 space-y-3 overflow-y-auto px-1">
             {defaults?.existingDraftMediaId && (
               <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                 {t("wechatDraftDialog_updateHint")}
@@ -355,7 +354,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                 value={digest}
                 onChange={(event) => setDigest(event.target.value)}
                 rows={3}
-                className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all resize-y min-h-24"
+                className="w-full max-h-32 min-h-20 resize-y rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
               />
             </div>
 
@@ -451,16 +450,13 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
           </aside>
         </div>
 
-        <div className="wechat-draft-footer mt-3 flex shrink-0 flex-col items-end gap-2 border-t border-gray-200/50 pt-3 dark:border-white/10">
-          <div className="wechat-draft-tips w-full space-y-1.5 text-left">
-            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-              {t("wechatDraftDialog_desc")}
-            </p>
-            <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
-              {t("wechatDraftDialog_ipHint")}
+        <div className="wechat-draft-footer mt-2 flex shrink-0 flex-col items-end gap-1.5 border-t border-gray-200/50 pt-2 dark:border-white/10">
+          <div className="wechat-draft-tips w-full text-left">
+            <p className="text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+              {t("wechatDraftDialog_desc")} {t("wechatDraftDialog_ipHint")}
             </p>
             {unresolvedImages.length > 0 ? (
-              <div className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+              <div className="mt-1.5 rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
                 <p>
                   {t("wechatDraftDialog_unresolvedImages", {
                     count: unresolvedImages.length,
@@ -474,10 +470,6 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                   ))}
                 </ul>
               </div>
-            ) : imageCount > 0 ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t("wechatDraftDialog_imageCount", { count: imageCount })}
-              </p>
             ) : null}
           </div>
           {!coverImagePath.trim() ? (

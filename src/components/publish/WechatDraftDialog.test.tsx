@@ -292,11 +292,32 @@ describe("WechatDraftDialog", () => {
     const tips = document.querySelector(".wechat-draft-tips");
     expect(tips).toBeTruthy();
     expect(tips?.textContent).toContain("IP 不在白名单");
-    expect(tips?.textContent).toContain("将上传");
+    expect(tips?.textContent).not.toContain("将上传");
     expect(
       title.compareDocumentPosition(tips as Node) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("keeps focus in the author field after each keystroke", async () => {
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    const author = screen.getByDisplayValue("作者") as HTMLInputElement;
+    author.focus();
+    fireEvent.change(author, { target: { value: "作者A" } });
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(author);
+    });
+    expect(author.value).toBe("作者A");
   });
 
   it("accepts a pasted image as the cover", async () => {
