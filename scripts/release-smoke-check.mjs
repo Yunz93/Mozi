@@ -149,16 +149,31 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
+  const readme = readFileSync(join(projectRoot, "README.md"), "utf8");
+  if (!readme.includes("scripts/install-macos.sh")) {
+    console.error(
+      "README.md must document the macOS one-line install script scripts/install-macos.sh.",
+    );
+    process.exit(1);
+  }
+
   const releaseBodyPath = join(projectRoot, ".github", "release-body.md");
   const releaseBody = existsSync(releaseBodyPath)
     ? readFileSync(releaseBodyPath, "utf8")
     : "";
-  const documentsInstallScript =
-    workflow.includes("scripts/install-macos.sh") ||
-    releaseBody.includes("scripts/install-macos.sh");
-  if (!documentsInstallScript) {
+  if (releaseBody && !releaseBody.includes("{{VERSION}}")) {
     console.error(
-      "release.yml or .github/release-body.md must document the macOS one-line install script scripts/install-macos.sh.",
+      ".github/release-body.md must include {{VERSION}} so each GitHub Release can show that version's notes.",
+    );
+    process.exit(1);
+  }
+  if (
+    /macOS 安装说明|Windows 安装说明|See the assets to download/.test(
+      releaseBody,
+    )
+  ) {
+    console.error(
+      ".github/release-body.md should only contain this version's changelog, not repeated install instructions.",
     );
     process.exit(1);
   }
