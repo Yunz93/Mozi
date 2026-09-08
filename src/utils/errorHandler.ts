@@ -1,5 +1,6 @@
 import { useAppStore } from "../store/appStore";
-import { t } from "./i18n";
+import type { AppLanguage } from "../types";
+import { localizeKnownError, t } from "./i18n";
 
 /**
  * Error codes for file system operations
@@ -109,25 +110,70 @@ export async function withErrorHandling<T>(
   }
 }
 
-/**
- * Create an error handler for async operations
- */
+const INVOKE_ERROR_KEYS = [
+  "message",
+  "error",
+  "errmsg",
+  "payload",
+  "data",
+] as const;
+
+function isBlankOrObjectString(value: string): boolean {
+  const trimmed = value.trim();
+  return !trimmed || trimmed === "[object Object]";
+}
+
 /** Normalize invoke / DOM / Error values into a readable message. */
 export function getErrorMessage(error: unknown): string {
+  return readErrorMessage(error, 0);
+}
+
+function readErrorMessage(error: unknown, depth: number): string {
+  if (depth > 4 || error == null) {
+    return "";
+  }
   if (typeof error === "string") {
-    return error.trim();
+    return isBlankOrObjectString(error) ? "" : error.trim();
+  }
+  if (typeof ErrorEvent !== "undefined" && error instanceof ErrorEvent) {
+    return (
+      readErrorMessage(error.error, depth + 1) ||
+      (isBlankOrObjectString(error.message) ? "" : error.message.trim())
+    );
   }
   if (error instanceof Error) {
-    return error.message.trim();
-  }
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message: unknown }).message;
-    if (typeof message === "string") {
-      return message.trim();
+    const message = error.message.trim();
+    if (!isBlankOrObjectString(message)) {
+      return message;
     }
+    if ("cause" in error) {
+      return readErrorMessage(error.cause, depth + 1);
+    }
+    return "";
   }
+  if (typeof error !== "object") {
+    return "";
+  }
+
+  const record = error as Record<string, unknown>;
+  if (record.errcode != null && String(record.errcode).trim()) {
+    const errmsg =
+      typeof record.errmsg === "string" ? record.errmsg.trim() : "";
+    return errmsg
+      ? `WeChat API error ${record.errcode}: ${errmsg}`
+      : `WeChat API error ${record.errcode}`;
+  }
+
+  for (const key of INVOKE_ERROR_KEYS) {
+    if (!(key in record)) continue;
+    const nested = readErrorMessage(record[key], depth + 1);
+    if (nested) return nested;
+  }
+
   return "";
 }
+
+const RESOURCE_ERROR_TAGS = /^(IMG|VIDEO|AUDIO|SOURCE|LINK|IFRAME)$/i;
 
 /** 预览图、样式等资源加载失败不应当成应用崩溃。 */
 export function isIgnorableWindowErrorEvent(event: Event): boolean {
@@ -135,10 +181,30 @@ export function isIgnorableWindowErrorEvent(event: Event): boolean {
   if (!(target instanceof Element)) {
     return false;
   }
-  if (event instanceof ErrorEvent && event.error) {
-    return false;
+  if (RESOURCE_ERROR_TAGS.test(target.tagName)) {
+    return true;
   }
-  return /^(IMG|VIDEO|AUDIO|SOURCE|LINK|IFRAME|SCRIPT)$/i.test(target.tagName);
+  // Failed <script src> loads, not executed script exceptions.
+  if (target.tagName === "SCRIPT") {
+    return !(event instanceof ErrorEvent && event.error);
+  }
+  return false;
+}
+
+/** Prefer a mapped WeChat/API toast over the generic ErrorBoundary copy. */
+export function userFacingRuntimeErrorMessage(
+  error: unknown,
+  language: AppLanguage,
+): string {
+  const raw = getErrorMessage(error);
+  if (!raw) {
+    return t(language, "errorBoundary_fallbackMessage");
+  }
+  const localized = localizeKnownError(language, raw);
+  if (localized !== raw) {
+    return localized;
+  }
+  return t(language, "errorBoundary_fallbackMessage");
 }
 
 /** 顶层未捕获错误：尽量提示用户，store 未就绪时只打日志。 */
@@ -151,12 +217,16 @@ export function reportUnhandledRuntimeError(
     const language = useAppStore.getState().settings.language;
     useAppStore
       .getState()
-      .showNotification(t(language, "errorBoundary_fallbackMessage"), "error");
+      .showNotification(
+        userFacingRuntimeErrorMessage(error, language),
+        "error",
+      );
   } catch {
     // store / i18n 可能尚未就绪
   }
 }
 
+/** Create an error handler for async operations. */
 export function createErrorHandler(context: string) {
   return {
     withErrorHandling: <T>(operation: () => Promise<T>): Promise<T> =>
