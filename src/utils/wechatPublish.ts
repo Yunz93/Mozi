@@ -59,6 +59,8 @@ interface PrepareWechatDraftPublishOptions {
   rootFolderPath?: string | null;
   currentFilePath: string;
   markdownContent: string;
+  /** Draft title shown by WeChat; used to drop a duplicate leading H1. */
+  title?: string;
   settings: Pick<
     AppSettings,
     "previewFontFamily" | "codeFontFamily" | "fontSize" | "markdownStylePreset"
@@ -200,6 +202,47 @@ function resolveWechatLinkTab(value: string): "innerlink" | "outerlink" {
 
 function isImagePath(value: string): boolean {
   return IMAGE_FILE_PATTERN.test(value);
+}
+
+function normalizeWechatTitleText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function firstMeaningfulChild(host: ParentNode): ChildNode | null {
+  for (const child of Array.from(host.childNodes)) {
+    if (child.nodeType === Node.COMMENT_NODE) {
+      continue;
+    }
+    if (child.nodeType === Node.TEXT_NODE && !child.textContent?.trim()) {
+      continue;
+    }
+    return child;
+  }
+  return null;
+}
+
+/**
+ * WeChat already renders the draft title above the article body.
+ * Drop the first H1 when it repeats that title so the published HTML
+ * and in-app phone preview do not show two identical headings.
+ */
+export function stripLeadingWechatTitleHeading(
+  host: HTMLElement,
+  title: string,
+): void {
+  const normalizedTitle = normalizeWechatTitleText(title);
+  if (!normalizedTitle) {
+    return;
+  }
+
+  const first = firstMeaningfulChild(host);
+  if (!(first instanceof HTMLElement) || first.tagName !== "H1") {
+    return;
+  }
+
+  if (normalizeWechatTitleText(first.textContent ?? "") === normalizedTitle) {
+    first.remove();
+  }
 }
 
 function setInlineStyle(
@@ -470,7 +513,9 @@ export async function prepareWechatDraftPublish(
     );
   }
 
-  const { body } = parseFrontmatter(markdownContent);
+  const { frontmatter, body } = parseFrontmatter(markdownContent);
+  const draftTitle =
+    options.title?.trim() || resolveTitle(frontmatter, currentFilePath);
   const markdownStylePreset = normalizeMarkdownStylePreset(
     settings.markdownStylePreset,
   );
@@ -481,6 +526,7 @@ export async function prepareWechatDraftPublish(
   });
   const host = document.createElement("div");
   host.innerHTML = renderedHtml;
+  stripLeadingWechatTitleHeading(host, draftTitle);
 
   const attachmentResolverContext = createAttachmentResolverContext(
     files,
