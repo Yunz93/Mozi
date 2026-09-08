@@ -165,7 +165,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
                   />
                   <button
                     onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                     aria-label={showApiKey ? "Hide API key" : "Show API key"}
                   >
                     <EyeIcon visible={showApiKey} />
@@ -319,7 +319,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
                   />
                   <button
                     onClick={() => setShowDeepSeekApiKey(!showDeepSeekApiKey)}
-                    className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                     aria-label={
                       showDeepSeekApiKey ? "Hide API key" : "Show API key"
                     }
@@ -413,7 +413,7 @@ export const AITab: React.FC<SettingsTabProps> = ({
                   />
                   <button
                     onClick={() => setShowOpenAIApiKey(!showOpenAIApiKey)}
-                    className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                     aria-label={
                       showOpenAIApiKey ? "Hide API key" : "Show API key"
                     }
