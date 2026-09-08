@@ -4,7 +4,9 @@ export interface PaletteCommand {
   group: string;
   keywords?: string;
   shortcut?: string;
-  run: () => void;
+  /** Hidden from the empty-query list; shown when the query matches. */
+  showOnlyWhenQueried?: boolean;
+  run: (query?: string) => void;
 }
 
 function normalizeQuery(value: string): string {
@@ -22,7 +24,9 @@ export function filterPaletteCommands(
   query: string,
 ): PaletteCommand[] {
   const needle = normalizeQuery(query);
-  if (!needle) return commands;
+  if (!needle) {
+    return commands.filter((command) => !command.showOnlyWhenQueried);
+  }
 
   const scored = commands
     .map((command) => {

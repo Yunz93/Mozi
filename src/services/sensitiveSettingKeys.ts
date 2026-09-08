@@ -1,6 +1,7 @@
 export const SENSITIVE_SETTING_KEYS = [
   "blogGithubToken",
   "wechatAppSecret",
+  "wereadApiKey",
   "geminiApiKey",
   "codexApiKey",
   "deepseekApiKey",

@@ -63,6 +63,8 @@ export interface AIWikiGenerationResult {
 
 export type AIProvider = "gemini" | "codex" | "deepseek";
 
+export type WereadImportFolderMode = "flat" | "author" | "year" | "authorYear";
+
 export interface ShortcutConfig {
   save: string;
   toggleView: string;
@@ -223,6 +225,15 @@ export interface AppSettings {
   blogGithubToken?: string;
   wechatAppId: string;
   wechatAppSecret?: string;
+  wereadApiKey?: string;
+  /** Vault-relative folder for WeRead import notes. */
+  wereadImportFolder: string;
+  /** How imported WeRead notes are nested under wereadImportFolder. */
+  wereadImportFolderMode: WereadImportFolderMode;
+  /** Download book covers into the resource folder instead of hotlinking. */
+  wereadImportSaveCover: boolean;
+  /** Append a clearly labeled popular-highlights section. */
+  wereadImportIncludeHotHighlights: boolean;
   geminiApiKey?: string;
   geminiModel?: string;
   codexApiBaseUrl?: string;

@@ -41,7 +41,7 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
   const runCommand = (command: PaletteCommand | undefined) => {
     if (!command) return;
     onClose();
-    command.run();
+    command.run(query);
   };
 
   return (

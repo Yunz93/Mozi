@@ -23,6 +23,7 @@ export function useSecureSettings(
   const secureSaveRequestIdRef = useRef<Record<SensitiveSettingKey, number>>({
     blogGithubToken: 0,
     wechatAppSecret: 0,
+    wereadApiKey: 0,
     geminiApiKey: 0,
     codexApiKey: 0,
     deepseekApiKey: 0,

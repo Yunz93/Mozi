@@ -13,6 +13,7 @@ const SECURE_SETTINGS_KEY_FILE_NAME: &str = "secure-settings.key";
 const SECURE_SETTINGS_VERSION: u8 = 1;
 const SECRET_KEY_BLOG_GITHUB_TOKEN: &str = "blogGithubToken";
 const SECRET_KEY_WECHAT_APP_SECRET: &str = "wechatAppSecret";
+const SECRET_KEY_WEREAD_API_KEY: &str = "wereadApiKey";
 const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
 const SECRET_KEY_CODEX_API_KEY: &str = "codexApiKey";
 const SECRET_KEY_DEEPSEEK_API_KEY: &str = "deepseekApiKey";
@@ -27,6 +28,7 @@ const SECRET_KEY_EMBEDDING_API_KEY: &str = "embeddingApiKey";
 pub(crate) struct SecureSettingsResult {
     blog_github_token: Option<String>,
     wechat_app_secret: Option<String>,
+    weread_api_key: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
     deepseek_api_key: Option<String>,
@@ -42,6 +44,7 @@ pub(crate) struct SecureSettingsResult {
 struct SecureSettingsFile {
     blog_github_token: Option<String>,
     wechat_app_secret: Option<String>,
+    weread_api_key: Option<String>,
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
     deepseek_api_key: Option<String>,
@@ -319,6 +322,7 @@ fn write_secure_settings_file(
     let path = secure_settings_file_path(app)?;
     let has_secrets = settings.blog_github_token.is_some()
         || settings.wechat_app_secret.is_some()
+        || settings.weread_api_key.is_some()
         || settings.gemini_api_key.is_some()
         || settings.codex_api_key.is_some()
         || settings.deepseek_api_key.is_some()
@@ -371,6 +375,7 @@ fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String
     Ok(match key {
         SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token,
         SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret,
+        SECRET_KEY_WEREAD_API_KEY => settings.weread_api_key,
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
         SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key,
@@ -399,6 +404,7 @@ fn write_secure_secret(
         match key {
             SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token = normalized,
             SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret = normalized,
+            SECRET_KEY_WEREAD_API_KEY => settings.weread_api_key = normalized,
             SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
             SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
             SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key = normalized,
@@ -426,6 +432,7 @@ fn resolve_secret_key(key: &str) -> Option<&'static str> {
     match key {
         SECRET_KEY_BLOG_GITHUB_TOKEN => Some(SECRET_KEY_BLOG_GITHUB_TOKEN),
         SECRET_KEY_WECHAT_APP_SECRET => Some(SECRET_KEY_WECHAT_APP_SECRET),
+        SECRET_KEY_WEREAD_API_KEY => Some(SECRET_KEY_WEREAD_API_KEY),
         SECRET_KEY_GEMINI_API_KEY => Some(SECRET_KEY_GEMINI_API_KEY),
         SECRET_KEY_CODEX_API_KEY => Some(SECRET_KEY_CODEX_API_KEY),
         SECRET_KEY_DEEPSEEK_API_KEY => Some(SECRET_KEY_DEEPSEEK_API_KEY),
@@ -459,6 +466,7 @@ fn get_secure_settings_blocking(app: &tauri::AppHandle) -> Result<SecureSettings
     Ok(SecureSettingsResult {
         blog_github_token: read_secure_secret(&app, SECRET_KEY_BLOG_GITHUB_TOKEN)?,
         wechat_app_secret: read_secure_secret(&app, SECRET_KEY_WECHAT_APP_SECRET)?,
+        weread_api_key: read_secure_secret(&app, SECRET_KEY_WEREAD_API_KEY)?,
         gemini_api_key: read_secure_secret(&app, SECRET_KEY_GEMINI_API_KEY)?,
         codex_api_key: read_secure_secret(&app, SECRET_KEY_CODEX_API_KEY)?,
         deepseek_api_key: read_secure_secret(&app, SECRET_KEY_DEEPSEEK_API_KEY)?,
@@ -501,9 +509,23 @@ pub(crate) async fn set_secure_secret(
     .map_err(|e| format!("Failed to join secure settings write task: {}", e))?
 }
 
+pub(crate) fn read_weread_api_key(
+    app: &tauri::AppHandle,
+) -> Result<Option<String>, String> {
+    read_secure_secret(app, SECRET_KEY_WEREAD_API_KEY)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolve_secret_key_accepts_weread_api_key() {
+        assert_eq!(
+            resolve_secret_key(SECRET_KEY_WEREAD_API_KEY),
+            Some(SECRET_KEY_WEREAD_API_KEY)
+        );
+    }
 
     #[test]
     fn resolve_secret_key_accepts_embedding_api_key() {

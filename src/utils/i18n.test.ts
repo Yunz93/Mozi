@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatMessage, t, localizeKnownError } from "./i18n";
+import zhCN from "./i18n/zh-CN";
+import en from "./i18n/en";
 
 describe("formatMessage", () => {
   it("returns template unchanged when no params provided", () => {
@@ -34,6 +36,9 @@ describe("formatMessage", () => {
 });
 
 describe("t", () => {
+  it("keeps English keys aligned with Chinese", () => {
+    expect(Object.keys(en).sort()).toEqual(Object.keys(zhCN).sort());
+  });
   it("returns Chinese translation for zh-CN", () => {
     expect(t("zh-CN", "common_done")).toBe("完成");
   });
@@ -47,6 +52,13 @@ describe("t", () => {
     expect(t("zh-CN", "settings_wechatAppSecretHint")).toContain("开发者密码");
     expect(t("zh-CN", "settings_wechatGuide3")).toContain("IP 白名单");
     expect(t("zh-CN", "settings_wechatGuide3")).not.toContain("封面图");
+  });
+
+  it("documents WeRead import settings and dialog copy", () => {
+    expect(t("zh-CN", "settings_wereadApiKeyDesc")).toContain("wrk-");
+    expect(t("zh-CN", "wereadImport_conflictMerge")).toContain("合并");
+    expect(t("zh-CN", "commandPalette_wereadImport")).toContain("微信读书");
+    expect(t("en", "wereadImport_includeHot")).toMatch(/popular highlights/i);
   });
 
   it("falls back to Chinese when key is missing in target locale", () => {
@@ -158,5 +170,17 @@ describe("localizeKnownError", () => {
       "WeChat API error 40164 during fetching access token: invalid ip 203.0.113.8, not in whitelist";
     expect(localizeKnownError("zh-CN", message)).toContain("203.0.113.8");
     expect(localizeKnownError("en", message)).toContain("203.0.113.8");
+  });
+
+  it("maps WeRead skill upgrade and API key errors", () => {
+    expect(
+      localizeKnownError(
+        "zh-CN",
+        "WeRead skill upgrade required: 请升级 Skill 到 1.0.5",
+      ),
+    ).toContain("1.0.5");
+    expect(
+      localizeKnownError("zh-CN", "WeRead API key is required."),
+    ).toContain("API Key");
   });
 });
