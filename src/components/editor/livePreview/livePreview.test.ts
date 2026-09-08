@@ -466,7 +466,19 @@ describe("live preview hide formatting", () => {
       /cm-live-preview-math-display[^}]*text-align:\s*center/,
     );
     expect(sheetText).toMatch(
+      /cm-live-preview-callout[^}]*padding:\s*0\.9rem 1rem/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-callout[^}]*white-space:\s*normal/,
+    );
+    expect(sheetText).toMatch(
       /cm-live-preview-callout-body\.markdown-body\s*\{[^}]*line-height:\s*inherit/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-callout-body\.markdown-body\s*\{[^}]*white-space:\s*normal/,
+    );
+    expect(sheetText).toMatch(
+      /cm-live-preview-callout-body\.markdown-body\s*\{[^}]*background:\s*transparent/,
     );
     expect(sheetText).toMatch(
       /cm-live-preview-callout-body\.markdown-body p\s*\{[^}]*margin-bottom:\s*0/,
@@ -480,6 +492,43 @@ describe("live preview hide formatting", () => {
     expect(sheetText).toMatch(
       /cm-live-preview-mermaid \.mermaid > svg\s*\{[^}]*margin-inline:\s*auto/,
     );
+  });
+
+  it("renders compact live callouts without preview blank-line placeholders", () => {
+    const doc = [
+      "> [!note] 提示",
+      "> 空行输入 / 可插入这类提示块。",
+      "",
+      "> [!caution] 注意",
+      ">",
+      "> 测试",
+      ">",
+      "> 测试",
+      "",
+      "away",
+    ].join("\n");
+    const view = mount(doc, doc.length - 1, [
+      livePreviewTheme,
+      livePreviewCallouts,
+    ]);
+    const callouts = [
+      ...view.dom.querySelectorAll(".cm-live-preview-callout"),
+    ] as HTMLElement[];
+    expect(callouts).toHaveLength(2);
+    expect(callouts[0].classList.contains("cm-live-preview-callout-note")).toBe(
+      true,
+    );
+    expect(
+      callouts[1].classList.contains("cm-live-preview-callout-caution"),
+    ).toBe(true);
+    for (const callout of callouts) {
+      expect(callout.querySelector(".preview-source-blank-line")).toBeNull();
+      const body = callout.querySelector(
+        ".cm-live-preview-callout-body",
+      ) as HTMLElement | null;
+      expect(body).not.toBeNull();
+      expect(body!.innerHTML).not.toMatch(/^\s/);
+    }
   });
 
   it("allows block decorations via StateField extensions without crashing", () => {

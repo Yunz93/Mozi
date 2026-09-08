@@ -1570,11 +1570,28 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Nested markdown-it HTML inside callouts / note embeds. */
+/* Nested markdown-it HTML inside callouts / note embeds.
+   Callout widgets inherit `.cm-content { white-space: pre }` / `.cm-lineWrapping
+   { white-space: break-spaces }`, so reset to `normal` like Reading blockquotes
+   (trailing `</p>\n` must not become an extra blank line). Padding matches
+   `.preview-pane-document.markdown-body blockquote`. */
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-callout {
+  white-space: normal;
+  padding: 0.9rem 1rem;
+}
+
+.editor-pane-layout[data-live-preview="true"] .cm-live-preview-callout-title {
+  margin: 0;
+}
+
 .editor-pane-layout[data-live-preview="true"]
   .cm-live-preview-callout-body.markdown-body {
   font-size: inherit;
   line-height: inherit;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  white-space: normal;
 }
 
 .editor-pane-layout[data-live-preview="true"]

@@ -215,8 +215,11 @@ export function buildCalloutDecorations(
             themeMode: ctx.themeMode,
             markdownStylePreset: ctx.markdownStylePreset,
             highlighter: ctx.highlighter ?? null,
+            // Preview callouts are nested blockquotes; blank-line placeholders
+            // are top-level only. Keep the widget body compact to match.
+            preserveSourceBlankLines: false,
           };
-          const cacheKey = `${callout.bodyMarkdown}::${ctx.themeMode ?? "light"}::${ctx.markdownStylePreset ?? "nord"}::${ctx.highlighter?.__revision ?? 0}`;
+          const cacheKey = `${callout.bodyMarkdown}::${ctx.themeMode ?? "light"}::${ctx.markdownStylePreset ?? "nord"}::${ctx.highlighter?.__revision ?? 0}::compact`;
           bodyHtml = getCachedMarkdownHtml(
             callout.bodyMarkdown,
             (source) => renderMarkdown(source, renderOpts),

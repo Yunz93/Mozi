@@ -497,21 +497,24 @@ export const livePreviewTheme = EditorView.baseTheme({
   // Callouts echo Reading blockquote chrome + type accents.
   // Block widgets sit beside `.cm-line` (no horizontal padding on `.cm-content`);
   // margin-inline matches the text column used in Reading.
+  // `white-space: normal` is required: `.cm-content` uses pre/break-spaces, and
+  // markdown-it HTML (`</p>\n`) would otherwise paint a full extra blank line.
   ".cm-live-preview-callout": {
     display: "block",
     boxSizing: "border-box",
     marginInline: "var(--pane-content-px)",
-    padding: "0.9em 1em",
-    paddingBlock: "0.9em",
+    padding: "0.9rem 1rem",
     borderRadius: "0 14px 14px 0",
     borderInlineStart:
       "4px solid var(--mp-doc-accent, rgba(124, 58, 237, 0.28))",
     background:
       "color-mix(in srgb, var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 70%, transparent)",
     color: "var(--mp-doc-quote-text, #5b21b6)",
+    whiteSpace: "normal",
   },
   ".cm-live-preview-callout-title": {
     fontWeight: "700",
+    margin: 0,
     paddingBottom: 0,
     textTransform: "capitalize",
     color: "var(--mp-doc-text, inherit)",
@@ -519,6 +522,10 @@ export const livePreviewTheme = EditorView.baseTheme({
   ".cm-live-preview-callout-body.markdown-body": {
     fontSize: "inherit",
     lineHeight: "inherit",
+    margin: 0,
+    padding: 0,
+    background: "transparent",
+    whiteSpace: "normal",
   },
   ".cm-live-preview-callout-body.markdown-body p": {
     marginTop: 0,
