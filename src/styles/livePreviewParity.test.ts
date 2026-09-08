@@ -141,7 +141,19 @@ describe("live preview / reading visual parity", () => {
 
   it("keeps live callout body line spacing aligned with prose", () => {
     expect(editorCss).toMatch(
+      /\.cm-live-preview-callout\s*\{[^}]*white-space:\s*normal;/m,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-live-preview-callout\s*\{[^}]*padding:\s*0\.9rem 1rem;/m,
+    );
+    expect(editorCss).toMatch(
       /\.cm-live-preview-callout-body\.markdown-body\s*\{[^}]*line-height:\s*inherit;/m,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-live-preview-callout-body\.markdown-body\s*\{[^}]*white-space:\s*normal;/m,
+    );
+    expect(editorCss).toMatch(
+      /\.cm-live-preview-callout-body\.markdown-body\s*\{[^}]*background:\s*transparent;/m,
     );
     expect(editorCss).toMatch(
       /\.cm-live-preview-callout-body\.markdown-body\s*\n\s*p\s*\{[^}]*margin-bottom:\s*0;/m,
