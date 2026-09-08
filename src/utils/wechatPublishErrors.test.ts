@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { classifyWechatPublishError } from "./wechatPublishErrors";
+import {
+  classifyWechatPublishError,
+  extractWechatAllowlistIps,
+} from "./wechatPublishErrors";
 
 describe("classifyWechatPublishError", () => {
   it("maps missing credentials and title", () => {
@@ -22,6 +25,22 @@ describe("classifyWechatPublishError", () => {
         "WeChat API error 40164 during fetching access token: invalid ip 1.2.3.4, not in whitelist",
       ),
     ).toBe("ipAllowlist");
+  });
+
+  it("extracts blocked IPv4s from WeChat 40164 errmsgs", () => {
+    expect(
+      extractWechatAllowlistIps(
+        "WeChat API error 40164 during fetching access token: invalid ip 1.2.3.4, not in whitelist",
+      ),
+    ).toEqual(["1.2.3.4"]);
+    expect(
+      extractWechatAllowlistIps(
+        "invalid ip 10.0.0.1 ipv6 ::ffff:10.0.0.1, not in whitelist",
+      ),
+    ).toEqual(["10.0.0.1"]);
+    expect(extractWechatAllowlistIps("invalid ip, not in whitelist")).toEqual(
+      [],
+    );
   });
 
   it("maps invalid AppID and AppSecret", () => {

@@ -145,4 +145,11 @@ describe("localizeKnownError", () => {
       ),
     ).toContain("白名单");
   });
+
+  it("prints the blocked IP when WeChat returns one", () => {
+    const message =
+      "WeChat API error 40164 during fetching access token: invalid ip 203.0.113.8, not in whitelist";
+    expect(localizeKnownError("zh-CN", message)).toContain("203.0.113.8");
+    expect(localizeKnownError("en", message)).toContain("203.0.113.8");
+  });
 });

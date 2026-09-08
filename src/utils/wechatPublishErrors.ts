@@ -12,6 +12,21 @@ export type WechatPublishErrorKind =
   | "generic";
 
 const WECHAT_API_ERROR_RE = /WeChat API error\s+(-?\d+)/i;
+const IPV4_RE =
+  /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g;
+
+/** IPv4s WeChat reported as blocked (40164 errmsg: `invalid ip 1.2.3.4, …`). */
+export function extractWechatAllowlistIps(message: string): string[] {
+  const ips: string[] = [];
+  const seen = new Set<string>();
+  for (const match of message.matchAll(IPV4_RE)) {
+    const ip = match[0];
+    if (seen.has(ip)) continue;
+    seen.add(ip);
+    ips.push(ip);
+  }
+  return ips;
+}
 
 function looksLikeWechatError(message: string): boolean {
   return /wechat/i.test(message) || /微信/i.test(message);

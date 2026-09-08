@@ -840,6 +840,8 @@ export default {
   notifications_wechatTitleRequired: "请填写公众号图文标题。",
   notifications_wechatIpAllowlist:
     "当前出口 IP 不在公众号白名单。请到微信公众平台「基本配置」加入本机公网 IP 后再试。",
+  notifications_wechatIpAllowlistWithIp:
+    "当前出口 IP {ip} 不在公众号白名单。请到微信公众平台「基本配置」加入该地址后再试。",
   notifications_wechatInvalidAppId:
     "公众号 AppID 无效。请到设置 → 发布核对 AppID。",
   notifications_wechatInvalidAppSecret:
