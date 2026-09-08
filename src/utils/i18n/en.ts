@@ -802,19 +802,19 @@ export default {
   settings_wechatAppId: "WeChat AppID",
   settings_wechatAppIdPlaceholder: "Example: wx1234567890abcdef",
   settings_wechatAppIdDesc:
-    "Enter the Official Account AppID. It is stored with the normal local settings.",
+    "Sign in at mp.weixin.qq.com → Settings and Development → Developer Tools → Basic Configuration, then copy Developer ID (AppID). It is stored with local settings.",
   settings_wechatAppSecret: "WeChat AppSecret",
   settings_wechatAppSecretPlaceholder: "Paste the AppSecret here...",
   settings_wechatAppSecretDesc:
     "Required. Used to obtain the Official Account access token and stored only in secure local storage.",
   settings_wechatAppSecretHint:
-    "Enable developer access in WeChat Official Account settings and make sure your outbound server IP is in the allowlist.",
+    "On the same page, view or reset Developer Password (AppSecret). An admin must scan to confirm; the old password stops working immediately, so paste the new one here.",
   settings_wechatGuide1:
     "Publishing to drafts uploads local body images as WeChat article images before creating or updating the draft.",
   settings_wechatGuide2:
     "The first version supports one Official Account only. Republishing the same note prefers the saved `wechat_draft_media_id` and updates that draft.",
   settings_wechatGuide3:
-    "The cover image is selected during publishing and uploaded as a WeChat thumbnail asset.",
+    "The IP allowlist is also on Basic Configuration: click Modify next to IP Whitelist and add this machine's public IPv4. Look up your public IP, or use the address shown when publish fails. Without it, WeChat will not issue an access token.",
   settings_desktopPublishOnly:
     "One-click publishing is available in the desktop app only.",
   settings_updatesSectionTitle: "App updates",
