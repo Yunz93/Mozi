@@ -1,5 +1,8 @@
 import type { AppLanguage } from "../types";
-import { classifyWechatPublishError } from "./wechatPublishErrors";
+import {
+  classifyWechatPublishError,
+  extractWechatAllowlistIps,
+} from "./wechatPublishErrors";
 import zhCN from "./i18n/zh-CN";
 import en from "./i18n/en";
 
@@ -70,6 +73,15 @@ export function localizeKnownError(
   if (exactKey) return t(language, exactKey);
 
   const wechatKind = classifyWechatPublishError(normalizedMessage);
+  if (wechatKind === "ipAllowlist") {
+    const ips = extractWechatAllowlistIps(normalizedMessage);
+    if (ips.length > 0) {
+      return t(language, "notifications_wechatIpAllowlistWithIp", {
+        ip: ips.join(language === "zh-CN" ? "、" : ", "),
+      });
+    }
+    return t(language, "notifications_wechatIpAllowlist");
+  }
   if (wechatKind) {
     return t(language, wechatPublishErrorKeys[wechatKind]);
   }

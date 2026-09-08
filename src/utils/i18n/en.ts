@@ -917,6 +917,8 @@ export default {
   notifications_wechatTitleRequired: "Enter a title for the WeChat draft.",
   notifications_wechatIpAllowlist:
     "This machine's public IP is not in the Official Account IP allowlist. Add it under Settings → Basic Configuration, then retry.",
+  notifications_wechatIpAllowlistWithIp:
+    "Public IP {ip} is not in the Official Account IP allowlist. Add that address under Settings → Basic Configuration, then retry.",
   notifications_wechatInvalidAppId:
     "The WeChat AppID is invalid. Check it in Settings → Publishing.",
   notifications_wechatInvalidAppSecret:
