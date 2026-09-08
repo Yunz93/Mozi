@@ -742,18 +742,19 @@ export default {
   settings_wechatAppId: "公众号 AppID",
   settings_wechatAppIdPlaceholder: "例如：wx1234567890abcdef",
   settings_wechatAppIdDesc:
-    "填写公众号的开发者 AppID。它会随设置一起保存在本地。",
+    "登录微信公众平台 mp.weixin.qq.com →「设置与开发」→「开发接口管理」→「基本配置」，复制「开发者 ID（AppID）」。会随设置保存在本地。",
   settings_wechatAppSecret: "公众号 AppSecret",
   settings_wechatAppSecretPlaceholder: "在此粘贴 AppSecret...",
   settings_wechatAppSecretDesc:
     "必填。用于获取公众号 access_token，仅保存在当前设备的安全存储中。",
   settings_wechatAppSecretHint:
-    "请先在微信公众平台开发设置中开启开发者能力，并确认服务器出口 IP 已加入白名单。",
+    "同一页可查看或重置「开发者密码（AppSecret）」。需管理员扫码确认；重置后旧密码立即失效，请把新密码粘贴到这里。",
   settings_wechatGuide1:
     "发布到草稿箱会先把正文中的本地图片上传为公众号可用图片，再创建或更新草稿。",
   settings_wechatGuide2:
     "第一版只支持单个公众号账号。再次发布同一篇笔记时，会优先使用笔记里保存的 `wechat_draft_media_id` 更新原草稿。",
-  settings_wechatGuide3: "封面图会在发布时临时选择，并上传为公众号缩略图素材。",
+  settings_wechatGuide3:
+    "IP 白名单也在「基本配置」页：点「IP 白名单」后的「修改」，加入本机公网 IPv4。可在浏览器搜索「本机 IP」，或看发布失败提示里的地址。未加入时无法获取 access_token。",
   settings_desktopPublishOnly: "一键发布仅在桌面版可用。",
   settings_updatesSectionTitle: "应用更新",
   settings_updatesSectionDesc:

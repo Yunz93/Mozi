@@ -42,6 +42,13 @@ describe("t", () => {
     expect(t("en", "common_done")).toBe("Done");
   });
 
+  it("explains WeChat AppID, AppSecret, and IP allowlist on the settings page", () => {
+    expect(t("zh-CN", "settings_wechatAppIdDesc")).toContain("开发者 ID");
+    expect(t("zh-CN", "settings_wechatAppSecretHint")).toContain("开发者密码");
+    expect(t("zh-CN", "settings_wechatGuide3")).toContain("IP 白名单");
+    expect(t("zh-CN", "settings_wechatGuide3")).not.toContain("封面图");
+  });
+
   it("falls back to Chinese when key is missing in target locale", () => {
     // common_loading exists in both zh-CN and en, but let's test a key that only exists in zh-CN
     // Actually all keys exist in both. Let's use a custom key instead.
