@@ -84,7 +84,7 @@ export default {
 
   wechatDraftDialog_title: "Publish to WeChat drafts",
   wechatDraftDialog_desc:
-    "Review the article metadata before publishing. Title, author, digest, and cover are saved on this note so you do not have to re-enter them.",
+    "Title, author, digest, and cover are saved on this note.",
   wechatDraftDialog_updateHint:
     "This note is already linked to a WeChat draft, so publishing will update that draft.",
   wechatDraftDialog_titleLabel: "Title",
@@ -113,11 +113,10 @@ export default {
   wechatDraftDialog_previewLoading: "Building preview…",
   wechatDraftDialog_previewFailed:
     "Could not build the preview. You can still try to publish.",
-  wechatDraftDialog_imageCount: "{count} body image(s) will be uploaded",
   wechatDraftDialog_unresolvedImages:
-    "{count} image(s) could not be resolved. Fix the paths before publishing:",
+    "Some images could not be resolved. Fix the paths before publishing.",
   wechatDraftDialog_ipHint:
-    "If the API says the IP is not allowlisted, add this machine's public IP under Official Account Settings → Basic Configuration → IP whitelist.",
+    "If the IP is not allowlisted, add it under Official Account Settings → Basic Configuration → IP whitelist.",
 
   simpleBlogDialog_title: "Publish to Simple Blog",
   simpleBlogDialog_desc:

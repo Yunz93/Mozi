@@ -188,12 +188,14 @@ describe("WechatDraftDialog", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "发布到草稿箱" }));
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "草稿标题",
-        coverImagePath: "/covers/thumb.jpg",
-      }),
-    );
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "草稿标题",
+          coverImagePath: "/covers/thumb.jpg",
+        }),
+      );
+    });
   });
 
   it("keeps the chosen cover when publish defaults are rebuilt", async () => {
@@ -292,11 +294,63 @@ describe("WechatDraftDialog", () => {
     const tips = document.querySelector(".wechat-draft-tips");
     expect(tips).toBeTruthy();
     expect(tips?.textContent).toContain("IP 不在白名单");
-    expect(tips?.textContent).toContain("将上传");
+    expect(tips?.textContent).not.toContain("将上传");
+    expect(tips?.textContent).not.toContain("张正文图片");
+    expect(tips?.querySelector("ul")).toBeNull();
     expect(
       title.compareDocumentPosition(tips as Node) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("does not list unresolved image paths in the helper tips", async () => {
+    mockPrepare.mockResolvedValue({
+      contentHtml: "<p>正文</p>",
+      previewHtml: "<p>正文</p>",
+      imageAssets: [],
+      unresolvedImages: ["a.png", "b.png"],
+    });
+
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("有图片找不到，修好路径后才能发布。"),
+      ).toBeTruthy();
+    });
+    const tips = document.querySelector(".wechat-draft-tips");
+    expect(tips?.textContent).not.toContain("a.png");
+    expect(tips?.textContent).not.toContain("将上传");
+    expect(tips?.querySelector("ul")).toBeNull();
+  });
+
+  it("keeps focus in the author field after each keystroke", async () => {
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+
+    const author = screen.getByDisplayValue("作者") as HTMLInputElement;
+    author.focus();
+    fireEvent.change(author, { target: { value: "作者A" } });
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(author);
+    });
+    expect(author.value).toBe("作者A");
   });
 
   it("accepts a pasted image as the cover", async () => {

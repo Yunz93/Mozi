@@ -2,7 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./src/App";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
-import { reportUnhandledRuntimeError } from "./src/utils/errorHandler";
+import {
+  isIgnorableWindowErrorEvent,
+  reportUnhandledRuntimeError,
+} from "./src/utils/errorHandler";
 import { ensureExcalidrawAssetPath } from "./src/utils/excalidrawAssetPath";
 import {
   ensureDynamicFontFaces,
@@ -33,6 +36,9 @@ if (typeof window !== "undefined") {
     reportUnhandledRuntimeError(event.reason, "unhandledrejection");
   });
   window.addEventListener("error", (event) => {
+    if (isIgnorableWindowErrorEvent(event)) {
+      return;
+    }
     reportUnhandledRuntimeError(event.error ?? event.message, "error");
   });
 }

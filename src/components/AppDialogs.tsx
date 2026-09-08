@@ -50,7 +50,9 @@ interface AppDialogsProps {
   onSubmitSimpleBlog: (input: SimpleBlogPublishInput) => void;
   onCloseWechatDraft: () => void;
   onSubmitWechatDraft: (input: WechatDraftPublishInput) => void;
-  onPersistWechatDraft?: (input: WechatDraftPublishInput) => void;
+  onPersistWechatDraft?: (
+    input: WechatDraftPublishInput,
+  ) => void | Promise<void>;
   onCloseShareLongImage: () => void;
   isAiEnhanceConfirmOpen?: boolean;
   onConfirmAiEnhance?: () => void;

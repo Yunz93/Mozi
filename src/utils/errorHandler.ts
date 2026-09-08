@@ -112,6 +112,35 @@ export async function withErrorHandling<T>(
 /**
  * Create an error handler for async operations
  */
+/** Normalize invoke / DOM / Error values into a readable message. */
+export function getErrorMessage(error: unknown): string {
+  if (typeof error === "string") {
+    return error.trim();
+  }
+  if (error instanceof Error) {
+    return error.message.trim();
+  }
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message: unknown }).message;
+    if (typeof message === "string") {
+      return message.trim();
+    }
+  }
+  return "";
+}
+
+/** 预览图、样式等资源加载失败不应当成应用崩溃。 */
+export function isIgnorableWindowErrorEvent(event: Event): boolean {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  if (event instanceof ErrorEvent && event.error) {
+    return false;
+  }
+  return /^(IMG|VIDEO|AUDIO|SOURCE|LINK|IFRAME|SCRIPT)$/i.test(target.tagName);
+}
+
 /** 顶层未捕获错误：尽量提示用户，store 未就绪时只打日志。 */
 export function reportUnhandledRuntimeError(
   error: unknown,

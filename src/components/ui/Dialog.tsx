@@ -33,32 +33,35 @@ export const Dialog: React.FC<DialogProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const closableRef = useRef(closable);
   const settings = useAppStore((state) => state.settings);
   const uiFontScale = settings.uiFontSize / defaultSettings.uiFontSize;
   const uiFontFamily = getResolvedUiFontFamily(settings);
+  onCloseRef.current = onClose;
+  closableRef.current = closable;
 
-  // Handle escape key
+  // Escape / initial focus must not depend on onClose identity.
+  // Callers often pass inline closures, and re-focusing the shell on each
+  // render steals the caret from inputs after every keystroke.
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        if (closable) onClose();
+        if (closableRef.current) onCloseRef.current();
       }
     };
 
-    // Store the previously focused element
     previousActiveElement.current = document.activeElement as HTMLElement;
-
-    // Focus the dialog
     requestAnimationFrame(() => {
       dialogRef.current?.focus();
     });
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, closable]);
+  }, [isOpen]);
 
   // Restore focus on close
   useEffect(() => {

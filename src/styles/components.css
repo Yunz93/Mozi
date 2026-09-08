@@ -978,31 +978,34 @@
 }
 
 .wechat-draft-layout {
-  display: grid;
-  gap: 1rem;
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1rem;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .wechat-draft-form {
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 @media (min-width: 880px) {
   .wechat-draft-layout {
-    grid-template-columns: minmax(0, 1fr) 375px;
+    flex-direction: row;
     align-items: stretch;
-    overflow: hidden;
   }
 
   .wechat-draft-form {
-    min-height: 0;
-    overflow: auto;
+    flex: 1 1 auto;
   }
 
   .wechat-draft-preview-pane {
     display: flex;
+    flex: 0 0 375px;
     flex-direction: column;
     min-height: 0;
   }

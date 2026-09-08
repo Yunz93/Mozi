@@ -27,6 +27,7 @@ import {
   normalizeBlogSiteUrl,
 } from "../utils/blogRepo";
 import { refreshDocumentUpdateTime } from "../utils/metadataFields";
+import { getErrorMessage } from "../utils/errorHandler";
 import { localizeKnownError, t, type TranslationKey } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
 import { isMarkdownFile } from "../utils/fileTypes";
@@ -190,7 +191,13 @@ export function usePublishActions(
       if (latestContent === undefined) {
         return;
       }
-      const nextContent = applyWechatDraftPublishInput(latestContent, input);
+      let nextContent: string;
+      try {
+        nextContent = applyWechatDraftPublishInput(latestContent, input);
+      } catch (error) {
+        console.error("Failed to apply WeChat draft form:", error);
+        return;
+      }
       if (nextContent === latestContent) {
         return;
       }
@@ -675,6 +682,21 @@ export function usePublishActions(
           return false;
         }
 
+        const { invoke } = await import("@tauri-apps/api/core");
+        const pathsToAllow = [
+          input.coverImagePath.trim(),
+          ...prepared.imageAssets.map(
+            (asset) => asset.sourcePath?.trim() || "",
+          ),
+        ].filter(Boolean);
+        await Promise.all(
+          pathsToAllow.map((path) =>
+            invoke("register_allowed_path", { path, recursive: false }).catch(
+              () => {},
+            ),
+          ),
+        );
+
         const result = await invokePublishWithTimeout<{ mediaId: string }>(
           "publish_wechat_draft",
           {
@@ -721,10 +743,10 @@ export function usePublishActions(
           );
           return false;
         }
-        const message =
-          error instanceof Error
-            ? localizeKnownError(hydratedSettings.language, error.message)
-            : t(hydratedSettings.language, "notifications_wechatPublishFailed");
+        const rawMessage = getErrorMessage(error);
+        const message = rawMessage
+          ? localizeKnownError(hydratedSettings.language, rawMessage)
+          : t(hydratedSettings.language, "notifications_wechatPublishFailed");
         showNotification(message, "error");
         return false;
       } finally {
