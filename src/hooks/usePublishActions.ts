@@ -669,6 +669,7 @@ export function usePublishActions(
           rootFolderPath: storeState.rootFolderPath,
           currentFilePath: activeFile.path,
           markdownContent: latestContent,
+          title: input.title.trim(),
           settings: storeState.settings,
         });
 

@@ -26,6 +26,7 @@ import {
   extractWechatDraftDefaults,
   hydrateWechatPreviewImages,
   prepareWechatDraftPublish,
+  stripLeadingWechatTitleHeading,
 } from "./wechatPublish";
 import { clearMarkdownCache, renderMarkdown } from "./markdown";
 
@@ -114,6 +115,38 @@ title: old
       coverImagePath: "/covers/a.jpg",
       existingDraftMediaId: "",
     });
+  });
+});
+
+describe("stripLeadingWechatTitleHeading", () => {
+  it("removes the first H1 when it matches the draft title", () => {
+    const host = document.createElement("div");
+    host.innerHTML =
+      '<h1 class="heading-1">墨知正式版发布</h1><p>正文</p><h1>后记</h1>';
+
+    stripLeadingWechatTitleHeading(host, "墨知正式版发布");
+
+    expect(host.querySelectorAll("h1")).toHaveLength(1);
+    expect(host.querySelector("h1")?.textContent).toBe("后记");
+    expect(host.textContent).toContain("正文");
+  });
+
+  it("keeps a leading H1 that is not the draft title", () => {
+    const host = document.createElement("div");
+    host.innerHTML = "<h1>章节标题</h1><p>正文</p>";
+
+    stripLeadingWechatTitleHeading(host, "文章标题");
+
+    expect(host.querySelector("h1")?.textContent).toBe("章节标题");
+  });
+
+  it("does not remove a matching H1 that is not the first block", () => {
+    const host = document.createElement("div");
+    host.innerHTML = "<p>引言</p><h1>文章标题</h1>";
+
+    stripLeadingWechatTitleHeading(host, "文章标题");
+
+    expect(host.querySelector("h1")?.textContent).toBe("文章标题");
   });
 });
 
@@ -223,6 +256,76 @@ describe("prepareWechatDraftPublish", () => {
     expect(prepared.previewHtml).toContain("/notes/cover.png");
     expect(prepared.previewHtml).not.toContain("__WECHAT_LOCAL_IMAGE_1__");
     expect(prepared.unresolvedImages).toHaveLength(0);
+  });
+
+  it("strips a leading H1 that repeats the WeChat draft title", async () => {
+    const prepared = await prepareWechatDraftPublish({
+      files: [],
+      currentFilePath: "/notes/release.md",
+      markdownContent: `---
+title: 墨知正式版发布：Live 模式、一键发布与小知助手
+---
+
+# 墨知正式版发布：Live 模式、一键发布与小知助手
+
+最近抽空做了比较大的重构。
+
+## 新功能
+`,
+      settings: {
+        previewFontFamily: "Arial",
+        codeFontFamily: "Menlo",
+        fontSize: 16,
+        markdownStylePreset: "nord",
+      },
+    });
+
+    expect(prepared.contentHtml).not.toMatch(/<h1\b[^>]*>墨知正式版发布/);
+    expect(prepared.previewHtml).not.toMatch(/<h1\b[^>]*>墨知正式版发布/);
+    expect(prepared.contentHtml).toContain("最近抽空做了比较大的重构");
+    expect(prepared.contentHtml).toMatch(/<h2\b[^>]*>新功能/);
+  });
+
+  it("keeps a leading H1 that differs from the draft title", async () => {
+    const prepared = await prepareWechatDraftPublish({
+      files: [],
+      currentFilePath: "/notes/release.md",
+      markdownContent: `---
+title: 正式版发布说明
+---
+
+# 新功能一览
+
+正文从这里开始。
+`,
+      settings: {
+        previewFontFamily: "Arial",
+        codeFontFamily: "Menlo",
+        fontSize: 16,
+        markdownStylePreset: "nord",
+      },
+    });
+
+    expect(prepared.contentHtml).toMatch(/<h1\b[^>]*>新功能一览/);
+    expect(prepared.contentHtml).toContain("正文从这里开始");
+  });
+
+  it("uses the explicit draft title when stripping a duplicate H1", async () => {
+    const prepared = await prepareWechatDraftPublish({
+      files: [],
+      currentFilePath: "/notes/post.md",
+      title: "自定义发布标题",
+      markdownContent: "# 自定义发布标题\n\n正文内容",
+      settings: {
+        previewFontFamily: "Arial",
+        codeFontFamily: "Menlo",
+        fontSize: 16,
+        markdownStylePreset: "nord",
+      },
+    });
+
+    expect(prepared.contentHtml).not.toMatch(/<h1\b/);
+    expect(prepared.contentHtml).toContain("正文内容");
   });
 });
 
