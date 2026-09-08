@@ -367,6 +367,14 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
           {renderSecureSaveState("wereadApiKey")}
         </div>
 
+        <button
+          type="button"
+          onClick={() => requestWeReadImportDialog()}
+          className="inline-flex items-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:opacity-90 dark:bg-white dark:text-black"
+        >
+          {t("settings_wereadOpenImport")}
+        </button>
+
         <div>
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {t("settings_wereadImportFolder")}
@@ -449,14 +457,6 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
             </span>
           </span>
         </label>
-
-        <button
-          type="button"
-          onClick={() => requestWeReadImportDialog()}
-          className="inline-flex items-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:opacity-90 dark:bg-white dark:text-black"
-        >
-          {t("settings_wereadOpenImport")}
-        </button>
 
         <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs leading-6 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
           <p>{t("settings_wereadGuide1")}</p>

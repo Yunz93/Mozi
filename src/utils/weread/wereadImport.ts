@@ -262,6 +262,7 @@ export async function importWereadBook(
 
     let content: string;
     let status: WereadImportBookResult["status"];
+    let writtenPath = existing?.path ?? preferred.filePath;
     if (existing && request.conflictMode === "merge") {
       content = mergeWereadMarkdown(existing.content, generated);
       await request.writeFile(existing.path, content);
@@ -278,10 +279,13 @@ export async function importWereadBook(
           content,
           targetFolder || preferred.folderPath,
         );
-        if (!created) {
+        if (created?.path) {
+          writtenPath = created.path;
+        } else {
           await ensureDirectory(preferred.folderPath);
           const fs = await getFileSystem();
           await fs.writeFile(preferred.filePath, content);
+          writtenPath = preferred.filePath;
         }
       } catch (error) {
         if (error instanceof FileSystemError && error.code === "FILE_EXISTS") {
@@ -306,7 +310,6 @@ export async function importWereadBook(
       status = "created";
     }
 
-    const writtenPath = existing?.path ?? preferred.filePath;
     notifyVaultFileSaved(writtenPath, content);
     return {
       bookId: notebook.bookId,
