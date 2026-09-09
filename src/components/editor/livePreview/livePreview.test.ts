@@ -533,6 +533,26 @@ describe("live preview hide formatting", () => {
     }
   });
 
+  it("renders ==highlight== inside quote excerpt callouts", () => {
+    const doc = [
+      "> [!quote] 书摘",
+      "> 我们要==给岁月以文明==，而不是给文明以岁月。",
+      "",
+      "away",
+    ].join("\n");
+    const view = mount(doc, doc.length - 1, [
+      livePreviewTheme,
+      livePreviewCallouts,
+    ]);
+    const callout = view.dom.querySelector(
+      ".cm-live-preview-callout-quote",
+    ) as HTMLElement | null;
+    expect(callout).not.toBeNull();
+    expect(callout!.textContent).toContain("给岁月以文明");
+    expect(callout!.textContent).not.toContain("==");
+    expect(callout!.querySelector("mark, .markdown-highlight")).not.toBeNull();
+  });
+
   it("allows block decorations via StateField extensions without crashing", () => {
     const doc = [
       "$$E=mc^2$$",
