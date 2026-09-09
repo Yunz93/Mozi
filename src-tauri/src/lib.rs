@@ -177,20 +177,69 @@ const DEFAULT_WINDOW_HEIGHT: f64 = 800.0;
 const MIN_WINDOW_WIDTH: f64 = 960.0;
 const MIN_WINDOW_HEIGHT: f64 = 640.0;
 
+const SCALE_EPSILON: f64 = 0.01;
+const LOGICAL_SIZE_EPSILON: f64 = 4.0;
+
+#[derive(Clone, Copy, Debug)]
+struct WindowSizeSnapshot {
+    logical: (f64, f64),
+    scale: f64,
+    /// Scale before the latest monitor / DPI crossing. Stale `Resized`
+    /// events after that crossing still report the old physical size.
+    prior_scale: Option<f64>,
+}
+
 #[derive(Default)]
 struct WindowLogicalSizeMemory {
-    sizes: Mutex<HashMap<String, (f64, f64)>>,
+    snapshots: Mutex<HashMap<String, WindowSizeSnapshot>>,
 }
 
 impl WindowLogicalSizeMemory {
-    fn remember(&self, label: &str, size: (f64, f64)) {
-        if let Ok(mut sizes) = self.sizes.lock() {
-            sizes.insert(label.to_string(), size);
-        }
+    fn snapshot(&self, label: &str) -> Option<WindowSizeSnapshot> {
+        self.snapshots.lock().ok()?.get(label).copied()
     }
 
     fn last(&self, label: &str) -> Option<(f64, f64)> {
-        self.sizes.lock().ok()?.get(label).copied()
+        self.snapshot(label).map(|snapshot| snapshot.logical)
+    }
+
+    fn remember(&self, label: &str, size: (f64, f64), scale: f64) {
+        if let Ok(mut snapshots) = self.snapshots.lock() {
+            snapshots.insert(
+                label.to_string(),
+                WindowSizeSnapshot {
+                    logical: size,
+                    scale,
+                    prior_scale: None,
+                },
+            );
+        }
+    }
+
+    fn remember_scale_transition(&self, label: &str, new_scale: f64) {
+        if new_scale <= 0.0 {
+            return;
+        }
+        if let Ok(mut snapshots) = self.snapshots.lock() {
+            if let Some(snapshot) = snapshots.get_mut(label) {
+                if scales_differ(snapshot.scale, new_scale) {
+                    snapshot.prior_scale = Some(snapshot.scale);
+                    snapshot.scale = new_scale;
+                }
+            }
+        }
+    }
+
+    fn any_in_scale_transition(&self) -> bool {
+        self.snapshots
+            .lock()
+            .ok()
+            .map(|snapshots| {
+                snapshots
+                    .values()
+                    .any(|snapshot| snapshot.prior_scale.is_some())
+            })
+            .unwrap_or(false)
     }
 }
 
@@ -203,6 +252,75 @@ fn is_usable_logical_window_size(width: f64, height: f64) -> bool {
         && height.is_finite()
         && width + 0.5 >= MIN_WINDOW_WIDTH
         && height + 0.5 >= MIN_WINDOW_HEIGHT
+}
+
+fn scales_differ(left: f64, right: f64) -> bool {
+    (left - right).abs() > SCALE_EPSILON
+}
+
+fn logical_sizes_close(left: (f64, f64), right: (f64, f64)) -> bool {
+    (left.0 - right.0).abs() <= LOGICAL_SIZE_EPSILON
+        && (left.1 - right.1).abs() <= LOGICAL_SIZE_EPSILON
+}
+
+fn is_dpi_monitor_change(last_scale: Option<f64>, current_scale: f64) -> bool {
+    match last_scale {
+        Some(previous) if current_scale > 0.0 && scales_differ(previous, current_scale) => true,
+        _ => false,
+    }
+}
+
+/// True when the OS kept the same physical pixel size after a DPI change
+/// (2× → 1× makes a 1200×800 window report as 2400×1600 logical).
+fn is_physical_pixels_kept_across_scale(
+    last_logical: (f64, f64),
+    from_scale: f64,
+    to_scale: f64,
+    current_logical: (f64, f64),
+) -> bool {
+    if from_scale <= 0.0 || to_scale <= 0.0 || !scales_differ(from_scale, to_scale) {
+        return false;
+    }
+    let expected = (
+        last_logical.0 * from_scale / to_scale,
+        last_logical.1 * from_scale / to_scale,
+    );
+    logical_sizes_close(current_logical, expected)
+}
+
+fn should_ignore_resize_after_monitor_move(
+    snapshot: Option<WindowSizeSnapshot>,
+    current_logical: (f64, f64),
+    current_scale: f64,
+) -> bool {
+    let Some(snapshot) = snapshot else {
+        return false;
+    };
+    if logical_sizes_close(current_logical, snapshot.logical) {
+        return false;
+    }
+    if let Some(from_scale) = snapshot.prior_scale {
+        if is_physical_pixels_kept_across_scale(
+            snapshot.logical,
+            from_scale,
+            current_scale,
+            current_logical,
+        ) || is_physical_pixels_kept_across_scale(
+            snapshot.logical,
+            from_scale,
+            snapshot.scale,
+            current_logical,
+        ) {
+            return true;
+        }
+    }
+    is_dpi_monitor_change(Some(snapshot.scale), current_scale)
+        && is_physical_pixels_kept_across_scale(
+            snapshot.logical,
+            snapshot.scale,
+            current_scale,
+            current_logical,
+        )
 }
 
 /// Pick a usable logical size after restore or a DPI / monitor change.
@@ -316,12 +434,59 @@ fn ensure_usable_window_size(window: &tauri::WebviewWindow, last_good: Option<(f
 }
 
 fn remember_usable_window_size(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
-    if let Some(size) = window_logical_inner_size(window) {
-        if is_usable_logical_window_size(size.0, size.1) {
-            app.state::<WindowLogicalSizeMemory>()
-                .remember(window.label(), size);
+    let Some(size) = window_logical_inner_size(window) else {
+        return;
+    };
+    let Ok(scale) = window.scale_factor() else {
+        return;
+    };
+    if scale > 0.0 && is_usable_logical_window_size(size.0, size.1) {
+        app.state::<WindowLogicalSizeMemory>()
+            .remember(window.label(), size, scale);
+    }
+}
+
+fn restore_remembered_logical_size(
+    window: &tauri::WebviewWindow,
+    last_good: Option<(f64, f64)>,
+) {
+    let Some((width, height)) =
+        last_good.filter(|(width, height)| is_usable_logical_window_size(*width, *height))
+    else {
+        return;
+    };
+    let _ = window.set_min_size(Some(tauri::LogicalSize::new(
+        MIN_WINDOW_WIDTH,
+        MIN_WINDOW_HEIGHT,
+    )));
+    if let Some(current) = window_logical_inner_size(window) {
+        if logical_sizes_close(current, (width, height)) {
+            return;
         }
     }
+    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+}
+
+fn preserve_logical_size_on_monitor_change(window: &tauri::WebviewWindow) -> bool {
+    let Ok(scale) = window.scale_factor() else {
+        return false;
+    };
+    if scale <= 0.0 {
+        return false;
+    }
+    let memory = window.app_handle().state::<WindowLogicalSizeMemory>();
+    let snapshot = memory.snapshot(window.label());
+    let current_logical = window_logical_inner_size(window);
+    let dpi_changed = is_dpi_monitor_change(snapshot.map(|item| item.scale), scale);
+    let stale_resize = current_logical
+        .map(|size| should_ignore_resize_after_monitor_move(snapshot, size, scale))
+        .unwrap_or(false);
+    if !dpi_changed && !stale_resize {
+        return false;
+    }
+    restore_remembered_logical_size(window, snapshot.map(|item| item.logical));
+    memory.remember_scale_transition(window.label(), scale);
+    true
 }
 
 fn enforce_all_window_sizes(app: &tauri::AppHandle) {
@@ -451,10 +616,17 @@ fn force_exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-fn persist_window_state(app: &tauri::AppHandle) {
+fn persist_window_state(app: &tauri::AppHandle, require_settled: bool) {
     use tauri_plugin_window_state::{AppHandleExt, StateFlags};
     // The plugin writes physical pixels. Skip mid-DPI-move frames so a ~400px
-    // transitional size is not what the next launch restores.
+    // or blown-up transitional size is not what the next launch restores.
+    if require_settled
+        && app
+            .state::<WindowLogicalSizeMemory>()
+            .any_in_scale_transition()
+    {
+        return;
+    }
     if app
         .webview_windows()
         .values()
@@ -549,7 +721,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    persist_window_state(window.app_handle());
+                    let _ = preserve_logical_size_on_monitor_change(window);
+                    persist_window_state(window.app_handle(), false);
                     if ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst) {
                         return;
                     }
@@ -564,10 +737,8 @@ pub fn run() {
                     scale_factor,
                     new_inner_size,
                 } => {
-                    let last_good = window
-                        .app_handle()
-                        .state::<WindowLogicalSizeMemory>()
-                        .last(window.label());
+                    let memory = window.app_handle().state::<WindowLogicalSizeMemory>();
+                    let last_good = memory.last(window.label());
                     let (width, height) = resolve_scale_change_logical_size(
                         last_good,
                         *scale_factor,
@@ -586,22 +757,27 @@ pub fn run() {
                     } else {
                         (0.0, 0.0)
                     };
-                    if (incoming_logical.0 - width).abs() > 1.0
-                        || (incoming_logical.1 - height).abs() > 1.0
-                    {
+                    if !logical_sizes_close(incoming_logical, (width, height)) {
                         let _ = window.set_size(tauri::LogicalSize::new(width, height));
                     }
-                    window
-                        .app_handle()
-                        .state::<WindowLogicalSizeMemory>()
-                        .remember(window.label(), (width, height));
+                    if last_good.is_some() {
+                        memory.remember_scale_transition(window.label(), *scale_factor);
+                    } else {
+                        memory.remember(window.label(), (width, height), *scale_factor);
+                    }
                 }
                 tauri::WindowEvent::Resized(_) => {
+                    if preserve_logical_size_on_monitor_change(window) {
+                        return;
+                    }
                     let memory = window.app_handle().state::<WindowLogicalSizeMemory>();
                     match window_logical_inner_size(window) {
                         Some(size) if is_usable_logical_window_size(size.0, size.1) => {
-                            memory.remember(window.label(), size);
-                            persist_window_state(window.app_handle());
+                            let scale = window.scale_factor().ok().filter(|value| *value > 0.0);
+                            if let Some(scale) = scale {
+                                memory.remember(window.label(), size, scale);
+                            }
+                            persist_window_state(window.app_handle(), true);
                         }
                         Some(_) if memory.last(window.label()).is_none() => {
                             // First paint after a tiny window-state restore.
@@ -612,7 +788,10 @@ pub fn run() {
                     }
                 }
                 tauri::WindowEvent::Moved(_) => {
-                    persist_window_state(window.app_handle());
+                    if preserve_logical_size_on_monitor_change(window) {
+                        return;
+                    }
+                    persist_window_state(window.app_handle(), true);
                 }
                 _ => {}
             }
@@ -650,7 +829,8 @@ pub fn run() {
                 enforce_all_window_sizes(app);
             }
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
-                persist_window_state(app);
+                enforce_all_window_sizes(app);
+                persist_window_state(app, false);
                 // 仅拦截系统触发的退出（Cmd+Q / 任务栏关闭）；前端在保存完成后调用 exit(0)
                 // 会带 code，直接放行。最后一个窗口已经 destroy 时也不能再拦，否则进程会变成僵尸。
                 if code.is_none() && !app.webview_windows().is_empty() {
@@ -1176,6 +1356,77 @@ mod tests {
         assert!(!is_usable_logical_window_size(400.0, 300.0));
         assert!(!is_usable_logical_window_size(767.0, 640.0));
         assert!(is_usable_logical_window_size(960.0, 640.0));
+    }
+
+    #[test]
+    fn physical_pixels_kept_across_scale_detects_2x_to_1x_blowup() {
+        assert!(is_physical_pixels_kept_across_scale(
+            (1200.0, 800.0),
+            2.0,
+            1.0,
+            (2400.0, 1600.0),
+        ));
+        assert!(is_physical_pixels_kept_across_scale(
+            (1200.0, 800.0),
+            1.0,
+            2.0,
+            (600.0, 400.0),
+        ));
+        assert!(!is_physical_pixels_kept_across_scale(
+            (1200.0, 800.0),
+            2.0,
+            1.0,
+            (1300.0, 820.0),
+        ));
+        assert!(!is_physical_pixels_kept_across_scale(
+            (1200.0, 800.0),
+            2.0,
+            2.0,
+            (2400.0, 1600.0),
+        ));
+    }
+
+    #[test]
+    fn ignore_resize_after_monitor_move_until_logical_size_matches() {
+        let snapshot = WindowSizeSnapshot {
+            logical: (1200.0, 800.0),
+            scale: 2.0,
+            prior_scale: None,
+        };
+        assert!(should_ignore_resize_after_monitor_move(
+            Some(snapshot),
+            (2400.0, 1600.0),
+            1.0,
+        ));
+        assert!(!should_ignore_resize_after_monitor_move(
+            Some(snapshot),
+            (1200.0, 800.0),
+            1.0,
+        ));
+
+        let after_transition = WindowSizeSnapshot {
+            logical: (1200.0, 800.0),
+            scale: 1.0,
+            prior_scale: Some(2.0),
+        };
+        assert!(should_ignore_resize_after_monitor_move(
+            Some(after_transition),
+            (2400.0, 1600.0),
+            1.0,
+        ));
+        assert!(!should_ignore_resize_after_monitor_move(
+            Some(after_transition),
+            (1400.0, 900.0),
+            1.0,
+        ));
+    }
+
+    #[test]
+    fn dpi_monitor_change_ignores_first_reading_and_same_scale() {
+        assert!(!is_dpi_monitor_change(None, 2.0));
+        assert!(!is_dpi_monitor_change(Some(2.0), 2.0));
+        assert!(is_dpi_monitor_change(Some(2.0), 1.0));
+        assert!(is_dpi_monitor_change(Some(1.0), 2.0));
     }
 
     fn create_test_directory(prefix: &str) -> PathBuf {
