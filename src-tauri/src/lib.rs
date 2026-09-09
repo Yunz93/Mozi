@@ -616,6 +616,10 @@ fn force_exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+fn webview_for_window_event(window: &tauri::Window) -> Option<tauri::WebviewWindow> {
+    window.app_handle().get_webview_window(window.label())
+}
+
 fn persist_window_state(app: &tauri::AppHandle, require_settled: bool) {
     use tauri_plugin_window_state::{AppHandleExt, StateFlags};
     // The plugin writes physical pixels. Skip mid-DPI-move frames so a ~400px
@@ -721,7 +725,9 @@ pub fn run() {
         .on_window_event(|window, event| {
             match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    let _ = preserve_logical_size_on_monitor_change(window);
+                    if let Some(webview) = webview_for_window_event(window) {
+                        let _ = preserve_logical_size_on_monitor_change(&webview);
+                    }
                     persist_window_state(window.app_handle(), false);
                     if ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst) {
                         return;
@@ -736,6 +742,7 @@ pub fn run() {
                 tauri::WindowEvent::ScaleFactorChanged {
                     scale_factor,
                     new_inner_size,
+                    ..
                 } => {
                     let memory = window.app_handle().state::<WindowLogicalSizeMemory>();
                     let last_good = memory.last(window.label());
@@ -767,29 +774,34 @@ pub fn run() {
                     }
                 }
                 tauri::WindowEvent::Resized(_) => {
-                    if preserve_logical_size_on_monitor_change(window) {
+                    let Some(webview) = webview_for_window_event(window) else {
+                        return;
+                    };
+                    if preserve_logical_size_on_monitor_change(&webview) {
                         return;
                     }
-                    let memory = window.app_handle().state::<WindowLogicalSizeMemory>();
-                    match window_logical_inner_size(window) {
+                    let memory = webview.app_handle().state::<WindowLogicalSizeMemory>();
+                    match window_logical_inner_size(&webview) {
                         Some(size) if is_usable_logical_window_size(size.0, size.1) => {
-                            let scale = window.scale_factor().ok().filter(|value| *value > 0.0);
+                            let scale = webview.scale_factor().ok().filter(|value| *value > 0.0);
                             if let Some(scale) = scale {
-                                memory.remember(window.label(), size, scale);
+                                memory.remember(webview.label(), size, scale);
                             }
-                            persist_window_state(window.app_handle(), true);
+                            persist_window_state(webview.app_handle(), true);
                         }
-                        Some(_) if memory.last(window.label()).is_none() => {
+                        Some(_) if memory.last(webview.label()).is_none() => {
                             // First paint after a tiny window-state restore.
-                            ensure_usable_window_size(window, None);
-                            remember_usable_window_size(window.app_handle(), window);
+                            ensure_usable_window_size(&webview, None);
+                            remember_usable_window_size(webview.app_handle(), &webview);
                         }
                         _ => {}
                     }
                 }
                 tauri::WindowEvent::Moved(_) => {
-                    if preserve_logical_size_on_monitor_change(window) {
-                        return;
+                    if let Some(webview) = webview_for_window_event(window) {
+                        if preserve_logical_size_on_monitor_change(&webview) {
+                            return;
+                        }
                     }
                     persist_window_state(window.app_handle(), true);
                 }
