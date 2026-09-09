@@ -55,6 +55,8 @@ describe("t", () => {
   });
 
   it("documents WeRead import settings and dialog copy", () => {
+    expect(t("zh-CN", "settings_tab_readingNotes")).toBe("读书笔记同步");
+    expect(t("zh-CN", "settings_readingNotesTabWeread")).toBe("微信读书");
     expect(t("zh-CN", "settings_wereadApiKeyDesc")).toContain("wrk-");
     expect(t("zh-CN", "wereadImport_conflictMerge")).toContain("合并");
     expect(t("zh-CN", "commandPalette_wereadImport")).toContain("微信读书");

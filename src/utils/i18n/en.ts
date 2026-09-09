@@ -499,6 +499,7 @@ export default {
   settings_tab_interface: "Interface",
   settings_tab_imageHosting: "Image Hosting",
   settings_tab_publishing: "Publishing",
+  settings_tab_readingNotes: "Reading notes sync",
   settings_tab_about: "About",
   settings_interface: "Interface",
   settings_languageLabel: "Display language",
@@ -794,7 +795,8 @@ export default {
   settings_publishingTitle: "Publishing",
   settings_publishingTabSimpleBlog: "simple-blog",
   settings_publishingTabWechat: "WeChat",
-  settings_publishingTabWeread: "WeRead",
+  settings_readingNotesTitle: "Reading notes sync",
+  settings_readingNotesTabWeread: "WeRead",
   settings_aboutTitle: "About",
   settings_aboutDesc:
     "See the current version, check for updates, and review how updates work on each platform.",

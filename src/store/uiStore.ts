@@ -56,7 +56,7 @@ export interface UIState {
   isSidebarOpen: boolean;
   isSettingsOpen: boolean;
   /** When opening settings, jump to this tab once (then cleared). */
-  settingsFocusTab: "ai" | "index" | "editor" | null;
+  settingsFocusTab: "ai" | "index" | "editor" | "readingNotes" | null;
   isSaving: boolean;
   isAnalyzing: boolean;
   isPublishing: boolean;

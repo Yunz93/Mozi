@@ -9,6 +9,7 @@ import { AITab } from "./tabs/AITab";
 import { MetadataTab } from "./tabs/MetadataTab";
 import { ShortcutsTab } from "./tabs/ShortcutsTab";
 import { PublishingTab } from "./tabs/PublishingTab";
+import { ReadingNotesTab } from "./tabs/ReadingNotesTab";
 import { ImageHostingTab } from "./tabs/ImageHostingTab";
 import { UpdatesTab } from "./tabs/UpdatesTab";
 import { IndexTab } from "./tabs/IndexTab";
@@ -31,6 +32,7 @@ type SettingsTab =
   | "index"
   | "interface"
   | "imageHosting"
+  | "readingNotes"
   | "about";
 
 interface TabConfig {
@@ -50,6 +52,7 @@ function getTabs(
     { id: "shortcuts", label: t("settings_tab_shortcuts") },
     { id: "imageHosting", label: t("settings_tab_imageHosting") },
     { id: "general", label: t("settings_tab_publishing") },
+    { id: "readingNotes", label: t("settings_tab_readingNotes") },
     { id: "about", label: t("settings_tab_about") },
   ];
 }
@@ -111,7 +114,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (
       settingsFocusTab === "ai" ||
       settingsFocusTab === "index" ||
-      settingsFocusTab === "editor"
+      settingsFocusTab === "editor" ||
+      settingsFocusTab === "readingNotes"
     ) {
       setActiveTab(settingsFocusTab);
       clearSettingsFocusTab();
@@ -209,6 +213,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       case "general":
         return (
           <PublishingTab
+            settings={settings}
+            onUpdateSettings={onUpdateSettings}
+          />
+        );
+      case "readingNotes":
+        return (
+          <ReadingNotesTab
             settings={settings}
             onUpdateSettings={onUpdateSettings}
           />

@@ -68,7 +68,7 @@ export function useWeReadImportActions() {
     const apiKey = useAppStore.getState().settings.wereadApiKey?.trim();
     if (!apiKey) {
       showNotification(t("wereadImport_needApiKey"), "error");
-      setSettingsOpen(true);
+      setSettingsOpen(true, "readingNotes");
       return false;
     }
     return true;
