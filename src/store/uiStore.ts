@@ -56,7 +56,7 @@ export interface UIState {
   isSidebarOpen: boolean;
   isSettingsOpen: boolean;
   /** When opening settings, jump to this tab once (then cleared). */
-  settingsFocusTab: "ai" | "index" | "editor" | null;
+  settingsFocusTab: "ai" | "index" | "editor" | "readingNotes" | null;
   isSaving: boolean;
   isAnalyzing: boolean;
   isPublishing: boolean;
@@ -183,6 +183,11 @@ export const defaultSettings: AppSettings = {
   blogGithubToken: "",
   wechatAppId: "",
   wechatAppSecret: "",
+  wereadApiKey: "",
+  wereadImportFolder: "读书",
+  wereadImportFolderMode: "flat",
+  wereadImportSaveCover: true,
+  wereadImportIncludeHotHighlights: false,
   geminiApiKey: "",
   geminiModel: "gemini-2.0-flash-exp",
   codexApiBaseUrl: "https://api.openai.com/v1",

@@ -38,6 +38,12 @@ import { CommandPalette } from "./components/commandPalette/CommandPalette";
 import { buildCommandPaletteItems } from "./components/commandPalette/buildCommandPaletteItems";
 import { useExportActions } from "./hooks/useExportActions";
 import { usePublishActions } from "./hooks/usePublishActions";
+import { useWeReadImportActions } from "./hooks/useWeReadImportActions";
+import {
+  fetchAllNotebooksCached,
+  notebookAuthor,
+  notebookTitle,
+} from "./utils/weread/wereadApi";
 import { ViewMode } from "./types";
 import { requestEditorRangeFocus } from "./utils/editorSelectionBridge";
 import {
@@ -221,6 +227,11 @@ const App: React.FC = () => {
     handlePublishWechatDraft,
     persistWechatDraftForm,
   } = usePublishActions(forceSave);
+  const weReadImport = useWeReadImportActions();
+  const openWeReadImportDialog = weReadImport.openDialog;
+  const [wereadNotebooks, setWereadNotebooks] = useState<
+    Array<{ bookId: string; title: string; author?: string }>
+  >([]);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
 
@@ -238,6 +249,29 @@ const App: React.FC = () => {
     useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
     useState(false);
+
+  useEffect(() => {
+    if (!isCommandPaletteOpen) return;
+    if (!settings.wereadApiKey?.trim()) return;
+    let cancelled = false;
+    void fetchAllNotebooksCached()
+      .then((books) => {
+        if (cancelled) return;
+        setWereadNotebooks(
+          books.map((book) => ({
+            bookId: book.bookId,
+            title: notebookTitle(book),
+            author: notebookAuthor(book) || undefined,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setWereadNotebooks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCommandPaletteOpen, settings.wereadApiKey]);
 
   const openRuntimeExternalPaths = useCallback(
     async (paths: string[]) => {
@@ -681,6 +715,13 @@ const App: React.FC = () => {
           setIsAskVaultOpen(true);
           setIsOutlineOpen(false);
         },
+        importWeread: (query, bookIds) => {
+          openWeReadImportDialog({
+            initialQuery: query,
+            bookIds,
+          });
+        },
+        wereadNotebooks,
       }),
     [
       activeTabId,
@@ -705,6 +746,8 @@ const App: React.FC = () => {
       t,
       toggleTheme,
       viewMode,
+      openWeReadImportDialog,
+      wereadNotebooks,
     ],
   );
 
@@ -1108,6 +1151,10 @@ const App: React.FC = () => {
           isPublishTargetDialogOpen={isPublishTargetDialogOpen}
           isSimpleBlogDialogOpen={isSimpleBlogDialogOpen}
           isWechatDraftDialogOpen={isWechatDraftDialogOpen}
+          isWeReadImportDialogOpen={weReadImport.isOpen}
+          isWeReadImporting={weReadImport.isImporting}
+          weReadImportInitialQuery={weReadImport.initialQuery}
+          weReadImportPreselectedBookIds={weReadImport.preselectedBookIds}
           isShareLongImageDialogOpen={isShareLongImageDialogOpen}
           isPublishing={isPublishing}
           settings={settings}
@@ -1144,6 +1191,10 @@ const App: React.FC = () => {
               console.error("Failed to submit WeChat draft:", error);
             });
           }}
+          onCloseWeReadImport={weReadImport.closeDialog}
+          onLoadWeReadNotebooks={weReadImport.loadNotebooks}
+          onSearchWeReadStore={weReadImport.searchBooks}
+          onImportWeRead={weReadImport.importSelected}
           onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
           isAiEnhanceConfirmOpen={isAiEnhanceConfirmOpen}
           onConfirmAiEnhance={() => {

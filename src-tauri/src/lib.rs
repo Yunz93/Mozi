@@ -6,6 +6,7 @@ mod sample_notes;
 mod secure_settings;
 mod system_fonts;
 mod url_encode;
+mod weread;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use sample_notes::{CopySampleNotesResult, SAMPLE_NOTES_FOLDER_NAME};
@@ -714,6 +715,8 @@ pub fn run() {
             copy_sample_notes,
             publishing::publish_simple_blog,
             publishing::publish_wechat_draft,
+            weread::weread_gateway,
+            weread::weread_download_cover,
             upload_image_to_hosting,
             check_macos_update,
             install_macos_update,

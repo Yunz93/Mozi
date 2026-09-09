@@ -91,6 +91,10 @@ describe("defaultSettings", () => {
       "**/node_modules/**",
     ]);
     expect(defaultSettings.shortcuts.commandPalette).toMatch(/Shift\+P$/);
+    expect(defaultSettings.wereadImportFolder).toBe("读书");
+    expect(defaultSettings.wereadImportFolderMode).toBe("flat");
+    expect(defaultSettings.wereadImportSaveCover).toBe(true);
+    expect(defaultSettings.wereadImportIncludeHotHighlights).toBe(false);
   });
 });
 

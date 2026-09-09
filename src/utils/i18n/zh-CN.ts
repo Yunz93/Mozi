@@ -14,6 +14,9 @@ export default {
   commandPalette_groupEditor: "编辑",
   commandPalette_groupTable: "表格",
   commandPalette_groupPublish: "发布",
+  commandPalette_groupWeread: "微信读书",
+  commandPalette_wereadImport: "导入微信读书笔记",
+  commandPalette_wereadImportBook: "导入《{title}》的微信读书笔记",
   commandPalette_bold: "加粗",
   commandPalette_italic: "斜体",
   commandPalette_insertLink: "插入链接",
@@ -104,6 +107,31 @@ export default {
   wechatDraftDialog_unresolvedImages: "有图片找不到，修好路径后才能发布。",
   wechatDraftDialog_ipHint:
     "IP 不在白名单时，请到公众平台「基本配置 → IP 白名单」添加本机出口 IP。",
+
+  wereadImport_title: "导入微信读书笔记",
+  wereadImport_desc:
+    "选择有划线或想法的书，每本书生成一篇 Markdown。再次导入同一本时默认合并，并保留你写在生成内容之后的文字。",
+  wereadImport_searchPlaceholder: "按书名或作者筛选，也可搜索书城…",
+  wereadImport_listCount: "{count} 本有笔记的书",
+  wereadImport_toggleVisible: "全选当前列表",
+  wereadImport_empty: "没有匹配的笔记本。换个关键词，或检查 API Key。",
+  wereadImport_searching: "正在书城搜索…",
+  wereadImport_fromStore: "来自书城搜索，导入时仍只写入你的划线与想法",
+  wereadImport_stats:
+    "划线 {notes} · 想法 {reviews} · 书签 {bookmarks} · 合计 {total}",
+  wereadImport_conflictLabel: "若笔记已存在",
+  wereadImport_conflictMerge: "合并（更新划线/想法，保留文末附录）",
+  wereadImport_conflictSkip: "跳过",
+  wereadImport_conflictOverwrite: "覆盖整篇",
+  wereadImport_saveCover: "下载封面到本地（不热链远程图片）",
+  wereadImport_includeHot: "附加「热门划线」并标明来源",
+  wereadImport_submit: "导入 {count} 本",
+  wereadImport_importing: "正在导入…",
+  wereadImport_desktopOnly: "微信读书导入仅在桌面版可用。",
+  wereadImport_needApiKey: "请先在设置中填写微信读书 API Key。",
+  wereadImport_done:
+    "导入完成：成功 {imported}，跳过 {skipped}，失败 {failed}。",
+  wereadImport_failed: "导入微信读书笔记失败。",
 
   simpleBlogDialog_title: "发布到 Simple Blog",
   simpleBlogDialog_desc:
@@ -440,6 +468,7 @@ export default {
   settings_tab_interface: "界面",
   settings_tab_imageHosting: "图床",
   settings_tab_publishing: "发布",
+  settings_tab_readingNotes: "读书笔记同步",
   settings_tab_about: "关于",
   settings_interface: "界面",
   settings_languageLabel: "显示语言",
@@ -706,6 +735,8 @@ export default {
   settings_publishingTitle: "发布设置",
   settings_publishingTabSimpleBlog: "simple-blog",
   settings_publishingTabWechat: "微信公众号",
+  settings_readingNotesTitle: "读书笔记同步",
+  settings_readingNotesTabWeread: "微信读书",
   settings_aboutTitle: "关于",
   settings_aboutDesc: "查看当前版本、检查更新，并了解不同平台的更新方式。",
   settings_aboutAuthor: "作者",
@@ -755,6 +786,36 @@ export default {
     "第一版只支持单个公众号账号。再次发布同一篇笔记时，会优先使用笔记里保存的 `wechat_draft_media_id` 更新原草稿。",
   settings_wechatGuide3:
     "IP 白名单也在「基本配置」页：点「IP 白名单」后的「修改」，加入本机公网 IPv4。可在浏览器搜索「本机 IP」，或看发布失败提示里的地址。未加入时无法获取 access_token。",
+  settings_wereadSectionTitle: "微信读书笔记导入",
+  settings_wereadSectionDesc:
+    "用微信读书 Skill API Key 把划线和想法导入为本地 Markdown 笔记。密钥只保存在本机。",
+  settings_wereadApiKey: "微信读书 API Key",
+  settings_wereadApiKeyPlaceholder: "wrk-xxxxxxxx",
+  settings_wereadApiKeyDesc:
+    "必填。在 weread.qq.com/r/weread-skills 创建微信读书 Skill，复制 API Key。格式以 wrk- 开头。",
+  settings_wereadApiKeyHint:
+    "密钥仅用于本机调用微信读书网关，不会上传到其他服务器。",
+  settings_wereadImportFolder: "导入目录",
+  settings_wereadImportFolderDesc:
+    "相对知识库根目录。默认「读书」。可再按作者或出版年份分子目录。",
+  settings_wereadImportFolderMode: "目录结构",
+  settings_wereadImportFolderModeFlat: "全部放在导入目录下",
+  settings_wereadImportFolderModeAuthor: "按作者分子目录",
+  settings_wereadImportFolderModeYear: "按出版年份分子目录",
+  settings_wereadImportFolderModeAuthorYear: "按作者 / 年份分子目录",
+  settings_wereadSaveCover: "下载封面到本地资源目录",
+  settings_wereadSaveCoverDesc:
+    "勾选后把封面保存到资源目录，笔记使用本地图片，不会默认热链远程封面。",
+  settings_wereadIncludeHot: "导入时附带热门划线",
+  settings_wereadIncludeHotDesc:
+    "在笔记末尾增加「热门划线」一节，并标明这些是他人常划的句子，不是你的笔记。",
+  settings_wereadOpenImport: "打开导入对话框",
+  settings_wereadGuide1:
+    "导入内容 = 划线原文 + 个人想法/点评。书签只统计数量，当前无法导出书签内容。",
+  settings_wereadGuide2:
+    "同一本书用 weread_book_id 识别。再次导入可选择跳过、覆盖，或合并（保留你写在生成内容之后的附录）。",
+  settings_wereadGuide3:
+    "命令面板搜索「导入微信读书笔记」，也可按书名筛选或导入单本。",
   settings_desktopPublishOnly: "一键发布仅在桌面版可用。",
   settings_updatesSectionTitle: "应用更新",
   settings_updatesSectionDesc:
@@ -884,6 +945,12 @@ export default {
   notifications_wechatDraftBackfillFailed:
     "已发布到微信公众号草稿箱，但写回草稿标识失败。",
   notifications_wechatPublishFailed: "发布微信公众号草稿失败",
+  notifications_wereadApiKeyRequired: "请先在设置中填写微信读书 API Key。",
+  notifications_wereadUpgradeRequired: "微信读书 Skill 需要升级：{message}",
+  notifications_wereadAuthFailed: "微信读书鉴权失败，请检查 API Key 是否有效。",
+  notifications_wereadNetworkFailed: "无法连接微信读书接口，请稍后重试。",
+  notifications_wereadDesktopOnly: "微信读书导入仅在桌面版可用。",
+  notifications_wereadImportFailed: "导入微信读书笔记失败。",
   notifications_openKnowledgeBaseBeforePastingImage:
     "请先打开知识库，再粘贴图片。",
   notifications_imagePastedTo: "图片已粘贴到 {folder}",

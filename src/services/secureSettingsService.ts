@@ -15,6 +15,7 @@ export type SensitiveSettings = Pick<AppSettings, SensitiveSettingKey>;
 interface SecureSettingsPayload {
   blogGithubToken?: string | null;
   wechatAppSecret?: string | null;
+  wereadApiKey?: string | null;
   geminiApiKey?: string | null;
   codexApiKey?: string | null;
   deepseekApiKey?: string | null;
@@ -129,6 +130,7 @@ export async function loadSecureSettings(): Promise<
     secureSettingsCache = {
       blogGithubToken: normalizeSecretValue(payload.blogGithubToken),
       wechatAppSecret: normalizeSecretValue(payload.wechatAppSecret),
+      wereadApiKey: normalizeSecretValue(payload.wereadApiKey),
       geminiApiKey: normalizeSecretValue(payload.geminiApiKey),
       codexApiKey: normalizeSecretValue(payload.codexApiKey),
       deepseekApiKey: normalizeSecretValue(payload.deepseekApiKey),

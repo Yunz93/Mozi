@@ -8,6 +8,7 @@ import { clearDraftBackup } from "../utils/draftBackup";
 import { PublishTargetDialog } from "./publish/PublishTargetDialog";
 import { SimpleBlogPublishDialog } from "./publish/SimpleBlogPublishDialog";
 import { WechatDraftDialog } from "./publish/WechatDraftDialog";
+import { WeReadImportDialog } from "./import/WeReadImportDialog";
 import { ShareLongImageDialog } from "./share/ShareLongImageDialog";
 import type { AppSettings, FileNode, Notification } from "../types";
 import type {
@@ -21,6 +22,12 @@ import type {
 import { registerBuiltinEmbeddingConsentPrompt } from "../services/vault/builtinEmbeddingConsent";
 import { completeAppClose } from "../app/useCloseGuard";
 import type { LongImageSharePayload } from "./share/longImageSharePayload";
+import type {
+  WereadConflictMode,
+  WereadNotebook,
+  WereadStoreBook,
+} from "../utils/weread/wereadTypes";
+import type { WereadImportBookResult } from "../utils/weread/wereadImport";
 
 interface AppDialogsProps {
   isSettingsOpen: boolean;
@@ -28,6 +35,10 @@ interface AppDialogsProps {
   isPublishTargetDialogOpen: boolean;
   isSimpleBlogDialogOpen: boolean;
   isWechatDraftDialogOpen: boolean;
+  isWeReadImportDialogOpen: boolean;
+  isWeReadImporting: boolean;
+  weReadImportInitialQuery?: string;
+  weReadImportPreselectedBookIds?: string[];
   isShareLongImageDialogOpen: boolean;
   isPublishing: boolean;
   settings: AppSettings;
@@ -53,6 +64,15 @@ interface AppDialogsProps {
   onPersistWechatDraft?: (
     input: WechatDraftPublishInput,
   ) => void | Promise<void>;
+  onCloseWeReadImport: () => void;
+  onLoadWeReadNotebooks: (force?: boolean) => Promise<WereadNotebook[]>;
+  onSearchWeReadStore: (keyword: string) => Promise<WereadStoreBook[]>;
+  onImportWeRead: (options: {
+    notebooks: WereadNotebook[];
+    conflictMode: WereadConflictMode;
+    saveCover: boolean;
+    includeHotHighlights: boolean;
+  }) => Promise<WereadImportBookResult[]>;
   onCloseShareLongImage: () => void;
   isAiEnhanceConfirmOpen?: boolean;
   onConfirmAiEnhance?: () => void;
@@ -68,6 +88,10 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   isPublishTargetDialogOpen,
   isSimpleBlogDialogOpen,
   isWechatDraftDialogOpen,
+  isWeReadImportDialogOpen,
+  isWeReadImporting,
+  weReadImportInitialQuery,
+  weReadImportPreselectedBookIds,
   isShareLongImageDialogOpen,
   isPublishing,
   settings,
@@ -91,6 +115,10 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   onCloseWechatDraft,
   onSubmitWechatDraft,
   onPersistWechatDraft,
+  onCloseWeReadImport,
+  onLoadWeReadNotebooks,
+  onSearchWeReadStore,
+  onImportWeRead,
   onCloseShareLongImage,
   isAiEnhanceConfirmOpen = false,
   onConfirmAiEnhance,
@@ -198,6 +226,19 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
             console.error("Failed to submit WeChat draft:", error);
           });
         }}
+      />
+
+      <WeReadImportDialog
+        isOpen={isWeReadImportDialogOpen}
+        isImporting={isWeReadImporting}
+        initialQuery={weReadImportInitialQuery}
+        preselectedBookIds={weReadImportPreselectedBookIds}
+        defaultSaveCover={settings.wereadImportSaveCover}
+        defaultIncludeHotHighlights={settings.wereadImportIncludeHotHighlights}
+        onClose={onCloseWeReadImport}
+        onLoadNotebooks={onLoadWeReadNotebooks}
+        onSearchStore={onSearchWeReadStore}
+        onImport={onImportWeRead}
       />
 
       <ShareLongImageDialog

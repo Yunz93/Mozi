@@ -14,6 +14,9 @@ export default {
   commandPalette_groupEditor: "Editor",
   commandPalette_groupTable: "Table",
   commandPalette_groupPublish: "Publish",
+  commandPalette_groupWeread: "WeRead",
+  commandPalette_wereadImport: "Import WeRead notes",
+  commandPalette_wereadImportBook: "Import WeRead notes from “{title}”",
   commandPalette_bold: "Bold",
   commandPalette_italic: "Italic",
   commandPalette_insertLink: "Insert link",
@@ -117,6 +120,36 @@ export default {
     "Some images could not be resolved. Fix the paths before publishing.",
   wechatDraftDialog_ipHint:
     "If the IP is not allowlisted, add it under Official Account Settings → Basic Configuration → IP whitelist.",
+
+  wereadImport_title: "Import WeRead notes",
+  wereadImport_desc:
+    "Choose books with highlights or thoughts. Each book becomes one Markdown note. Re-importing the same book merges by default and keeps text you add after the generated section.",
+  wereadImport_searchPlaceholder:
+    "Filter by title or author, or search the store…",
+  wereadImport_listCount: "{count} books with notes",
+  wereadImport_toggleVisible: "Select visible",
+  wereadImport_empty:
+    "No matching notebooks. Try another keyword, or check the API key.",
+  wereadImport_searching: "Searching the store…",
+  wereadImport_fromStore:
+    "From store search; import still writes only your highlights and thoughts",
+  wereadImport_stats:
+    "{notes} highlights · {reviews} thoughts · {bookmarks} bookmarks · {total} total",
+  wereadImport_conflictLabel: "If the note already exists",
+  wereadImport_conflictMerge:
+    "Merge (refresh highlights/thoughts, keep the appendix)",
+  wereadImport_conflictSkip: "Skip",
+  wereadImport_conflictOverwrite: "Overwrite the whole note",
+  wereadImport_saveCover: "Download covers locally (do not hotlink)",
+  wereadImport_includeHot: "Append popular highlights with a source label",
+  wereadImport_submit: "Import {count}",
+  wereadImport_importing: "Importing…",
+  wereadImport_desktopOnly:
+    "WeRead import is available in the desktop app only.",
+  wereadImport_needApiKey: "Add a WeRead API key in Settings first.",
+  wereadImport_done:
+    "Import finished: {imported} imported, {skipped} skipped, {failed} failed.",
+  wereadImport_failed: "Failed to import WeRead notes.",
 
   simpleBlogDialog_title: "Publish to Simple Blog",
   simpleBlogDialog_desc:
@@ -466,6 +499,7 @@ export default {
   settings_tab_interface: "Interface",
   settings_tab_imageHosting: "Image Hosting",
   settings_tab_publishing: "Publishing",
+  settings_tab_readingNotes: "Reading notes sync",
   settings_tab_about: "About",
   settings_interface: "Interface",
   settings_languageLabel: "Display language",
@@ -761,6 +795,8 @@ export default {
   settings_publishingTitle: "Publishing",
   settings_publishingTabSimpleBlog: "simple-blog",
   settings_publishingTabWechat: "WeChat",
+  settings_readingNotesTitle: "Reading notes sync",
+  settings_readingNotesTabWeread: "WeRead",
   settings_aboutTitle: "About",
   settings_aboutDesc:
     "See the current version, check for updates, and review how updates work on each platform.",
@@ -815,6 +851,36 @@ export default {
     "The first version supports one Official Account only. Republishing the same note prefers the saved `wechat_draft_media_id` and updates that draft.",
   settings_wechatGuide3:
     "The IP allowlist is also on Basic Configuration: click Modify next to IP Whitelist and add this machine's public IPv4. Look up your public IP, or use the address shown when publish fails. Without it, WeChat will not issue an access token.",
+  settings_wereadSectionTitle: "WeRead note import",
+  settings_wereadSectionDesc:
+    "Import WeRead highlights and thoughts as local Markdown notes with a Skill API key stored on this device only.",
+  settings_wereadApiKey: "WeRead API Key",
+  settings_wereadApiKeyPlaceholder: "wrk-xxxxxxxx",
+  settings_wereadApiKeyDesc:
+    "Required. Create a WeRead Skill at weread.qq.com/r/weread-skills and copy the API key. It starts with wrk-.",
+  settings_wereadApiKeyHint:
+    "The key is used only on this device to call the WeRead gateway.",
+  settings_wereadImportFolder: "Import folder",
+  settings_wereadImportFolderDesc:
+    "Relative to the vault root. Defaults to 读书. You can nest by author or publication year.",
+  settings_wereadImportFolderMode: "Folder layout",
+  settings_wereadImportFolderModeFlat: "Keep notes in the import folder",
+  settings_wereadImportFolderModeAuthor: "Nest by author",
+  settings_wereadImportFolderModeYear: "Nest by publication year",
+  settings_wereadImportFolderModeAuthorYear: "Nest by author / year",
+  settings_wereadSaveCover: "Download covers into the local resource folder",
+  settings_wereadSaveCoverDesc:
+    "Saves covers locally so notes do not hotlink remote images.",
+  settings_wereadIncludeHot: "Include popular highlights",
+  settings_wereadIncludeHotDesc:
+    "Append a Popular highlights section labeled as other readers’ marks, not your notes.",
+  settings_wereadOpenImport: "Open import dialog",
+  settings_wereadGuide1:
+    "Import content is highlights plus personal thoughts. Bookmarks are counted only and cannot be exported.",
+  settings_wereadGuide2:
+    "The same book is recognized by weread_book_id. Re-import can skip, overwrite, or merge (keeping text you add after the generated section).",
+  settings_wereadGuide3:
+    "Use the command palette to search “Import WeRead notes”, filter by title, or import one book.",
   settings_desktopPublishOnly:
     "One-click publishing is available in the desktop app only.",
   settings_updatesSectionTitle: "App updates",
@@ -967,6 +1033,16 @@ export default {
   notifications_wechatDraftBackfillFailed:
     "Published to the WeChat draft box, but failed to write the draft marker back into the note.",
   notifications_wechatPublishFailed: "Failed to publish the WeChat draft",
+  notifications_wereadApiKeyRequired: "Add a WeRead API key in Settings first.",
+  notifications_wereadUpgradeRequired:
+    "The WeRead Skill needs an upgrade: {message}",
+  notifications_wereadAuthFailed:
+    "WeRead authentication failed. Check that the API key is still valid.",
+  notifications_wereadNetworkFailed:
+    "Could not reach the WeRead API. Try again later.",
+  notifications_wereadDesktopOnly:
+    "WeRead import is available in the desktop app only.",
+  notifications_wereadImportFailed: "Failed to import WeRead notes.",
   notifications_openKnowledgeBaseBeforePastingImage:
     "Open a knowledge base before pasting images.",
   notifications_imagePastedTo: "Image pasted to {folder}",

@@ -22,11 +22,28 @@ const commands = [
     group: "发布",
     run: () => undefined,
   },
+  {
+    id: "wereadImport:123",
+    title: "导入《三体》的微信读书笔记",
+    group: "微信读书",
+    keywords: "三体 刘慈欣",
+    showOnlyWhenQueried: true,
+    run: () => undefined,
+  },
 ];
 
 describe("filterPaletteCommands", () => {
   it("returns all commands for a blank query", () => {
     expect(filterPaletteCommands(commands, "  ")).toHaveLength(3);
+  });
+
+  it("hides per-book WeRead commands until the query matches", () => {
+    expect(
+      filterPaletteCommands(commands, "").map((item) => item.id),
+    ).not.toContain("wereadImport:123");
+    expect(
+      filterPaletteCommands(commands, "三体").map((item) => item.id),
+    ).toContain("wereadImport:123");
   });
 
   it("prefers title prefix matches", () => {

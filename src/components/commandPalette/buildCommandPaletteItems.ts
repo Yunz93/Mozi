@@ -30,6 +30,8 @@ interface CommandPaletteActions {
   shareLongImage: () => void;
   publish: () => void;
   askVault: () => void;
+  importWeread: (query?: string, bookIds?: string[]) => void;
+  wereadNotebooks?: Array<{ bookId: string; title: string; author?: string }>;
 }
 
 function runEditorCommand(
@@ -354,7 +356,31 @@ export function buildCommandPaletteItems(
       group: publish,
       run: actions.shareLongImage,
     },
+    {
+      id: "wereadImport",
+      title: t("commandPalette_wereadImport"),
+      group: t("commandPalette_groupWeread"),
+      keywords: "weread 微信读书 导入 笔记 import highlights",
+      run: actions.importWeread,
+    },
   ];
 
-  return [...workspaceItems, ...editorItems, ...tableItems, ...publishItems];
+  const wereadBookItems: PaletteCommand[] = (actions.wereadNotebooks ?? []).map(
+    (book) => ({
+      id: `wereadImport:${book.bookId}`,
+      title: t("commandPalette_wereadImportBook", { title: book.title }),
+      group: t("commandPalette_groupWeread"),
+      keywords: `${book.title} ${book.author ?? ""} 微信读书 导入 weread`,
+      showOnlyWhenQueried: true,
+      run: () => actions.importWeread(book.title, [book.bookId]),
+    }),
+  );
+
+  return [
+    ...workspaceItems,
+    ...editorItems,
+    ...tableItems,
+    ...publishItems,
+    ...wereadBookItems,
+  ];
 }

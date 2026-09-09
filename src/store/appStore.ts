@@ -204,6 +204,22 @@ export const useAppStore = create<AppState>()(
                   typeof item === "string" && item.trim().length > 0,
               )
             : [...DEFAULT_INDEX_EXCLUDE_GLOBS],
+          wereadImportFolder:
+            typeof persistedSettings.wereadImportFolder === "string" &&
+            persistedSettings.wereadImportFolder.trim()
+              ? persistedSettings.wereadImportFolder
+              : defaultSettings.wereadImportFolder,
+          wereadImportFolderMode:
+            persistedSettings.wereadImportFolderMode === "author" ||
+            persistedSettings.wereadImportFolderMode === "year" ||
+            persistedSettings.wereadImportFolderMode === "authorYear" ||
+            persistedSettings.wereadImportFolderMode === "flat"
+              ? persistedSettings.wereadImportFolderMode
+              : defaultSettings.wereadImportFolderMode,
+          wereadImportSaveCover:
+            persistedSettings.wereadImportSaveCover !== false,
+          wereadImportIncludeHotHighlights:
+            persistedSettings.wereadImportIncludeHotHighlights === true,
         };
 
         return {

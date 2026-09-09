@@ -3,6 +3,11 @@ import {
   classifyWechatPublishError,
   extractWechatAllowlistIps,
 } from "./wechatPublishErrors";
+import {
+  classifyWereadError,
+  extractWereadApiMessage,
+  extractWereadUpgradeMessage,
+} from "./weread/wereadErrors";
 import zhCN from "./i18n/zh-CN";
 import en from "./i18n/en";
 
@@ -45,6 +50,7 @@ const knownErrorMessages: Record<string, TranslationKey> = {
     "notifications_setWechatAppSecretFirst",
   "WeChat draft title is required.": "notifications_wechatTitleRequired",
   "A file with this name already exists.": "notifications_fileExists",
+  "WeRead API key is required.": "notifications_wereadApiKeyRequired",
 };
 
 const wechatPublishErrorKeys: Record<
@@ -84,6 +90,32 @@ export function localizeKnownError(
   }
   if (wechatKind) {
     return t(language, wechatPublishErrorKeys[wechatKind]);
+  }
+
+  const wereadKind = classifyWereadError(normalizedMessage);
+  if (wereadKind === "upgrade") {
+    return t(language, "notifications_wereadUpgradeRequired", {
+      message:
+        extractWereadUpgradeMessage(normalizedMessage) || normalizedMessage,
+    });
+  }
+  if (wereadKind === "apiKey") {
+    return t(language, "notifications_wereadApiKeyRequired");
+  }
+  if (wereadKind === "auth") {
+    return t(language, "notifications_wereadAuthFailed");
+  }
+  if (wereadKind === "network") {
+    return t(language, "notifications_wereadNetworkFailed");
+  }
+  if (wereadKind === "notTauri") {
+    return t(language, "notifications_wereadDesktopOnly");
+  }
+  if (wereadKind === "generic") {
+    return (
+      extractWereadApiMessage(normalizedMessage) ||
+      t(language, "notifications_wereadImportFailed")
+    );
   }
 
   const isDeepSeekMessage = /deepseek/i.test(normalizedMessage);
