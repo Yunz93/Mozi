@@ -578,7 +578,19 @@ pub fn run() {
                         MIN_WINDOW_WIDTH,
                         MIN_WINDOW_HEIGHT,
                     )));
-                    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                    let incoming_logical = if *scale_factor > 0.0 {
+                        (
+                            new_inner_size.width as f64 / *scale_factor,
+                            new_inner_size.height as f64 / *scale_factor,
+                        )
+                    } else {
+                        (0.0, 0.0)
+                    };
+                    if (incoming_logical.0 - width).abs() > 1.0
+                        || (incoming_logical.1 - height).abs() > 1.0
+                    {
+                        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                    }
                     window
                         .app_handle()
                         .state::<WindowLogicalSizeMemory>()
