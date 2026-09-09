@@ -76,13 +76,16 @@ describe("buildWereadMarkdown", () => {
       "[在微信读书打开](https://weread.qq.com/web/reader/abc)",
     );
     expect(markdown).toContain("## 书评");
+    expect(markdown).toContain("> [!comment] 书评");
     expect(markdown).toContain("整本书的读后感");
     expect(markdown).toContain("## 第一章");
     expect(markdown).toContain("<!-- weread:bookmark:bm-1 -->");
-    expect(markdown).toContain("> [!quote] 书摘");
-    expect(markdown).toContain("……==给岁月以文明==……");
+    expect(markdown).toContain("==给岁月以文明==");
+    expect(markdown).not.toContain("……==给岁月以文明==……");
+    expect(markdown).not.toContain("> [!quote] 书摘");
     expect(markdown).not.toContain("> 给岁月以文明");
     expect(markdown).toContain("<!-- weread:review:rv-1 -->");
+    expect(markdown).toContain("> [!comment] 想法");
     expect(markdown).toContain("> 这句太好了");
     expect(markdown).toContain(WEREAD_GENERATED_END_MARKER);
     expect(markdown).not.toContain("weread://");
@@ -113,9 +116,25 @@ describe("buildWereadMarkdown", () => {
     expect(preview.textContent).not.toContain("weread:review");
     expect(html).toContain("mp-callout-quote");
     expect(html).toContain("书摘");
+    expect(html).toContain("mp-callout-comment");
+    expect(html).toContain("想法");
     expect(html).toContain("markdown-highlight");
     expect(preview.textContent).toContain("给岁月以文明");
     expect(preview.textContent).toContain("这句太好了");
+  });
+
+  it("does not invent excerpt context when the API only returned the mark", () => {
+    const markdown = buildWereadMarkdown(sampleInput());
+    const html = renderMarkdown(markdown);
+    const preview = document.createElement("div");
+    preview.innerHTML = html;
+    expect(markdown).toContain("==给岁月以文明==");
+    expect(markdown).not.toContain("……");
+    expect(html).not.toContain("mp-callout-quote");
+    expect(html).toContain("mp-callout-comment");
+    expect(preview.textContent).toContain("想法");
+    expect(preview.textContent).not.toContain("书摘");
+    expect(html).toContain("markdown-highlight");
   });
 
   it("highlights the mark inside surrounding paragraph context", () => {
@@ -138,6 +157,7 @@ describe("buildWereadMarkdown", () => {
     );
     expect(markdown).toContain("我们要==给岁月以文明==，而不是给文明以岁月。");
     expect(markdown).toContain("> [!quote] 书摘");
+    expect(markdown).toContain("> [!comment] 想法");
     expect(markdown).toContain("> 这句太好了");
   });
 
@@ -172,6 +192,7 @@ describe("buildWereadMarkdown", () => {
       }),
     );
     expect(markdown).toContain("我们要==给岁月以文明==，而不是给文明以岁月。");
+    expect(markdown).toContain("> [!comment] 想法");
     expect(markdown).toContain("> 这句太好了");
   });
 

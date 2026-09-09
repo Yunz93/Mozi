@@ -63,12 +63,15 @@ function escapeForMarkdown(value: string): string {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
-function asBlockquote(text: string): string {
+function asLabeledCallout(type: string, title: string, text: string): string {
   const lines = escapeForMarkdown(text).split("\n");
   if (lines.length === 0 || (lines.length === 1 && !lines[0])) {
     return "";
   }
-  return lines.map((line) => `> ${line || ""}`).join("\n");
+  return [
+    `> [!${type}] ${title}`,
+    ...lines.map((line) => `> ${line || ""}`),
+  ].join("\n");
 }
 
 function rangeStart(range: string | undefined): number {
@@ -80,28 +83,54 @@ function escapeHighlightInner(text: string): string {
   return escapeForMarkdown(text).replace(/\n+/g, " ").replace(/==/g, "＝＝");
 }
 
-function highlightInsideContext(highlight: string, context?: string): string {
+function asHighlightLine(highlight: string): string {
   const mark = escapeHighlightInner(highlight);
-  if (!mark) return "";
-  const paragraph = escapeForMarkdown(context ?? "").replace(/\n+/g, " ");
-  if (paragraph && paragraph !== mark && paragraph.includes(mark)) {
-    const index = paragraph.indexOf(mark);
-    return `${paragraph.slice(0, index)}==${mark}==${paragraph.slice(index + mark.length)}`;
-  }
-  return `……==${mark}==……`;
+  return mark ? `==${mark}==` : "";
 }
 
-function asExcerptCallout(
-  body: string,
+/** Wrap the mark in a paragraph only when the API actually returned extra context. */
+function wrapMarkInParagraph(
+  highlight: string,
+  context?: string,
+): string | null {
+  const mark = escapeHighlightInner(highlight);
+  if (!mark) return null;
+  const paragraph = escapeForMarkdown(context ?? "").replace(/\n+/g, " ");
+  if (!paragraph || paragraph === mark || !paragraph.includes(mark)) {
+    return null;
+  }
+  const index = paragraph.indexOf(mark);
+  return `${paragraph.slice(0, index)}==${mark}==${paragraph.slice(index + mark.length)}`;
+}
+
+function renderHighlightBlock(
+  highlight: string,
+  context: string | undefined,
   language: "zh-CN" | "en",
-  title?: string,
+  excerptTitle?: string,
 ): string {
-  const heading = title ?? (language === "en" ? "Excerpt" : "书摘");
-  const lines = body.split("\n").filter((line) => line.length > 0);
-  if (lines.length === 0) return "";
-  return [`> [!quote] ${heading}`, ...lines.map((line) => `> ${line}`)].join(
-    "\n",
-  );
+  const wrapped = wrapMarkInParagraph(highlight, context);
+  if (wrapped) {
+    const heading = excerptTitle ?? (language === "en" ? "Excerpt" : "书摘");
+    return asLabeledCallout("quote", heading, wrapped);
+  }
+  return asHighlightLine(highlight);
+}
+
+function renderThoughtBlock(
+  text: string,
+  language: "zh-CN" | "en",
+  kind: "thought" | "review" = "thought",
+): string {
+  const title =
+    kind === "review"
+      ? language === "en"
+        ? "Review"
+        : "书评"
+      : language === "en"
+        ? "Thought"
+        : "想法";
+  return asLabeledCallout("comment", title, text);
 }
 
 function formatImportedAt(isoDate: string): string {
@@ -231,16 +260,17 @@ function renderBookmark(
   const mark =
     textOf(bookmark.markText) ||
     (language === "en" ? "(no highlight)" : "（无划线原文）");
-  const excerpt = highlightInsideContext(
+  const highlight = renderHighlightBlock(
     mark,
     paragraphContextForBookmark(bookmark, linkedReviews, mark),
+    language,
   );
-  const parts = [wereadBookmarkMarker(id), asExcerptCallout(excerpt, language)];
+  const parts = [wereadBookmarkMarker(id), highlight];
   for (const review of linkedReviews) {
     const reviewId = textOf(review.reviewId);
     if (reviewId) parts.push(wereadReviewMarker(reviewId));
     const content = textOf(review.content);
-    if (content) parts.push(asBlockquote(content));
+    if (content) parts.push(renderThoughtBlock(content, language));
   }
   return parts.filter(Boolean).join("\n\n");
 }
@@ -248,15 +278,16 @@ function renderBookmark(
 function renderStandaloneReview(
   review: WereadReviewBody,
   language: "zh-CN" | "en",
+  kind: "thought" | "review" = "thought",
 ): string {
   const id = textOf(review.reviewId) || "unknown";
   const parts = [wereadReviewMarker(id)];
   const abstract = textOf(review.abstract);
   if (abstract) {
-    parts.push(asExcerptCallout(highlightInsideContext(abstract), language));
+    parts.push(renderHighlightBlock(abstract, undefined, language));
   }
   const content = textOf(review.content);
-  if (content) parts.push(asBlockquote(content));
+  if (content) parts.push(renderThoughtBlock(content, language, kind));
   return parts.filter(Boolean).join("\n\n");
 }
 
@@ -272,15 +303,14 @@ function renderHotHighlights(
       ? "These are popular highlights from other WeRead readers, not your own notes."
       : "以下是微信读书中他人常划的句子，不是你的个人笔记。";
 
-  const excerptTitle = language === "en" ? "Popular excerpt" : "热门书摘";
   const lines = [heading, "", notice, ""];
   for (const item of items) {
     const id =
       textOf(item.bookmarkId) || textOf(item.range) || textOf(item.markText);
     if (id) lines.push(wereadHotHighlightMarker(id));
-    const excerpt = highlightInsideContext(textOf(item.markText));
+    const excerpt = asHighlightLine(textOf(item.markText));
     if (excerpt) {
-      lines.push(asExcerptCallout(excerpt, language, excerptTitle));
+      lines.push(excerpt);
     }
     const meta: string[] = [];
     const chapter = chapterTitleFrom(chapters, item.chapterUid);
@@ -367,7 +397,7 @@ export function buildWereadGeneratedBody(input: WereadMarkdownInput): string {
   if (bookReviews.length > 0) {
     lines.push(language === "en" ? "## Book review" : "## 书评", "");
     for (const review of bookReviews) {
-      lines.push(renderStandaloneReview(review, language), "");
+      lines.push(renderStandaloneReview(review, language, "review"), "");
     }
   }
 

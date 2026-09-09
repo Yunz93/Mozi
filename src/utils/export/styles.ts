@@ -659,6 +659,11 @@ ${exportDelStrikeBlock}
       );
     }
 
+    .export-document .markdown-body .mp-callout-comment {
+      border-left-color: #0f766e;
+      background: color-mix(in srgb, #0f766e 10%, transparent);
+    }
+
     .export-document .markdown-body code {
       color: var(--mp-doc-code-text);
       background: var(--mp-doc-code-bg);

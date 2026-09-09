@@ -373,6 +373,11 @@
   );
 }
 
+.preview-pane-document.markdown-body .mp-callout-comment {
+  border-inline-start-color: #0f766e;
+  background: color-mix(in srgb, #0f766e 10%, transparent);
+}
+
 .preview-pane-document.markdown-body .preview-source-blank-line {
   display: block;
   height: calc(var(--preview-line-height) * 1em);

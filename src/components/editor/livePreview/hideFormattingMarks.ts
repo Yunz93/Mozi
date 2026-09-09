@@ -556,6 +556,11 @@ export const livePreviewTheme = EditorView.baseTheme({
     background:
       "color-mix(in srgb, var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 72%, rgba(235, 203, 139, 0.22))",
   },
+  ".cm-live-preview-callout-comment": {
+    borderInlineStartColor: "#0f766e",
+    background: "color-mix(in srgb, #0f766e 10%, transparent)",
+    color: "inherit",
+  },
   ".cm-live-preview-hr": {
     border: "none",
     borderTop: "1px solid var(--mp-doc-border, rgba(124, 58, 237, 0.18))",
