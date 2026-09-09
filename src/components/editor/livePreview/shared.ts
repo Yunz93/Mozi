@@ -52,13 +52,21 @@ export function selectionTouchesRange(
  * Also protects YAML frontmatter (including fence lines) so `---` is not
  * replaced by HR widgets and list markers inside tags stay plain YAML.
  */
-export function hasSkipAncestor(state: EditorState, pos: number): boolean {
+export function hasSkipAncestor(
+  state: EditorState,
+  pos: number,
+  options?: { ignoreCommentBlock?: boolean },
+): boolean {
   if (isWithinFrontmatterBlock(state, pos)) {
     return true;
   }
   let node = syntaxTree(state).resolveInner(pos, 1);
   for (let depth = 0; depth < 12 && node; depth += 1) {
-    if (SKIP_ANCESTOR_NODES.has(node.name)) return true;
+    if (SKIP_ANCESTOR_NODES.has(node.name)) {
+      if (!(options?.ignoreCommentBlock && node.name === "CommentBlock")) {
+        return true;
+      }
+    }
     if (!node.parent) break;
     node = node.parent;
   }

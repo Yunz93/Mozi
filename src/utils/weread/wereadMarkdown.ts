@@ -71,6 +71,39 @@ function asBlockquote(text: string): string {
   return lines.map((line) => `> ${line || ""}`).join("\n");
 }
 
+function rangeStart(range: string | undefined): number {
+  const match = String(range ?? "").match(/^(\d+)/);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function escapeHighlightInner(text: string): string {
+  return escapeForMarkdown(text).replace(/\n+/g, " ").replace(/==/g, "＝＝");
+}
+
+function highlightInsideContext(highlight: string, context?: string): string {
+  const mark = escapeHighlightInner(highlight);
+  if (!mark) return "";
+  const paragraph = escapeForMarkdown(context ?? "").replace(/\n+/g, " ");
+  if (paragraph && paragraph !== mark && paragraph.includes(mark)) {
+    const index = paragraph.indexOf(mark);
+    return `${paragraph.slice(0, index)}==${mark}==${paragraph.slice(index + mark.length)}`;
+  }
+  return `……==${mark}==……`;
+}
+
+function asExcerptCallout(
+  body: string,
+  language: "zh-CN" | "en",
+  title?: string,
+): string {
+  const heading = title ?? (language === "en" ? "Excerpt" : "书摘");
+  const lines = body.split("\n").filter((line) => line.length > 0);
+  if (lines.length === 0) return "";
+  return [`> [!quote] ${heading}`, ...lines.map((line) => `> ${line}`)].join(
+    "\n",
+  );
+}
+
 function formatImportedAt(isoDate: string): string {
   const match = isoDate.match(/^\d{4}-\d{2}-\d{2}/);
   if (match) return match[0];
@@ -145,6 +178,11 @@ function collectChapters(
     ).reviews.push(review);
   }
 
+  for (const bucket of buckets.values()) {
+    bucket.bookmarks.sort((a, b) => rangeStart(a.range) - rangeStart(b.range));
+    bucket.reviews.sort((a, b) => rangeStart(a.range) - rangeStart(b.range));
+  }
+
   return Array.from(buckets.values()).sort((a, b) => {
     if (a.uid === UNCHAPTERED_UID) return 1;
     if (b.uid === UNCHAPTERED_UID) return -1;
@@ -163,34 +201,62 @@ function bookmarkMatchesReview(
   }
   const markText = textOf(bookmark.markText);
   const abstract = textOf(review.abstract);
-  return Boolean(markText && abstract && markText === abstract);
+  if (!markText || !abstract) return false;
+  return markText === abstract || abstract.includes(markText);
+}
+
+function paragraphContextForBookmark(
+  bookmark: WereadBookmark,
+  linkedReviews: WereadReviewBody[],
+  mark: string,
+): string | undefined {
+  const candidates = [
+    textOf(bookmark.context),
+    textOf(bookmark.abstract),
+    ...linkedReviews.map((review) => textOf(review.abstract)),
+  ].filter(Boolean);
+  return (
+    candidates.find((value) => value !== mark && value.includes(mark)) ||
+    candidates[0] ||
+    undefined
+  );
 }
 
 function renderBookmark(
   bookmark: WereadBookmark,
   linkedReviews: WereadReviewBody[],
+  language: "zh-CN" | "en",
 ): string {
   const id = textOf(bookmark.bookmarkId) || textOf(bookmark.range) || "unknown";
-  const quote = asBlockquote(textOf(bookmark.markText) || "（无划线原文）");
-  const parts = [wereadBookmarkMarker(id), quote];
+  const mark =
+    textOf(bookmark.markText) ||
+    (language === "en" ? "(no highlight)" : "（无划线原文）");
+  const excerpt = highlightInsideContext(
+    mark,
+    paragraphContextForBookmark(bookmark, linkedReviews, mark),
+  );
+  const parts = [wereadBookmarkMarker(id), asExcerptCallout(excerpt, language)];
   for (const review of linkedReviews) {
     const reviewId = textOf(review.reviewId);
     if (reviewId) parts.push(wereadReviewMarker(reviewId));
-    const content = escapeForMarkdown(textOf(review.content));
-    if (content) parts.push(content);
+    const content = textOf(review.content);
+    if (content) parts.push(asBlockquote(content));
   }
   return parts.filter(Boolean).join("\n\n");
 }
 
-function renderStandaloneReview(review: WereadReviewBody): string {
+function renderStandaloneReview(
+  review: WereadReviewBody,
+  language: "zh-CN" | "en",
+): string {
   const id = textOf(review.reviewId) || "unknown";
   const parts = [wereadReviewMarker(id)];
   const abstract = textOf(review.abstract);
   if (abstract) {
-    parts.push(asBlockquote(abstract));
+    parts.push(asExcerptCallout(highlightInsideContext(abstract), language));
   }
-  const content = escapeForMarkdown(textOf(review.content));
-  if (content) parts.push(content);
+  const content = textOf(review.content);
+  if (content) parts.push(asBlockquote(content));
   return parts.filter(Boolean).join("\n\n");
 }
 
@@ -206,13 +272,16 @@ function renderHotHighlights(
       ? "These are popular highlights from other WeRead readers, not your own notes."
       : "以下是微信读书中他人常划的句子，不是你的个人笔记。";
 
+  const excerptTitle = language === "en" ? "Popular excerpt" : "热门书摘";
   const lines = [heading, "", notice, ""];
   for (const item of items) {
     const id =
       textOf(item.bookmarkId) || textOf(item.range) || textOf(item.markText);
     if (id) lines.push(wereadHotHighlightMarker(id));
-    const quote = asBlockquote(textOf(item.markText));
-    if (quote) lines.push(quote);
+    const excerpt = highlightInsideContext(textOf(item.markText));
+    if (excerpt) {
+      lines.push(asExcerptCallout(excerpt, language, excerptTitle));
+    }
     const meta: string[] = [];
     const chapter = chapterTitleFrom(chapters, item.chapterUid);
     if (chapter.title && chapter.title !== "未分章") {
@@ -298,7 +367,7 @@ export function buildWereadGeneratedBody(input: WereadMarkdownInput): string {
   if (bookReviews.length > 0) {
     lines.push(language === "en" ? "## Book review" : "## 书评", "");
     for (const review of bookReviews) {
-      lines.push(renderStandaloneReview(review), "");
+      lines.push(renderStandaloneReview(review, language), "");
     }
   }
 
@@ -322,10 +391,10 @@ export function buildWereadGeneratedBody(input: WereadMarkdownInput): string {
           remaining.splice(index, 1);
         }
       }
-      lines.push(renderBookmark(bookmark, linked), "");
+      lines.push(renderBookmark(bookmark, linked, language), "");
     }
     for (const review of remaining) {
-      lines.push(renderStandaloneReview(review), "");
+      lines.push(renderStandaloneReview(review, language), "");
     }
   }
 

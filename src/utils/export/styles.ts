@@ -646,6 +646,19 @@ ${exportDelStrikeBlock}
       background: color-mix(in srgb, #16a34a 10%, transparent);
     }
 
+    .export-document .markdown-body .mp-callout-quote {
+      border-left-color: color-mix(
+        in srgb,
+        var(--mp-doc-accent, #7c3aed) 55%,
+        #d4a017
+      );
+      background: color-mix(
+        in srgb,
+        var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 72%,
+        rgba(235, 203, 139, 0.22)
+      );
+    }
+
     .export-document .markdown-body code {
       color: var(--mp-doc-code-text);
       background: var(--mp-doc-code-bg);

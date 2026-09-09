@@ -40,6 +40,8 @@ import {
   buildHighlightDecorationsInScanRanges,
   findHighlightRanges,
   findCommentRanges,
+  findHtmlCommentRanges,
+  htmlCommentHideRange,
   livePreviewBlockquotes,
   livePreviewHighlights,
   livePreviewListMarkerReplaceFrom,
@@ -1318,6 +1320,53 @@ describe("callouts / highlight / comments", () => {
     expect(findCommentRanges("a %%hidden%% b", 0, 14)).toEqual([
       { from: 2, to: 12 },
     ]);
+    expect(
+      findHtmlCommentRanges("a <!-- weread:bookmark:1 --> b", 0, 32),
+    ).toEqual([{ from: 2, to: 28 }]);
+  });
+
+  it("hides WeRead HTML comment markers in live preview", () => {
+    const doc = "<!-- weread:bookmark:1 -->\n正文";
+    const view = createView(doc, doc.length, [livePreviewHighlights]);
+    try {
+      const hide = htmlCommentHideRange(
+        view.state,
+        0,
+        "<!-- weread:bookmark:1 -->".length,
+      );
+      expect(view.state.doc.sliceString(hide.from, hide.to)).toBe(
+        "<!-- weread:bookmark:1 -->\n",
+      );
+
+      const { decorations } = buildHighlightDecorations(view.state);
+      const hidden: Array<[number, number]> = [];
+      decorations.between(0, view.state.doc.length, (from, to) => {
+        hidden.push([from, to]);
+      });
+      expect(
+        hidden.some(
+          ([from, to]) =>
+            view.state.doc.sliceString(from, to) ===
+            "<!-- weread:bookmark:1 -->\n",
+        ),
+      ).toBe(true);
+      expect(view.dom.textContent).not.toContain("weread:bookmark");
+      expect(view.dom.textContent).toContain("正文");
+    } finally {
+      view.destroy();
+      view.dom.parentElement?.remove();
+    }
+  });
+
+  it("does not hide HTML comments inside fenced code", () => {
+    const doc = "```\n<!-- weread:bookmark:1 -->\n```\n";
+    const view = createView(doc, doc.length, [livePreviewHighlights]);
+    try {
+      expect(view.dom.textContent).toContain("weread:bookmark");
+    } finally {
+      view.destroy();
+      view.dom.parentElement?.remove();
+    }
   });
 
   it("highlights/comments don't cross paragraph boundaries", () => {
