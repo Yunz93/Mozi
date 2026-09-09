@@ -10,6 +10,7 @@ mod url_encode;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use sample_notes::{CopySampleNotesResult, SAMPLE_NOTES_FOLDER_NAME};
 use secure_settings::{get_secure_settings, set_secure_secret};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -170,35 +171,171 @@ fn queue_opened_file_paths(app: &tauri::AppHandle, paths: Vec<String>) {
 /// Matches `app.windows[main].width/height` in tauri.conf.json.
 const DEFAULT_WINDOW_WIDTH: f64 = 1200.0;
 const DEFAULT_WINDOW_HEIGHT: f64 = 800.0;
-/// Keep secondary/file windows usable — platform default without an explicit
-/// size is often ~300–400px and clips the sidebar + editor chrome.
+/// Keep windows usable — platform default without an explicit size, or a
+/// window-state restore of physical pixels onto a higher-DPI display, is often
+/// ~300–400 logical px and clips the sidebar + editor chrome.
 const MIN_WINDOW_WIDTH: f64 = 960.0;
 const MIN_WINDOW_HEIGHT: f64 = 640.0;
 
+#[derive(Default)]
+struct WindowLogicalSizeMemory {
+    sizes: Mutex<HashMap<String, (f64, f64)>>,
+}
+
+impl WindowLogicalSizeMemory {
+    fn remember(&self, label: &str, size: (f64, f64)) {
+        if let Ok(mut sizes) = self.sizes.lock() {
+            sizes.insert(label.to_string(), size);
+        }
+    }
+
+    fn last(&self, label: &str) -> Option<(f64, f64)> {
+        self.sizes.lock().ok()?.get(label).copied()
+    }
+}
+
 fn clamp_window_size(width: f64, height: f64) -> (f64, f64) {
-    (
-        width.max(MIN_WINDOW_WIDTH),
-        height.max(MIN_WINDOW_HEIGHT),
-    )
+    (width.max(MIN_WINDOW_WIDTH), height.max(MIN_WINDOW_HEIGHT))
+}
+
+fn is_usable_logical_window_size(width: f64, height: f64) -> bool {
+    width.is_finite()
+        && height.is_finite()
+        && width + 0.5 >= MIN_WINDOW_WIDTH
+        && height + 0.5 >= MIN_WINDOW_HEIGHT
+}
+
+/// Pick a usable logical size after restore or a DPI / monitor change.
+///
+/// `tauri-plugin-window-state` persists `inner_size()` as **physical** pixels
+/// and restores with `set_size(PhysicalSize)`. On a higher-DPI display that
+/// shrinks the logical window (1200×800 physical on 2× → 600×400 logical) and
+/// bypasses `minWidth`/`minHeight` from tauri.conf.json.
+fn resolve_enforced_window_size(
+    current_logical: Option<(f64, f64)>,
+    scale: f64,
+    last_good: Option<(f64, f64)>,
+) -> (f64, f64) {
+    if let Some((width, height)) = current_logical {
+        if is_usable_logical_window_size(width, height) {
+            return (width, height);
+        }
+        let recovered = (width * scale, height * scale);
+        if scale > 1.0 && is_usable_logical_window_size(recovered.0, recovered.1) {
+            return recovered;
+        }
+    }
+    if let Some((width, height)) = last_good {
+        if is_usable_logical_window_size(width, height) {
+            return (width, height);
+        }
+    }
+    (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+}
+
+fn resolve_scale_change_logical_size(
+    last_good: Option<(f64, f64)>,
+    new_scale: f64,
+    new_physical_width: u32,
+    new_physical_height: u32,
+) -> (f64, f64) {
+    if let Some((width, height)) = last_good {
+        if is_usable_logical_window_size(width, height) {
+            return (width, height);
+        }
+    }
+    if new_scale > 0.0 {
+        let logical = (
+            new_physical_width as f64 / new_scale,
+            new_physical_height as f64 / new_scale,
+        );
+        if is_usable_logical_window_size(logical.0, logical.1) {
+            return logical;
+        }
+    }
+    (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
 }
 
 fn resolve_file_window_size(main_logical_size: Option<(f64, f64)>) -> (f64, f64) {
     match main_logical_size {
-        Some((width, height)) if width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0 => {
+        Some((width, height))
+            if width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0 =>
+        {
             clamp_window_size(width, height)
         }
         _ => (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT),
     }
 }
 
-fn main_window_logical_size(app: &tauri::AppHandle) -> Option<(f64, f64)> {
-    let main = app.get_webview_window("main")?;
-    let scale = main.scale_factor().ok()?;
+fn window_logical_inner_size(window: &tauri::WebviewWindow) -> Option<(f64, f64)> {
+    let scale = window.scale_factor().ok()?;
     if scale <= 0.0 {
         return None;
     }
-    let size = main.inner_size().ok()?;
+    let size = window.inner_size().ok()?;
     Some((size.width as f64 / scale, size.height as f64 / scale))
+}
+
+fn window_has_usable_logical_size(window: &tauri::WebviewWindow) -> bool {
+    match window_logical_inner_size(window) {
+        Some((width, height)) => is_usable_logical_window_size(width, height),
+        None => false,
+    }
+}
+
+fn ensure_usable_window_size(window: &tauri::WebviewWindow, last_good: Option<(f64, f64)>) {
+    let _ = window.set_min_size(Some(tauri::LogicalSize::new(
+        MIN_WINDOW_WIDTH,
+        MIN_WINDOW_HEIGHT,
+    )));
+    let scale = window
+        .scale_factor()
+        .ok()
+        .filter(|value| *value > 0.0)
+        .unwrap_or(1.0);
+    let current = window_logical_inner_size(window);
+    let (width, height) = resolve_enforced_window_size(current, scale, last_good);
+    let should_apply = match current {
+        Some((current_width, current_height)) => {
+            (current_width - width).abs() > 1.0 || (current_height - height).abs() > 1.0
+        }
+        None => true,
+    };
+    if !should_apply {
+        return;
+    }
+    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+    if current
+        .map(|(current_width, current_height)| {
+            !is_usable_logical_window_size(current_width, current_height)
+        })
+        .unwrap_or(true)
+    {
+        let _ = window.center();
+    }
+}
+
+fn remember_usable_window_size(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    if let Some(size) = window_logical_inner_size(window) {
+        if is_usable_logical_window_size(size.0, size.1) {
+            app.state::<WindowLogicalSizeMemory>()
+                .remember(window.label(), size);
+        }
+    }
+}
+
+fn enforce_all_window_sizes(app: &tauri::AppHandle) {
+    let memory = app.state::<WindowLogicalSizeMemory>();
+    for window in app.webview_windows().values() {
+        let last_good = memory.last(window.label());
+        ensure_usable_window_size(window, last_good);
+        remember_usable_window_size(app, window);
+    }
+}
+
+fn main_window_logical_size(app: &tauri::AppHandle) -> Option<(f64, f64)> {
+    let main = app.get_webview_window("main")?;
+    window_logical_inner_size(&main)
 }
 
 fn next_window_label(prefix: &str) -> Result<String, String> {
@@ -234,6 +371,10 @@ fn build_secondary_window(
         .build()
         .map_err(|e| format!("Failed to create window: {}", e))?;
 
+    let last_good = app.state::<WindowLogicalSizeMemory>().last(window.label());
+    ensure_usable_window_size(&window, last_good);
+    remember_usable_window_size(app, &window);
+
     let _ = window.show();
     let _ = window.set_focus();
     Ok(window)
@@ -262,9 +403,7 @@ async fn open_file_in_new_window(
     // `with_vault=1` is set by in-app "Open in New Window". OS / system file
     // launches omit it so the window opens the document alone (no vault restore).
     let url = if with_vault.unwrap_or(false) {
-        tauri::WebviewUrl::App(
-            format!("index.html?openFile={}&withVault=1", encoded).into(),
-        )
+        tauri::WebviewUrl::App(format!("index.html?openFile={}&withVault=1", encoded).into())
     } else {
         tauri::WebviewUrl::App(format!("index.html?openFile={}", encoded).into())
     };
@@ -314,6 +453,15 @@ fn force_exit_app(app: tauri::AppHandle) {
 
 fn persist_window_state(app: &tauri::AppHandle) {
     use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+    // The plugin writes physical pixels. Skip mid-DPI-move frames so a ~400px
+    // transitional size is not what the next launch restores.
+    if app
+        .webview_windows()
+        .values()
+        .any(|window| !window_has_usable_logical_size(window))
+    {
+        return;
+    }
     if let Err(error) = app.save_window_state(StateFlags::all()) {
         log::warn!("Failed to persist window state: {error}");
     }
@@ -329,10 +477,7 @@ async fn upload_image_to_hosting(
     filename: String,
 ) -> Result<image_hosting::ImageUploadResponse, String> {
     let trimmed = image_base64.trim();
-    let estimated_decoded_len = trimmed
-        .len()
-        .saturating_mul(3)
-        .saturating_div(4);
+    let estimated_decoded_len = trimmed.len().saturating_mul(3).saturating_div(4);
     if estimated_decoded_len > MAX_UPLOAD_IMAGE_BYTES {
         return Err(format!(
             "Image data exceeds maximum upload size of {} bytes.",
@@ -372,6 +517,7 @@ pub fn run() {
     builder
         .manage(SecurityState::default())
         .manage(OpenedFilesState::default())
+        .manage(WindowLogicalSizeMemory::default())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -414,7 +560,46 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.emit_to(window.label(), "app-close-requested", "window");
                 }
-                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                tauri::WindowEvent::ScaleFactorChanged {
+                    scale_factor,
+                    new_inner_size,
+                } => {
+                    let last_good = window
+                        .app_handle()
+                        .state::<WindowLogicalSizeMemory>()
+                        .last(window.label());
+                    let (width, height) = resolve_scale_change_logical_size(
+                        last_good,
+                        *scale_factor,
+                        new_inner_size.width,
+                        new_inner_size.height,
+                    );
+                    let _ = window.set_min_size(Some(tauri::LogicalSize::new(
+                        MIN_WINDOW_WIDTH,
+                        MIN_WINDOW_HEIGHT,
+                    )));
+                    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                    window
+                        .app_handle()
+                        .state::<WindowLogicalSizeMemory>()
+                        .remember(window.label(), (width, height));
+                }
+                tauri::WindowEvent::Resized(_) => {
+                    let memory = window.app_handle().state::<WindowLogicalSizeMemory>();
+                    match window_logical_inner_size(window) {
+                        Some(size) if is_usable_logical_window_size(size.0, size.1) => {
+                            memory.remember(window.label(), size);
+                            persist_window_state(window.app_handle());
+                        }
+                        Some(_) if memory.last(window.label()).is_none() => {
+                            // First paint after a tiny window-state restore.
+                            ensure_usable_window_size(window, None);
+                            remember_usable_window_size(window.app_handle(), window);
+                        }
+                        _ => {}
+                    }
+                }
+                tauri::WindowEvent::Moved(_) => {
                     persist_window_state(window.app_handle());
                 }
                 _ => {}
@@ -430,9 +615,7 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             {
-                if let Err(error) =
-                    native_new_window::install_dock_new_window_menu(app.handle())
-                {
+                if let Err(error) = native_new_window::install_dock_new_window_menu(app.handle()) {
                     log::error!("Failed to install Dock new-window menu: {error}");
                 }
             }
@@ -441,10 +624,7 @@ pub fn run() {
                 let args: Vec<String> = std::env::args().skip(1).collect();
                 if let Ok(cwd) = std::env::current_dir() {
                     let cwd = cwd.to_string_lossy().into_owned();
-                    queue_opened_file_paths(
-                        app.handle(),
-                        opened_file_paths_from_args(&args, &cwd),
-                    );
+                    queue_opened_file_paths(app.handle(), opened_file_paths_from_args(&args, &cwd));
                 }
             }
             Ok(())
@@ -452,6 +632,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            if let tauri::RunEvent::Ready = &event {
+                // Plugin restore runs on window-ready and can override conf.json
+                // min sizes with a physical-pixel snapshot from another display.
+                enforce_all_window_sizes(app);
+            }
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
                 persist_window_state(app);
                 // 仅拦截系统触发的退出（Cmd+Q / 任务栏关闭）；前端在保存完成后调用 exit(0)
@@ -472,9 +657,9 @@ pub fn run() {
 }
 
 fn write_text_file_atomic_at(path: &Path, content: &str) -> Result<(), String> {
-    let parent = path.parent().ok_or_else(|| {
-        format!("Failed to resolve parent directory for {}", path.display())
-    })?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Failed to resolve parent directory for {}", path.display()))?;
     let basename = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -610,8 +795,9 @@ async fn delete_path_recursively(path: String, app: tauri::AppHandle) -> Result<
         ensure_path_allowed(app.state::<SecurityState>().inner(), &canonical)?;
 
         if canonical.is_dir() {
-            fs::remove_dir_all(&canonical)
-                .map_err(|e| format!("Failed to delete directory {}: {}", canonical.display(), e))?;
+            fs::remove_dir_all(&canonical).map_err(|e| {
+                format!("Failed to delete directory {}: {}", canonical.display(), e)
+            })?;
         } else {
             fs::remove_file(&canonical)
                 .map_err(|e| format!("Failed to delete file {}: {}", canonical.display(), e))?;
@@ -847,13 +1033,11 @@ mod tests {
         let leftover_tmp = fs::read_dir(&temp_dir)
             .expect("read temp dir")
             .filter_map(|entry| entry.ok())
-            .any(|entry| {
-                entry
-                    .file_name()
-                    .to_string_lossy()
-                    .contains(".tmp-")
-            });
-        assert!(!leftover_tmp, "temporary file should be removed after rename");
+            .any(|entry| entry.file_name().to_string_lossy().contains(".tmp-"));
+        assert!(
+            !leftover_tmp,
+            "temporary file should be removed after rename"
+        );
 
         cleanup_test_directory(&temp_dir);
     }
@@ -903,6 +1087,83 @@ mod tests {
             resolve_file_window_size(Some((1400.0, 900.0))),
             (1400.0, 900.0)
         );
+    }
+
+    #[test]
+    fn resolve_enforced_window_size_keeps_usable_logical_sizes() {
+        assert_eq!(
+            resolve_enforced_window_size(Some((1400.0, 900.0)), 2.0, None),
+            (1400.0, 900.0)
+        );
+        assert_eq!(
+            resolve_enforced_window_size(Some((960.0, 640.0)), 1.0, None),
+            (MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn resolve_enforced_window_size_recovers_physical_restore_on_retina() {
+        // window-state saved 1200×800 physical on a 1× display, then restored
+        // that PhysicalSize onto a 2× display → 600×400 logical.
+        assert_eq!(
+            resolve_enforced_window_size(Some((600.0, 400.0)), 2.0, None),
+            (1200.0, 800.0)
+        );
+        assert_eq!(
+            resolve_enforced_window_size(Some((400.0, 800.0 / 3.0)), 3.0, None),
+            (1200.0, 800.0)
+        );
+    }
+
+    #[test]
+    fn resolve_enforced_window_size_defaults_when_size_is_genuinely_tiny() {
+        assert_eq!(
+            resolve_enforced_window_size(None, 1.0, None),
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        );
+        assert_eq!(
+            resolve_enforced_window_size(Some((400.0, 300.0)), 1.0, None),
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        );
+        assert_eq!(
+            resolve_enforced_window_size(Some((400.0, 300.0)), 2.0, None),
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        );
+        assert_eq!(
+            resolve_enforced_window_size(
+                Some((400.0, 300.0)),
+                1.0,
+                Some((DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT))
+            ),
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn resolve_scale_change_logical_size_keeps_last_good_size() {
+        assert_eq!(
+            resolve_scale_change_logical_size(Some((1200.0, 800.0)), 2.0, 1200, 800),
+            (1200.0, 800.0)
+        );
+        assert_eq!(
+            resolve_scale_change_logical_size(Some((1400.0, 900.0)), 1.0, 2800, 1800),
+            (1400.0, 900.0)
+        );
+        assert_eq!(
+            resolve_scale_change_logical_size(None, 2.0, 2400, 1600),
+            (1200.0, 800.0)
+        );
+        assert_eq!(
+            resolve_scale_change_logical_size(None, 2.0, 800, 600),
+            (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn is_usable_logical_window_size_rejects_sidebar_clipping_widths() {
+        assert!(!is_usable_logical_window_size(400.0, 300.0));
+        assert!(!is_usable_logical_window_size(767.0, 640.0));
+        assert!(is_usable_logical_window_size(960.0, 640.0));
     }
 
     fn create_test_directory(prefix: &str) -> PathBuf {
