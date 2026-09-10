@@ -1014,6 +1014,55 @@ describe("live preview hide formatting", () => {
     expect(href).toBe("docs/完整 PRD.md");
   });
 
+  it("keeps http(s) destinations visible when the cursor is away", () => {
+    const href = "https://example.com/path?q=1#hash";
+    const doc = `go [here](${href})\n\naway`;
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewLinkDecorations(view);
+    const replaced: string[] = [];
+    let widgetHref = "";
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      replaced.push(view.state.doc.sliceString(from, to));
+      const widget = value.spec.widget as { href?: string } | undefined;
+      if (widget?.href) widgetHref = widget.href;
+    });
+    expect(replaced.join("|")).not.toContain(href);
+    expect(widgetHref).toBe(href);
+  });
+
+  it("keeps a Yuque-style URL with a CJK hash visible when the cursor is away", () => {
+    const href =
+      "https://yueque.antfin.com/g/embodied/wxdppa/nx62cw34yuzlt3lm/collaborator/join?token=1apzsf20gGGjJR1S&source=docx_collaborator/#《RobbyStudio PRD》";
+    const doc = `- RobbyantStudio 总体PRD: [《RobbyStudio PRD》](${href})\n\naway`;
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewLinkDecorations(view);
+    const replaced: string[] = [];
+    let widgetHref = "";
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      replaced.push(view.state.doc.sliceString(from, to));
+      const widget = value.spec.widget as { href?: string } | undefined;
+      if (widget?.href) widgetHref = widget.href;
+    });
+    expect(replaced.some((text) => text.includes("https://"))).toBe(false);
+    expect(widgetHref).toBe(href);
+  });
+
+  it("hides empty []() chrome around an http(s) URL instead of replacing the destination", () => {
+    const href = "https://example.com/invite";
+    const doc = `go [](${href})\n\naway`;
+    const view = mount(doc, doc.length - 1);
+    const deco = buildLivePreviewLinkDecorations(view);
+    const replaced: string[] = [];
+    let widgetCount = 0;
+    deco.between(0, view.state.doc.length, (from, to, value) => {
+      replaced.push(view.state.doc.sliceString(from, to));
+      if (value.spec.widget) widgetCount += 1;
+    });
+    expect(widgetCount).toBe(0);
+    expect(replaced.join("|")).not.toContain(href);
+    expect(replaced).toEqual(expect.arrayContaining(["[](", ")"]));
+  });
+
   it("does not replace frontmatter fences with HR widgets", () => {
     const doc = [
       "---",

@@ -1,5 +1,9 @@
 /**
  * Live Preview: clickable markdown links `[text](url)` (non-image).
+ *
+ * Local / relative destinations collapse to the label (Reading-style).
+ * http(s) destinations stay visible: hiding them makes invite / Yuque /
+ * share URLs look like they vanished once the caret leaves the line.
  */
 
 import { RangeSetBuilder } from "@codemirror/state";
@@ -28,6 +32,12 @@ import {
   getCachedMarkdownHtml,
 } from "./shared";
 
+const hideLinkChrome = Decoration.replace({});
+
+function isHttpMarkdownDestination(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
 function renderInlineLinkLabel(label: string): string {
   const trimmed = label.trim();
   if (!trimmed) return "";
@@ -43,6 +53,7 @@ class MarkdownLinkWidget extends WidgetType {
     readonly label: string,
     readonly href: string,
     readonly from: number,
+    readonly keepDestinationVisible = false,
   ) {
     super();
   }
@@ -51,13 +62,16 @@ class MarkdownLinkWidget extends WidgetType {
     return (
       this.label === other.label &&
       this.href === other.href &&
-      this.from === other.from
+      this.from === other.from &&
+      this.keepDestinationVisible === other.keepDestinationVisible
     );
   }
 
   toDOM(view: EditorView) {
     const el = document.createElement("a");
-    el.className = "cm-live-preview-link";
+    el.className = this.keepDestinationVisible
+      ? "cm-live-preview-link has-visible-dest"
+      : "cm-live-preview-link";
     el.href = this.href;
     if (this.label.trim()) {
       const labelHtml = renderInlineLinkLabel(this.label);
@@ -100,12 +114,14 @@ export function buildLivePreviewLinkDecorations(
       ...link,
       from: link.from + viewportFrom,
       to: link.to + viewportFrom,
+      urlFrom: link.urlFrom + viewportFrom,
+      urlTo: link.urlTo + viewportFrom,
     }))
     .sort((a, b) => a.from - b.from || a.to - b.to);
 
   let lastTo = -1;
   for (const link of links) {
-    const { from, to, alt, url } = link;
+    const { from, to, alt, url, urlFrom, urlTo } = link;
     if (from < lastTo) continue;
     if (from >= to) continue;
     if (selectionTouchesRange(state, from, to)) continue;
@@ -115,13 +131,39 @@ export function buildLivePreviewLinkDecorations(
     }
     if (!url) continue;
 
-    builder.add(
-      from,
-      to,
-      Decoration.replace({
-        widget: new MarkdownLinkWidget(alt, url, from),
-      }),
-    );
+    const keepDestinationVisible =
+      isHttpMarkdownDestination(url) &&
+      urlFrom > from &&
+      urlTo <= to &&
+      urlFrom >= lastTo &&
+      urlTo > urlFrom;
+
+    if (keepDestinationVisible) {
+      if (from < urlFrom) {
+        if (alt.trim()) {
+          builder.add(
+            from,
+            urlFrom,
+            Decoration.replace({
+              widget: new MarkdownLinkWidget(alt, url, from, true),
+            }),
+          );
+        } else {
+          builder.add(from, urlFrom, hideLinkChrome);
+        }
+      }
+      if (urlTo < to) {
+        builder.add(urlTo, to, hideLinkChrome);
+      }
+    } else {
+      builder.add(
+        from,
+        to,
+        Decoration.replace({
+          widget: new MarkdownLinkWidget(alt, url, from),
+        }),
+      );
+    }
     lastTo = to;
   }
 
