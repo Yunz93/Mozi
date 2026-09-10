@@ -213,10 +213,7 @@ describe("tryOpenLivePreviewLinkAtPos", () => {
       doc.length - 1,
     );
 
-    const link = view.dom.querySelector(
-      ".cm-live-preview-link",
-    ) as HTMLAnchorElement | null;
-    expect(link).not.toBeNull();
-    expect(link!.textContent).toBe("https://example.com");
+    expect(view.contentDOM.textContent).toContain("https://example.com");
+    expect(view.dom.querySelector(".cm-live-preview-link")).toBeNull();
   });
 });
