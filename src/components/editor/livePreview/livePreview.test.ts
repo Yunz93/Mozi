@@ -48,7 +48,7 @@ import {
   livePreviewListMarkers,
   livePreviewListNestLevelFromIndent,
 } from "./listAndHighlight";
-import { buildLivePreviewLinkDecorations } from "./links";
+import { buildLivePreviewLinkDecorations, livePreviewLinks } from "./links";
 import { livePreviewMermaid } from "./mermaid";
 import { livePreviewMath } from "./math";
 
@@ -1061,6 +1061,21 @@ describe("live preview hide formatting", () => {
     expect(widgetCount).toBe(0);
     expect(replaced.join("|")).not.toContain(href);
     expect(replaced).toEqual(expect.arrayContaining(["[](", ")"]));
+  });
+
+  it("renders Yuque http destinations in the live DOM when the caret is away", () => {
+    const href =
+      "https://yueque.antfin.com/g/embodied/wxdppa/nx62cw34yuzlt3lm/collaborator/join?token=1apzsf20gGGjJR1S&source=docx_collaborator/#《RobbyStudio PRD》";
+    const doc = `- RobbyantStudio 总体PRD: [《RobbyStudio PRD》](${href})\n\naway`;
+    const view = mount(doc, doc.length - 1, [livePreviewLinks]);
+    expect(view.contentDOM.textContent).toContain("https://yueque.antfin.com");
+    const link = view.dom.querySelector(
+      ".cm-live-preview-link",
+    ) as HTMLAnchorElement | null;
+    expect(link).not.toBeNull();
+    expect(link!.classList.contains("has-visible-dest")).toBe(true);
+    expect(link!.textContent).toContain("《RobbyStudio PRD》");
+    expect(link!.textContent).not.toContain("https://");
   });
 
   it("does not replace frontmatter fences with HR widgets", () => {
