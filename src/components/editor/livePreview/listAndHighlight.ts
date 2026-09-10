@@ -1,6 +1,6 @@
 /**
  * Live Preview: hide list marks and show bullet/number widgets;
- * ==highlight== and %%comments%%.
+ * ==highlight==, %%comments%%, and HTML comments such as WeRead markers.
  *
  * Highlights/comments may span line breaks, so their replace decorations are
  * provided via StateField (CodeMirror forbids linebreak replaces from plugins).
@@ -357,6 +357,53 @@ export function findCommentRanges(
   return ranges;
 }
 
+export function findHtmlCommentRanges(
+  text: string,
+  from: number,
+  to: number,
+): Array<{ from: number; to: number }> {
+  const ranges: Array<{ from: number; to: number }> = [];
+  const start = Math.max(0, from);
+  const end = Math.min(text.length, to);
+  let i = start;
+
+  while (i < end - 3) {
+    const open = text.indexOf("<!--", i);
+    if (open === -1 || open >= end) break;
+    const close = text.indexOf("-->", open + 4);
+    if (close === -1 || close + 3 > end) break;
+    const content = text.slice(open + 4, close);
+    if (!/\n[ \t]*\n/.test(content)) {
+      ranges.push({ from: open, to: close + 3 });
+    }
+    i = close + 3;
+  }
+  return ranges;
+}
+
+/**
+ * Hide a whole-line HTML comment (WeRead bookmark/review ids) including its
+ * trailing newline so Live Preview does not leave an empty source line.
+ */
+export function htmlCommentHideRange(
+  state: EditorState,
+  from: number,
+  to: number,
+): { from: number; to: number } {
+  const startLine = state.doc.lineAt(from);
+  const endLine = state.doc.lineAt(Math.max(from, to - 1));
+  const prefix = startLine.text.slice(0, from - startLine.from);
+  const suffix = endLine.text.slice(to - endLine.from);
+  const hideFrom = prefix.trim() === "" ? startLine.from : from;
+  const hideTo =
+    suffix.trim() === ""
+      ? endLine.to < state.doc.length
+        ? endLine.to + 1
+        : endLine.to
+      : to;
+  return { from: hideFrom, to: hideTo };
+}
+
 export function buildLivePreviewListMarkerDecorations(
   view: EditorView,
 ): DecorationSet {
@@ -546,6 +593,31 @@ export function buildHighlightDecorationsInScanRanges(
           deco: Decoration.replace({}),
         });
       }
+    }
+
+    for (const range of findHtmlCommentRanges(text, 0, text.length)) {
+      const absFrom = scan.from + range.from;
+      const absTo = scan.from + range.to;
+      const hide = htmlCommentHideRange(state, absFrom, absTo);
+      coverage.push({ from: hide.from, to: hide.to });
+      if (selectionTouchesRange(state, hide.from, hide.to)) continue;
+      // HTML comments are Lezer `CommentBlock` nodes; still skip fenced/inline code.
+      if (hasSkipAncestor(state, absFrom, { ignoreCommentBlock: true })) {
+        continue;
+      }
+      if (
+        absTo > absFrom &&
+        hasSkipAncestor(state, absTo - 1, { ignoreCommentBlock: true })
+      ) {
+        continue;
+      }
+      if (hide.from >= hide.to) continue;
+
+      ranges.push({
+        from: hide.from,
+        to: hide.to,
+        deco: Decoration.replace({}),
+      });
     }
   }
 

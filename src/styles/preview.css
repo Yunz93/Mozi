@@ -360,10 +360,22 @@
   background: color-mix(in srgb, #dc2626 10%, transparent);
 }
 
-.preview-pane-document.markdown-body .mp-callout-success,
-.preview-pane-document.markdown-body .mp-callout-tip {
-  border-inline-start-color: #16a34a;
-  background: color-mix(in srgb, #16a34a 10%, transparent);
+.preview-pane-document.markdown-body .mp-callout-quote {
+  border-inline-start-color: color-mix(
+    in srgb,
+    var(--mp-doc-accent, #7c3aed) 55%,
+    #d4a017
+  );
+  background: color-mix(
+    in srgb,
+    var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 72%,
+    rgba(235, 203, 139, 0.22)
+  );
+}
+
+.preview-pane-document.markdown-body .mp-callout-comment {
+  border-inline-start-color: #0f766e;
+  background: color-mix(in srgb, #0f766e 10%, transparent);
 }
 
 .preview-pane-document.markdown-body .preview-source-blank-line {

@@ -42,6 +42,9 @@ export interface WereadBookmark {
   bookId?: string;
   chapterUid?: number;
   markText?: string;
+  /** Surrounding paragraph when the gateway includes it. */
+  context?: string;
+  abstract?: string;
   createTime?: number;
   type?: number;
   range?: string;

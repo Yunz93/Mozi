@@ -63,12 +63,91 @@ function escapeForMarkdown(value: string): string {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
-function asBlockquote(text: string): string {
+function asLabeledCallout(type: string, title: string, text: string): string {
   const lines = escapeForMarkdown(text).split("\n");
   if (lines.length === 0 || (lines.length === 1 && !lines[0])) {
     return "";
   }
-  return lines.map((line) => `> ${line || ""}`).join("\n");
+  return [
+    `> [!${type}] ${title}`,
+    ...lines.map((line) => `> ${line || ""}`),
+  ].join("\n");
+}
+
+function rangeStart(range: string | undefined): number {
+  const match = String(range ?? "").match(/^(\d+)/);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function escapeHighlightInner(text: string): string {
+  return escapeForMarkdown(text).replace(/\n+/g, " ").replace(/==/g, "＝＝");
+}
+
+function asHighlightLine(highlight: string): string {
+  const mark = escapeHighlightInner(highlight);
+  return mark ? `==${mark}==` : "";
+}
+
+/** Wrap the mark in a paragraph only when the API actually returned extra context. */
+function wrapMarkInParagraph(
+  highlight: string,
+  context?: string,
+): string | null {
+  const mark = escapeHighlightInner(highlight);
+  if (!mark) return null;
+  const paragraph = escapeForMarkdown(context ?? "").replace(/\n+/g, " ");
+  if (!paragraph || paragraph === mark || !paragraph.includes(mark)) {
+    return null;
+  }
+  const index = paragraph.indexOf(mark);
+  return `${paragraph.slice(0, index)}==${mark}==${paragraph.slice(index + mark.length)}`;
+}
+
+function highlightSource(
+  highlight: string,
+  context?: string,
+): { text: string; hasParagraph: boolean } {
+  const wrapped = wrapMarkInParagraph(highlight, context);
+  if (wrapped) return { text: wrapped, hasParagraph: true };
+  return { text: asHighlightLine(highlight), hasParagraph: false };
+}
+
+function renderThoughtBlock(
+  text: string,
+  language: "zh-CN" | "en",
+  kind: "thought" | "review" = "thought",
+): string {
+  const title =
+    kind === "review"
+      ? language === "en"
+        ? "Review"
+        : "书评"
+      : language === "en"
+        ? "Thought"
+        : "想法";
+  return asLabeledCallout("comment", title, text);
+}
+
+/** Keep a highlight and its thoughts in one visual unit. */
+function renderNoteUnit(
+  source: { text: string; hasParagraph: boolean } | null,
+  thoughts: string[],
+  language: "zh-CN" | "en",
+  kind: "thought" | "review" = "thought",
+): string {
+  const thoughtTexts = thoughts.map((value) => textOf(value)).filter(Boolean);
+  if (thoughtTexts.length === 0) {
+    if (!source?.text) return "";
+    if (source.hasParagraph) {
+      const heading = language === "en" ? "Excerpt" : "书摘";
+      return asLabeledCallout("quote", heading, source.text);
+    }
+    return source.text;
+  }
+  const body = source?.text
+    ? [source.text, "", ...thoughtTexts].join("\n")
+    : thoughtTexts.join("\n\n");
+  return renderThoughtBlock(body, language, kind);
 }
 
 function formatImportedAt(isoDate: string): string {
@@ -145,6 +224,11 @@ function collectChapters(
     ).reviews.push(review);
   }
 
+  for (const bucket of buckets.values()) {
+    bucket.bookmarks.sort((a, b) => rangeStart(a.range) - rangeStart(b.range));
+    bucket.reviews.sort((a, b) => rangeStart(a.range) - rangeStart(b.range));
+  }
+
   return Array.from(buckets.values()).sort((a, b) => {
     if (a.uid === UNCHAPTERED_UID) return 1;
     if (b.uid === UNCHAPTERED_UID) return -1;
@@ -163,35 +247,68 @@ function bookmarkMatchesReview(
   }
   const markText = textOf(bookmark.markText);
   const abstract = textOf(review.abstract);
-  return Boolean(markText && abstract && markText === abstract);
+  if (!markText || !abstract) return false;
+  return markText === abstract || abstract.includes(markText);
+}
+
+function paragraphContextForBookmark(
+  bookmark: WereadBookmark,
+  linkedReviews: WereadReviewBody[],
+  mark: string,
+): string | undefined {
+  const candidates = [
+    textOf(bookmark.context),
+    textOf(bookmark.abstract),
+    ...linkedReviews.map((review) => textOf(review.abstract)),
+  ].filter(Boolean);
+  return (
+    candidates.find((value) => value !== mark && value.includes(mark)) ||
+    candidates[0] ||
+    undefined
+  );
 }
 
 function renderBookmark(
   bookmark: WereadBookmark,
   linkedReviews: WereadReviewBody[],
+  language: "zh-CN" | "en",
 ): string {
   const id = textOf(bookmark.bookmarkId) || textOf(bookmark.range) || "unknown";
-  const quote = asBlockquote(textOf(bookmark.markText) || "（无划线原文）");
-  const parts = [wereadBookmarkMarker(id), quote];
+  const mark =
+    textOf(bookmark.markText) ||
+    (language === "en" ? "(no highlight)" : "（无划线原文）");
+  const source = highlightSource(
+    mark,
+    paragraphContextForBookmark(bookmark, linkedReviews, mark),
+  );
+  const markers = [wereadBookmarkMarker(id)];
+  const thoughts: string[] = [];
   for (const review of linkedReviews) {
     const reviewId = textOf(review.reviewId);
-    if (reviewId) parts.push(wereadReviewMarker(reviewId));
-    const content = escapeForMarkdown(textOf(review.content));
-    if (content) parts.push(content);
+    if (reviewId) markers.push(wereadReviewMarker(reviewId));
+    const content = textOf(review.content);
+    if (content) thoughts.push(content);
   }
-  return parts.filter(Boolean).join("\n\n");
+  return [...markers, renderNoteUnit(source, thoughts, language)]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
-function renderStandaloneReview(review: WereadReviewBody): string {
+function renderStandaloneReview(
+  review: WereadReviewBody,
+  language: "zh-CN" | "en",
+  kind: "thought" | "review" = "thought",
+): string {
   const id = textOf(review.reviewId) || "unknown";
-  const parts = [wereadReviewMarker(id)];
   const abstract = textOf(review.abstract);
-  if (abstract) {
-    parts.push(asBlockquote(abstract));
-  }
-  const content = escapeForMarkdown(textOf(review.content));
-  if (content) parts.push(content);
-  return parts.filter(Boolean).join("\n\n");
+  const source = abstract ? highlightSource(abstract, undefined) : null;
+  const content = textOf(review.content);
+  return [
+    wereadReviewMarker(id),
+    renderNoteUnit(source, content ? [content] : [], language, kind),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function renderHotHighlights(
@@ -211,8 +328,10 @@ function renderHotHighlights(
     const id =
       textOf(item.bookmarkId) || textOf(item.range) || textOf(item.markText);
     if (id) lines.push(wereadHotHighlightMarker(id));
-    const quote = asBlockquote(textOf(item.markText));
-    if (quote) lines.push(quote);
+    const excerpt = asHighlightLine(textOf(item.markText));
+    if (excerpt) {
+      lines.push(excerpt);
+    }
     const meta: string[] = [];
     const chapter = chapterTitleFrom(chapters, item.chapterUid);
     if (chapter.title && chapter.title !== "未分章") {
@@ -298,7 +417,7 @@ export function buildWereadGeneratedBody(input: WereadMarkdownInput): string {
   if (bookReviews.length > 0) {
     lines.push(language === "en" ? "## Book review" : "## 书评", "");
     for (const review of bookReviews) {
-      lines.push(renderStandaloneReview(review), "");
+      lines.push(renderStandaloneReview(review, language, "review"), "");
     }
   }
 
@@ -322,10 +441,10 @@ export function buildWereadGeneratedBody(input: WereadMarkdownInput): string {
           remaining.splice(index, 1);
         }
       }
-      lines.push(renderBookmark(bookmark, linked), "");
+      lines.push(renderBookmark(bookmark, linked, language), "");
     }
     for (const review of remaining) {
-      lines.push(renderStandaloneReview(review), "");
+      lines.push(renderStandaloneReview(review, language), "");
     }
   }
 

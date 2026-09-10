@@ -107,6 +107,8 @@ export {
   buildLivePreviewHighlightDecorations,
   buildLivePreviewListMarkerDecorations,
   findCommentRanges,
+  findHtmlCommentRanges,
+  htmlCommentHideRange,
   findHighlightRanges,
   livePreviewBlockquotes,
   livePreviewHighlights,
