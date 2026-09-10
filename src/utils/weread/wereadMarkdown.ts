@@ -103,18 +103,13 @@ function wrapMarkInParagraph(
   return `${paragraph.slice(0, index)}==${mark}==${paragraph.slice(index + mark.length)}`;
 }
 
-function renderHighlightBlock(
+function highlightSource(
   highlight: string,
-  context: string | undefined,
-  language: "zh-CN" | "en",
-  excerptTitle?: string,
-): string {
+  context?: string,
+): { text: string; hasParagraph: boolean } {
   const wrapped = wrapMarkInParagraph(highlight, context);
-  if (wrapped) {
-    const heading = excerptTitle ?? (language === "en" ? "Excerpt" : "书摘");
-    return asLabeledCallout("quote", heading, wrapped);
-  }
-  return asHighlightLine(highlight);
+  if (wrapped) return { text: wrapped, hasParagraph: true };
+  return { text: asHighlightLine(highlight), hasParagraph: false };
 }
 
 function renderThoughtBlock(
@@ -131,6 +126,28 @@ function renderThoughtBlock(
         ? "Thought"
         : "想法";
   return asLabeledCallout("comment", title, text);
+}
+
+/** Keep a highlight and its thoughts in one visual unit. */
+function renderNoteUnit(
+  source: { text: string; hasParagraph: boolean } | null,
+  thoughts: string[],
+  language: "zh-CN" | "en",
+  kind: "thought" | "review" = "thought",
+): string {
+  const thoughtTexts = thoughts.map((value) => textOf(value)).filter(Boolean);
+  if (thoughtTexts.length === 0) {
+    if (!source?.text) return "";
+    if (source.hasParagraph) {
+      const heading = language === "en" ? "Excerpt" : "书摘";
+      return asLabeledCallout("quote", heading, source.text);
+    }
+    return source.text;
+  }
+  const body = source?.text
+    ? [source.text, "", ...thoughtTexts].join("\n")
+    : thoughtTexts.join("\n\n");
+  return renderThoughtBlock(body, language, kind);
 }
 
 function formatImportedAt(isoDate: string): string {
@@ -260,19 +277,21 @@ function renderBookmark(
   const mark =
     textOf(bookmark.markText) ||
     (language === "en" ? "(no highlight)" : "（无划线原文）");
-  const highlight = renderHighlightBlock(
+  const source = highlightSource(
     mark,
     paragraphContextForBookmark(bookmark, linkedReviews, mark),
-    language,
   );
-  const parts = [wereadBookmarkMarker(id), highlight];
+  const markers = [wereadBookmarkMarker(id)];
+  const thoughts: string[] = [];
   for (const review of linkedReviews) {
     const reviewId = textOf(review.reviewId);
-    if (reviewId) parts.push(wereadReviewMarker(reviewId));
+    if (reviewId) markers.push(wereadReviewMarker(reviewId));
     const content = textOf(review.content);
-    if (content) parts.push(renderThoughtBlock(content, language));
+    if (content) thoughts.push(content);
   }
-  return parts.filter(Boolean).join("\n\n");
+  return [...markers, renderNoteUnit(source, thoughts, language)]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function renderStandaloneReview(
@@ -281,14 +300,15 @@ function renderStandaloneReview(
   kind: "thought" | "review" = "thought",
 ): string {
   const id = textOf(review.reviewId) || "unknown";
-  const parts = [wereadReviewMarker(id)];
   const abstract = textOf(review.abstract);
-  if (abstract) {
-    parts.push(renderHighlightBlock(abstract, undefined, language));
-  }
+  const source = abstract ? highlightSource(abstract, undefined) : null;
   const content = textOf(review.content);
-  if (content) parts.push(renderThoughtBlock(content, language, kind));
-  return parts.filter(Boolean).join("\n\n");
+  return [
+    wereadReviewMarker(id),
+    renderNoteUnit(source, content ? [content] : [], language, kind),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function renderHotHighlights(
