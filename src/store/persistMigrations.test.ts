@@ -3,6 +3,7 @@ import { defaultSettings } from "./uiStore";
 import {
   migratePersistedAppState,
   resolvePersistedEmbeddingConsent,
+  resolvePersistedImageHosting,
   resolvePersistedShortcuts,
 } from "./persistMigrations";
 import { findDefaultShortcutEditorConflicts } from "../utils/shortcutEditorConflict";
@@ -86,6 +87,26 @@ describe("migratePersistedAppState", () => {
       defaultSettings.shortcuts.openKnowledgeBase,
     );
     expect(resolvePersistedEmbeddingConsent(undefined)).toBe("unknown");
+  });
+});
+
+describe("resolvePersistedImageHosting", () => {
+  it("deep-merges partial image hosting config onto defaults", () => {
+    const hosting = resolvePersistedImageHosting({
+      imageHosting: {
+        provider: "s3",
+        s3: { bucket: "notes" },
+      },
+    });
+
+    expect(hosting.provider).toBe("s3");
+    expect(hosting.s3.bucket).toBe("notes");
+    expect(hosting.s3.pathPrefix).toBe(
+      defaultSettings.imageHosting.s3.pathPrefix,
+    );
+    expect(hosting.github.branch).toBe(
+      defaultSettings.imageHosting.github.branch,
+    );
   });
 });
 
