@@ -1,4 +1,8 @@
-import type { AppSettings, BuiltinEmbeddingDownloadConsent } from "../types";
+import type {
+  AppSettings,
+  BuiltinEmbeddingDownloadConsent,
+  ImageHostingConfig,
+} from "../types";
 import { defaultSettings } from "./uiStore";
 import {
   DEFAULT_CODE_FONT_FAMILY,
@@ -191,6 +195,45 @@ export function sanitizeSettingsForPersistence(
   return stripNonRuntimeSettings(
     settings as unknown as Record<string, unknown>,
   ) as unknown as AppSettings;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeNestedConfig<T extends object>(
+  defaults: T,
+  persisted: unknown,
+): T {
+  if (!isPlainObject(persisted)) return { ...defaults };
+  return { ...defaults, ...persisted };
+}
+
+export function resolvePersistedImageHosting(
+  persistedSettings: Record<string, unknown>,
+): ImageHostingConfig {
+  const defaults = defaultSettings.imageHosting;
+  const persisted = persistedSettings.imageHosting;
+  if (!isPlainObject(persisted)) {
+    return {
+      ...defaults,
+      github: { ...defaults.github },
+      s3: { ...defaults.s3 },
+      aliyunOss: { ...defaults.aliyunOss },
+      qiniu: { ...defaults.qiniu },
+      custom: { ...defaults.custom },
+    };
+  }
+
+  return {
+    ...defaults,
+    ...persisted,
+    github: mergeNestedConfig(defaults.github, persisted.github),
+    s3: mergeNestedConfig(defaults.s3, persisted.s3),
+    aliyunOss: mergeNestedConfig(defaults.aliyunOss, persisted.aliyunOss),
+    qiniu: mergeNestedConfig(defaults.qiniu, persisted.qiniu),
+    custom: mergeNestedConfig(defaults.custom, persisted.custom),
+  };
 }
 
 export function resolvePersistedBlogRepoUrl(

@@ -45,10 +45,17 @@ import {
   resolvePersistedBlogSiteUrl,
   resolvePersistedEmbeddingConsent,
   resolvePersistedFontSettings,
+  resolvePersistedImageHosting,
   resolvePersistedShortcuts,
   sanitizeSettingsForPersistence,
   stripNonRuntimeSettings,
 } from "./persistMigrations";
+import {
+  areAppStorePersistWritesEnabled,
+  backupLocalStorageKey,
+  createAppStorePersistStorage,
+  setAppStorePersistWritesEnabled,
+} from "./persistStorage";
 import { DEFAULT_INDEX_EXCLUDE_GLOBS } from "../utils/pathGlob";
 
 export const APP_STORE_PERSIST_NAME = "markdown-press-settings";
@@ -120,22 +127,31 @@ export const useAppStore = create<AppState>()(
     {
       name: APP_STORE_PERSIST_NAME,
       version: APP_STORE_PERSIST_VERSION,
+      storage: createAppStorePersistStorage(),
       migrate: (persistedState, version) =>
         migratePersistedAppState(persistedState, version),
       partialize: (state) => ({
         settings: sanitizeSettingsForPersistence((state as any).settings),
       }),
-      onRehydrateStorage: () => (_state, error) => {
-        if (!error) return;
-        console.error("Failed to rehydrate app settings", error);
-        try {
-          if (typeof localStorage !== "undefined") {
-            localStorage.removeItem(APP_STORE_PERSIST_NAME);
+      onRehydrateStorage: () => {
+        setAppStorePersistWritesEnabled(false);
+        return (state, error) => {
+          if (error) {
+            console.error("Failed to rehydrate app settings", error);
+            backupLocalStorageKey(APP_STORE_PERSIST_NAME);
+            markAppStoreHydrationFailed();
+            // Allow later user edits to persist, but do not flush defaults
+            // over the original blob during failed hydration.
+            setAppStorePersistWritesEnabled(true);
+            return;
           }
-        } catch {
-          // localStorage 可能不可用
-        }
-        markAppStoreHydrationFailed();
+          setAppStorePersistWritesEnabled(true);
+          if (!state) return;
+          queueMicrotask(() => {
+            if (!areAppStorePersistWritesEnabled()) return;
+            useAppStore.setState((current) => current);
+          });
+        };
       },
       merge: (persistedState, currentState) => {
         const persistedSettings = stripNonRuntimeSettings(
@@ -194,6 +210,7 @@ export const useAppStore = create<AppState>()(
           metadataFields: normalizeMetadataFields(
             persistedSettings.metadataFields,
           ),
+          imageHosting: resolvePersistedImageHosting(persistedSettings),
           shortcuts: resolvePersistedShortcuts(persistedSettings),
           builtinEmbeddingDownloadConsent: resolvePersistedEmbeddingConsent(
             persistedSettings.builtinEmbeddingDownloadConsent,
