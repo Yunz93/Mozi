@@ -243,6 +243,33 @@ describe("app store hydration recovery", () => {
     expect(useAppStore.getState().settings.aiProvider).toBe(
       defaultSettings.aiProvider,
     );
+    expect(localStorage.getItem(APP_STORE_PERSIST_NAME)).toBe('{"state":');
+    expect(localStorage.getItem(`${APP_STORE_PERSIST_NAME}.bak`)).toBe(
+      '{"state":',
+    );
+  });
+
+  it("does not persist default settings over a saved blob before hydration", async () => {
+    const saved = JSON.stringify({
+      state: {
+        settings: {
+          language: "en",
+          themeMode: "light",
+          lastKnowledgeBasePath: "/Users/me/vault",
+        },
+      },
+      version: 1,
+    });
+    localStorage.setItem(APP_STORE_PERSIST_NAME, saved);
+    const { setAppStorePersistWritesEnabled } =
+      await import("./persistStorage");
+    setAppStorePersistWritesEnabled(false);
+
+    useAppStore.setState({ isSaving: true });
+
+    expect(localStorage.getItem(APP_STORE_PERSIST_NAME)).toBe(saved);
+    setAppStorePersistWritesEnabled(true);
+    useAppStore.setState({ isSaving: false });
   });
 });
 

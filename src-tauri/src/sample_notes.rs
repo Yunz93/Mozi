@@ -225,10 +225,13 @@ fn decide_copy_action(
         });
     }
 
+    // No tracking hash: the file was there before we started managing it
+    // (settings reset, missing state file, or a user-created note with the
+    // same name). Never replace it on app update.
     Ok(CopyDecision {
-        should_copy: true,
-        skip_reason_user_modified: false,
-        tracked_hash: None,
+        should_copy: false,
+        skip_reason_user_modified: true,
+        tracked_hash: Some(current_target_hash),
     })
 }
 
@@ -313,17 +316,20 @@ mod tests {
     static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
-    fn untracked_existing_sample_note_is_replaced_with_latest_bundle_version() {
-        let temp_dir = create_test_directory("sample-note-replace");
+    fn untracked_existing_sample_note_is_preserved() {
+        let temp_dir = create_test_directory("sample-note-preserve");
         let target_path = temp_dir.join("02-Obsidian-内联语法示例.md");
         fs::write(&target_path, "# old sample version\n").expect("write target");
 
         let decision = decide_copy_action(&target_path, &hash_bytes(b"# bundled version\n"), None)
             .expect("copy decision");
 
-        assert!(decision.should_copy);
-        assert!(!decision.skip_reason_user_modified);
-        assert!(decision.tracked_hash.is_none());
+        assert!(!decision.should_copy);
+        assert!(decision.skip_reason_user_modified);
+        assert_eq!(
+            decision.tracked_hash.as_deref(),
+            Some(hash_bytes(b"# old sample version\n").as_str())
+        );
 
         cleanup_test_directory(&temp_dir);
     }
