@@ -609,6 +609,8 @@ export default {
   settings_aiContentEnhance: "AI 内容增强",
   settings_aiContentEnhanceDesc:
     "选择 AI 提供商，用于全文增强、选区生成 Wiki，以及工具栏「小知助手」问答。小知助手还依赖「知识库索引」页的切片 / Embedding。",
+  settings_wereadShowApiKey: "显示微信读书密钥",
+  settings_wereadHideApiKey: "隐藏微信读书密钥",
   settings_compatibleKeyLocalOnly: "密钥保存在本机安全存储中。",
   settings_compatibleModel: "模型",
   settings_compatibleCustomModel: "自定义模型",

@@ -74,13 +74,13 @@ export const ReadingNotesTab: React.FC<SettingsTabProps> = ({
               className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
               title={
                 showWereadApiKey
-                  ? t("settings_hideToken")
-                  : t("settings_showToken")
+                  ? t("settings_wereadHideApiKey")
+                  : t("settings_wereadShowApiKey")
               }
               aria-label={
                 showWereadApiKey
-                  ? t("settings_hideToken")
-                  : t("settings_showToken")
+                  ? t("settings_wereadHideApiKey")
+                  : t("settings_wereadShowApiKey")
               }
             >
               {showWereadApiKey ? (

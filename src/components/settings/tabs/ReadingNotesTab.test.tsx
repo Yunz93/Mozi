@@ -46,6 +46,16 @@ describe("ReadingNotesTab", () => {
     expect(screen.getByText("微信读书 API Key")).toBeTruthy();
   });
 
+  it("labels key visibility controls for the WeRead credential", () => {
+    render(
+      <ReadingNotesTab settings={defaultSettings} onUpdateSettings={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "显示微信读书密钥" }));
+    expect(
+      screen.getByRole("button", { name: "隐藏微信读书密钥" }),
+    ).toBeTruthy();
+  });
+
   it("keeps import and Skill update actions in the same row", () => {
     render(
       <ReadingNotesTab settings={defaultSettings} onUpdateSettings={vi.fn()} />,

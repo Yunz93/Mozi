@@ -2,6 +2,8 @@ mod ai_provider;
 mod image_hosting;
 mod macos_update;
 mod native_new_window;
+#[cfg(target_os = "macos")]
+mod native_app_exit;
 mod publishing;
 mod sample_notes;
 mod secure_settings;
@@ -767,6 +769,18 @@ fn exit_coordinator_label(labels: &[String]) -> Option<&str> {
         .or_else(|| labels.iter().min()).map(String::as_str)
 }
 
+fn request_app_exit(app: &tauri::AppHandle) -> bool {
+    let labels = app.webview_windows().keys().cloned().collect::<Vec<_>>();
+    if let Some(label) = exit_coordinator_label(&labels) {
+        if let Err(error) = app.emit_to(label, "app-close-requested", "exit") {
+            log::error!("分发退出前保存请求失败: {error}");
+        }
+        true
+    } else {
+        false
+    }
+}
+
 fn webview_for_window_event(window: &tauri::Window) -> Option<tauri::WebviewWindow> {
     window.app_handle().get_webview_window(window.label())
 }
@@ -995,6 +1009,12 @@ pub fn run() {
             if let tauri::RunEvent::Ready = &event {
                 // Plugin restore runs on window-ready and can override conf.json
                 // min sizes with a physical-pixel snapshot from another display.
+                #[cfg(target_os = "macos")]
+                if let Err(error) = native_app_exit::install(app) {
+                    log::error!("安装原生退出保护失败: {error}");
+                    app.exit(1);
+                    return;
+                }
                 restore_initial_window_geometry(app);
             }
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
@@ -1005,10 +1025,7 @@ pub fn run() {
                 if code.is_none() && !app.webview_windows().is_empty() {
                     api.prevent_exit();
                     // 只由一个窗口协调全应用保存，避免最快的窗口提前退出整个进程。
-                    let labels = app.webview_windows().keys().cloned().collect::<Vec<_>>();
-                    if let Some(label) = exit_coordinator_label(&labels) {
-                        let _ = app.emit_to(label, "app-close-requested", "exit");
-                    }
+                    request_app_exit(app);
                 }
             }
             #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]

@@ -659,6 +659,8 @@ export default {
   settings_aiContentEnhance: "AI Content Enhancement",
   settings_aiContentEnhanceDesc:
     "Choose an AI provider for note enhancement, wiki generation from selection, and XiaoZhi Assistant. XiaoZhi Assistant also needs the Index tab (chunks / embeddings).",
+  settings_wereadShowApiKey: "Show WeRead API key",
+  settings_wereadHideApiKey: "Hide WeRead API key",
   settings_compatibleKeyLocalOnly: "Stored securely on this device.",
   settings_compatibleModel: "Model",
   settings_compatibleCustomModel: "Custom model",
