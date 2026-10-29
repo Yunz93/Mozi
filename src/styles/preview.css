@@ -1156,7 +1156,8 @@
   border-color: var(--mp-doc-border, rgba(192, 132, 252, 0.22));
 }
 
-.dark .preview-pane-document.markdown-body blockquote {
+/* 提示块使用各自的强调色，避免深色普通引用覆盖其背景和逻辑边框。 */
+.dark .preview-pane-document.markdown-body blockquote:not(.mp-callout) {
   border-left-color: var(--mp-doc-accent, rgba(192, 132, 252, 0.32));
   color: var(--mp-doc-quote-text, #ddd6fe);
   background: var(--mp-doc-quote-bg, rgba(192, 132, 252, 0.06));
