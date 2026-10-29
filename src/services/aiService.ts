@@ -2,6 +2,7 @@ import type {
   AIAnalysisResult,
   AIWikiGenerationResult,
   AppSettings,
+  AIProvider as AIProviderId,
 } from "../types";
 import { analyzeContent, generateGeminiWikiArticle } from "./geminiService";
 import {
@@ -25,9 +26,12 @@ import { AiServiceError } from "./ai/errors";
 
 export { buildWikiPrompt };
 
-type AIProviderId = "gemini" | "codex" | "deepseek";
+import { generateCompatibleJson } from "./compatibleChatService";
+import { isCompatibleProvider } from "./ai/compatibleProviders";
+import { buildAnalyzeMarkdownPrompt } from "./ai/prompts";
 
 function resolveProviderId(settings: AppSettings): AIProviderId {
+  if (isCompatibleProvider(settings.aiProvider)) return settings.aiProvider;
   if (settings.aiProvider === "codex") return "codex";
   if (settings.aiProvider === "deepseek") return "deepseek";
   return "gemini";
@@ -57,6 +61,66 @@ interface AIProvider {
 }
 
 const PROVIDERS: Record<AIProviderId, AIProvider> = {
+  glm: {
+    validateConfig(settings) {
+      if (!settings.glmApiKey?.trim())
+        throw new AiServiceError("MISSING_API_KEY", { provider: "glm" });
+    },
+    analyze(content, settings) {
+      return generateCompatibleJson<AIAnalysisResult>(
+        "glm",
+        buildAnalyzeMarkdownPrompt(content),
+        settings,
+      );
+    },
+    generateWiki(prompt, settings) {
+      return generateCompatibleJson<AIWikiGenerationResult>(
+        "glm",
+        prompt,
+        settings,
+      );
+    },
+  },
+  kimi: {
+    validateConfig(settings) {
+      if (!settings.kimiApiKey?.trim())
+        throw new AiServiceError("MISSING_API_KEY", { provider: "kimi" });
+    },
+    analyze(content, settings) {
+      return generateCompatibleJson<AIAnalysisResult>(
+        "kimi",
+        buildAnalyzeMarkdownPrompt(content),
+        settings,
+      );
+    },
+    generateWiki(prompt, settings) {
+      return generateCompatibleJson<AIWikiGenerationResult>(
+        "kimi",
+        prompt,
+        settings,
+      );
+    },
+  },
+  mimo: {
+    validateConfig(settings) {
+      if (!settings.mimoApiKey?.trim())
+        throw new AiServiceError("MISSING_API_KEY", { provider: "mimo" });
+    },
+    analyze(content, settings) {
+      return generateCompatibleJson<AIAnalysisResult>(
+        "mimo",
+        buildAnalyzeMarkdownPrompt(content),
+        settings,
+      );
+    },
+    generateWiki(prompt, settings) {
+      return generateCompatibleJson<AIWikiGenerationResult>(
+        "mimo",
+        prompt,
+        settings,
+      );
+    },
+  },
   gemini: {
     validateConfig(settings) {
       if (!settings.geminiApiKey?.trim()) {
@@ -175,6 +239,14 @@ export async function completeJsonWithProvider<T>(
   }
   if (providerId === "codex") {
     return generateCodexJson<T>(prompt, settings, systemPrompt);
+  }
+  if (isCompatibleProvider(providerId)) {
+    return generateCompatibleJson<T>(
+      providerId,
+      prompt,
+      settings,
+      systemPrompt,
+    );
   }
   return generateDeepSeekJson<T>(prompt, settings, systemPrompt);
 }

@@ -1,3 +1,4 @@
+mod ai_provider;
 mod image_hosting;
 mod macos_update;
 mod native_new_window;
@@ -664,6 +665,9 @@ fn build_secondary_window(
     label: String,
     url: tauri::WebviewUrl,
 ) -> Result<tauri::WebviewWindow, String> {
+    if macos_update::update_installation_locked() {
+        return Err("正在保存窗口，请稍后再新建窗口。".to_string());
+    }
     let (width, height) = resolve_file_window_size(main_window_logical_size(app));
 
     // Match main window chrome. Overlay titlebar APIs are macOS-only.
@@ -683,6 +687,11 @@ fn build_secondary_window(
     let window = builder
         .build()
         .map_err(|e| format!("Failed to create window: {}", e))?;
+
+    if macos_update::update_installation_locked() {
+        let _ = window.destroy();
+        return Err("正在保存窗口，请稍后再新建窗口。".to_string());
+    }
 
     let last_good = app.state::<WindowLogicalSizeMemory>().last(window.label());
     ensure_usable_window_size(&window, last_good);
@@ -743,25 +752,19 @@ async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     create_empty_window(app).await
 }
 
-/// When the frontend has already flushed (or the user discarded), the next
-/// CloseRequested must not `prevent_close` again — otherwise `destroy()` /
-/// `close()` bounce back into the JS save dialog and the window never dies.
-static ALLOW_NEXT_WINDOW_CLOSE: AtomicBool = AtomicBool::new(false);
-
-#[tauri::command]
-fn allow_next_window_close() {
-    ALLOW_NEXT_WINDOW_CLOSE.store(true, Ordering::SeqCst);
-}
-
 #[tauri::command]
 fn force_close_window(window: tauri::WebviewWindow) -> Result<(), String> {
-    ALLOW_NEXT_WINDOW_CLOSE.store(true, Ordering::SeqCst);
     window.destroy().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 fn force_exit_app(app: tauri::AppHandle) {
     app.exit(0);
+}
+
+fn exit_coordinator_label(labels: &[String]) -> Option<&str> {
+    labels.iter().find(|label| label.as_str() == "main")
+        .or_else(|| labels.iter().min()).map(String::as_str)
 }
 
 fn webview_for_window_event(window: &tauri::Window) -> Option<tauri::WebviewWindow> {
@@ -862,6 +865,7 @@ pub fn run() {
             open_file_in_new_window,
             open_new_window,
             get_secure_settings,
+            ai_provider::ai_provider_request,
             set_secure_secret,
             list_system_fonts,
             register_allowed_path,
@@ -875,9 +879,11 @@ pub fn run() {
             weread_skill::weread_update_skill,
             upload_image_to_hosting,
             check_macos_update,
+            prepare_macos_update,
+            set_update_install_lock,
             install_macos_update,
+            discard_macos_update,
             write_text_file_atomic,
-            allow_next_window_close,
             force_close_window,
             force_exit_app
         ])
@@ -888,9 +894,6 @@ pub fn run() {
                         let _ = preserve_logical_size_on_monitor_change(&webview);
                     }
                     persist_window_state(window.app_handle(), false);
-                    if ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst) {
-                        return;
-                    }
                     // 插件默认只在 RunEvent::Exit 落盘；本应用会 preventClose
                     // 再 destroy，必须在 CloseRequested 时显式保存。
                     // 只通知被关闭的那个窗口自己去刷盘并 destroy；
@@ -1001,7 +1004,11 @@ pub fn run() {
                 // 会带 code，直接放行。最后一个窗口已经 destroy 时也不能再拦，否则进程会变成僵尸。
                 if code.is_none() && !app.webview_windows().is_empty() {
                     api.prevent_exit();
-                    let _ = app.emit("app-close-requested", "exit");
+                    // 只由一个窗口协调全应用保存，避免最快的窗口提前退出整个进程。
+                    let labels = app.webview_windows().keys().cloned().collect::<Vec<_>>();
+                    if let Some(label) = exit_coordinator_label(&labels) {
+                        let _ = app.emit_to(label, "app-close-requested", "exit");
+                    }
                 }
             }
             #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
@@ -1310,13 +1317,31 @@ async fn check_macos_update(
 }
 
 #[tauri::command]
-async fn install_macos_update(
-    app: tauri::AppHandle,
+fn set_update_install_lock(request_id: String, locked: bool) -> Result<(), String> {
+    macos_update::set_update_install_lock(request_id, locked)
+}
+
+#[tauri::command]
+async fn prepare_macos_update(
     tag: String,
     on_event: tauri::ipc::Channel<macos_update::MacosUpdateProgressEvent>,
-) -> Result<(), String> {
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || macos_update::prepare_macos_update(&tag, on_event))
+        .await
+        .map_err(|error| format!("Failed to join macOS update download: {error}"))?
+}
+
+#[tauri::command]
+async fn discard_macos_update(download_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || macos_update::discard_macos_update(&download_id))
+        .await
+        .map_err(|error| format!("Failed to join macOS update cleanup: {error}"))?
+}
+
+#[tauri::command]
+async fn install_macos_update(app: tauri::AppHandle, download_id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        macos_update::install_macos_update_command(app, tag, on_event)
+        macos_update::install_macos_update_command(app, download_id)
     })
     .await
     .map_err(|error| format!("Failed to join macOS update install: {error}"))?
@@ -1594,38 +1619,20 @@ mod tests {
     }
 
     #[test]
-    fn allow_next_window_close_is_consumed_once() {
-        ALLOW_NEXT_WINDOW_CLOSE.store(false, Ordering::SeqCst);
-        allow_next_window_close();
-        assert!(
-            ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst),
-            "the first CloseRequested after allow must proceed"
-        );
-        assert!(
-            !ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst),
-            "later CloseRequested events must be intercepted again"
-        );
+    fn app_exit_uses_exactly_one_available_coordinator() {
+        assert_eq!(exit_coordinator_label(&["win-b".into(), "main".into(), "file-a".into()]), Some("main"));
+        assert_eq!(exit_coordinator_label(&["win-b".into(), "file-a".into()]), Some("file-a"));
+        assert_eq!(exit_coordinator_label(&[]), None);
     }
 
     #[test]
-    fn close_commands_are_registered_and_honor_allow_flag() {
-        let src = include_str!("lib.rs");
-        assert!(
-            src.contains("allow_next_window_close,"),
-            "frontend must be able to mark the next close as intentional"
-        );
-        assert!(
-            src.contains("force_close_window,"),
-            "frontend must have a rust-side destroy fallback"
-        );
-        assert!(
-            src.contains("force_exit_app"),
-            "frontend must have a rust-side exit fallback"
-        );
-        assert!(
-            src.contains("if ALLOW_NEXT_WINDOW_CLOSE.swap(false, Ordering::SeqCst)"),
-            "CloseRequested must skip prevent_close after a successful flush/discard"
-        );
+    fn close_commands_destroy_only_the_requested_window_without_a_shared_bypass() {
+        let src = include_str!("lib.rs").split("#[cfg(test)]").next().expect("implementation");
+        assert!(src.contains("force_close_window,"));
+        assert!(src.contains("force_exit_app"));
+        assert!(src.contains("window.destroy()"));
+        assert!(!src.contains("ALLOW_NEXT_WINDOW_CLOSE"));
+        assert!(!src.contains("allow_next_window_close"));
     }
 
     #[test]

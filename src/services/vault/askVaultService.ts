@@ -1,3 +1,7 @@
+import {
+  isCompatibleProvider,
+  resolveCompatibleSettings,
+} from "../ai/compatibleProviders";
 import type { AppSettings } from "../../types";
 import type {
   AskVaultAnswer,
@@ -44,6 +48,8 @@ function normalizePath(path: string): string {
 }
 
 function resolveModelLabel(settings: AppSettings): string {
+  if (isCompatibleProvider(settings.aiProvider))
+    return resolveCompatibleSettings(settings.aiProvider, settings).model;
   return settings.aiProvider === "codex"
     ? settings.codexModel || "codex"
     : settings.aiProvider === "deepseek"

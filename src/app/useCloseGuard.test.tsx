@@ -5,14 +5,27 @@ import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultSettings, useAppStore } from "../store/appStore";
 
-const { listenMock, destroyMock, exitMock, flushAllDirtyMock, invokeMock } =
-  vi.hoisted(() => ({
-    listenMock: vi.fn(),
-    destroyMock: vi.fn(async () => {}),
-    exitMock: vi.fn(async () => {}),
-    flushAllDirtyMock: vi.fn(async () => true),
-    invokeMock: vi.fn(async (_cmd?: string) => {}),
-  }));
+const {
+  listenMock,
+  destroyMock,
+  exitMock,
+  flushAllDirtyMock,
+  invokeMock,
+  updateLockMock,
+  updateListenMock,
+  beginShutdownMock,
+  releaseShutdownMock,
+} = vi.hoisted(() => ({
+  listenMock: vi.fn(),
+  updateLockMock: vi.fn(() => false),
+  updateListenMock: vi.fn(async () => vi.fn()),
+  beginShutdownMock: vi.fn(),
+  releaseShutdownMock: vi.fn(async () => {}),
+  destroyMock: vi.fn(async () => {}),
+  exitMock: vi.fn(async () => {}),
+  flushAllDirtyMock: vi.fn(async () => true),
+  invokeMock: vi.fn(async (_cmd?: string) => {}),
+}));
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: listenMock,
@@ -32,6 +45,12 @@ vi.mock("@tauri-apps/plugin-process", () => ({
   exit: exitMock,
 }));
 
+vi.mock("../services/updateDocumentGuard", () => ({
+  isUpdateInstallLocked: updateLockMock,
+  listenForUpdateSaveRequests: updateListenMock,
+  beginDocumentShutdown: beginShutdownMock,
+}));
+
 vi.mock("../types/filesystem", () => ({
   isTauriEnvironment: () => true,
 }));
@@ -44,7 +63,11 @@ vi.mock("../utils/editorSelectionBridge", () => ({
   flushActiveEditorPendingChanges: vi.fn(),
 }));
 
-import { completeAppClose, useCloseGuard } from "./useCloseGuard";
+import {
+  completeAppClose,
+  completeAppCloseAfterDiscard,
+  useCloseGuard,
+} from "./useCloseGuard";
 
 const NOTE_ID = "/vault/note.md";
 
@@ -65,6 +88,10 @@ describe("useCloseGuard", () => {
 
   beforeEach(() => {
     closeListener = null;
+    releaseShutdownMock.mockReset().mockResolvedValue(undefined);
+    beginShutdownMock.mockReset().mockResolvedValue(releaseShutdownMock);
+    updateLockMock.mockReset().mockReturnValue(false);
+    updateListenMock.mockReset().mockResolvedValue(vi.fn());
     listenMock.mockImplementation(
       async (
         _event: string,
@@ -105,7 +132,7 @@ describe("useCloseGuard", () => {
 
   it("destroys the window after the user discards unsaved changes", async () => {
     await completeAppClose("window");
-    expect(invokeMock).toHaveBeenCalledWith("allow_next_window_close");
+    expect(invokeMock).not.toHaveBeenCalledWith("allow_next_window_close");
     expect(destroyMock).toHaveBeenCalledTimes(1);
     expect(exitMock).not.toHaveBeenCalled();
     expect(invokeMock).not.toHaveBeenCalledWith("force_close_window");
@@ -113,7 +140,7 @@ describe("useCloseGuard", () => {
 
   it("exits the process when the close source is exit", async () => {
     await completeAppClose("exit");
-    expect(invokeMock).toHaveBeenCalledWith("allow_next_window_close");
+    expect(invokeMock).not.toHaveBeenCalledWith("allow_next_window_close");
     expect(exitMock).toHaveBeenCalledWith(0);
     expect(destroyMock).not.toHaveBeenCalled();
   });
@@ -126,15 +153,17 @@ describe("useCloseGuard", () => {
     expect(exitMock).not.toHaveBeenCalled();
   });
 
-  it("exits the process when rust force-close also fails", async () => {
+  it("keeps other windows running when rust force-close also fails", async () => {
     destroyMock.mockRejectedValueOnce(new Error("destroy not allowed"));
     invokeMock.mockImplementation(async (cmd?: string) => {
       if (cmd === "force_close_window") {
         throw new Error("force close failed");
       }
     });
-    await completeAppClose("window");
-    expect(exitMock).toHaveBeenCalledWith(0);
+    await expect(completeAppClose("window")).rejects.toThrow(
+      "force close failed",
+    );
+    expect(exitMock).not.toHaveBeenCalled();
   });
 
   it("force-exits via rust when javascript exit is denied", async () => {
@@ -234,5 +263,160 @@ describe("useCloseGuard", () => {
       expect(destroyMock).toHaveBeenCalledTimes(1);
     });
     expect(forceSave).not.toHaveBeenCalled();
+  });
+  it("waits for a pending write even when undo made the tab look clean", async () => {
+    useAppStore.setState({
+      fileContents: { [NOTE_ID]: "saved" },
+      lastSavedContent: { [NOTE_ID]: "saved" },
+    });
+    let finishWrite!: (value: boolean) => void;
+    flushAllDirtyMock.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishWrite = resolve;
+        }),
+    );
+    render(<Harness forceSave={vi.fn(async () => true)} />);
+    await waitFor(() => expect(closeListener).not.toBeNull());
+    await act(async () => {
+      closeListener?.({ payload: "window" });
+      await Promise.resolve();
+    });
+    expect(flushAllDirtyMock).toHaveBeenCalledTimes(1);
+    expect(destroyMock).not.toHaveBeenCalled();
+    await act(async () => {
+      finishWrite(true);
+    });
+    await waitFor(() => expect(destroyMock).toHaveBeenCalledTimes(1));
+  });
+  it("keeps ordinary close protection when update listener registration fails", async () => {
+    updateListenMock.mockRejectedValueOnce(new Error("listener unavailable"));
+    render(<Harness forceSave={vi.fn(async () => true)} />);
+    await waitFor(() => expect(closeListener).not.toBeNull());
+    await act(async () => {
+      closeListener?.({ payload: "window" });
+    });
+    await waitFor(() => expect(destroyMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not exit while another window coordinates an update installation", async () => {
+    updateLockMock.mockReturnValue(true);
+    const forceSave = vi.fn(async () => true);
+    render(<Harness forceSave={forceSave} />);
+    await waitFor(() => expect(closeListener).not.toBeNull());
+    await act(async () => {
+      closeListener?.({ payload: "exit" });
+    });
+    expect(forceSave).not.toHaveBeenCalled();
+    expect(exitMock).not.toHaveBeenCalled();
+    expect(destroyMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a seemingly clean window open if its queued write cannot finish saving", async () => {
+    useAppStore.setState({
+      fileContents: { [NOTE_ID]: "saved" },
+      lastSavedContent: { [NOTE_ID]: "saved" },
+    });
+    flushAllDirtyMock.mockResolvedValueOnce(false);
+    render(<Harness forceSave={vi.fn(async () => true)} />);
+    await waitFor(() => expect(closeListener).not.toBeNull());
+    await act(async () => {
+      closeListener?.({ payload: "window" });
+    });
+    await waitFor(() =>
+      expect(useAppStore.getState().pendingCloseDespiteSaveFailure).toBe(
+        "window",
+      ),
+    );
+    expect(destroyMock).not.toHaveBeenCalled();
+  });
+  it("waits for every window to save before a coordinated application exit", async () => {
+    let saved!: (release: () => Promise<void>) => void;
+    beginShutdownMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          saved = resolve;
+        }),
+    );
+    render(<Harness forceSave={vi.fn(async () => true)} />);
+    await waitFor(() => expect(closeListener).not.toBeNull());
+    await act(async () => {
+      closeListener?.({ payload: "exit" });
+    });
+    expect(beginShutdownMock).toHaveBeenCalledWith("exit");
+    expect(exitMock).not.toHaveBeenCalled();
+    await act(async () => {
+      saved(releaseShutdownMock);
+    });
+    await waitFor(() => expect(exitMock).toHaveBeenCalledWith(0));
+    expect(releaseShutdownMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels application exit when a different window cannot save", async () => {
+    beginShutdownMock.mockRejectedValueOnce(
+      new Error("another window could not save"),
+    );
+    render(<Harness forceSave={vi.fn(async () => true)} />);
+    await waitFor(() => expect(closeListener).not.toBeNull());
+    await act(async () => {
+      closeListener?.({ payload: "exit" });
+    });
+    await waitFor(() =>
+      expect(useAppStore.getState().pendingCloseDespiteSaveFailure).toBe(
+        "exit",
+      ),
+    );
+    expect(exitMock).not.toHaveBeenCalled();
+  });
+
+  it("never arms a shared bypass when destroying A before closing B", async () => {
+    await completeAppClose("window");
+    expect(destroyMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).not.toHaveBeenCalledWith("allow_next_window_close");
+    const forceSave = vi.fn(async () => true);
+    render(<Harness forceSave={forceSave} />);
+    await waitFor(() => expect(closeListener).not.toBeNull());
+    await act(async () => {
+      closeListener?.({ payload: "window" });
+    });
+    await waitFor(() => expect(destroyMock).toHaveBeenCalledTimes(2));
+    expect(forceSave).toHaveBeenCalledWith(undefined, { trigger: "system" });
+    expect(invokeMock).not.toHaveBeenCalledWith("allow_next_window_close");
+  });
+  it("backs up every window before the user-confirmed discard exits the application", async () => {
+    let backedUp!: (release: () => Promise<void>) => void;
+    beginShutdownMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          backedUp = resolve;
+        }),
+    );
+    const running = completeAppCloseAfterDiscard("exit");
+    await Promise.resolve();
+    expect(beginShutdownMock).toHaveBeenCalledWith("exit", {
+      backupOnly: true,
+    });
+    expect(exitMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalledWith("force_exit_app");
+    backedUp(releaseShutdownMock);
+    await running;
+    expect(exitMock).toHaveBeenCalledWith(0);
+    expect(releaseShutdownMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps all windows open when confirmed discard cannot back up another window", async () => {
+    beginShutdownMock.mockRejectedValueOnce(new Error("backup failed"));
+    await expect(completeAppCloseAfterDiscard("exit")).rejects.toThrow(
+      "backup failed",
+    );
+    expect(exitMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalledWith("force_exit_app");
+  });
+
+  it("preserves the existing single-window discard close path", async () => {
+    await completeAppCloseAfterDiscard("window");
+    expect(destroyMock).toHaveBeenCalledTimes(1);
+    expect(beginShutdownMock).not.toHaveBeenCalled();
+    expect(exitMock).not.toHaveBeenCalled();
   });
 });

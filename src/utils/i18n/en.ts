@@ -659,10 +659,16 @@ export default {
   settings_aiContentEnhance: "AI Content Enhancement",
   settings_aiContentEnhanceDesc:
     "Choose an AI provider for note enhancement, wiki generation from selection, and XiaoZhi Assistant. XiaoZhi Assistant also needs the Index tab (chunks / embeddings).",
+  settings_compatibleKeyLocalOnly: "Stored securely on this device.",
+  settings_compatibleModel: "Model",
+  settings_compatibleCustomModel: "Custom model",
+  settings_compatibleModelId: "Model ID",
+  settings_compatibleApiHint:
+    "Uses the standard API by default. Subscription keys require their dedicated endpoint.",
   settings_aiProvider: "AI provider",
   settings_geminiApiKey: "Gemini API key",
-  settings_secureSaving: "Saving to the system keychain...",
-  settings_secureSaved: "Saved securely to the system keychain.",
+  settings_secureSaving: "Saving securely on this device...",
+  settings_secureSaved: "Saved securely on this device.",
   settings_apiKeyPaste: "Paste API key here...",
   settings_localOnlyGoogle:
     "Stored locally only. Get it from Google AI Studio.",
@@ -1255,6 +1261,8 @@ export default {
   aiError_requestTimeout: "The request timed out. Please try again.",
   aiError_invalidJson: "{provider} returned invalid JSON.",
   aiError_emptyResponse: "{provider} returned an empty response.",
+  aiError_networkFailed:
+    "{provider} request failed. Check the API URL and network connection. Remote endpoints require HTTPS; local endpoints may use HTTP.",
   aiError_httpFailed: "{provider} request failed ({status}).",
   index_embeddingConsentLabel: "Built-in model download consent",
   index_embeddingConsentUnknown:

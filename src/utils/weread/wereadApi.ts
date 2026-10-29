@@ -139,11 +139,20 @@ export async function fetchAllNotebooks(): Promise<WereadNotebook[]> {
 }
 
 let notebookCache: { at: number; books: WereadNotebook[] } | null = null;
+// 账号标识只保留在内存中，不能写入日志或持久化缓存。
+let notebookCacheAccount = "";
+let notebookCacheGeneration = 0;
 const NOTEBOOK_CACHE_MS = 60_000;
 
 export async function fetchAllNotebooksCached(
   force = false,
+  accountKey = "",
 ): Promise<WereadNotebook[]> {
+  if (accountKey !== notebookCacheAccount) {
+    clearWereadNotebookCache();
+    notebookCacheAccount = accountKey;
+  }
+  const generation = notebookCacheGeneration;
   if (
     !force &&
     notebookCache &&
@@ -152,11 +161,14 @@ export async function fetchAllNotebooksCached(
     return notebookCache.books;
   }
   const books = await fetchAllNotebooks();
-  notebookCache = { at: Date.now(), books };
+  if (generation === notebookCacheGeneration) {
+    notebookCache = { at: Date.now(), books };
+  }
   return books;
 }
 
 export function clearWereadNotebookCache(): void {
+  notebookCacheGeneration += 1;
   notebookCache = null;
 }
 

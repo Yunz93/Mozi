@@ -60,6 +60,9 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
   const [query, setQuery] = useState(initialQuery);
   const [notebooks, setNotebooks] = useState<WereadNotebook[]>([]);
   const [storeBooks, setStoreBooks] = useState<WereadStoreBook[]>([]);
+  const [storeBookCatalog, setStoreBookCatalog] = useState<
+    Record<string, WereadStoreBook>
+  >({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [conflictMode, setConflictMode] = useState<WereadConflictMode>("merge");
   const [loading, setLoading] = useState(false);
@@ -73,15 +76,20 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
     setQuery(initialQuery);
     setConflictMode("merge");
     setStoreBooks([]);
+    setStoreBookCatalog({});
+    setNotebooks([]);
+    setSelectedIds(new Set());
     setLoadError("");
     setLoading(true);
     const selected = preselectedKey ? preselectedKey.split("\0") : [];
     void onLoadNotebooksRef
       .current()
       .then((items) => {
+        if (cancelled) return;
         setNotebooks(items);
         const next = new Set(selected.filter(Boolean));
         if (next.size === 0 && items.length === 1 && items[0]) {
@@ -90,9 +98,15 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
         setSelectedIds(next);
       })
       .catch((error: unknown) => {
+        if (cancelled) return;
         setLoadError(error instanceof Error ? error.message : String(error));
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [initialQuery, isOpen, preselectedKey]);
 
   const filteredNotebooks = useMemo(() => {
@@ -106,6 +120,8 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
   }, [notebooks, query]);
 
   useEffect(() => {
+    setSearching(false);
+    setStoreBooks([]);
     if (!isOpen) return;
     const needle = query.trim();
     if (needle.length < 2) {
@@ -122,7 +138,13 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
       void onSearchStoreRef
         .current(needle)
         .then((items) => {
-          if (!cancelled) setStoreBooks(items);
+          if (cancelled) return;
+          setStoreBooks(items);
+          // 切换搜索词后仍保留已选书籍的元数据，保证按钮计数与实际导入一致。
+          setStoreBookCatalog((previous) => ({
+            ...previous,
+            ...Object.fromEntries(items.map((book) => [book.bookId, book])),
+          }));
         })
         .catch(() => {
           if (!cancelled) setStoreBooks([]);
@@ -141,6 +163,18 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
     const known = new Set(notebooks.map((item) => item.bookId));
     return storeBooks.filter((book) => !known.has(book.bookId));
   }, [notebooks, storeBooks]);
+
+  const selectedNotebooks = useMemo(() => {
+    const known = new Set(notebooks.map((item) => item.bookId));
+    return [
+      ...notebooks.filter((item) => selectedIds.has(item.bookId)),
+      ...Object.values(storeBookCatalog)
+        .filter(
+          (item) => selectedIds.has(item.bookId) && !known.has(item.bookId),
+        )
+        .map(storeBookToNotebook),
+    ];
+  }, [notebooks, selectedIds, storeBookCatalog]);
 
   const toggleId = (bookId: string) => {
     setSelectedIds((prev) => {
@@ -169,16 +203,9 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
   };
 
   const handleImport = async () => {
-    const fromNotebooks = notebooks.filter((item) =>
-      selectedIds.has(item.bookId),
-    );
-    const fromStore = visibleStoreBooks
-      .filter((item) => selectedIds.has(item.bookId))
-      .map(storeBookToNotebook);
-    const selected = [...fromNotebooks, ...fromStore];
-    if (selected.length === 0) return;
+    if (selectedNotebooks.length === 0) return;
     const results = await onImport({
-      notebooks: selected,
+      notebooks: selectedNotebooks,
       conflictMode,
       saveCover: defaultSaveCover,
       includeHotHighlights: defaultIncludeHotHighlights,
@@ -337,12 +364,12 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
           onClick={() => {
             void handleImport();
           }}
-          disabled={isImporting || selectedIds.size === 0}
+          disabled={isImporting || selectedNotebooks.length === 0}
           className="inline-flex items-center rounded-xl bg-black px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
         >
           {isImporting
             ? t("wereadImport_importing")
-            : t("wereadImport_submit", { count: selectedIds.size })}
+            : t("wereadImport_submit", { count: selectedNotebooks.length })}
         </button>
       </div>
     </Dialog>

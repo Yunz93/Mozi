@@ -9,6 +9,10 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { isTauriEnvironment } from "../types/filesystem";
 import { isMacOSPlatform, isWindowsPlatform } from "../utils/platform";
 import { areUpdaterArtifactsEnabled } from "./updaterCapabilities";
+import { flushAllDirtyOpenTabs } from "./filesystem/flushActiveDocument";
+import { useAppStore } from "../store/appStore";
+import { t } from "../utils/i18n";
+import { beginUpdateInstall } from "./updateDocumentGuard";
 
 export const RELEASES_PAGE_URL = "https://github.com/Yunz93/Mozi/releases";
 export {
@@ -102,7 +106,18 @@ async function installMacOSUpdate(
   channel.onmessage = (event) => {
     onEvent?.(event);
   };
-  await invoke("install_macos_update", { tag, onEvent: channel });
+  const downloadId = await invoke<string>("prepare_macos_update", {
+    tag,
+    onEvent: channel,
+  });
+  let release: (() => Promise<void>) | undefined;
+  try {
+    release = await beginUpdateInstall();
+    await invoke("install_macos_update", { downloadId });
+  } finally {
+    await release?.();
+    await invoke("discard_macos_update", { downloadId }).catch(() => {});
+  }
 }
 
 export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
@@ -123,6 +138,14 @@ export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
   return update ? fromTauriUpdate(update) : null;
 }
 
+async function saveDocumentsBeforeUpdate(): Promise<void> {
+  if (!(await flushAllDirtyOpenTabs())) {
+    throw new Error(
+      t(useAppStore.getState().settings.language, "tab_closeBlockedUnsaved"),
+    );
+  }
+}
+
 export async function downloadAndInstallUpdate(
   update: AvailableUpdate,
   onEvent?: (event: UpdateDownloadEvent) => void,
@@ -131,6 +154,7 @@ export async function downloadAndInstallUpdate(
     if (!isMacOSUpdaterSupported()) {
       throw new Error("macOS in-app updates are only available on macOS.");
     }
+    await saveDocumentsBeforeUpdate();
     const tag = update.tag || `v${update.version}`;
     await installMacOSUpdate(tag, onEvent);
     return;
@@ -150,8 +174,16 @@ export async function downloadAndInstallUpdate(
     throw new Error("Windows updater handle is missing.");
   }
 
-  await update.tauriUpdate.downloadAndInstall(onEvent, {
+  await saveDocumentsBeforeUpdate();
+  await update.tauriUpdate.download(onEvent, {
     timeout: DOWNLOAD_TIMEOUT_MS,
   });
-  await relaunch();
+  // 下载期间仍可能编辑，必须在安装器接管进程前再保存一次。
+  const release = await beginUpdateInstall();
+  try {
+    await update.tauriUpdate.install();
+    await relaunch();
+  } finally {
+    await release();
+  }
 }

@@ -19,6 +19,9 @@ interface SecureSettingsPayload {
   geminiApiKey?: string | null;
   codexApiKey?: string | null;
   deepseekApiKey?: string | null;
+  glmApiKey?: string | null;
+  kimiApiKey?: string | null;
+  mimoApiKey?: string | null;
   imageHostingGithubToken?: string | null;
   imageHostingS3SecretAccessKey?: string | null;
   imageHostingOssAccessKeySecret?: string | null;
@@ -134,6 +137,9 @@ export async function loadSecureSettings(): Promise<
       geminiApiKey: normalizeSecretValue(payload.geminiApiKey),
       codexApiKey: normalizeSecretValue(payload.codexApiKey),
       deepseekApiKey: normalizeSecretValue(payload.deepseekApiKey),
+      glmApiKey: normalizeSecretValue(payload.glmApiKey),
+      kimiApiKey: normalizeSecretValue(payload.kimiApiKey),
+      mimoApiKey: normalizeSecretValue(payload.mimoApiKey),
       imageHostingGithubToken: normalizeSecretValue(
         payload.imageHostingGithubToken,
       ),
@@ -171,6 +177,11 @@ export async function persistSecureSetting(
         key,
         value: trimmed ? trimmed : null,
       });
+      if (key === "wereadApiKey") {
+        const { clearWereadNotebookCache } =
+          await import("../utils/weread/wereadApi");
+        clearWereadNotebookCache();
+      }
       secureSettingsCache = {
         ...(secureSettingsCache ?? {}),
         [key]: trimmed,

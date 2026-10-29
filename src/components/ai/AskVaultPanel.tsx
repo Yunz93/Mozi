@@ -1,3 +1,5 @@
+import type { AppSettings } from "../../types";
+import { ensureAIConfiguration } from "../../services/aiService";
 import React, {
   useCallback,
   useEffect,
@@ -55,17 +57,13 @@ type AskScope = "vault" | "folder" | "files";
 type PrimaryTab = "ask" | "history";
 type SecondaryTab = "answer" | "sources";
 
-function isAiConfigured(settings: {
-  aiProvider?: string;
-  geminiApiKey?: string;
-  codexApiKey?: string;
-  deepseekApiKey?: string;
-}): boolean {
-  if (settings.aiProvider === "codex")
-    return Boolean(settings.codexApiKey?.trim());
-  if (settings.aiProvider === "deepseek")
-    return Boolean(settings.deepseekApiKey?.trim());
-  return Boolean(settings.geminiApiKey?.trim());
+function isAiConfigured(settings: AppSettings): boolean {
+  try {
+    ensureAIConfiguration(settings);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function formatHistoryTime(at: number, language: string): string {
@@ -390,9 +388,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     } catch (error) {
       if (!isCurrentRequest(generation, requestKey)) return;
       showNotification(
-        error instanceof Error
-          ? localizeKnownError(language, error.message)
-          : t("askVault_failed"),
+        isAiServiceError(error)
+          ? formatAiServiceError(language, error)
+          : error instanceof Error
+            ? localizeKnownError(language, error.message)
+            : t("askVault_failed"),
         "error",
       );
       setSettingsOpen(true, "ai");
@@ -450,9 +450,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       } catch (error) {
         if (!isCurrentRequest(generation, requestKey)) return;
         showNotification(
-          error instanceof Error
-            ? localizeKnownError(language, error.message)
-            : t("askVault_failed"),
+          isAiServiceError(error)
+            ? formatAiServiceError(language, error)
+            : error instanceof Error
+              ? localizeKnownError(language, error.message)
+              : t("askVault_failed"),
           "error",
         );
         setSettingsOpen(true, "ai");
@@ -501,9 +503,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     } catch (error) {
       if (!isCurrentRequest(generation, requestKey)) return;
       showNotification(
-        error instanceof Error
-          ? localizeKnownError(language, error.message)
-          : t("askVault_failed"),
+        isAiServiceError(error)
+          ? formatAiServiceError(language, error)
+          : error instanceof Error
+            ? localizeKnownError(language, error.message)
+            : t("askVault_failed"),
         "error",
       );
       setSettingsOpen(true, "ai");

@@ -16,6 +16,7 @@ import { getScaledEditorFontSize } from "./utils/uiFontSize";
 import { UiZoomHint } from "./components/ui/UiZoomHint";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useCloseGuard } from "./app/useCloseGuard";
+import { UpdateInstallGuard } from "./app/UpdateInstallGuard";
 import { closeTabSafely } from "./hooks/closeTabSafely";
 import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
@@ -1213,6 +1214,7 @@ const App: React.FC = () => {
           onCancelCleanupAttachments={cancelCleanupUnusedAttachments}
         />
         <UiZoomHint />
+        <UpdateInstallGuard />
       </div>
     </ErrorBoundary>
   );

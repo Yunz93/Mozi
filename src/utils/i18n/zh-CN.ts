@@ -609,10 +609,16 @@ export default {
   settings_aiContentEnhance: "AI 内容增强",
   settings_aiContentEnhanceDesc:
     "选择 AI 提供商，用于全文增强、选区生成 Wiki，以及工具栏「小知助手」问答。小知助手还依赖「知识库索引」页的切片 / Embedding。",
+  settings_compatibleKeyLocalOnly: "密钥保存在本机安全存储中。",
+  settings_compatibleModel: "模型",
+  settings_compatibleCustomModel: "自定义模型",
+  settings_compatibleModelId: "模型 ID",
+  settings_compatibleApiHint:
+    "默认使用标准 API。套餐密钥需使用对应的专用地址。",
   settings_aiProvider: "AI 提供商",
   settings_geminiApiKey: "Gemini API 密钥",
-  settings_secureSaving: "正在写入系统钥匙串...",
-  settings_secureSaved: "已安全保存到系统钥匙串。",
+  settings_secureSaving: "正在写入本机安全存储...",
+  settings_secureSaved: "已保存到本机安全存储。",
   settings_apiKeyPaste: "在此粘贴 API 密钥...",
   settings_localOnlyGoogle: "仅在本地存储。从 Google AI Studio 获取。",
   settings_geminiModel: "Gemini 模型",
@@ -1141,6 +1147,8 @@ export default {
   aiError_requestTimeout: "请求超时，请稍后重试。",
   aiError_invalidJson: "{provider} 返回了无效的 JSON。",
   aiError_emptyResponse: "{provider} 返回了空响应。",
+  aiError_networkFailed:
+    "{provider} 网络请求失败，请检查接口地址和网络连接。远程接口须使用 HTTPS，本机接口可使用 HTTP。",
   aiError_httpFailed: "{provider} 请求失败（{status}）。",
   index_embeddingConsentLabel: "内置模型下载同意",
   index_embeddingConsentUnknown: "尚未决定（首次需要时会询问）",

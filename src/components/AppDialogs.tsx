@@ -20,7 +20,7 @@ import type {
   SimpleBlogPublishInput,
 } from "../utils/simpleBlogPublish";
 import { registerBuiltinEmbeddingConsentPrompt } from "../services/vault/builtinEmbeddingConsent";
-import { completeAppClose } from "../app/useCloseGuard";
+import { completeAppCloseAfterDiscard } from "../app/useCloseGuard";
 import type { LongImageSharePayload } from "./share/longImageSharePayload";
 import type {
   WereadConflictMode,
@@ -301,7 +301,7 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         onClose={() => setPendingCloseDespiteSaveFailure(null)}
         onConfirm={() => {
           const source = pendingCloseDespiteSaveFailure ?? "window";
-          void completeAppClose(source).catch((error) => {
+          void completeAppCloseAfterDiscard(source).catch((error) => {
             console.error(
               "Failed to close after discarding unsaved changes:",
               error,

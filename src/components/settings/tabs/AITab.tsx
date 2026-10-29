@@ -1,3 +1,9 @@
+import {
+  COMPATIBLE_PROVIDERS,
+  isCompatibleProvider,
+  resolveCompatibleSettings,
+  type CompatibleProvider,
+} from "../../../services/ai/compatibleProviders";
 import React, { useState } from "react";
 import type { AppSettings } from "../../../types";
 import {
@@ -35,6 +41,16 @@ export const AITab: React.FC<SettingsTabProps> = ({
       : settings.wikiPromptTemplateZh || DEFAULT_WIKI_PROMPT_TEMPLATE;
   const { handleSecureSettingChange, renderSecureSaveState } =
     useSecureSettings(onUpdateSettings);
+  const [showCompatibleKey, setShowCompatibleKey] = useState(false);
+  const [customModels, setCustomModels] = useState<
+    Partial<Record<CompatibleProvider, boolean>>
+  >({});
+  const compatibleProvider = isCompatibleProvider(settings.aiProvider)
+    ? settings.aiProvider
+    : null;
+  const compatibleConfig = compatibleProvider
+    ? resolveCompatibleSettings(compatibleProvider, settings)
+    : null;
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOpenAIApiKey, setShowOpenAIApiKey] = useState(false);
   const [showDeepSeekApiKey, setShowDeepSeekApiKey] = useState(false);
@@ -44,6 +60,9 @@ export const AITab: React.FC<SettingsTabProps> = ({
     gemini: [],
     codex: [],
     deepseek: [],
+    glm: [],
+    kimi: [],
+    mimo: [],
   });
   const [isLoadingModels, setIsLoadingModels] = useState<
     Record<AppSettings["aiProvider"], boolean>
@@ -51,41 +70,60 @@ export const AITab: React.FC<SettingsTabProps> = ({
     gemini: false,
     codex: false,
     deepseek: false,
+    glm: false,
+    kimi: false,
+    mimo: false,
   });
-  const [modelLoadMessage, setModelLoadMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [modelLoadMessages, setModelLoadMessages] = useState<
+    Partial<
+      Record<
+        AppSettings["aiProvider"],
+        { type: "success" | "error"; text: string }
+      >
+    >
+  >({});
+  const modelLoadMessage = modelLoadMessages[settings.aiProvider];
 
   const getProviderLabel = (provider: AppSettings["aiProvider"]) => {
     if (provider === "gemini") return "Gemini ";
     if (provider === "codex") return "OpenAI ";
+    if (isCompatibleProvider(provider))
+      return `${COMPATIBLE_PROVIDERS[provider].label} `;
     return "DeepSeek ";
   };
 
   const loadModels = async (provider: AppSettings["aiProvider"]) => {
     try {
-      setModelLoadMessage(null);
+      setModelLoadMessages((previous) => ({
+        ...previous,
+        [provider]: undefined,
+      }));
       setIsLoadingModels((prev) => ({ ...prev, [provider]: true }));
       await hydrateSensitiveSettingsIntoStore();
       const latestSettings = useAppStore.getState().settings;
       const models = await fetchAvailableModels(provider, latestSettings);
       setAvailableModels((prev) => ({ ...prev, [provider]: models }));
-      setModelLoadMessage({
-        type: "success",
-        text:
-          models.length > 0
-            ? t("settings_modelsLoaded", {
-                count: models.length,
-                provider: getProviderLabel(provider),
-              })
-            : t("settings_noAvailableModels"),
-      });
+      setModelLoadMessages((previous) => ({
+        ...previous,
+        [provider]: {
+          type: "success",
+          text:
+            models.length > 0
+              ? t("settings_modelsLoaded", {
+                  count: models.length,
+                  provider: getProviderLabel(provider),
+                })
+              : t("settings_noAvailableModels"),
+        },
+      }));
     } catch (error) {
-      setModelLoadMessage({
-        type: "error",
-        text: formatAiServiceError(currentLanguage, error),
-      });
+      setModelLoadMessages((previous) => ({
+        ...previous,
+        [provider]: {
+          type: "error",
+          text: formatAiServiceError(currentLanguage, error),
+        },
+      }));
     } finally {
       setIsLoadingModels((prev) => ({ ...prev, [provider]: false }));
     }
@@ -138,14 +176,170 @@ export const AITab: React.FC<SettingsTabProps> = ({
                 { value: "gemini", label: "Gemini" },
                 { value: "deepseek", label: "DeepSeek" },
                 { value: "codex", label: "OpenAI" },
+                { value: "glm", label: "GLM" },
+                { value: "kimi", label: "Kimi" },
+                { value: "mimo", label: "Xiaomi MiMo" },
               ]}
-              onChange={(aiProvider) =>
+              onChange={(aiProvider) => {
+                setShowCompatibleKey(false);
                 onUpdateSettings({
                   aiProvider: aiProvider as AppSettings["aiProvider"],
-                })
-              }
+                });
+              }}
             />
           </div>
+
+          {compatibleProvider && compatibleConfig && (
+            <>
+              <div className="space-y-2">
+                <label
+                  htmlFor="compatible-ai-base-url"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  {compatibleConfig.label} API Base URL
+                </label>
+                <input
+                  id="compatible-ai-base-url"
+                  type="text"
+                  value={
+                    settings[`${compatibleProvider}ApiBaseUrl`] ??
+                    compatibleConfig.baseUrl
+                  }
+                  onChange={(event) =>
+                    onUpdateSettings({
+                      [`${compatibleProvider}ApiBaseUrl`]: event.target.value,
+                    })
+                  }
+                  placeholder={COMPATIBLE_PROVIDERS[compatibleProvider].baseUrl}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 font-mono"
+                />
+                <p className="text-[10px] text-gray-400">
+                  {t("settings_compatibleApiHint")}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t("settings_compatibleModel")}
+                  </label>
+                  {compatibleConfig.discovery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void loadModels(compatibleProvider);
+                      }}
+                      disabled={isLoadingModels[compatibleProvider]}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200 disabled:opacity-60"
+                    >
+                      {isLoadingModels[compatibleProvider]
+                        ? t("settings_loadingModels")
+                        : t("settings_loadModelList")}
+                    </button>
+                  )}
+                </div>
+                <SettingsSelect
+                  aria-label={t("settings_compatibleModel")}
+                  value={
+                    customModels[compatibleProvider] ||
+                    ![
+                      ...compatibleConfig.models,
+                      ...availableModels[compatibleProvider].map(
+                        (item) => item.id,
+                      ),
+                    ].includes(compatibleConfig.model)
+                      ? "__custom__"
+                      : compatibleConfig.model
+                  }
+                  options={[
+                    ...Array.from(
+                      new Set<string>([
+                        ...compatibleConfig.models,
+                        ...availableModels[compatibleProvider].map(
+                          (item) => item.id,
+                        ),
+                      ]),
+                    ).map((id) => ({ value: id, label: id })),
+                    {
+                      value: "__custom__",
+                      label: t("settings_compatibleCustomModel"),
+                    },
+                  ]}
+                  onChange={(model) => {
+                    setCustomModels((previous) => ({
+                      ...previous,
+                      [compatibleProvider]: model === "__custom__",
+                    }));
+                    if (model !== "__custom__")
+                      onUpdateSettings({
+                        [`${compatibleProvider}Model`]: model,
+                      });
+                  }}
+                />
+                {(customModels[compatibleProvider] ||
+                  ![
+                    ...compatibleConfig.models,
+                    ...availableModels[compatibleProvider].map(
+                      (item) => item.id,
+                    ),
+                  ].includes(compatibleConfig.model)) && (
+                  <input
+                    type="text"
+                    aria-label={t("settings_compatibleModelId")}
+                    value={
+                      settings[`${compatibleProvider}Model`] ??
+                      compatibleConfig.model
+                    }
+                    onChange={(event) =>
+                      onUpdateSettings({
+                        [`${compatibleProvider}Model`]: event.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 font-mono"
+                  />
+                )}
+              </div>
+              <div className="space-y-2">
+                <label
+                  htmlFor="compatible-ai-api-key"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  {compatibleConfig.label} API Key
+                </label>
+                <div className="relative">
+                  <input
+                    id="compatible-ai-api-key"
+                    type={showCompatibleKey ? "text" : "password"}
+                    value={settings[`${compatibleProvider}ApiKey`] || ""}
+                    onChange={(event) =>
+                      handleSecureSettingChange(
+                        `${compatibleProvider}ApiKey`,
+                        event.target.value,
+                      )
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="w-full pl-3 pr-10 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowCompatibleKey((previous) => !previous)
+                    }
+                    className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    aria-label={
+                      showCompatibleKey ? "Hide API key" : "Show API key"
+                    }
+                  >
+                    <EyeIcon visible={showCompatibleKey} />
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400">
+                  {t("settings_compatibleKeyLocalOnly")}
+                </p>
+                {renderSecureSaveState(`${compatibleProvider}ApiKey`)}
+              </div>
+            </>
+          )}
 
           {settings.aiProvider === "gemini" && (
             <>

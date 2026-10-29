@@ -313,6 +313,7 @@ describe("renderMermaidDiagrams", () => {
     expect(el.dataset.mermaidRendered).toBe("true");
     expect(initialize).toHaveBeenCalledWith(
       expect.objectContaining({
+        suppressErrorRendering: true,
         flowchart: expect.objectContaining({ useMaxWidth: false }),
       }),
     );
@@ -715,7 +716,7 @@ describe("initMermaid", () => {
 
     const tokens = [{ info: "mermaid", content: "flowchart LR\nA-->B" }];
     const result = md.renderer.rules.fence(tokens, 0, {}, {}, {});
-    expect(result).toBe('<div class="mermaid">flowchart LR\nA-->B</div>');
+    expect(result).toBe('<div class="mermaid">flowchart LR\nA--&gt;B</div>');
   });
 
   it("returns mermaid div for mmd fence language", () => {
@@ -724,7 +725,7 @@ describe("initMermaid", () => {
 
     const tokens = [{ info: "mmd", content: "graph TD\nA-->B" }];
     const result = md.renderer.rules.fence(tokens, 0, {}, {}, {});
-    expect(result).toBe('<div class="mermaid">graph TD\nA-->B</div>');
+    expect(result).toBe('<div class="mermaid">graph TD\nA--&gt;B</div>');
   });
 
   it("falls back to default fence for non-mermaid languages", () => {

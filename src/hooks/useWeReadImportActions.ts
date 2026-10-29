@@ -89,7 +89,10 @@ export function useWeReadImportActions() {
     async (force = false): Promise<WereadNotebook[]> => {
       const ready = await ensureReady();
       if (!ready) return [];
-      return fetchAllNotebooksCached(force);
+      return fetchAllNotebooksCached(
+        force,
+        useAppStore.getState().settings.wereadApiKey?.trim() ?? "",
+      );
     },
     [ensureReady],
   );

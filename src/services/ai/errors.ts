@@ -8,7 +8,8 @@ export type AiServiceErrorCode =
   | "REQUEST_TIMEOUT"
   | "INVALID_JSON"
   | "EMPTY_RESPONSE"
-  | "HTTP_FAILED";
+  | "HTTP_FAILED"
+  | "NETWORK_FAILED";
 
 export type AiServiceProvider = AIProvider | "openai";
 
@@ -40,6 +41,9 @@ export function isAiServiceError(error: unknown): error is AiServiceError {
 function providerLabel(provider?: AiServiceProvider): string {
   if (provider === "gemini") return "Gemini";
   if (provider === "deepseek") return "DeepSeek";
+  if (provider === "glm") return "GLM";
+  if (provider === "kimi") return "Kimi";
+  if (provider === "mimo") return "Xiaomi MiMo";
   return "OpenAI";
 }
 
@@ -51,6 +55,7 @@ const CODE_KEYS: Record<AiServiceErrorCode, TranslationKey> = {
   INVALID_JSON: "aiError_invalidJson",
   EMPTY_RESPONSE: "aiError_emptyResponse",
   HTTP_FAILED: "aiError_httpFailed",
+  NETWORK_FAILED: "aiError_networkFailed",
 };
 
 /** 把带 code 的 AI 错误映射为当前语言的用户可见文案。 */

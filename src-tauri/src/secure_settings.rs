@@ -17,6 +17,9 @@ const SECRET_KEY_WEREAD_API_KEY: &str = "wereadApiKey";
 const SECRET_KEY_GEMINI_API_KEY: &str = "geminiApiKey";
 const SECRET_KEY_CODEX_API_KEY: &str = "codexApiKey";
 const SECRET_KEY_DEEPSEEK_API_KEY: &str = "deepseekApiKey";
+const SECRET_KEY_GLM_API_KEY: &str = "glmApiKey";
+const SECRET_KEY_KIMI_API_KEY: &str = "kimiApiKey";
+const SECRET_KEY_MIMO_API_KEY: &str = "mimoApiKey";
 const SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN: &str = "imageHostingGithubToken";
 const SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY: &str = "imageHostingS3SecretAccessKey";
 const SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET: &str = "imageHostingOssAccessKeySecret";
@@ -32,6 +35,9 @@ pub(crate) struct SecureSettingsResult {
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
     deepseek_api_key: Option<String>,
+    glm_api_key: Option<String>,
+    kimi_api_key: Option<String>,
+    mimo_api_key: Option<String>,
     image_hosting_github_token: Option<String>,
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
@@ -48,6 +54,9 @@ struct SecureSettingsFile {
     gemini_api_key: Option<String>,
     codex_api_key: Option<String>,
     deepseek_api_key: Option<String>,
+    glm_api_key: Option<String>,
+    kimi_api_key: Option<String>,
+    mimo_api_key: Option<String>,
     image_hosting_github_token: Option<String>,
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
@@ -202,11 +211,7 @@ fn load_or_create_secure_settings_key(app: &tauri::AppHandle) -> Result<[u8; 32]
     rand::rngs::OsRng.fill_bytes(&mut key);
     let encoded = BASE64_STANDARD.encode(key);
 
-    match OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
-    {
+    match OpenOptions::new().write(true).create_new(true).open(&path) {
         Ok(mut file) => {
             file.write_all(encoded.as_bytes()).map_err(|e| {
                 format!(
@@ -326,6 +331,9 @@ fn write_secure_settings_file(
         || settings.gemini_api_key.is_some()
         || settings.codex_api_key.is_some()
         || settings.deepseek_api_key.is_some()
+        || settings.glm_api_key.is_some()
+        || settings.kimi_api_key.is_some()
+        || settings.mimo_api_key.is_some()
         || settings.image_hosting_github_token.is_some()
         || settings.image_hosting_s3_secret_access_key.is_some()
         || settings.image_hosting_oss_access_key_secret.is_some()
@@ -379,6 +387,9 @@ fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String
         SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
         SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
         SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key,
+        SECRET_KEY_GLM_API_KEY => settings.glm_api_key,
+        SECRET_KEY_KIMI_API_KEY => settings.kimi_api_key,
+        SECRET_KEY_MIMO_API_KEY => settings.mimo_api_key,
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token,
         SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
             settings.image_hosting_s3_secret_access_key
@@ -408,6 +419,9 @@ fn write_secure_secret(
             SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key = normalized,
             SECRET_KEY_CODEX_API_KEY => settings.codex_api_key = normalized,
             SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key = normalized,
+            SECRET_KEY_GLM_API_KEY => settings.glm_api_key = normalized,
+            SECRET_KEY_KIMI_API_KEY => settings.kimi_api_key = normalized,
+            SECRET_KEY_MIMO_API_KEY => settings.mimo_api_key = normalized,
             SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => {
                 settings.image_hosting_github_token = normalized
             }
@@ -436,6 +450,9 @@ fn resolve_secret_key(key: &str) -> Option<&'static str> {
         SECRET_KEY_GEMINI_API_KEY => Some(SECRET_KEY_GEMINI_API_KEY),
         SECRET_KEY_CODEX_API_KEY => Some(SECRET_KEY_CODEX_API_KEY),
         SECRET_KEY_DEEPSEEK_API_KEY => Some(SECRET_KEY_DEEPSEEK_API_KEY),
+        SECRET_KEY_GLM_API_KEY => Some(SECRET_KEY_GLM_API_KEY),
+        SECRET_KEY_KIMI_API_KEY => Some(SECRET_KEY_KIMI_API_KEY),
+        SECRET_KEY_MIMO_API_KEY => Some(SECRET_KEY_MIMO_API_KEY),
         SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => Some(SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN),
         SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
             Some(SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY)
@@ -470,6 +487,9 @@ fn get_secure_settings_blocking(app: &tauri::AppHandle) -> Result<SecureSettings
         gemini_api_key: read_secure_secret(&app, SECRET_KEY_GEMINI_API_KEY)?,
         codex_api_key: read_secure_secret(&app, SECRET_KEY_CODEX_API_KEY)?,
         deepseek_api_key: read_secure_secret(&app, SECRET_KEY_DEEPSEEK_API_KEY)?,
+        glm_api_key: read_secure_secret(&app, SECRET_KEY_GLM_API_KEY)?,
+        kimi_api_key: read_secure_secret(&app, SECRET_KEY_KIMI_API_KEY)?,
+        mimo_api_key: read_secure_secret(&app, SECRET_KEY_MIMO_API_KEY)?,
         image_hosting_github_token: read_secure_secret(
             &app,
             SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN,
@@ -509,9 +529,7 @@ pub(crate) async fn set_secure_secret(
     .map_err(|e| format!("Failed to join secure settings write task: {}", e))?
 }
 
-pub(crate) fn read_weread_api_key(
-    app: &tauri::AppHandle,
-) -> Result<Option<String>, String> {
+pub(crate) fn read_weread_api_key(app: &tauri::AppHandle) -> Result<Option<String>, String> {
     read_secure_secret(app, SECRET_KEY_WEREAD_API_KEY)
 }
 
@@ -525,6 +543,26 @@ mod tests {
             resolve_secret_key(SECRET_KEY_WEREAD_API_KEY),
             Some(SECRET_KEY_WEREAD_API_KEY)
         );
+    }
+
+    #[test]
+    fn new_ai_provider_secrets_are_allowed_and_survive_legacy_settings() {
+        for key in ["glmApiKey", "kimiApiKey", "mimoApiKey"] {
+            assert_eq!(resolve_secret_key(key), Some(key));
+        }
+        // 旧配置缺少新增字段时，仍能读取并保留原供应商密钥。
+        let legacy: SecureSettingsFile =
+            serde_json::from_str(r#"{"deepseekApiKey":"old-secret"}"#).unwrap();
+        assert_eq!(legacy.deepseek_api_key.as_deref(), Some("old-secret"));
+        assert!(legacy.glm_api_key.is_none());
+        let current: SecureSettingsFile = serde_json::from_str(
+            r#"{"glmApiKey":"glm-secret","kimiApiKey":"kimi-secret","mimoApiKey":"mimo-secret"}"#,
+        )
+        .unwrap();
+        let encoded = serde_json::to_value(current).unwrap();
+        assert_eq!(encoded["glmApiKey"], "glm-secret");
+        assert_eq!(encoded["kimiApiKey"], "kimi-secret");
+        assert_eq!(encoded["mimoApiKey"], "mimo-secret");
     }
 
     #[test]

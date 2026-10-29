@@ -4,6 +4,14 @@ const { mockInvoke } = vi.hoisted(() => ({
   mockInvoke: vi.fn(),
 }));
 
+vi.mock("./updateDocumentGuard", () => ({
+  beginUpdateInstall: vi.fn(async () => async () => {}),
+}));
+
+vi.mock("./filesystem/flushActiveDocument", () => ({
+  flushAllDirtyOpenTabs: vi.fn(async () => true),
+}));
+
 vi.mock("../types/filesystem", () => ({
   isTauriEnvironment: () => true,
 }));
@@ -68,7 +76,7 @@ describe("macOS script updater", () => {
   });
 
   it("installs through the signed macOS updater command", async () => {
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvoke.mockResolvedValue("download-id");
 
     await downloadAndInstallUpdate({
       version: "0.9.1",
@@ -79,11 +87,14 @@ describe("macOS script updater", () => {
     });
 
     expect(mockInvoke).toHaveBeenCalledWith(
-      "install_macos_update",
+      "prepare_macos_update",
       expect.objectContaining({
         tag: "v0.9.1",
         onEvent: expect.any(Object),
       }),
     );
+    expect(mockInvoke).toHaveBeenCalledWith("install_macos_update", {
+      downloadId: "download-id",
+    });
   });
 });

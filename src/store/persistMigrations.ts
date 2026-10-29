@@ -378,7 +378,10 @@ export function resolvePersistedAISettings(
   if (
     persistedProvider === "codex" ||
     persistedProvider === "gemini" ||
-    persistedProvider === "deepseek"
+    persistedProvider === "deepseek" ||
+    persistedProvider === "glm" ||
+    persistedProvider === "kimi" ||
+    persistedProvider === "mimo"
   ) {
     return {
       aiProvider: persistedProvider,

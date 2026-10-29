@@ -1,4 +1,10 @@
+import { requestCompatibleApi } from "./ai/compatibleHttp";
 import type { AIProvider, AppSettings } from "../types";
+import {
+  COMPATIBLE_PROVIDERS,
+  isCompatibleProvider,
+  resolveCompatibleSettings,
+} from "./ai/compatibleProviders";
 import { fetchWithTimeout } from "./ai/http";
 import { AiServiceError } from "./ai/errors";
 
@@ -166,6 +172,36 @@ export async function fetchAvailableModels(
   provider: AIProvider,
   settings: AppSettings,
 ): Promise<ModelOption[]> {
+  if (isCompatibleProvider(provider)) {
+    const config = resolveCompatibleSettings(provider, settings);
+    if (!config.apiKey)
+      throw new AiServiceError("MISSING_API_KEY", { provider });
+    // GLM 未公开模型枚举接口，使用官方文档预设并允许填写模型 ID。
+    if (!COMPATIBLE_PROVIDERS[provider].discovery)
+      return config.models.map((id) => ({ id, label: id }));
+    const response = await requestCompatibleApi(
+      provider,
+      config.baseUrl,
+      config.apiKey,
+      "models",
+    );
+    const payload = response.payload as OpenAIModelListResponse | null;
+    if (!response.ok)
+      throw new AiServiceError("MODEL_LIST_FAILED", {
+        provider,
+        status: response.status,
+      });
+    return dedupeAndSortModels(
+      (payload?.data ?? [])
+        .map((item) => item.id?.trim() || "")
+        .filter((id) =>
+          provider === "mimo"
+            ? /^mimo-/i.test(id) && !/(?:asr|tts|audio|speech)/i.test(id)
+            : /^(?:kimi-|moonshot-)/i.test(id),
+        )
+        .map((id) => ({ id, label: id })),
+    );
+  }
   if (provider === "codex") {
     return fetchOpenAIModels(settings);
   }

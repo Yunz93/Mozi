@@ -191,6 +191,8 @@ async function ensureOfficialMermaidConfigured(themeMode: "light" | "dark") {
 
   mermaid.initialize({
     startOnLoad: false,
+    // 语法错误交给应用显示，避免将官方错误 SVG 误判为成功的图表。
+    suppressErrorRendering: true,
     theme: themeMode === "dark" ? "dark" : "default",
     fontFamily: '"Trebuchet MS", Verdana, Arial, sans-serif',
     flowchart: {
@@ -405,7 +407,7 @@ export function initMermaid(md: any) {
       // Omit a random id: it makes the HTML unstable and causes React to replace the DOM
       // on every markdown render, destroying already-rendered Mermaid SVGs and forcing a
       // re-render that can fail when the container is temporarily invisible.
-      return `<div class="mermaid">${code}</div>`;
+      return `<div class="mermaid">${escapeHtml(code)}</div>`;
     }
 
     return defaultFence(tokens, idx, options, env, self);

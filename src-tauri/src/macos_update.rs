@@ -13,6 +13,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
+use std::sync::{Mutex, OnceLock};
 use tauri::ipc::Channel;
 use tauri::AppHandle;
 
@@ -445,50 +446,135 @@ pub fn check_macos_update(current_version: &str) -> Result<Option<MacosUpdateInf
     }
 }
 
-pub fn install_macos_update(
+static UPDATE_INSTALL_LOCK: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn set_update_install_lock(request_id: String, locked: bool) -> Result<(), String> {
+    let mut owner = UPDATE_INSTALL_LOCK
+        .lock()
+        .map_err(|_| "更新状态不可用。".to_string())?;
+    if locked {
+        if owner.as_ref().map(|id| id != &request_id).unwrap_or(false) {
+            return Err("其他窗口正在安装更新。".to_string());
+        }
+        *owner = Some(request_id);
+    } else if owner.as_ref() == Some(&request_id) {
+        *owner = None;
+    }
+    Ok(())
+}
+
+pub fn update_installation_locked() -> bool {
+    UPDATE_INSTALL_LOCK
+        .lock()
+        .map(|owner| owner.is_some())
+        .unwrap_or(true)
+}
+
+struct PreparedMacosUpdate {
+    download_id: String,
+    directory: PathBuf,
+    signature: String,
+}
+
+static PREPARED_UPDATE: OnceLock<Mutex<Option<PreparedMacosUpdate>>> = OnceLock::new();
+
+fn prepared_update_state() -> &'static Mutex<Option<PreparedMacosUpdate>> {
+    PREPARED_UPDATE.get_or_init(|| Mutex::new(None))
+}
+
+fn take_prepared_update(
+    state: &Mutex<Option<PreparedMacosUpdate>>,
+    download_id: &str,
+) -> Result<PreparedMacosUpdate, String> {
+    let mut pending = state.lock().map_err(|_| "更新状态不可用。".to_string())?;
+    if pending.as_ref().map(|update| update.download_id.as_str()) != Some(download_id) {
+        return Err("下载的更新已失效，请重新检查更新。".to_string());
+    }
+    pending
+        .take()
+        .ok_or_else(|| "没有已下载的更新。".to_string())
+}
+
+/// 下载和验签期间允许继续编辑；前端在全部窗口保存成功后才调用安装。
+pub fn prepare_macos_update(
     tag: &str,
     on_event: Channel<MacosUpdateProgressEvent>,
-) -> Result<(), String> {
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = (tag, on_event);
+) -> Result<String, String> {
+    if !cfg!(target_os = "macos") {
         return Err("macOS in-app updates are only available on macOS.".to_string());
     }
-
-    #[cfg(target_os = "macos")]
-    {
-        if !is_valid_release_tag(tag) {
-            return Err(format!("无效的版本标签: {tag}"));
-        }
-
-        let client = http_client(DOWNLOAD_TIMEOUT_SECS)?;
-        let latest = fetch_latest_json(&client)?;
-        let platform = updater_platform_key(std::env::consts::ARCH)?;
-        let (url, signature) = require_signed_platform_artifact(&latest, platform)?;
-
-        let tmp_dir =
-            std::env::temp_dir().join(format!("mozi-macos-update-{}", std::process::id()));
-        fs::create_dir_all(&tmp_dir).map_err(|error| format!("无法创建临时目录: {error}"))?;
-        let archive_path = tmp_dir.join("update.app.tar.gz");
-        let extract_dir = tmp_dir.join("extract");
-        fs::create_dir_all(&extract_dir)
-            .map_err(|error| format!("无法创建解压目录: {error}"))?;
-        let backup_path = tmp_dir.join(format!("{APP_NAME}.app.bak"));
-
-        let result = (|| {
-            download_file(&client, &url, &archive_path, &on_event)?;
-            let bytes = fs::read(&archive_path).map_err(|error| format!("读取更新包失败: {error}"))?;
-            verify_update_signature(&bytes, &signature, UPDATER_PUBKEY)?;
-            let new_app = extract_app_bundle(&archive_path, &extract_dir)?;
-            clear_quarantine_xattr(&new_app)?;
-            replace_app_atomically(&installed_app_path(), &new_app, &backup_path)?;
-            spawn_relaunch_waiter(&installed_app_path())?;
-            Ok(())
-        })();
-
-        let _ = fs::remove_dir_all(&tmp_dir);
-        result
+    if !is_valid_release_tag(tag) {
+        return Err(format!("无效的版本标签: {tag}"));
     }
+    let client = http_client(DOWNLOAD_TIMEOUT_SECS)?;
+    let latest = fetch_latest_json(&client)?;
+    let latest_tag = normalize_release_tag(latest.version.as_deref().unwrap_or_default());
+    if latest_tag != tag {
+        return Err("可用更新版本已变化，请重新检查更新。".to_string());
+    }
+    let platform = updater_platform_key(std::env::consts::ARCH)?;
+    let (url, signature) = require_signed_platform_artifact(&latest, platform)?;
+    let download_id = uuid::Uuid::new_v4().to_string();
+    let directory = std::env::temp_dir().join(format!(
+        "mozi-macos-update-{}-{}",
+        std::process::id(),
+        download_id
+    ));
+    fs::create_dir(&directory).map_err(|error| format!("无法创建临时目录: {error}"))?;
+    let archive_path = directory.join("update.app.tar.gz");
+    let result = (|| {
+        download_file(&client, &url, &archive_path, &on_event)?;
+        let bytes = fs::read(&archive_path).map_err(|error| format!("读取更新包失败: {error}"))?;
+        verify_update_signature(&bytes, &signature, UPDATER_PUBKEY)?;
+        let prepared = PreparedMacosUpdate {
+            download_id: download_id.clone(),
+            directory: directory.clone(),
+            signature,
+        };
+        let previous = prepared_update_state()
+            .lock()
+            .map_err(|_| "更新状态不可用。".to_string())?
+            .replace(prepared);
+        if let Some(previous) = previous {
+            let _ = fs::remove_dir_all(previous.directory);
+        }
+        Ok(download_id)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_dir_all(directory);
+    }
+    result
+}
+
+pub fn discard_macos_update(download_id: &str) -> Result<(), String> {
+    if let Ok(prepared) = take_prepared_update(prepared_update_state(), download_id) {
+        fs::remove_dir_all(prepared.directory)
+            .map_err(|error| format!("清理更新包失败: {error}"))?;
+    }
+    Ok(())
+}
+
+pub fn install_macos_update(download_id: &str) -> Result<(), String> {
+    if !cfg!(target_os = "macos") {
+        return Err("macOS in-app updates are only available on macOS.".to_string());
+    }
+    let prepared = take_prepared_update(prepared_update_state(), download_id)?;
+    let result = (|| {
+        let archive_path = prepared.directory.join("update.app.tar.gz");
+        let bytes = fs::read(&archive_path).map_err(|error| format!("读取更新包失败: {error}"))?;
+        // 下载后仍再次验签，防止等待保存期间的磁盘篡改。
+        verify_update_signature(&bytes, &prepared.signature, UPDATER_PUBKEY)?;
+        let extract_dir = prepared.directory.join("extract");
+        fs::create_dir(&extract_dir).map_err(|error| format!("无法创建解压目录: {error}"))?;
+        let new_app = extract_app_bundle(&archive_path, &extract_dir)?;
+        clear_quarantine_xattr(&new_app)?;
+        let backup_path = prepared.directory.join(format!("{APP_NAME}.app.bak"));
+        replace_app_atomically(&installed_app_path(), &new_app, &backup_path)?;
+        spawn_relaunch_waiter(&installed_app_path())?;
+        Ok(())
+    })();
+    let _ = fs::remove_dir_all(prepared.directory);
+    result
 }
 
 pub fn check_macos_update_command(
@@ -498,12 +584,8 @@ pub fn check_macos_update_command(
     check_macos_update(&current_version)
 }
 
-pub fn install_macos_update_command(
-    app: AppHandle,
-    tag: String,
-    on_event: Channel<MacosUpdateProgressEvent>,
-) -> Result<(), String> {
-    install_macos_update(&tag, on_event)?;
+pub fn install_macos_update_command(app: AppHandle, download_id: String) -> Result<(), String> {
+    install_macos_update(&download_id)?;
     app.exit(0);
     Ok(())
 }
@@ -563,6 +645,32 @@ mod tests {
 
     fn parse_latest_json(raw: &str) -> LatestJson {
         serde_json::from_str(raw).expect("parse latest.json")
+    }
+
+    #[test]
+    fn prepared_update_is_consumed_only_by_the_matching_download() {
+        let pending = Mutex::new(Some(PreparedMacosUpdate {
+            download_id: "current".into(),
+            directory: PathBuf::from("unused"),
+            signature: "signed".into(),
+        }));
+        assert!(take_prepared_update(&pending, "stale").is_err());
+        assert_eq!(
+            take_prepared_update(&pending, "current").unwrap().signature,
+            "signed"
+        );
+        assert!(take_prepared_update(&pending, "current").is_err());
+    }
+
+    #[test]
+    fn update_install_lock_has_a_single_owner() {
+        set_update_install_lock("owner".into(), true).expect("lock");
+        assert!(update_installation_locked());
+        assert!(set_update_install_lock("other".into(), true).is_err());
+        set_update_install_lock("other".into(), false).expect("foreign release");
+        assert!(update_installation_locked());
+        set_update_install_lock("owner".into(), false).expect("release");
+        assert!(!update_installation_locked());
     }
 
     #[test]

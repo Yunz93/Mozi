@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-RELEASE_TAG=v1.1.1 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v1.2.0 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
@@ -187,6 +187,12 @@ xattr -cr /Applications/墨知.app
 | [html2canvas](https://html2canvas.hertzen.com/)             | 预览光栅化 | MIT        |
 | [html2pdf.js](https://ekoopmans.github.io/html2pdf.js/)     | HTML → PDF | MIT        |
 | [jsPDF](https://github.com/parallax/jsPDF)                  | PDF 生成   | MIT        |
+
+### AI 供应商配置
+
+在设置的 AI 页面选择 Gemini、OpenAI、DeepSeek、GLM、Kimi 或 Xiaomi MiMo，可用于内容增强、Wiki 生成和问库。每家供应商独立保存密钥、接口地址和模型，切换供应商不会覆盖其他配置。
+
+GLM、Kimi、Xiaomi MiMo 默认使用官方标准 API；套餐密钥需填写套餐对应的专用地址。模型可使用预设或自定义 ID，Kimi 和 MiMo 也可加载账号可用的模型列表。GLM 使用文档预设，不请求未公开的模型枚举接口。密钥通过应用的安全存储保存，不写入普通设置缓存。
 
 ### 知识检索与可选 AI
 

@@ -5,6 +5,11 @@ import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge"
 import { flushAllDirtyOpenTabs } from "../services/filesystem/flushActiveDocument";
 import { writeDraftBackup } from "../utils/draftBackup";
 import { t } from "../utils/i18n";
+import {
+  isUpdateInstallLocked,
+  listenForUpdateSaveRequests,
+  beginDocumentShutdown,
+} from "../services/updateDocumentGuard";
 
 type ForceSaveFn = (
   content?: string,
@@ -42,13 +47,6 @@ export async function completeAppClose(
   source: CloseRequestSource,
 ): Promise<void> {
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("allow_next_window_close");
-  } catch {
-    // Command may be missing on older builds; keep trying JS close paths.
-  }
-
-  try {
     if (source === "exit") {
       const { exit } = await import("@tauri-apps/plugin-process");
       await exit(0);
@@ -66,8 +64,26 @@ export async function completeAppClose(
     await invokeForceClose(source);
   } catch (error) {
     console.error("Forced close failed:", error);
+    // 单窗关闭失败不能退化为退出进程，否则会丢失其他窗口尚未保存的修改。
+    if (source !== "exit") throw error;
     const { exit } = await import("@tauri-apps/plugin-process");
     await exit(0);
+  }
+}
+
+/** 放弃全应用修改前逐窗备份，不能让确认框绕过其他窗口的保存保护。 */
+export async function completeAppCloseAfterDiscard(
+  source: CloseRequestSource,
+): Promise<void> {
+  if (source !== "exit") {
+    await completeAppClose(source);
+    return;
+  }
+  const release = await beginDocumentShutdown("exit", { backupOnly: true });
+  try {
+    await completeAppClose(source);
+  } finally {
+    await release();
   }
 }
 
@@ -109,9 +125,10 @@ export function useCloseGuard(forceSave: ForceSaveFn): void {
 
     let cancelled = false;
     let unlisten: (() => void) | null = null;
+    let unlistenUpdates: (() => void) | null = null;
 
     const handleCloseRequested = async (source: CloseRequestSource) => {
-      if (isClosingRef.current) return;
+      if (isClosingRef.current || isUpdateInstallLocked()) return;
       isClosingRef.current = true;
 
       try {
@@ -132,12 +149,23 @@ export function useCloseGuard(forceSave: ForceSaveFn): void {
               return;
             }
           }
+        }
 
-          const flushed = await flushAllDirtyOpenTabs();
-          if (!flushed) {
-            requestCloseDespiteSaveFailure(source);
-            return;
+        if (source === "exit") {
+          const release = await beginDocumentShutdown("exit");
+          try {
+            await completeAppClose(source);
+          } finally {
+            await release();
           }
+          return;
+        }
+
+        // 即使撤销后看似干净，也要等待在途写盘，避免旧保存覆盖撤销结果。
+        const flushed = await flushAllDirtyOpenTabs();
+        if (!flushed) {
+          requestCloseDespiteSaveFailure(source);
+          return;
         }
 
         await completeAppClose(source);
@@ -150,6 +178,17 @@ export function useCloseGuard(forceSave: ForceSaveFn): void {
     };
 
     void (async () => {
+      try {
+        const stopUpdateListener = await listenForUpdateSaveRequests();
+        if (cancelled) {
+          stopUpdateListener();
+          return;
+        }
+        unlistenUpdates = stopUpdateListener;
+      } catch (error) {
+        console.warn("Failed to listen for update save requests:", error);
+      }
+      if (cancelled) return;
       try {
         const { listen } = await import("@tauri-apps/api/event");
         const unlistenFn = await listen<unknown>(
@@ -170,6 +209,7 @@ export function useCloseGuard(forceSave: ForceSaveFn): void {
 
     return () => {
       cancelled = true;
+      unlistenUpdates?.();
       if (unlisten) {
         unlisten();
       }

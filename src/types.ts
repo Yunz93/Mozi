@@ -61,7 +61,13 @@ export interface AIWikiGenerationResult {
   citations: string[];
 }
 
-export type AIProvider = "gemini" | "codex" | "deepseek";
+export type AIProvider =
+  | "gemini"
+  | "codex"
+  | "deepseek"
+  | "glm"
+  | "kimi"
+  | "mimo";
 
 export type WereadImportFolderMode = "flat" | "author" | "year" | "authorYear";
 
@@ -242,6 +248,15 @@ export interface AppSettings {
   deepseekApiBaseUrl?: string;
   deepseekApiKey?: string;
   deepseekModel?: string;
+  glmApiBaseUrl?: string;
+  glmApiKey?: string;
+  glmModel?: string;
+  kimiApiBaseUrl?: string;
+  kimiApiKey?: string;
+  kimiModel?: string;
+  mimoApiBaseUrl?: string;
+  mimoApiKey?: string;
+  mimoModel?: string;
   aiSystemPrompt?: string;
   aiSystemPromptZh?: string;
   aiSystemPromptEn?: string;
