@@ -62,10 +62,6 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
   const [storeBooks, setStoreBooks] = useState<WereadStoreBook[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [conflictMode, setConflictMode] = useState<WereadConflictMode>("merge");
-  const [saveCover, setSaveCover] = useState(defaultSaveCover);
-  const [includeHotHighlights, setIncludeHotHighlights] = useState(
-    defaultIncludeHotHighlights,
-  );
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -79,8 +75,6 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
     if (!isOpen) return;
     setQuery(initialQuery);
     setConflictMode("merge");
-    setSaveCover(defaultSaveCover);
-    setIncludeHotHighlights(defaultIncludeHotHighlights);
     setStoreBooks([]);
     setLoadError("");
     setLoading(true);
@@ -99,13 +93,7 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
         setLoadError(error instanceof Error ? error.message : String(error));
       })
       .finally(() => setLoading(false));
-  }, [
-    defaultIncludeHotHighlights,
-    defaultSaveCover,
-    initialQuery,
-    isOpen,
-    preselectedKey,
-  ]);
+  }, [initialQuery, isOpen, preselectedKey]);
 
   const filteredNotebooks = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -192,8 +180,8 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
     const results = await onImport({
       notebooks: selected,
       conflictMode,
-      saveCover,
-      includeHotHighlights,
+      saveCover: defaultSaveCover,
+      includeHotHighlights: defaultIncludeHotHighlights,
     });
     if (results.some((result) => result.status !== "failed")) {
       onClose();
@@ -210,7 +198,7 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
       contentScroll={false}
       closable={!isImporting}
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
         <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
           {t("wereadImport_desc")}
         </p>
@@ -333,26 +321,9 @@ export const WeReadImportDialog: React.FC<WeReadImportDialogProps> = ({
             </label>
           ))}
         </fieldset>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={saveCover}
-            onChange={(event) => setSaveCover(event.target.checked)}
-          />
-          {t("wereadImport_saveCover")}
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={includeHotHighlights}
-            onChange={(event) => setIncludeHotHighlights(event.target.checked)}
-          />
-          {t("wereadImport_includeHot")}
-        </label>
       </div>
 
-      <div className="flex justify-end gap-3 border-t border-gray-200/50 px-6 py-4 dark:border-white/10">
+      <div className="flex shrink-0 justify-end gap-3 border-t border-gray-200/50 px-6 py-4 dark:border-white/10">
         <button
           type="button"
           onClick={onClose}

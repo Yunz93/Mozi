@@ -46,6 +46,34 @@ describe("ReadingNotesTab", () => {
     expect(screen.getByText("微信读书 API Key")).toBeTruthy();
   });
 
+  it("keeps import and Skill update actions in the same row", () => {
+    render(
+      <ReadingNotesTab settings={defaultSettings} onUpdateSettings={vi.fn()} />,
+    );
+    const importButton = screen.getByRole("button", { name: "打开导入对话框" });
+    const updateButton = screen.getByRole("button", {
+      name: "更新微信读书 Skill",
+    });
+    expect(importButton.parentElement).toBe(updateButton.parentElement);
+  });
+
+  it("uses the shared dropdown to change the import directory structure", () => {
+    const onUpdateSettings = vi.fn();
+    render(
+      <ReadingNotesTab
+        settings={defaultSettings}
+        onUpdateSettings={onUpdateSettings}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "目录结构" }));
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(4);
+    fireEvent.click(screen.getByRole("option", { name: "按作者分子目录" }));
+    expect(onUpdateSettings).toHaveBeenCalledWith({
+      wereadImportFolderMode: "author",
+    });
+  });
+
   it("prevents repeat updates and shows the installed Skill version", async () => {
     let finish: (version: string) => void = () => undefined;
     vi.mocked(updateWereadSkill).mockReturnValueOnce(

@@ -6,6 +6,7 @@ import type { SettingsTabProps } from "../types";
 import { useSecureSettings } from "../useSecureSettings";
 import { requestWeReadImportDialog } from "../../../utils/weread/wereadImportEvents";
 import { updateWereadSkill } from "../../../utils/weread/wereadApi";
+import { AppSelect } from "../../ui/AppSelect";
 
 type ReadingNotesSourceTab = "weread";
 
@@ -116,27 +117,28 @@ export const ReadingNotesTab: React.FC<SettingsTabProps> = ({
           {renderSecureSaveState("wereadApiKey")}
         </div>
 
-        <button
-          type="button"
-          onClick={() => requestWeReadImportDialog()}
-          className="inline-flex items-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:opacity-90 dark:bg-white dark:text-black"
-        >
-          {t("settings_wereadOpenImport")}
-        </button>
-
         <div>
-          <button
-            type="button"
-            onClick={() => void handleUpdateSkill()}
-            disabled={updatingSkill || !isTauriEnvironment()}
-            className="inline-flex items-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
-          >
-            {t(
-              updatingSkill
-                ? "settings_wereadSkillUpdating"
-                : "settings_wereadUpdateSkill",
-            )}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => requestWeReadImportDialog()}
+              className="inline-flex items-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:opacity-90 dark:bg-white dark:text-black"
+            >
+              {t("settings_wereadOpenImport")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleUpdateSkill()}
+              disabled={updatingSkill || !isTauriEnvironment()}
+              className="inline-flex items-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+            >
+              {t(
+                updatingSkill
+                  ? "settings_wereadSkillUpdating"
+                  : "settings_wereadUpdateSkill",
+              )}
+            </button>
+          </div>
           <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
             {t("settings_wereadSkillUpdateDesc")}
           </p>
@@ -172,29 +174,33 @@ export const ReadingNotesTab: React.FC<SettingsTabProps> = ({
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {t("settings_wereadImportFolderMode")}
           </label>
-          <select
+          <AppSelect
+            aria-label={t("settings_wereadImportFolderMode")}
             value={settings.wereadImportFolderMode}
-            onChange={(e) =>
+            onChange={(value) =>
               onUpdateSettings({
-                wereadImportFolderMode: e.target
-                  .value as WereadImportFolderMode,
+                wereadImportFolderMode: value as WereadImportFolderMode,
               })
             }
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm transition-all focus:border-accent-DEFAULT focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 dark:border-white/10 dark:bg-white/5"
-          >
-            <option value="flat">
-              {t("settings_wereadImportFolderModeFlat")}
-            </option>
-            <option value="author">
-              {t("settings_wereadImportFolderModeAuthor")}
-            </option>
-            <option value="year">
-              {t("settings_wereadImportFolderModeYear")}
-            </option>
-            <option value="authorYear">
-              {t("settings_wereadImportFolderModeAuthorYear")}
-            </option>
-          </select>
+            options={[
+              {
+                value: "flat",
+                label: t("settings_wereadImportFolderModeFlat"),
+              },
+              {
+                value: "author",
+                label: t("settings_wereadImportFolderModeAuthor"),
+              },
+              {
+                value: "year",
+                label: t("settings_wereadImportFolderModeYear"),
+              },
+              {
+                value: "authorYear",
+                label: t("settings_wereadImportFolderModeAuthorYear"),
+              },
+            ]}
+          />
         </div>
 
         <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
