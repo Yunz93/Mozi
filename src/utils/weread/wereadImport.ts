@@ -3,6 +3,7 @@ import { getFileSystem } from "../../types/filesystem";
 import { getPathDirname } from "../pathHelpers";
 import { FileSystemError } from "../errorHandler";
 import { notifyVaultFileSaved } from "../../services/vault/linkIndexEvents";
+import { classifyWereadError } from "./wereadErrors";
 import {
   downloadWereadCover,
   fetchBestBookmarks,
@@ -51,6 +52,10 @@ export interface WereadImportRequest {
   language: "zh-CN" | "en";
   readFile: (path: string) => Promise<string>;
   writeFile: (path: string, content: string) => Promise<void>;
+  updateFile?: (
+    path: string,
+    update: (content: string) => string,
+  ) => Promise<string>;
   createFile: (
     fileName: string,
     content: string,
@@ -155,6 +160,12 @@ function mergeBookInfo(
   };
 }
 
+function fallbackUnlessUpgradeRequired(error: unknown): null {
+  const message = error instanceof Error ? error.message : String(error);
+  if (classifyWereadError(message) === "upgrade") throw error;
+  return null;
+}
+
 async function ensureDirectory(path: string): Promise<void> {
   const fs = await getFileSystem();
   await fs.createDirectory(path);
@@ -221,11 +232,13 @@ export async function importWereadBook(
     const [bookmarks, reviews, info] = await Promise.all([
       fetchBookmarkList(notebook.bookId),
       fetchMyReviews(notebook.bookId),
-      fetchBookInfo(notebook.bookId).catch(() => null),
+      fetchBookInfo(notebook.bookId).catch(fallbackUnlessUpgradeRequired),
     ]);
     const book = mergeBookInfo(notebook, info);
     const hotHighlights = request.includeHotHighlights
-      ? await fetchBestBookmarks(notebook.bookId).catch(() => null)
+      ? await fetchBestBookmarks(notebook.bookId).catch(
+          fallbackUnlessUpgradeRequired,
+        )
       : null;
 
     const targetPath = existing?.path ?? preferred.filePath;
@@ -264,12 +277,20 @@ export async function importWereadBook(
     let status: WereadImportBookResult["status"];
     let writtenPath = existing?.path ?? preferred.filePath;
     if (existing && request.conflictMode === "merge") {
-      content = mergeWereadMarkdown(existing.content, generated);
-      await request.writeFile(existing.path, content);
+      const update = (latest: string) => mergeWereadMarkdown(latest, generated);
+      if (request.updateFile) {
+        content = await request.updateFile(existing.path, update);
+      } else {
+        content = update(await request.readFile(existing.path));
+        await request.writeFile(existing.path, content);
+      }
       status = "merged";
     } else if (existing && request.conflictMode === "overwrite") {
-      content = buildWereadMarkdown(generated);
-      await request.writeFile(existing.path, content);
+      const update = () => buildWereadMarkdown(generated);
+      content = request.updateFile
+        ? await request.updateFile(existing.path, update)
+        : update();
+      if (!request.updateFile) await request.writeFile(existing.path, content);
       status = "overwritten";
     } else {
       content = buildWereadMarkdown(generated);
@@ -332,8 +353,25 @@ export async function importWereadBooks(
   request: WereadImportRequest,
 ): Promise<WereadImportBookResult[]> {
   const results: WereadImportBookResult[] = [];
+  let blockingUpgradeError: string | undefined;
   for (const notebook of request.notebooks) {
-    results.push(await importWereadBook(notebook, request));
+    if (blockingUpgradeError) {
+      results.push({
+        bookId: notebook.bookId,
+        title: notebook.book?.title?.trim() || notebook.bookId,
+        status: "failed",
+        error: blockingUpgradeError,
+      });
+      continue;
+    }
+    const result = await importWereadBook(notebook, request);
+    results.push(result);
+    if (
+      result.status === "failed" &&
+      classifyWereadError(result.error ?? "") === "upgrade"
+    ) {
+      blockingUpgradeError = result.error;
+    }
   }
   return results;
 }

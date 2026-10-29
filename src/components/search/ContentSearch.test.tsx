@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
@@ -87,6 +87,7 @@ describe("ContentSearch replace history", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -133,5 +134,120 @@ describe("ContentSearch replace history", () => {
 
     clearActiveEditorView(view);
     view.destroy();
+  });
+
+  it.each([
+    {
+      source: "foobar",
+      pattern: "foo(?=bar)",
+      replacement: "baz",
+      expected: "bazbar",
+    },
+    {
+      source: "foobar",
+      pattern: "(?<=foo)bar",
+      replacement: "baz",
+      expected: "foobaz",
+    },
+    {
+      source: "foobar",
+      pattern: "(foo)(?=bar)",
+      replacement: "$1!",
+      expected: "foo!bar",
+    },
+    {
+      source: "foobar",
+      pattern: "foo(?=bar)",
+      replacement: "$&-$'",
+      expected: "foo-barbar",
+    },
+    {
+      source: "foobar",
+      pattern: "(?<word>foo)(?=bar)",
+      replacement: "$<word>!",
+      expected: "foo!bar",
+    },
+    {
+      source: "foobar",
+      pattern: "(foo)(z)?(?=bar)",
+      replacement: "$2-$10-$$",
+      expected: "-foo0-$bar",
+    },
+    {
+      source: "pre foobar",
+      pattern: "foo(?=bar)",
+      replacement: "$`x",
+      expected: "pre pre xbar",
+    },
+  ])(
+    "全部替换保留正则上下文：$pattern",
+    async ({ source, pattern, replacement, expected }) => {
+      vi.useFakeTimers();
+      useAppStore.getState().updateTabContent("/vault/a.md", source);
+      const view = new EditorView({
+        state: EditorState.create({ doc: source, extensions: [history()] }),
+      });
+      registerActiveEditorView(view, "/vault/a.md");
+      try {
+        const { getByPlaceholderText, getByTitle, getByText } = render(
+          <ContentSearch onClose={() => undefined} />,
+        );
+        fireEvent.change(getByPlaceholderText(/搜索|Search/i), {
+          target: { value: pattern },
+        });
+        fireEvent.click(getByTitle(/正则|Regex/i));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(200);
+        });
+        fireEvent.click(getByText(/替换|Replace/i));
+        fireEvent.change(getByPlaceholderText(/替换|Replace/i), {
+          target: { value: replacement },
+        });
+        fireEvent.click(getByText(/全部替换|Replace all/i));
+        expect(view.state.doc.toString()).toBe(expected);
+        undo(view);
+        expect(view.state.doc.toString()).toBe(source);
+      } finally {
+        clearActiveEditorView(view);
+        view.destroy();
+      }
+    },
+  );
+
+  it("全部替换保持未改动文本中的光标位置和撤销选区", async () => {
+    vi.useFakeTimers();
+    const source = "foobar untouched foobar";
+    useAppStore.getState().updateTabContent("/vault/a.md", source);
+    const view = new EditorView({
+      state: EditorState.create({ doc: source, extensions: [history()] }),
+    });
+    registerActiveEditorView(view, "/vault/a.md");
+    try {
+      const { getByPlaceholderText, getByTitle, getByText } = render(
+        <ContentSearch onClose={() => undefined} />,
+      );
+      fireEvent.change(getByPlaceholderText(/搜索|Search/i), {
+        target: { value: "foo(?=bar)" },
+      });
+      fireEvent.click(getByTitle(/正则|Regex/i));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      fireEvent.click(getByText(/替换|Replace/i));
+      fireEvent.change(getByPlaceholderText(/替换|Replace/i), {
+        target: { value: "x" },
+      });
+      const anchor = source.indexOf("untouched") + 2;
+      view.dispatch({ selection: { anchor } });
+      fireEvent.click(getByText(/全部替换|Replace all/i));
+      expect(view.state.doc.toString()).toBe("xbar untouched xbar");
+      expect(view.state.selection.main.anchor).toBe(anchor - 2);
+      undo(view);
+      expect(view.state.doc.toString()).toBe(source);
+      expect(view.state.selection.main.anchor).toBe(anchor);
+    } finally {
+      clearActiveEditorView(view);
+      view.destroy();
+    }
   });
 });

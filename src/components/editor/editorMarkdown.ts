@@ -22,5 +22,7 @@ export function createEditorMarkdownLanguage(): LanguageSupport {
     base: markdownLanguage,
     codeLanguages: resolveEditorCodeLanguage,
     extensions: disableSetextHeading,
+    // 使用应用自己的粘贴规则，避免语言扩展提前生成未转义的链接目标。
+    pasteURLAsLink: false,
   });
 }

@@ -5,6 +5,7 @@ import type { WereadImportFolderMode } from "../../../types";
 import type { SettingsTabProps } from "../types";
 import { useSecureSettings } from "../useSecureSettings";
 import { requestWeReadImportDialog } from "../../../utils/weread/wereadImportEvents";
+import { updateWereadSkill } from "../../../utils/weread/wereadApi";
 
 type ReadingNotesSourceTab = "weread";
 
@@ -17,6 +18,28 @@ export const ReadingNotesTab: React.FC<SettingsTabProps> = ({
     useSecureSettings(onUpdateSettings);
   const [activeTab, setActiveTab] = useState<ReadingNotesSourceTab>("weread");
   const [showWereadApiKey, setShowWereadApiKey] = useState(false);
+  const [updatingSkill, setUpdatingSkill] = useState(false);
+  const [skillUpdateResult, setSkillUpdateResult] = useState("");
+  const [skillUpdateFailed, setSkillUpdateFailed] = useState(false);
+
+  const handleUpdateSkill = async () => {
+    setUpdatingSkill(true);
+    setSkillUpdateResult("");
+    setSkillUpdateFailed(false);
+    try {
+      const version = await updateWereadSkill();
+      setSkillUpdateResult(t("settings_wereadSkillUpdated", { version }));
+    } catch (error) {
+      setSkillUpdateFailed(true);
+      setSkillUpdateResult(
+        t("settings_wereadSkillUpdateFailed", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    } finally {
+      setUpdatingSkill(false);
+    }
+  };
 
   const renderWereadPanel = () => (
     <div className="rounded-2xl border border-gray-200/70 bg-white/70 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
@@ -100,6 +123,32 @@ export const ReadingNotesTab: React.FC<SettingsTabProps> = ({
         >
           {t("settings_wereadOpenImport")}
         </button>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => void handleUpdateSkill()}
+            disabled={updatingSkill || !isTauriEnvironment()}
+            className="inline-flex items-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+          >
+            {t(
+              updatingSkill
+                ? "settings_wereadSkillUpdating"
+                : "settings_wereadUpdateSkill",
+            )}
+          </button>
+          <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
+            {t("settings_wereadSkillUpdateDesc")}
+          </p>
+          {skillUpdateResult && (
+            <p
+              role="status"
+              className={`mt-2 text-xs ${skillUpdateFailed ? "text-red-500" : "text-green-600 dark:text-green-400"}`}
+            >
+              {skillUpdateResult}
+            </p>
+          )}
+        </div>
 
         <div>
           <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">

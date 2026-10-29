@@ -8,7 +8,10 @@ import {
   EditorState,
   type Transaction,
 } from "@codemirror/state";
-import { indentUnit as indentUnitFacet } from "@codemirror/language";
+import {
+  indentUnit as indentUnitFacet,
+  ensureSyntaxTree,
+} from "@codemirror/language";
 import type { OrderedListMode } from "../../../types";
 
 // ==================== 常量定义 ====================
@@ -195,14 +198,59 @@ export function removeIndentUnit(
 
 // ==================== 代码块检测 ====================
 
+function isInsideParsedFencedCode(
+  state: EditorState,
+  position: number,
+): boolean | null {
+  const tree = ensureSyntaxTree(state, position, 20);
+  if (!tree || tree.type.name !== "Document") return null;
+  let node = tree.resolveInner(position, -1);
+  while (node.name !== "FencedCode") {
+    if (!node.parent) return false;
+    node = node.parent;
+  }
+  const markers = node.getChildren("CodeMark");
+  // 关闭围栏所在行仍可继续输入普通文本；其余位置完全遵循 Markdown 语法树。
+  const closing = markers.length > 1 ? markers[markers.length - 1] : null;
+  return (
+    !closing ||
+    state.doc.lineAt(position).number !== state.doc.lineAt(closing.from).number
+  );
+}
+
 function walkFenceStackForLines(
   state: EditorState,
   upToLineInclusive: number,
-): Array<{ fenceChar: string; fenceLength: number }> {
-  const stack: Array<{ fenceChar: string; fenceLength: number }> = [];
+): Array<{ fenceChar: string; fenceLength: number; quoteDepth: number }> {
+  const stack: Array<{
+    fenceChar: string;
+    fenceLength: number;
+    quoteDepth: number;
+  }> = [];
 
   for (let lineNumber = 1; lineNumber <= upToLineInclusive; lineNumber += 1) {
-    const lineText = state.doc.line(lineNumber).text;
+    const rawLine = state.doc.line(lineNumber).text;
+    const quote = parseQuote(rawLine);
+    let quoteDepth = quote?.depth ?? 0;
+    let lineText = quote ? quote.content : rawLine;
+    const activeFence = stack[0];
+    if (activeFence?.quoteDepth === 0) {
+      // 根级代码里的 > 是字面量，不会改变围栏容器。
+      quoteDepth = 0;
+      lineText = rawLine;
+    } else if (activeFence && quoteDepth >= activeFence.quoteDepth) {
+      // 只剥离原围栏所在的引用层数，额外的 > 仍属于代码正文。
+      let offset = 0;
+      for (let depth = 0; depth < activeFence.quoteDepth; depth += 1) {
+        while (rawLine[offset] === " " || rawLine[offset] === "\t") offset += 1;
+        offset += 1;
+        if (rawLine[offset] === " " || rawLine[offset] === "\t") offset += 1;
+      }
+      lineText = rawLine.slice(offset);
+      quoteDepth = activeFence.quoteDepth;
+    } else if (activeFence) {
+      stack.pop();
+    }
     const match = lineText.match(/^([ \t]*)(`{3,}|~{3,})(.*)$/);
     if (!match) continue;
 
@@ -211,10 +259,15 @@ function walkFenceStackForLines(
     const fenceLength = fence.length;
 
     const top = stack[stack.length - 1];
-    if (top && top.fenceChar === fenceChar && fenceLength >= top.fenceLength) {
+    if (
+      top &&
+      top.fenceChar === fenceChar &&
+      fenceLength >= top.fenceLength &&
+      !match[3].trim()
+    ) {
       stack.pop();
-    } else if (!top) {
-      stack.push({ fenceChar, fenceLength });
+    } else if (!top && !(fenceChar === "`" && match[3].includes("`"))) {
+      stack.push({ fenceChar, fenceLength, quoteDepth });
     }
   }
 
@@ -225,6 +278,8 @@ export function isInsideFencedCode(
   state: EditorState,
   position: number,
 ): boolean {
+  const parsed = isInsideParsedFencedCode(state, position);
+  if (parsed !== null) return parsed;
   const currentLine = state.doc.lineAt(position).number;
   const stack = walkFenceStackForLines(state, currentLine);
   return stack.length > 0;
@@ -238,6 +293,11 @@ export function hasOpenFencedBlockBeforeLine(
   if (lineNumber <= 1) {
     return false;
   }
+  const parsed = isInsideParsedFencedCode(
+    state,
+    state.doc.line(lineNumber - 1).to,
+  );
+  if (parsed !== null) return parsed;
   return walkFenceStackForLines(state, lineNumber - 1).length > 0;
 }
 
@@ -592,6 +652,23 @@ export function unwrapInline(
 
   const changes = state.changeByRange((range) => {
     const selectedText = state.doc.sliceString(range.from, range.to);
+    const surroundingWrapped =
+      range.from >= before.length &&
+      state.doc.sliceString(range.from - before.length, range.from) ===
+        before &&
+      state.doc.sliceString(range.to, range.to + after.length) === after;
+    if (surroundingWrapped) {
+      return {
+        changes: [
+          { from: range.from - before.length, to: range.from, insert: "" },
+          { from: range.to, to: range.to + after.length, insert: "" },
+        ],
+        range: EditorSelection.range(
+          range.from - before.length,
+          range.to - before.length,
+        ),
+      };
+    }
     const alreadyWrapped =
       selectedText.startsWith(before) && selectedText.endsWith(after);
 

@@ -42,7 +42,7 @@ describe("splitTableRow", () => {
 
   it("keeps escaped pipes inside a single cell", () => {
     expect(splitTableRow("| a \\| b | c |")).toEqual(["a | b", "c"]);
-    expect(splitTableRow("| a\\\\| b |")).toEqual(["a\\", "b"]);
+    expect(splitTableRow("| a\\\\| b |")).toEqual(["a\\| b"]);
   });
 });
 

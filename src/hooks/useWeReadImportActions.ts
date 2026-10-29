@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore } from "../store/appStore";
 import { hydrateSensitiveSettingsSafely } from "../app/hydrateSensitiveSettingsSafely";
 import { useFileSystem } from "./useFileSystem";
+import { useFileOperations } from "./useFileOperations";
+import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
+import { acquireDocumentWrite } from "../services/filesystem/documentWriteQueue";
+import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
 import { useI18n } from "./useI18n";
 import { localizeKnownError } from "../utils/i18n";
 import { getFileSystem, isTauriEnvironment } from "../types/filesystem";
@@ -29,10 +33,17 @@ export function useWeReadImportActions() {
   const showNotification = useAppStore((state) => state.showNotification);
   const settings = useAppStore((state) => state.settings);
   const rootFolderPath = useAppStore((state) => state.rootFolderPath);
-  const addTab = useAppStore((state) => state.addTab);
-  const setCurrentFilePath = useAppStore((state) => state.setCurrentFilePath);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const { createFile, writeFile, refreshFileTree } = useFileSystem();
+  const { handleFileSelect } = useFileOperations();
+  const importGenerationRef = useRef(0);
+  const importInFlightRef = useRef(false);
+  useEffect(() => {
+    importGenerationRef.current += 1;
+    return () => {
+      importGenerationRef.current += 1;
+    };
+  }, [rootFolderPath]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -99,13 +110,30 @@ export function useWeReadImportActions() {
       saveCover: boolean;
       includeHotHighlights: boolean;
     }): Promise<WereadImportBookResult[]> => {
+      if (importInFlightRef.current) return [];
       const ready = await ensureReady();
       if (!ready) return [];
       const vaultPath = useAppStore.getState().rootFolderPath;
       if (!vaultPath) return [];
+      if (importInFlightRef.current) return [];
+      const generation = ++importGenerationRef.current;
+      const originTabId = useAppStore.getState().activeTabId;
+      const isCurrent = () =>
+        importGenerationRef.current === generation &&
+        useAppStore.getState().rootFolderPath === vaultPath;
+      const assertCurrent = () => {
+        if (!isCurrent())
+          throw new Error("Knowledge base changed during import");
+      };
 
+      importInFlightRef.current = true;
       setIsImporting(true);
       try {
+        if (!(await flushActiveDocumentIfDirty())) {
+          showNotification(t("tab_closeBlockedUnsaved"), "error");
+          return [];
+        }
+        assertCurrent();
         const results = await importWereadBooks({
           notebooks: options.notebooks,
           conflictMode: options.conflictMode,
@@ -116,14 +144,59 @@ export function useWeReadImportActions() {
           files: useAppStore.getState().files,
           language,
           readFile: async (path: string) => {
+            assertCurrent();
             const fs = await getFileSystem();
             return fs.readFile(path);
           },
-          writeFile,
-          createFile,
+          writeFile: async (path, content) => {
+            assertCurrent();
+            await writeFile(path, content);
+          },
+          createFile: async (...args) => {
+            assertCurrent();
+            return createFile(...args);
+          },
+          updateFile: async (path, update) => {
+            const release = await acquireDocumentWrite(path);
+            try {
+              while (true) {
+                assertCurrent();
+                flushActiveEditorPendingChanges();
+                const state = useAppStore.getState();
+                const active =
+                  state.currentFilePath === path ? state.activeTabId : null;
+                const buffered = active
+                  ? state.fileContents[active]
+                  : undefined;
+                const fs = await getFileSystem();
+                const source = buffered ?? (await fs.readFile(path));
+                const content = update(source);
+                assertCurrent();
+                await writeFile(path, content);
+                flushActiveEditorPendingChanges();
+                const latest = useAppStore.getState();
+                if (
+                  isCurrent() &&
+                  active &&
+                  latest.activeTabId === active &&
+                  latest.currentFilePath === path
+                ) {
+                  // 慢写盘期间若又输入，重新合并最新缓冲，不能用导入快照覆盖用户补充。
+                  if (latest.fileContents[active] !== buffered) continue;
+                  latest.updateTabContent(active, content);
+                  latest.markAsSaved(active, content);
+                }
+                return content;
+              }
+            } finally {
+              release();
+            }
+          },
         });
 
+        if (!isCurrent()) return results;
         await refreshFileTree();
+        if (!isCurrent()) return results;
 
         const opened = results.find(
           (result) =>
@@ -132,9 +205,16 @@ export function useWeReadImportActions() {
               result.status === "merged" ||
               result.status === "overwritten"),
         );
-        if (opened?.path) {
-          addTab(opened.path);
-          setCurrentFilePath(opened.path);
+        if (
+          opened?.path &&
+          useAppStore.getState().activeTabId === originTabId
+        ) {
+          await handleFileSelect({
+            id: opened.path,
+            path: opened.path,
+            name: opened.path.split(/[\\/]/).pop()!,
+            type: "file",
+          });
         }
 
         const failed = results.filter((result) => result.status === "failed");
@@ -167,20 +247,21 @@ export function useWeReadImportActions() {
 
         return results;
       } catch (error) {
+        if (!isCurrent()) return [];
         const message = error instanceof Error ? error.message : String(error);
         showNotification(localizeKnownError(language, message), "error");
         return [];
       } finally {
+        importInFlightRef.current = false;
         setIsImporting(false);
       }
     },
     [
-      addTab,
       createFile,
       ensureReady,
       language,
       refreshFileTree,
-      setCurrentFilePath,
+      handleFileSelect,
       showNotification,
       t,
       writeFile,

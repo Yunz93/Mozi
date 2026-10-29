@@ -5,6 +5,8 @@ import { render, act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore, defaultSettings } from "../store/appStore";
 import { useAutoSave } from "./useAutoSave";
+import { registerActiveEditorFlush } from "../utils/editorSelectionBridge";
+import { closeTabSafely } from "./closeTabSafely";
 
 const { writeFile, readFile } = vi.hoisted(() => ({
   writeFile: vi.fn(async () => {}),
@@ -86,6 +88,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  registerActiveEditorFlush(null);
   vi.clearAllTimers();
   vi.useRealTimers();
   useAppStore.setState({
@@ -781,5 +784,156 @@ describe("useAutoSave", () => {
     expect((writeFile.mock.calls[0] as unknown as [string, string])[0]).toBe(
       NOTE_ID,
     );
+  });
+});
+
+describe("forceSave 等待最新保存", () => {
+  function deferredWrite() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((done) => {
+      resolve = done;
+    });
+    return { promise, resolve };
+  }
+
+  function setupSaveHook(path = NOTE_ID) {
+    setupStore(60_000);
+    useAppStore.setState({
+      activeTabId: path,
+      openTabs: [path],
+      currentFilePath: path,
+      fileContents: { [path]: "original" },
+      lastSavedContent: { [path]: "original" },
+    });
+    let saveHook!: ReturnType<typeof useAutoSave>;
+    function SaveHarness() {
+      saveHook = useAutoSave({ enabled: false, maxRetries: 0 });
+      return null;
+    }
+    render(<SaveHarness />);
+    return () => saveHook;
+  }
+
+  it.each(["system", "manual"] as const)(
+    "%s 保存直到继续输入的内容写盘后才成功",
+    async (trigger) => {
+      const getSave = setupSaveHook();
+      const first = deferredWrite(),
+        second = deferredWrite();
+      writeFile
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => second.promise);
+      act(() => useAppStore.getState().updateTabContent(NOTE_ID, "first edit"));
+      let settled = false;
+      const saving = getSave()
+        .forceSave(undefined, { trigger })
+        .then((saved) => {
+          settled = true;
+          return saved;
+        });
+      await act(async () => {
+        await flushMicrotasks();
+      });
+      act(() =>
+        useAppStore.getState().updateTabContent(NOTE_ID, "latest edit"),
+      );
+      await act(async () => {
+        first.resolve();
+        await flushMicrotasks();
+      });
+      expect(writeFile).toHaveBeenNthCalledWith(2, NOTE_ID, "latest edit");
+      expect(settled).toBe(false);
+      await act(async () => {
+        second.resolve();
+        expect(await saving).toBe(true);
+      });
+      expect(useAppStore.getState().lastSavedContent[NOTE_ID]).toBe(
+        "latest edit",
+      );
+    },
+  );
+
+  it("后续保存失败时返回失败并阻止关闭文档", async () => {
+    const getSave = setupSaveHook();
+    const first = deferredWrite(),
+      second = deferredWrite();
+    writeFile
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(async () => {
+        await second.promise;
+        throw new Error("disk full");
+      });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    act(() => useAppStore.getState().updateTabContent(NOTE_ID, "first edit"));
+    const onBlocked = vi.fn();
+    const closing = closeTabSafely({
+      tabId: NOTE_ID,
+      forceSave: getSave().forceSave,
+      closeTab: useAppStore.getState().closeTab,
+      hasUnsavedChanges: useAppStore.getState().hasUnsavedChanges,
+      isTabOpen: (id) => useAppStore.getState().openTabs.includes(id),
+      onBlocked,
+    });
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    act(() => useAppStore.getState().updateTabContent(NOTE_ID, "latest edit"));
+    await act(async () => {
+      first.resolve();
+      await flushMicrotasks();
+    });
+    expect(useAppStore.getState().openTabs).toEqual([NOTE_ID]);
+    await act(async () => {
+      second.resolve();
+      expect(await closing).toBe(false);
+    });
+    expect(onBlocked).toHaveBeenCalledOnce();
+    expect(useAppStore.getState().fileContents[NOTE_ID]).toBe("latest edit");
+    expect(useAppStore.getState().hasUnsavedChanges(NOTE_ID)).toBe(true);
+  });
+
+  it("等待画板 flush bridge 提交的后续保存，期间不关闭缓冲", async () => {
+    const path = "/vault/drawing.excalidraw";
+    const getSave = setupSaveHook(path);
+    const first = deferredWrite(),
+      second = deferredWrite();
+    writeFile
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    act(() => useAppStore.getState().updateTabContent(path, "first drawing"));
+    let pendingDrawing: string | null = null;
+    registerActiveEditorFlush(() => {
+      if (pendingDrawing === null) return;
+      useAppStore.getState().updateTabContent(path, pendingDrawing);
+      pendingDrawing = null;
+    });
+    let settled = false;
+    const closing = closeTabSafely({
+      tabId: path,
+      forceSave: getSave().forceSave,
+      closeTab: useAppStore.getState().closeTab,
+      hasUnsavedChanges: useAppStore.getState().hasUnsavedChanges,
+      isTabOpen: (id) => useAppStore.getState().openTabs.includes(id),
+      onBlocked: vi.fn(),
+    }).then((saved) => {
+      settled = true;
+      return saved;
+    });
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    pendingDrawing = "latest drawing";
+    await act(async () => {
+      first.resolve();
+      await flushMicrotasks();
+    });
+    expect(writeFile).toHaveBeenNthCalledWith(2, path, "latest drawing");
+    expect(settled).toBe(false);
+    expect(useAppStore.getState().openTabs).toEqual([path]);
+    await act(async () => {
+      second.resolve();
+      expect(await closing).toBe(true);
+    });
+    expect(useAppStore.getState().openTabs).toEqual([]);
   });
 });

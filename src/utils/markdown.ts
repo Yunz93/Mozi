@@ -386,7 +386,9 @@ let currentHighlighter: ShikiHighlighter | null = null;
 let currentTheme: ThemeMode = "light";
 
 // LRU Cache for markdown rendering results
-const markdownCache = new LRUCache<string, string>(30);
+const markdownCache = new LRUCache<string, { source: string; html: string }>(
+  30,
+);
 const MAX_CACHEABLE_LENGTH = 100000; // Don't cache very large documents
 const MARKDOWN_RENDERER_CACHE_VERSION = 10;
 const PREVIEW_BLANK_LINE_HTML =
@@ -445,7 +447,7 @@ function configureFenceRenderer(
     if (lang === "mermaid" || lang === "mmd") {
       return baseFence
         ? baseFence(tokens, idx, options, env, self)
-        : `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
+        : `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content)}</code></pre>`;
     }
 
     // Use the local highlighter reference for this specific render call
@@ -465,7 +467,7 @@ function configureFenceRenderer(
           markdownStylePreset,
         );
         const shikiHtml = wrapShikiBlockHtml(
-          activeHighlighter.codeToHtml(token.content.trim(), {
+          activeHighlighter.codeToHtml(token.content, {
             lang,
             theme: activeTheme,
           }),
@@ -521,7 +523,7 @@ function configureFenceRenderer(
       return baseFence(tokens, idx, options, env, self);
     }
 
-    return `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content.trim())}</code></pre>`;
+    return `<pre><code class="language-${lang}">${md.utils.escapeHtml(token.content)}</code></pre>`;
   };
 }
 
@@ -731,8 +733,8 @@ export function renderMarkdown(
   if (shouldCache) {
     const cacheKey = createCacheKey(markdown, options);
     const cached = markdownCache.get(cacheKey);
-    if (cached !== undefined) {
-      return cached;
+    if (cached?.source === markdown) {
+      return cached.html;
     }
   }
 
@@ -806,7 +808,7 @@ export function renderMarkdown(
   // Store in cache
   if (shouldCache) {
     const cacheKey = createCacheKey(markdown, options);
-    markdownCache.set(cacheKey, result);
+    markdownCache.set(cacheKey, { source: markdown, html: result });
   }
 
   return result;

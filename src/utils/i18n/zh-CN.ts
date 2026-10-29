@@ -810,6 +810,12 @@ export default {
   settings_wereadIncludeHotDesc:
     "在笔记末尾增加「热门划线」一节，并标明这些是他人常划的句子，不是你的笔记。",
   settings_wereadOpenImport: "打开导入对话框",
+  settings_wereadUpdateSkill: "更新微信读书 Skill",
+  settings_wereadSkillUpdating: "正在更新 Skill…",
+  settings_wereadSkillUpdateDesc:
+    "从官方来源更新 Skill 文档。导入时若需要升级，也会自动更新并重试当前请求。",
+  settings_wereadSkillUpdated: "微信读书 Skill 已更新至 {version}。",
+  settings_wereadSkillUpdateFailed: "Skill 更新失败，原版本已保留：{message}",
   settings_wereadGuide1:
     "导入内容 = 划线原文 + 个人想法/点评。书签只统计数量，当前无法导出书签内容。",
   settings_wereadGuide2:

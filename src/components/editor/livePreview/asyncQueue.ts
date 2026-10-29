@@ -44,7 +44,9 @@ export class LivePreviewAsyncQueue {
 
   private pump(): void {
     while (this.active.size < this.maxConcurrent && this.pending.size > 0) {
-      const next = this.pending.values().next().value as QueuedJob | undefined;
+      const next = [...this.pending.values()].find(
+        (job) => !this.active.has(job.key),
+      );
       if (!next) return;
       this.pending.delete(next.key);
       if (this.generations.get(next.key) !== next.generation) continue;

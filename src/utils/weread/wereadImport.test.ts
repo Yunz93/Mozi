@@ -5,6 +5,7 @@ import { WEREAD_USER_APPENDIX_MARKER } from "./wereadConstants";
 import {
   findExistingWereadNote,
   importWereadBook,
+  importWereadBooks,
   type WereadImportRequest,
 } from "./wereadImport";
 
@@ -272,5 +273,49 @@ describe("importWereadBook", () => {
       "/vault/读书/三体.md",
       createdContent,
     );
+  });
+
+  it.each(["bookInfo", "hotHighlights"])(
+    "stops without writing when %s still requires a Skill upgrade",
+    async (source) => {
+      const error = new Error("WeRead skill upgrade required: download failed");
+      if (source === "bookInfo") fetchBookInfo.mockRejectedValueOnce(error);
+      else fetchBestBookmarks.mockRejectedValueOnce(error);
+      const options = request({ includeHotHighlights: true });
+      const result = await importWereadBook(notebook(), options);
+      expect(result).toMatchObject({ status: "failed", error: error.message });
+      expect(options.writeFile).not.toHaveBeenCalled();
+      expect(options.createFile).not.toHaveBeenCalled();
+      expect(notifyVaultFileSaved).not.toHaveBeenCalled();
+    },
+  );
+
+  it("continues using the notebook metadata for an ordinary optional request failure", async () => {
+    fetchBookInfo.mockRejectedValueOnce(new Error("network timeout"));
+    fetchBestBookmarks.mockRejectedValueOnce(new Error("network timeout"));
+    const options = request({ includeHotHighlights: true });
+    expect((await importWereadBook(notebook(), options)).status).toBe("merged");
+    expect(options.writeFile).toHaveBeenCalledOnce();
+  });
+
+  it("stops requesting the remaining books after an unsuccessful Skill upgrade", async () => {
+    fetchBookmarkList.mockRejectedValueOnce(
+      new Error("WeRead skill upgrade required: download failed"),
+    );
+    const options = request({
+      notebooks: [notebook(), { bookId: "next", book: { title: "下一本" } }],
+    });
+    const results = await importWereadBooks(options);
+    expect(results).toHaveLength(2);
+    expect(results.every((result) => result.status === "failed")).toBe(true);
+    expect(results[1]).toMatchObject({
+      bookId: "next",
+      error: expect.stringContaining("upgrade required"),
+    });
+    expect(fetchBookmarkList).toHaveBeenCalledTimes(1);
+    expect(fetchMyReviews).toHaveBeenCalledTimes(1);
+    expect(fetchBookInfo).toHaveBeenCalledTimes(1);
+    expect(options.writeFile).not.toHaveBeenCalled();
+    expect(options.createFile).not.toHaveBeenCalled();
   });
 });

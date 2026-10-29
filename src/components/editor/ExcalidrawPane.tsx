@@ -13,6 +13,10 @@ import {
   serializeExcalidrawContent,
 } from "../../utils/excalidrawDocument";
 import { ensureExcalidrawAssetPath } from "../../utils/excalidrawAssetPath";
+import {
+  clearActiveEditorFlush,
+  registerActiveEditorFlush,
+} from "../../utils/editorSelectionBridge";
 
 interface ExcalidrawPaneProps {
   onContentChange?: (content: string) => void;
@@ -82,6 +86,11 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
 
   const flushPendingWrite = useCallback(
     (pending: PendingExcalidrawWrite) => {
+      if (
+        pending.tabId &&
+        !useAppStore.getState().openTabs.includes(pending.tabId)
+      )
+        return;
       const mod = excalidrawModuleRef.current;
       if (!mod) return;
 
@@ -124,17 +133,31 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
     },
     [onContentChange, onContentChangeForTab],
   );
+  const flushPendingWriteRef = useRef(flushPendingWrite);
+  flushPendingWriteRef.current = flushPendingWrite;
+
+  const flushPendingChanges = useCallback(() => {
+    if (changeTimerRef.current !== null) {
+      window.clearTimeout(changeTimerRef.current);
+      changeTimerRef.current = null;
+    }
+    const pending = pendingWriteRef.current;
+    pendingWriteRef.current = null;
+    if (pending) flushPendingWriteRef.current(pending);
+  }, []);
+
+  useEffect(() => {
+    // 画板与 Markdown 编辑器共用保存前提交入口，避免切换或关窗漏掉防抖中的笔画。
+    registerActiveEditorFlush(flushPendingChanges);
+    return () => {
+      clearActiveEditorFlush(flushPendingChanges);
+      flushPendingChanges();
+    };
+  }, [flushPendingChanges]);
 
   useEffect(() => {
     if (activeTabId !== previousTabIdRef.current) {
-      if (changeTimerRef.current !== null) {
-        window.clearTimeout(changeTimerRef.current);
-        changeTimerRef.current = null;
-      }
-      if (pendingWriteRef.current) {
-        flushPendingWrite(pendingWriteRef.current);
-        pendingWriteRef.current = null;
-      }
+      flushPendingChanges();
       previousTabIdRef.current = activeTabId;
       baselineContentRef.current = content;
       sceneContentRef.current = content;
@@ -150,15 +173,7 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
       lastSerializedRef.current = content;
       setSceneKey(`${activeTabId ?? "none"}:${Date.now()}`);
     }
-  }, [activeTabId, content, hasUnsavedChanges, flushPendingWrite]);
-
-  useEffect(() => {
-    return () => {
-      if (changeTimerRef.current !== null) {
-        window.clearTimeout(changeTimerRef.current);
-      }
-    };
-  }, []);
+  }, [activeTabId, content, hasUnsavedChanges, flushPendingChanges]);
 
   const parsedDocument = useMemo(() => {
     return parseExcalidrawDocument(sceneContentRef.current);
@@ -212,14 +227,9 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
         files,
       };
 
-      changeTimerRef.current = window.setTimeout(() => {
-        const pending = pendingWriteRef.current;
-        pendingWriteRef.current = null;
-        changeTimerRef.current = null;
-        if (pending) flushPendingWrite(pending);
-      }, 400);
+      changeTimerRef.current = window.setTimeout(flushPendingChanges, 400);
     },
-    [excalidrawModule, onContentChange, activeTabId, flushPendingWrite],
+    [excalidrawModule, onContentChange, activeTabId, flushPendingChanges],
   );
 
   if (loadError) {

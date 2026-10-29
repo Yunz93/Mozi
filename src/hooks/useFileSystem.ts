@@ -60,14 +60,35 @@ export function isSamePathAllowingCaseChange(
 
 /** 目标路径已存在则抛 FILE_EXISTS，避免静默覆盖。 */
 export async function assertTargetPathAvailable(
-  fs: { fileExists: (path: string) => Promise<boolean> },
+  fs: {
+    fileExists: (path: string) => Promise<boolean>;
+    readDirectory?: (path: string) => Promise<FileNode[]>;
+  },
   targetPath: string,
   sourcePath?: string,
 ): Promise<void> {
-  if (sourcePath && isSamePathAllowingCaseChange(sourcePath, targetPath)) {
+  const normalizedTarget = normalizeSlashes(targetPath);
+  const normalizedSource = sourcePath ? normalizeSlashes(sourcePath) : null;
+  if (normalizedSource === normalizedTarget) {
     return;
   }
   if (await fs.fileExists(targetPath)) {
+    if (
+      sourcePath &&
+      isSamePathAllowingCaseChange(sourcePath, targetPath) &&
+      getPathDirname(sourcePath) === getPathDirname(targetPath) &&
+      fs.readDirectory
+    ) {
+      // 不区分大小写的卷只有源目录项；敏感卷中的另一个同名变体必须保留。
+      const entries = await fs.readDirectory(getPathDirname(sourcePath));
+      const hasSourceEntry = entries.some(
+        (entry) => normalizeSlashes(entry.path) === normalizedSource,
+      );
+      const hasTargetEntry = entries.some(
+        (entry) => normalizeSlashes(entry.path) === normalizedTarget,
+      );
+      if (hasSourceEntry && !hasTargetEntry) return;
+    }
     throw new FileSystemError(
       "A file with this name already exists.",
       "FILE_EXISTS",

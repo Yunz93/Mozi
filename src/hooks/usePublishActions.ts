@@ -31,6 +31,7 @@ import { getErrorMessage } from "../utils/errorHandler";
 import { localizeKnownError, t, type TranslationKey } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
 import { isMarkdownFile } from "../utils/fileTypes";
+import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
 
 // Publishing can legitimately take a while (image uploads, GitHub tree
 // writes). Keep the timeout generous - a premature timeout is worse than a
@@ -182,6 +183,7 @@ export function usePublishActions(
 
   const persistWechatDraftForm = useCallback(
     async (input: WechatDraftPublishInput) => {
+      flushActiveEditorPendingChanges();
       const state = useAppStore.getState();
       const tabId = state.activeTabId;
       if (!tabId) {
@@ -202,27 +204,20 @@ export function usePublishActions(
         return;
       }
 
-      const activeFile = findFileInTree(state.files, tabId);
-      if (!activeFile) {
-        state.setContentForFile(tabId, nextContent);
+      // 先合并到编辑缓冲，再通过同一个保存队列写盘，避免旧写入覆盖新输入。
+      state.setContentForFile(tabId, nextContent);
+      if (!findFileInTree(state.files, tabId)) {
         return;
       }
 
       try {
-        const fs = await getFileSystem();
-        await fs.writeFile(activeFile.path, nextContent);
-        const afterWrite = useAppStore.getState();
-        if (!afterWrite.openTabs.includes(tabId)) {
-          return;
-        }
-        afterWrite.updateTabContent(tabId, nextContent);
-        afterWrite.markAsSaved(tabId, nextContent);
+        await forceSave(nextContent, { trigger: "system" });
       } catch (error) {
+        // 保存失败时保留当前缓冲和未保存状态，不把旧快照写回。
         console.error("Failed to persist WeChat draft form:", error);
-        useAppStore.getState().setContentForFile(tabId, nextContent);
       }
     },
-    [],
+    [forceSave],
   );
 
   const handlePublishSimpleBlog = useCallback(

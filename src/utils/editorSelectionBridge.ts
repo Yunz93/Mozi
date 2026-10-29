@@ -4,6 +4,29 @@ import { redo as cmRedo, undo as cmUndo } from "@codemirror/commands";
 let activeEditorView: EditorView | null = null;
 let activeEditorFlush: (() => void) | null = null;
 let activeEditorTabId: string | null = null;
+const documentPathRemapListeners = new Set<
+  (paths: Record<string, string>) => void
+>();
+
+/** 路径变更沿用原文档身份，保留编辑器历史和待执行的定位请求。 */
+export function remapEditorDocumentPaths(paths: Record<string, string>): void {
+  if (activeEditorTabId)
+    activeEditorTabId = paths[activeEditorTabId] ?? activeEditorTabId;
+  if (pendingEditorFocusRequest?.tabId) {
+    pendingEditorFocusRequest.tabId =
+      paths[pendingEditorFocusRequest.tabId] ?? pendingEditorFocusRequest.tabId;
+  }
+  documentPathRemapListeners.forEach((listener) => listener(paths));
+}
+
+export function subscribeEditorDocumentPathRemap(
+  listener: (paths: Record<string, string>) => void,
+): () => void {
+  documentPathRemapListeners.add(listener);
+  return () => {
+    documentPathRemapListeners.delete(listener);
+  };
+}
 
 interface FocusOptions {
   alignTopRatio?: number;

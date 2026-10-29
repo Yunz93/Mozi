@@ -47,21 +47,14 @@ export function isTablePartLine(line: string): boolean {
   );
 }
 
-/** Unescape GFM table cell escapes (`\|` → `|`, `\\` → `\`). */
+/** 只解开表格层的管道转义，保留行内 Markdown 自身的所有反斜杠。 */
 export function unescapeTableCellText(value: string): string {
-  return value.replace(/\\([\\|])/g, "$1");
+  return value.replace(/\\\|/g, "|");
 }
 
-/**
- * Normalize cell text before serialization:
- * - collapse newlines (GFM cells are single-line)
- * - escape literal `|` and `\` so round-trips stay one column
- */
+/** 单元格保留原始行内 Markdown，仅为表格层转义管道并折叠换行。 */
 export function escapeTableCellText(value: string): string {
-  return value
-    .replace(/\r\n|\r|\n/g, " ")
-    .replace(/\\/g, "\\\\")
-    .replace(/\|/g, "\\|");
+  return value.replace(/\r\n|\r|\n/g, " ").replace(/\|/g, "\\|");
 }
 
 /**
@@ -71,42 +64,22 @@ export function escapeTableCellText(value: string): string {
 export function splitTableRow(line: string): string[] {
   let trimmed = line.trim();
   if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
-  if (trimmed.endsWith("|") && !trimmed.endsWith("\\|")) {
-    // Only strip a trailing pipe that is not escaped.
-    let escapes = 0;
-    for (let i = trimmed.length - 2; i >= 0 && trimmed[i] === "\\"; i -= 1) {
-      escapes += 1;
-    }
-    if (escapes % 2 === 0) {
-      trimmed = trimmed.slice(0, -1);
-    }
+  if (trimmed.endsWith("|") && trimmed.at(-2) !== "\\") {
+    trimmed = trimmed.slice(0, -1);
   }
   if (trimmed.length === 0) return [""];
 
   const cells: string[] = [];
   let current = "";
-  let escaped = false;
   for (let i = 0; i < trimmed.length; i += 1) {
     const ch = trimmed[i];
-    if (escaped) {
-      current += ch;
-      escaped = false;
-      continue;
-    }
-    if (ch === "\\") {
-      escaped = true;
-      current += ch;
-      continue;
-    }
-    if (ch === "|") {
+    // 与 markdown-it 的表格拆列一致：管道前紧邻反斜杠即可转义，不按奇偶数拆列。
+    if (ch === "|" && trimmed[i - 1] !== "\\") {
       cells.push(unescapeTableCellText(current.trim()));
       current = "";
-      continue;
+    } else {
+      current += ch;
     }
-    current += ch;
-  }
-  if (escaped) {
-    // Trailing lone backslash — keep as literal text.
   }
   cells.push(unescapeTableCellText(current.trim()));
   return cells;
@@ -286,15 +259,9 @@ export function getCellContentRanges(
   }
 
   let endTrim = 0;
-  if (working.endsWith("|")) {
-    let escapes = 0;
-    for (let i = working.length - 2; i >= 0 && working[i] === "\\"; i -= 1) {
-      escapes += 1;
-    }
-    if (escapes % 2 === 0) {
-      working = working.slice(0, -1);
-      endTrim = 1;
-    }
+  if (working.endsWith("|") && working.at(-2) !== "\\") {
+    working = working.slice(0, -1);
+    endTrim = 1;
   }
 
   if (working.length === 0 && endTrim === 1) {
@@ -304,7 +271,6 @@ export function getCellContentRanges(
 
   const ranges: Array<{ from: number; to: number }> = [];
   let partStart = 0;
-  let escaped = false;
 
   const pushRange = (partEnd: number) => {
     const part = working.slice(partStart, partEnd);
@@ -317,15 +283,7 @@ export function getCellContentRanges(
 
   for (let i = 0; i < working.length; i += 1) {
     const ch = working[i];
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (ch === "|") {
+    if (ch === "|" && working[i - 1] !== "\\") {
       pushRange(i);
       partStart = i + 1;
     }

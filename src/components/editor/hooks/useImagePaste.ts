@@ -4,7 +4,7 @@
  * 处理编辑器中的图片粘贴功能，支持本地保存和图床上传
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { EditorView } from "@codemirror/view";
 import type {
   AppLanguage,
@@ -102,6 +102,21 @@ export function useImagePaste(
     showNotification,
   } = options;
 
+  const mountedRef = useRef(true);
+  const documentSessionRef = useRef({ rootFolderPath, currentFilePath });
+  if (
+    documentSessionRef.current.rootFolderPath !== rootFolderPath ||
+    documentSessionRef.current.currentFilePath !== currentFilePath
+  ) {
+    documentSessionRef.current = { rootFolderPath, currentFilePath };
+  }
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const resolveTarget = useCallback(() => {
     return resolveAttachmentTargetDir({
       location: attachmentLocation,
@@ -117,7 +132,15 @@ export function useImagePaste(
       language: AppLanguage,
       arrayBuffer: ArrayBuffer,
       imageName: string,
+      isCurrent: () => boolean,
+      placeholder?: string,
     ): Promise<boolean> => {
+      if (!isCurrent()) return false;
+      if (placeholder && !view.state.doc.toString().includes(placeholder)) {
+        return false;
+      }
+      const sourceDoc = view.state.doc;
+      const selection = view.state.selection.main;
       try {
         const { absoluteDir, markdownRelativePathPrefix } = resolveTarget();
         const imagePath = joinFsPath(absoluteDir, imageName);
@@ -137,14 +160,21 @@ export function useImagePaste(
           imageMarkdownPath,
           attachmentPasteFormat,
         );
-        const selection = view.state.selection.main;
+        if (!isCurrent()) return false;
+        // 本地写入期间正文已变更时取消插入，不能用旧选区覆盖新内容。
+        if (!placeholder && view.state.doc !== sourceDoc) return false;
+        const from = placeholder
+          ? view.state.doc.toString().indexOf(placeholder)
+          : selection.from;
+        if (from < 0) return false;
+        const to = placeholder ? from + placeholder.length : selection.to;
         view.dispatch({
           changes: {
-            from: selection.from,
-            to: selection.to,
+            from,
+            to,
             insert: insertText,
           },
-          selection: { anchor: selection.from + insertText.length },
+          selection: { anchor: from + insertText.length },
           scrollIntoView: true,
         });
 
@@ -194,6 +224,7 @@ export function useImagePaste(
       language: AppLanguage,
       arrayBuffer: ArrayBuffer,
       imageName: string,
+      isCurrent: () => boolean,
     ): Promise<boolean> => {
       const altText = imageName.replace(/\.[^.]+$/, "");
       const placeholder = `![Uploading ${imageName}...]()`;
@@ -209,9 +240,6 @@ export function useImagePaste(
         scrollIntoView: true,
       });
 
-      const placeholderFrom = selection.from;
-      const placeholderTo = placeholderFrom + placeholder.length;
-
       try {
         const result = await uploadImageToHosting(
           arrayBuffer,
@@ -220,25 +248,17 @@ export function useImagePaste(
         );
         const finalText = buildRemoteImageMarkdown(result.url, altText);
 
+        if (!isCurrent()) return false;
         const currentDoc = view.state.doc.toString();
         const currentPlaceholderStart = currentDoc.indexOf(placeholder);
-        if (currentPlaceholderStart >= 0) {
-          view.dispatch({
-            changes: {
-              from: currentPlaceholderStart,
-              to: currentPlaceholderStart + placeholder.length,
-              insert: finalText,
-            },
-          });
-        } else {
-          view.dispatch({
-            changes: {
-              from: placeholderFrom,
-              to: Math.min(placeholderTo, view.state.doc.length),
-              insert: finalText,
-            },
-          });
-        }
+        if (currentPlaceholderStart < 0) return false;
+        view.dispatch({
+          changes: {
+            from: currentPlaceholderStart,
+            to: currentPlaceholderStart + placeholder.length,
+            insert: finalText,
+          },
+        });
 
         if (settings.imageHosting.keepLocalCopy) {
           saveLocalCopy(arrayBuffer, imageName).catch((err) =>
@@ -249,6 +269,11 @@ export function useImagePaste(
         showNotification(t(language, "notifications_imageUploaded"), "success");
         return true;
       } catch (error) {
+        if (!isCurrent()) return false;
+        const currentPlaceholderStart = view.state.doc
+          .toString()
+          .indexOf(placeholder);
+        if (currentPlaceholderStart < 0) return false;
         console.error("Image hosting upload failed:", error);
         const detail = error instanceof Error ? error.message : String(error);
         showNotification(
@@ -256,9 +281,16 @@ export function useImagePaste(
           "error",
         );
 
-        const currentDoc = view.state.doc.toString();
-        const currentPlaceholderStart = currentDoc.indexOf(placeholder);
-        if (currentPlaceholderStart >= 0) {
+        if (settings.imageHosting.keepLocalCopy) {
+          return handleLocalMode(
+            view,
+            language,
+            arrayBuffer,
+            imageName,
+            isCurrent,
+            placeholder,
+          );
+        } else {
           view.dispatch({
             changes: {
               from: currentPlaceholderStart,
@@ -266,10 +298,6 @@ export function useImagePaste(
               insert: "",
             },
           });
-        }
-
-        if (settings.imageHosting.keepLocalCopy) {
-          return handleLocalMode(view, language, arrayBuffer, imageName);
         }
 
         return false;
@@ -282,6 +310,18 @@ export function useImagePaste(
     async (file: File, view: EditorView): Promise<boolean> => {
       const settings = useAppStore.getState().settings;
       const language = settings.language;
+      const session = documentSessionRef.current;
+      const originState = useAppStore.getState();
+      const originTabId = originState.activeTabId;
+      const originRootPath = originState.rootFolderPath;
+      const sourceDoc = view.state.doc;
+      const selection = view.state.selection.main;
+      const isCurrent = () =>
+        mountedRef.current &&
+        documentSessionRef.current === session &&
+        useAppStore.getState().activeTabId === originTabId &&
+        useAppStore.getState().rootFolderPath === originRootPath &&
+        view.dom.isConnected;
 
       if (!rootFolderPath) {
         showNotification(
@@ -297,8 +337,16 @@ export function useImagePaste(
           ?.split(/[\\/]/)
           .pop()
           ?.replace(/\.(md|markdown)$/i, "") || "image";
-      const imageName = `${noteBaseName}-${Date.now()}.${extension}`;
+      // 使用旧版 WKWebView 也支持的随机数 API，避免同毫秒粘贴共用文件名和占位符。
+      const pasteId = Array.from(
+        globalThis.crypto.getRandomValues(new Uint32Array(4)),
+        (value) => value.toString(16).padStart(8, "0"),
+      ).join("");
+      const imageName = `${noteBaseName}-${Date.now()}-${pasteId}.${extension}`;
       const arrayBuffer = await file.arrayBuffer();
+      if (!isCurrent() || view.state.doc !== sourceDoc) return false;
+      // 文件读取完成后仍使用粘贴发起时的选区。
+      view.dispatch({ selection });
 
       if (isImageHostingEnabled(settings)) {
         return handleUploadMode(
@@ -307,10 +355,11 @@ export function useImagePaste(
           language,
           arrayBuffer,
           imageName,
+          isCurrent,
         );
       }
 
-      return handleLocalMode(view, language, arrayBuffer, imageName);
+      return handleLocalMode(view, language, arrayBuffer, imageName, isCurrent);
     },
     [
       rootFolderPath,

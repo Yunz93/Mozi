@@ -4,70 +4,27 @@ import { flushActiveEditorPendingChanges } from "../../utils/editorSelectionBrid
 import { clearDraftBackup } from "../../utils/draftBackup";
 import { findFileInTree } from "../../utils/fileTree";
 import { isSavableDocumentPath } from "../../utils/markdownFormat";
+import { acquireDocumentWrite } from "./documentWriteQueue";
 
-/**
- * Persist the currently open document if it has unsaved changes.
- * Call this before replacing the open buffer (single-document model).
- */
-export async function flushActiveDocumentIfDirty(): Promise<boolean> {
-  flushActiveEditorPendingChanges();
-
-  const state = useAppStore.getState();
-  const tabId = state.activeTabId;
-  if (!tabId || !state.hasUnsavedChanges(tabId)) {
-    return true;
-  }
-
-  const tabContent = state.fileContents[tabId];
-  const node = findFileInTree(state.files, tabId);
+/** 脏状态检查也须等待旧写盘，否则撤销到干净状态时可能放行尚未完成的旧保存。 */
+export async function flushDocumentIfDirty(tabId: string): Promise<boolean> {
+  const initial = useAppStore.getState();
+  const node = findFileInTree(initial.files, tabId);
   const savePath = node?.type === "file" ? node.path : tabId;
-  if (tabContent === undefined || !savePath) {
-    return false;
-  }
-
-  if (!isSavableDocumentPath(savePath)) {
-    state.markAsSaved(tabId, tabContent);
-    return true;
-  }
-
+  const release = await acquireDocumentWrite(savePath);
   try {
-    const fs = await getFileSystem();
-    await fs.writeFile(savePath, tabContent);
-    state.markAsSaved(tabId, tabContent);
-    clearDraftBackup(tabId);
-    void import("../vault/linkIndexEvents").then(({ notifyVaultFileSaved }) => {
-      notifyVaultFileSaved(savePath, tabContent);
-    });
-    return true;
-  } catch (error) {
-    console.error(`Failed to flush active document ${tabId}:`, error);
-    return false;
-  }
-}
-
-/**
- * 尽量把所有脏 tab 写盘。树外节点回退用 tab id（绝对路径）作为保存路径。
- */
-export async function flushAllDirtyOpenTabs(): Promise<boolean> {
-  flushActiveEditorPendingChanges();
-
-  const state = useAppStore.getState();
-  const dirtyTabIds = state.openTabs.filter((tabId) =>
-    state.hasUnsavedChanges(tabId),
-  );
-  if (dirtyTabIds.length === 0) return true;
-
-  try {
-    const fs = await getFileSystem();
-    for (const tabId of dirtyTabIds) {
+    while (true) {
+      flushActiveEditorPendingChanges();
+      const state = useAppStore.getState();
+      if (!state.openTabs.includes(tabId)) return false;
+      if (!state.hasUnsavedChanges(tabId)) return true;
       const content = state.fileContents[tabId];
-      if (content === undefined) continue;
-      const node = findFileInTree(state.files, tabId);
-      const savePath = node?.type === "file" ? node.path : tabId;
+      if (content === undefined || !savePath) return false;
       if (!isSavableDocumentPath(savePath)) {
         state.markAsSaved(tabId, content);
-        continue;
+        return true;
       }
+      const fs = await getFileSystem();
       await fs.writeFile(savePath, content);
       state.markAsSaved(tabId, content);
       clearDraftBackup(tabId);
@@ -77,9 +34,26 @@ export async function flushAllDirtyOpenTabs(): Promise<boolean> {
         },
       );
     }
-    return true;
   } catch (error) {
-    console.error("Failed to flush dirty tabs before close:", error);
+    console.error(`Failed to flush document ${tabId}:`, error);
     return false;
+  } finally {
+    release();
   }
+}
+
+/** 替换单文档缓冲前，等待所有在途保存及最新编辑落盘。 */
+export async function flushActiveDocumentIfDirty(): Promise<boolean> {
+  flushActiveEditorPendingChanges();
+  const tabId = useAppStore.getState().activeTabId;
+  return tabId ? flushDocumentIfDirty(tabId) : true;
+}
+
+/** 关闭前逐个保存打开的文档，包括尚在写盘但当前看似干净的文档。 */
+export async function flushAllDirtyOpenTabs(): Promise<boolean> {
+  flushActiveEditorPendingChanges();
+  for (const tabId of useAppStore.getState().openTabs) {
+    if (!(await flushDocumentIfDirty(tabId))) return false;
+  }
+  return true;
 }

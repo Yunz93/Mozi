@@ -52,6 +52,7 @@ import {
   scheduleLivePreviewMeasure,
 } from "../livePreview/shared";
 import { isEditorImeComposing } from "../behavior/imeGuard";
+import { subscribeEditorDocumentPathRemap } from "../../../utils/editorSelectionBridge";
 
 export { getEditorTooltipSpace };
 
@@ -204,6 +205,20 @@ export function useCodeMirror(
   const previousDocumentKeyRef = useRef<string | null>(documentKey);
   const editorExtensionsRef = useRef<Extension[]>([]);
   const editorStateCacheRef = useRef<Map<string, EditorState>>(new Map());
+
+  useEffect(
+    () =>
+      subscribeEditorDocumentPathRemap((paths) => {
+        const previousKey = previousDocumentKeyRef.current;
+        if (previousKey)
+          previousDocumentKeyRef.current = paths[previousKey] ?? previousKey;
+        const cache = editorStateCacheRef.current;
+        const remapped = new Map<string, EditorState>();
+        cache.forEach((state, key) => remapped.set(paths[key] ?? key, state));
+        editorStateCacheRef.current = remapped;
+      }),
+    [],
+  );
 
   // Track initial content for delayed initialization
   const initialContentRef = useRef(content || "");

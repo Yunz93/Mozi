@@ -8,6 +8,7 @@ const UNICODE_DASH =
 
 /** Same pipe-row heuristic as markdownFormat (pipe table row, not a lone `|`). */
 export function isPotentialMarkdownTableRow(line: string): boolean {
+  if (/^\s*\|.+\|\s*$/.test(line)) return true;
   return /^\s*\|?.+\|.+\|?\s*$/.test(line);
 }
 
@@ -20,6 +21,8 @@ function separatorLineToAsciiHyphens(line: string): string {
  */
 export function isMarkdownTableSeparatorLine(line: string): boolean {
   const ascii = separatorLineToAsciiHyphens(line);
+  // 单列表格必须保留两侧管道，避免把普通分隔线识别为表格。
+  if (/^\s*\|\s*:?-+:?\s*\|\s*$/.test(ascii)) return true;
   return /^\s*\|?(?:\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$/.test(ascii);
 }
 

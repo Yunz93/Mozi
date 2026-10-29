@@ -13,6 +13,7 @@ import {
 } from "../utils/pathRemap";
 import type { DirectoryWatchEvent } from "../types/filesystem";
 import type { TranslationKey } from "../utils/i18n";
+import { remapEditorDocumentPaths } from "../utils/editorSelectionBridge";
 
 interface UseKnowledgeBaseWatchOptions {
   rootFolderPath: string | null;
@@ -51,6 +52,7 @@ export function useKnowledgeBaseWatch(
           state.openTabs,
         );
         if (Object.keys(pathRemaps).length > 0) {
+          remapEditorDocumentPaths(pathRemaps);
           useAppStore.setState((current) =>
             buildTabPathRemapState(current, pathRemaps),
           );

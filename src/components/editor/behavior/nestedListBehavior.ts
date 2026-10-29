@@ -15,7 +15,7 @@
  * ...以此类推
  */
 
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
 import { markdownLanguage } from "@codemirror/lang-markdown";
 import {
@@ -514,6 +514,23 @@ interface OrderedListNumberingResult {
 function computeOrderedListNumbering(
   state: EditorState,
 ): OrderedListNumberingResult {
+  const parsed = ensureSyntaxTree(state, state.doc.length, 20);
+  const tree =
+    parsed?.type.name === "Document"
+      ? parsed
+      : markdownLanguage.parser.parse(state.doc.toString());
+  const codeRanges: Array<{ from: number; to: number; nestedInList: boolean }> =
+    [];
+  tree.iterate({
+    enter(ref) {
+      if (ref.name !== "FencedCode" && ref.name !== "CodeBlock") return;
+      let parent = ref.node.parent;
+      while (parent && parent.name !== "ListItem") parent = parent.parent;
+      codeRanges.push({ from: ref.from, to: ref.to, nestedInList: !!parent });
+      return false;
+    },
+  });
+  let codeRangeIndex = 0;
   const numbers = new Map<number, number>();
   const previousSiblingStyles = new Map<
     number,
@@ -552,8 +569,26 @@ function computeOrderedListNumbering(
 
   for (let i = 1; i <= state.doc.lines; i++) {
     const line = state.doc.line(i);
+    while (
+      codeRangeIndex < codeRanges.length &&
+      codeRanges[codeRangeIndex].to <= line.from
+    ) {
+      codeRangeIndex += 1;
+    }
+    const code = codeRanges[codeRangeIndex];
     const item = parseListItem(line.text, i, line.from);
-
+    const markerPos =
+      line.from + (item?.quotePrefix?.length ?? 0) + (item?.indent.length ?? 0);
+    if (code && markerPos >= code.from && markerPos < code.to) {
+      // 代码中的列表标记既不能被改写，也不能参与外部列表的计数。
+      if (!code.nestedInList) {
+        clearAllCounters();
+        lastStyleByKey.clear();
+        consecutiveBlankLines = 0;
+        pendingBlankReset = false;
+      }
+      continue;
+    }
     if (item) {
       const itemDepth = getIndentColumnWidth(item.indent);
       const quoteKey = item.quotePrefix ?? "";

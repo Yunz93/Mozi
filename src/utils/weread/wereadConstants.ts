@@ -1,5 +1,3 @@
-export const WEREAD_SKILL_VERSION = "1.0.4";
-
 export const WEREAD_SOURCE = "weread";
 export const WEREAD_BOOK_ID_KEY = "weread_book_id";
 export const WEREAD_GENERATED_END_MARKER = "<!-- weread:generated-end -->";

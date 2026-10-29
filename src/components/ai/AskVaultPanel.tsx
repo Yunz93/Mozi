@@ -127,6 +127,9 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   const [lastAnsweredQuestion, setLastAnsweredQuestion] = useState<
     string | null
   >(null);
+  const [previewRequestKey, setPreviewRequestKey] = useState<string | null>(
+    null,
+  );
   const [answerMarkdown, setAnswerMarkdown] = useState("");
   const [citations, setCitations] = useState<AskVaultCitation[]>([]);
   const [history, setHistory] = useState<AskVaultHistoryItem[]>([]);
@@ -170,7 +173,51 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     return lastAnsweredQuestion;
   }, [question, lastAnsweredQuestion]);
 
+  const requestKey = JSON.stringify([
+    open,
+    rootFolderPath,
+    scope,
+    scope === "vault" ? null : currentFilePath,
+    question.trim(),
+  ]);
+  const requestKeyRef = useRef(requestKey);
+  requestKeyRef.current = requestKey;
+  const requestGenerationRef = useRef(0);
+
+  // 范围或问题改变后，旧请求和旧片段都不能用于下一次回答。
+  useEffect(() => {
+    requestGenerationRef.current += 1;
+    setPendingHits([]);
+    setPreviewItems([]);
+    setLastPreviewedQuestion(null);
+    setPreviewRequestKey(null);
+    setRetrieving(false);
+    setGenerating(false);
+  }, [requestKey]);
+
+  useEffect(() => {
+    setAnswerMarkdown("");
+    setCitations([]);
+    setLastAnsweredQuestion(null);
+    setHistory([]);
+  }, [rootFolderPath]);
+
+  useEffect(
+    () => () => {
+      requestGenerationRef.current += 1;
+    },
+    [],
+  );
+
+  const isCurrentRequest = useCallback(
+    (generation: number, key: string) =>
+      requestGenerationRef.current === generation &&
+      requestKeyRef.current === key,
+    [],
+  );
+
   const canReuseHits =
+    previewRequestKey === requestKey &&
     resolveAskVaultSubmitKind({
       question,
       lastPreviewedQuestion,
@@ -298,16 +345,29 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
   );
 
   const loadPreviewHits = useCallback(
-    async (trimmed: string): Promise<RetrieveHit[] | null> => {
+    async (
+      trimmed: string,
+      generation: number,
+    ): Promise<RetrieveHit[] | null> => {
       const activeSettings = await resolveHydratedSettings();
+      if (!isCurrentRequest(generation, requestKey)) return null;
       if (!(await ensureAskConfig(activeSettings))) return null;
+      if (!isCurrentRequest(generation, requestKey)) return null;
       const hits = await retrieveAskVaultHits(buildRequest(activeSettings));
+      if (!isCurrentRequest(generation, requestKey)) return null;
       setPendingHits(hits);
       setPreviewItems(hitsToPreviewItems(hits));
       setLastPreviewedQuestion(trimmed);
+      setPreviewRequestKey(requestKey);
       return hits;
     },
-    [resolveHydratedSettings, ensureAskConfig, buildRequest],
+    [
+      resolveHydratedSettings,
+      ensureAskConfig,
+      buildRequest,
+      isCurrentRequest,
+      requestKey,
+    ],
   );
 
   /** Optional: preview snippets without calling the chat model. */
@@ -315,18 +375,20 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     const trimmed = question.trim();
     if (!trimmed || !rootFolderPath || !canAsk || scopeBlocked) return;
 
+    const generation = ++requestGenerationRef.current;
     setRetrieving(true);
     setAnswerMarkdown("");
     setCitations([]);
     setPrimaryTab("ask");
     try {
-      const hits = await loadPreviewHits(trimmed);
+      const hits = await loadPreviewHits(trimmed, generation);
       if (hits === null) return;
       setSecondaryTab("sources");
       if (hits.length === 0) {
         showNotification(t("askVault_noHits"), "info");
       }
     } catch (error) {
+      if (!isCurrentRequest(generation, requestKey)) return;
       showNotification(
         error instanceof Error
           ? localizeKnownError(language, error.message)
@@ -335,7 +397,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       );
       setSettingsOpen(true, "ai");
     } finally {
-      setRetrieving(false);
+      if (isCurrentRequest(generation, requestKey)) setRetrieving(false);
     }
   }, [
     question,
@@ -347,23 +409,28 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     showNotification,
     setSettingsOpen,
     t,
+    isCurrentRequest,
+    requestKey,
   ]);
 
   /** Send retrieved snippets to the model and show the answer tab. */
   const handleGenerateFromHits = useCallback(
-    async (hits: RetrieveHit[], trimmed: string) => {
-      if (!rootFolderPath) return;
+    async (hits: RetrieveHit[], trimmed: string, generation: number) => {
+      if (!rootFolderPath || !isCurrentRequest(generation, requestKey)) return;
       setGenerating(true);
       setPrimaryTab("ask");
       try {
         const activeSettings = await resolveHydratedSettings();
+        if (!isCurrentRequest(generation, requestKey)) return;
         if (!(await ensureAskConfig(activeSettings))) return;
+        if (!isCurrentRequest(generation, requestKey)) return;
         const result = await answerAskVaultFromHits(
           trimmed,
           hits,
           activeSettings,
           followUpQuestion ?? undefined,
         );
+        if (!isCurrentRequest(generation, requestKey)) return;
         setAnswerMarkdown(
           normalizeAskVaultCitationMarkers(result.answerMarkdown),
         );
@@ -378,8 +445,10 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
           at: Date.now(),
         };
         await appendAskVaultHistory(rootFolderPath, historyItem);
+        if (!isCurrentRequest(generation, requestKey)) return;
         setHistory((prev) => [historyItem, ...prev].slice(0, 50));
       } catch (error) {
+        if (!isCurrentRequest(generation, requestKey)) return;
         showNotification(
           error instanceof Error
             ? localizeKnownError(language, error.message)
@@ -388,7 +457,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         );
         setSettingsOpen(true, "ai");
       } finally {
-        setGenerating(false);
+        if (isCurrentRequest(generation, requestKey)) setGenerating(false);
       }
     },
     [
@@ -400,6 +469,8 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       showNotification,
       setSettingsOpen,
       t,
+      isCurrentRequest,
+      requestKey,
     ],
   );
 
@@ -407,8 +478,9 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     const trimmed = question.trim();
     if (!trimmed || !rootFolderPath || !canAsk || scopeBlocked) return;
 
+    const generation = ++requestGenerationRef.current;
     if (canReuseHits) {
-      await handleGenerateFromHits(pendingHits, trimmed);
+      await handleGenerateFromHits(pendingHits, trimmed, generation);
       return;
     }
 
@@ -419,7 +491,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     setSecondaryTab("answer");
     let hits: RetrieveHit[] | null = null;
     try {
-      hits = await loadPreviewHits(trimmed);
+      hits = await loadPreviewHits(trimmed, generation);
       if (hits === null) return;
       if (hits.length === 0) {
         setSecondaryTab("sources");
@@ -427,6 +499,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         return;
       }
     } catch (error) {
+      if (!isCurrentRequest(generation, requestKey)) return;
       showNotification(
         error instanceof Error
           ? localizeKnownError(language, error.message)
@@ -436,11 +509,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       setSettingsOpen(true, "ai");
       return;
     } finally {
-      setRetrieving(false);
+      if (isCurrentRequest(generation, requestKey)) setRetrieving(false);
     }
 
     if (!hits || hits.length === 0) return;
-    await handleGenerateFromHits(hits, trimmed);
+    await handleGenerateFromHits(hits, trimmed, generation);
   }, [
     question,
     rootFolderPath,
@@ -454,6 +527,8 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     showNotification,
     setSettingsOpen,
     t,
+    isCurrentRequest,
+    requestKey,
   ]);
 
   const handleOpenCitation = useCallback(

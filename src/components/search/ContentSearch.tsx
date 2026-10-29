@@ -89,6 +89,33 @@ export function findClosestMatchIndex(
   return best;
 }
 
+/** 使用完整匹配的捕获组和原文上下文展开原生替换串标记。 */
+function expandSearchReplacement(
+  match: RegExpExecArray,
+  replacement: string,
+): string {
+  return replacement.replace(
+    /\$(\$|&|`|'|\d{1,2}|<[^>]*>)/g,
+    (token, key: string) => {
+      if (key === "$") return "$";
+      if (key === "&") return match[0];
+      if (key === "`") return match.input.slice(0, match.index);
+      if (key === "'") return match.input.slice(match.index + match[0].length);
+      if (key.startsWith("<")) {
+        return match.groups ? (match.groups[key.slice(1, -1)] ?? "") : token;
+      }
+      const index = Number(key);
+      if (index > 0 && index < match.length) return match[index] ?? "";
+      // $12 在不足十二个捕获组时按 $1 加字符 2 处理。
+      const firstIndex = Number(key[0]);
+      if (key.length === 2 && firstIndex > 0 && firstIndex < match.length) {
+        return (match[firstIndex] ?? "") + key[1];
+      }
+      return token;
+    },
+  );
+}
+
 /**
  * Content search component with find and replace functionality
  */
@@ -235,30 +262,29 @@ export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
     const view = getActiveEditorView();
     if (view) {
       const source = view.state.doc.toString();
-      // 正则模式下对每个匹配片段单独求值替换串（支持 $1 等引用），保留原 flags 但去掉 g
-      const singleMatchRegex = useRegex
-        ? new RegExp(regex.source, regex.flags.replace("g", ""))
-        : null;
-      const changes = matches.map((m) => {
-        const slice = source.slice(m.index, m.index + m.length);
-        const insert = singleMatchRegex
-          ? slice.replace(singleMatchRegex, replaceText)
-          : replaceText;
-        return { from: m.index, to: m.index + m.length, insert };
-      });
+      const changes = [];
+      // 重新匹配当前原文，避免切片丢失上下文，也避免使用过期的搜索位置。
+      for (const match of source.matchAll(regex)) {
+        if (match[0].length === 0) continue;
+        changes.push({
+          from: match.index,
+          to: match.index + match[0].length,
+          insert: useRegex
+            ? expandSearchReplacement(match, replaceText)
+            : replaceText,
+        });
+        if (changes.length >= MAX_MATCHES) break;
+      }
       view.dispatch({
         changes,
         userEvent: "input.replace",
       });
       return;
     }
-
-    // When not in regex mode the replacement text must be literal, so escape
-    // `$` which String.replace would otherwise treat as a pattern reference.
-    const literalReplacement = useRegex
+    const replacement = useRegex
       ? replaceText
       : replaceText.replace(/\$/g, "$$$$");
-    setContent(content.replace(regex, literalReplacement));
+    setContent(content.replace(regex, replacement));
   }, [
     matches,
     content,

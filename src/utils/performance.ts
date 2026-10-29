@@ -245,7 +245,7 @@ export class LRUCache<K, V> {
  */
 export function hashContent(content: string): string {
   let hash = 0;
-  const len = Math.min(content.length, 10000); // Limit hash computation
+  const len = content.length;
   for (let i = 0; i < len; i++) {
     const char = content.charCodeAt(i);
     hash = (hash << 5) - hash + char;

@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import {
   classifyWereadError,
   extractWereadApiMessage,
   extractWereadUpgradeMessage,
 } from "./wereadErrors";
-import { extractStoreSearchBooks } from "./wereadApi";
-import { WEREAD_SKILL_VERSION } from "./wereadConstants";
+import { extractStoreSearchBooks, updateWereadSkill } from "./wereadApi";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+vi.mock("../../types/filesystem", () => ({ isTauriEnvironment: () => true }));
 
 describe("classifyWereadError", () => {
   it("maps a missing API key", () => {
@@ -66,8 +69,10 @@ describe("extractStoreSearchBooks", () => {
   });
 });
 
-describe("WEREAD_SKILL_VERSION", () => {
-  it("pins the official skill version", () => {
-    expect(WEREAD_SKILL_VERSION).toBe("1.0.4");
+describe("updateWereadSkill", () => {
+  it("updates through the native backend without sending an API key", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce("1.0.5");
+    await expect(updateWereadSkill()).resolves.toBe("1.0.5");
+    expect(invoke).toHaveBeenCalledWith("weread_update_skill");
   });
 });

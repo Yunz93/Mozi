@@ -45,7 +45,10 @@ import {
   notebookTitle,
 } from "./utils/weread/wereadApi";
 import { ViewMode } from "./types";
-import { requestEditorRangeFocus } from "./utils/editorSelectionBridge";
+import {
+  flushActiveEditorPendingChanges,
+  requestEditorRangeFocus,
+} from "./utils/editorSelectionBridge";
 import {
   beginHeadingNavigationLock,
   requestPreviewHeadingScroll,
@@ -626,6 +629,7 @@ const App: React.FC = () => {
       );
       return;
     }
+    flushActiveEditorPendingChanges();
     const state = useAppStore.getState();
     const tabId = state.activeTabId;
     if (tabId && state.hasUnsavedChanges(tabId)) {

@@ -42,7 +42,7 @@ export interface WereadBookmark {
   bookId?: string;
   chapterUid?: number;
   markText?: string;
-  /** Surrounding paragraph when the gateway includes it. */
+  /** 网关实际返回的周边段落，并非所有划线都有此字段。 */
   context?: string;
   abstract?: string;
   createTime?: number;
@@ -61,6 +61,8 @@ export interface WereadReviewBody {
   reviewId?: string;
   content?: string;
   abstract?: string;
+  /** 网关返回上下文时，用于展示书摘的完整段落。 */
+  context?: string;
   range?: string;
   chapterUid?: number;
   chapterIdx?: number;

@@ -33,6 +33,33 @@ describe("extractAttachmentTargets", () => {
     ]);
   });
 
+  it("extracts full, collapsed and shortcut reference destinations", () => {
+    expect(
+      extractAttachmentTargets(
+        [
+          "![cover][asset] ![collapsed][] [download]",
+          "",
+          '[asset]: resources/cover.png "Cover title"',
+          "[collapsed]: <resources/my photo.png>",
+          "[download]:",
+          "  resources/guide.pdf 'Guide'",
+        ].join("\n"),
+      ),
+    ).toEqual([
+      "resources/cover.png",
+      "resources/my%20photo.png",
+      "resources/guide.pdf",
+    ]);
+  });
+
+  it("keeps balanced parentheses in image and link destinations", () => {
+    expect(
+      extractAttachmentTargets(
+        "![diagram](resources/a(b).png) [download](resources/manual(v2).pdf)",
+      ),
+    ).toEqual(["resources/a(b).png", "resources/manual(v2).pdf"]);
+  });
+
   it("extracts wiki embed targets", () => {
     expect(extractAttachmentTargets("![[image.png]]")).toEqual(["image.png"]);
   });

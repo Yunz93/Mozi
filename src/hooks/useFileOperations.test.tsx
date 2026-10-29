@@ -5,18 +5,22 @@ import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultSettings, useAppStore } from "../store/appStore";
 import type { FileNode } from "../types";
+import { registerActiveEditorFlush } from "../utils/editorSelectionBridge";
 
-const { readFileMock, isNonUtf8PathMock } = vi.hoisted(() => ({
-  readFileMock: vi.fn(),
-  isNonUtf8PathMock: vi.fn((_path?: string) => false),
-}));
+const { readFileMock, isNonUtf8PathMock, writeFileMock, renameFileMock } =
+  vi.hoisted(() => ({
+    readFileMock: vi.fn(),
+    isNonUtf8PathMock: vi.fn((_path?: string) => false),
+    writeFileMock: vi.fn(async (_path: string, _content: string) => {}),
+    renameFileMock: vi.fn(async () => undefined),
+  }));
 
 vi.mock("./useFileSystem", () => ({
   useFileSystem: () => ({
     readFile: readFileMock,
     createFile: vi.fn(),
     createFolder: vi.fn(),
-    renameFile: vi.fn(),
+    renameFile: renameFileMock,
     deleteFile: vi.fn(),
     moveToTrash: vi.fn(),
     restoreFromTrash: vi.fn(),
@@ -29,7 +33,7 @@ vi.mock("./useFileSystem", () => ({
 vi.mock("../types/filesystem", () => ({
   getFileSystem: vi.fn(async () => ({
     isNonUtf8Path: (path: string) => isNonUtf8PathMock(path),
-    writeFile: vi.fn(),
+    writeFile: writeFileMock,
     readFile: vi.fn(),
   })),
 }));
@@ -62,6 +66,7 @@ function Harness({
 
 describe("useFileOperations", () => {
   afterEach(() => {
+    registerActiveEditorFlush(null);
     vi.clearAllMocks();
     useAppStore.setState({
       files: [],
@@ -75,6 +80,9 @@ describe("useFileOperations", () => {
   });
 
   beforeEach(() => {
+    writeFileMock.mockReset();
+    writeFileMock.mockResolvedValue(undefined);
+    renameFileMock.mockClear();
     readFileMock.mockReset();
     isNonUtf8PathMock.mockReset();
     isNonUtf8PathMock.mockReturnValue(false);
@@ -87,6 +95,38 @@ describe("useFileOperations", () => {
       lastSavedContent: { [previousNote.id]: "# prev" },
       settings: defaultSettings,
     });
+  });
+
+  it("flushes buffered drawing changes before renaming its path", async () => {
+    const drawing = {
+      ...previousNote,
+      id: "/vault/drawing.excalidraw",
+      path: "/vault/drawing.excalidraw",
+      name: "drawing.excalidraw",
+    };
+    useAppStore.setState({
+      files: [drawing],
+      openTabs: [drawing.id],
+      activeTabId: drawing.id,
+      currentFilePath: drawing.path,
+      fileContents: { [drawing.id]: "original scene" },
+      lastSavedContent: { [drawing.id]: "original scene" },
+    });
+    registerActiveEditorFlush(() =>
+      useAppStore.getState().setContentForFile(drawing.id, "latest scene"),
+    );
+    let ops: ReturnType<typeof useFileOperations> | null = null;
+    render(<Harness onReady={(value) => (ops = value)} />);
+
+    await act(async () => {
+      await ops!.handleRename(drawing, "renamed");
+    });
+
+    expect(writeFileMock).toHaveBeenCalledWith(drawing.path, "latest scene");
+    expect(renameFileMock).toHaveBeenCalledWith(drawing, "renamed.excalidraw");
+    expect(writeFileMock.mock.invocationCallOrder[0]).toBeLessThan(
+      renameFileMock.mock.invocationCallOrder[0],
+    );
   });
 
   it("closes the new tab when readFile rejects", async () => {

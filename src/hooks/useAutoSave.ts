@@ -21,6 +21,10 @@ import {
   isSavableDocumentPath,
 } from "../utils/markdownFormat";
 import { sameDocumentText } from "../utils/documentText";
+import {
+  acquireDocumentWrite,
+  writeDocumentFile,
+} from "../services/filesystem/documentWriteQueue";
 
 interface UseAutoSaveOptions {
   debounceMs?: number;
@@ -161,7 +165,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   );
 
   const scheduleFollowUpSave = useCallback((options?: ForceSaveOptions) => {
-    void executeSaveRef.current(0, options ?? { trigger: "auto" });
+    return executeSaveRef.current(0, options ?? { trigger: "auto" });
   }, []);
 
   const drainPendingSave = useCallback(
@@ -169,12 +173,11 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       if (userEditedDuringSave) {
         const pending = pendingSaveRef.current;
         pendingSaveRef.current = null;
-        scheduleFollowUpSave(
+        return scheduleFollowUpSave(
           pending?.trigger === "manual" || pending?.trigger === "system"
             ? pending
             : { trigger: "auto" },
         );
-        return;
       }
 
       if (!pendingSaveRef.current) {
@@ -183,7 +186,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
 
       const pending = pendingSaveRef.current;
       pendingSaveRef.current = null;
-      scheduleFollowUpSave(pending);
+      return scheduleFollowUpSave(pending);
     },
     [scheduleFollowUpSave],
   );
@@ -216,8 +219,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       }
 
       try {
-        const fs = await getFileSystem();
-        await fs.writeFile(savePath, tabContent);
+        await writeDocumentFile(savePath, tabContent);
         state.markAsSaved(tabId, tabContent);
         clearDraftBackup(tabId);
         void import("../services/vault/linkIndexEvents").then(
@@ -278,9 +280,9 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
   // Execute save operation with retry logic
   const executeSave = useCallback(
     async (retryCount = 0, options?: ForceSaveOptions): Promise<boolean> => {
-      const currentContent = contentRef.current;
+      let currentContent = contentRef.current;
       const tabId = activeTabId;
-      const stateAtStart = useAppStore.getState();
+      let stateAtStart = useAppStore.getState();
       const resolvedNode = tabId
         ? findFileInTree(stateAtStart.files, tabId)
         : undefined;
@@ -311,8 +313,21 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       saveStateRef.current.status = "saving";
 
       let contentToSave = currentContent;
+      // 捕获快照后立即排队，格式化或读取磁盘的等待也不能让旧保存插队。
+      const releaseWrite = await acquireDocumentWrite(savePath);
 
       try {
+        if (isSaveContextStale(generation, tabId, savePath)) {
+          isSavingRef.current = false;
+          setSaving(false);
+          notifySaveIdle();
+          return false;
+        }
+        // 等待队列期间可能已有 flush 写入更新版本，不能继续使用排队前的快照。
+        flushActiveEditorPendingChanges();
+        stateAtStart = useAppStore.getState();
+        currentContent = stateAtStart.fileContents[tabId] ?? currentContent;
+        contentToSave = currentContent;
         // Yield one frame before sync format so the saving indicator can paint.
         if (shouldFormatBeforeSave) {
           await new Promise<void>((resolve) => {
@@ -360,8 +375,14 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         }
 
         // Check if content has changed (compare post-transform payload for manual saves)
-        if (sameDocumentText(contentToSave, lastSavedContentRef.current)) {
+        if (
+          sameDocumentText(
+            contentToSave,
+            stateAtStart.lastSavedContent[tabId] ?? lastSavedContentRef.current,
+          )
+        ) {
           markAsSaved(tabId, contentToSave);
+          lastSavedContentRef.current = contentToSave;
           isSavingRef.current = false;
           setSaving(false);
           notifySaveIdle();
@@ -372,8 +393,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         try {
           const diskContent = await fs.readFile(savePath);
           const lastSaved =
-            lastSavedContentRef.current ||
-            useAppStore.getState().lastSavedContent[tabId] ||
+            useAppStore.getState().lastSavedContent[tabId] ??
+            lastSavedContentRef.current ??
             "";
           // Line endings / BOM must not count as an external edit: the editor
           // emits LF while disk may still be CRLF from the original file.
@@ -403,6 +424,12 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           // 读盘失败（文件不存在等）不阻塞保存
         }
 
+        if (isSaveContextStale(generation, tabId, savePath)) {
+          isSavingRef.current = false;
+          setSaving(false);
+          notifySaveIdle();
+          return false;
+        }
         await withErrorHandling(async () => {
           await fs.writeFile(savePath, contentToSave);
         }, "Auto-save failed");
@@ -424,7 +451,14 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
           return true;
         }
 
-        const latestContent = contentRef.current;
+        // 写盘期间可能仍有编辑器防抖中的输入，先同步后再判断是否可以写回。
+        flushActiveEditorPendingChanges();
+        const latestStoredContent = useAppStore.getState().fileContents[tabId];
+        const latestContent =
+          latestStoredContent !== stateAtStart.fileContents[tabId]
+            ? (latestStoredContent ?? contentRef.current)
+            : contentRef.current;
+        contentRef.current = latestContent;
         const userEditedDuringSave = latestContent !== currentContent;
 
         // Adopt formatted/timestamp-normalized output when the user did not keep typing.
@@ -450,9 +484,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         isSavingRef.current = false;
         setSaving(false);
         notifySaveIdle();
-        drainPendingSave(userEditedDuringSave);
-
-        return true;
+        // 关闭和发布调用必须等待后续输入保存完成，不能只等待第一份快照。
+        return drainPendingSave(userEditedDuringSave) ?? true;
       } catch (error) {
         console.error(`Auto-save failed (attempt ${retryCount + 1}):`, error);
 
@@ -537,6 +570,8 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
         }
 
         return false;
+      } finally {
+        releaseWrite();
       }
     },
     [
@@ -613,7 +648,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
       }
 
       const trigger = options?.trigger ?? "manual";
-      if (
+      while (
         isSavingRef.current &&
         (trigger === "system" || trigger === "manual")
       ) {

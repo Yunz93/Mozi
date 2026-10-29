@@ -44,8 +44,15 @@ import {
   setActiveChunkIndex,
 } from "../services/vault/semanticIndexRuntime";
 import { packVectorSnapshot } from "../services/vault/vectorStore";
-import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
+import {
+  flushActiveDocumentIfDirty,
+  flushDocumentIfDirty,
+} from "../services/filesystem/flushActiveDocument";
 import { importDroppedFiles } from "../services/filesystem/importDroppedFiles";
+import {
+  flushActiveEditorPendingChanges,
+  remapEditorDocumentPaths,
+} from "../utils/editorSelectionBridge";
 
 async function notifyIfNonUtf8File(
   path: string,
@@ -70,6 +77,8 @@ async function notifyIfNonUtf8File(
 
 /** Prevent overlapping create calls for the same destination path. */
 const createDocumentInFlight = new Set<string>();
+// 多个调用方共用请求序号，过期读取不能恢复或覆盖当前文档。
+let fileOpenGeneration = 0;
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -123,28 +132,12 @@ async function flushDirtyTabsForTarget(
   openTabs: string[],
   target: FileNode,
 ): Promise<boolean> {
-  const state = useAppStore.getState();
-  const dirtyTabIds = collectAffectedOpenTabIds(files, openTabs, target).filter(
-    (tabId) => state.hasUnsavedChanges(tabId),
-  );
-  if (dirtyTabIds.length === 0) return true;
-
-  try {
-    const fs = await getFileSystem();
-    for (const tabId of dirtyTabIds) {
-      const node = findFileInTree(state.files, tabId);
-      const content = state.fileContents[tabId];
-      if (!node || node.type !== "file" || content === undefined) {
-        continue;
-      }
-      await fs.writeFile(node.path, content);
-      state.markAsSaved(tabId, content);
-    }
-    return true;
-  } catch (e) {
-    console.error("Failed to save unsaved changes before path change:", e);
-    return false;
+  flushActiveEditorPendingChanges();
+  const affectedIds = collectAffectedOpenTabIds(files, openTabs, target);
+  for (const tabId of affectedIds) {
+    if (!(await flushDocumentIfDirty(tabId))) return false;
   }
+  return true;
 }
 
 /**
@@ -181,6 +174,16 @@ export function useFileOperations() {
   const handleFileSelect = useCallback(
     async (file: FileNode) => {
       if (file.type === "folder") return;
+      let generation = fileOpenGeneration;
+      const ownsOpenRequest = () => generation === fileOpenGeneration;
+      const isCurrentDocument = () => {
+        const state = useAppStore.getState();
+        return (
+          ownsOpenRequest() &&
+          state.activeTabId === file.id &&
+          state.currentFilePath === file.path
+        );
+      };
 
       const previousState = useAppStore.getState();
       const previousId = previousState.activeTabId;
@@ -207,8 +210,11 @@ export function useFileOperations() {
           return;
         }
 
+        generation = ++fileOpenGeneration;
+
         if (previousId && previousId !== file.id) {
           const flushed = await flushActiveDocumentIfDirty();
+          if (!ownsOpenRequest()) return;
           if (!flushed) {
             showNotification(
               t(settings.language, "tab_closeBlockedUnsaved"),
@@ -220,12 +226,24 @@ export function useFileOperations() {
 
         addTab(file.id);
         setCurrentFilePath(file.path);
+        const contentAtReadStart = useAppStore.getState().fileContents[file.id];
+        const applyLoadedContent = (text: string): boolean => {
+          if (!isCurrentDocument()) return false;
+          // 编辑器可能尚未把防抖输入同步到 store，先刷新再判断是否有新编辑。
+          flushActiveEditorPendingChanges();
+          if (
+            useAppStore.getState().fileContents[file.id] === contentAtReadStart
+          ) {
+            updateTabContent(file.id, text);
+          }
+          markAsSaved(file.id, text);
+          return true;
+        };
 
         if (isPreviewOnlyFile(file.name)) {
           if (isHtmlFile(file.name)) {
             const text = await readFile(file);
-            updateTabContent(file.id, text);
-            markAsSaved(file.id);
+            if (!applyLoadedContent(text)) return;
             await notifyIfNonUtf8File(
               file.path,
               settings.language,
@@ -246,8 +264,7 @@ export function useFileOperations() {
               : undefined;
           if (cachedDrawing === undefined) {
             const text = await readFile(file);
-            updateTabContent(file.id, text);
-            markAsSaved(file.id);
+            if (!applyLoadedContent(text)) return;
             await notifyIfNonUtf8File(
               file.path,
               settings.language,
@@ -264,13 +281,14 @@ export function useFileOperations() {
 
         if (cachedContent === undefined) {
           const text = await readFile(file);
-          updateTabContent(file.id, text);
-          markAsSaved(file.id);
+          if (!applyLoadedContent(text)) return;
           await notifyIfNonUtf8File(
             file.path,
             settings.language,
             showNotification,
           );
+
+          if (!isCurrentDocument()) return;
 
           // A draft backup exists when a previous save failed. Offer to
           // restore it instead of silently keeping the (older) disk content.
@@ -288,6 +306,7 @@ export function useFileOperations() {
           }
         }
       } catch (e) {
+        if (!isCurrentDocument()) return;
         console.error("Failed to read file:", file.path, e);
         showNotification(
           t(settings.language, "notifications_failedToReadFile", {
@@ -553,6 +572,7 @@ export function useFileOperations() {
 
   const remapPathReferencesAfterMove = useCallback(
     (pathMap: Record<string, string>) => {
+      remapEditorDocumentPaths(pathMap);
       useAppStore.setState((state) => buildTabPathRemapState(state, pathMap));
       migrateDraftBackupKeys(pathMap);
 

@@ -266,7 +266,8 @@ export function initKaTeX(md: any) {
       if (start > 0 && state.src[start - 1] === "\\") return false;
 
       // Check it's not $$ (display math)
-      if (state.src[start + 1] === "$") return false;
+      if (state.src[start + 1] === "$" || state.src[start - 1] === "$")
+        return false;
 
       // 行内公式不跨行：遇到换行即停止；同时跳过 `\$` 转义，与 Live 端行为一致
       let end = -1;
@@ -284,6 +285,7 @@ export function initKaTeX(md: any) {
         j += 1;
       }
       if (end === -1 || end === start + 1) return false;
+      if (state.src[end + 1] === "$") return false;
 
       const content = state.src.slice(start + 1, end);
 
@@ -350,6 +352,14 @@ export function initKaTeX(md: any) {
           endLine = i;
           break;
         }
+      }
+
+      // 块公式只能消费完整行；带尾随正文时交回行内解析，不能吞掉正文。
+      if (
+        endLine >= _end ||
+        state.src.slice(contentEnd + 2, state.eMarks[endLine]).trim()
+      ) {
+        return false;
       }
 
       const token = state.push("katex_display", "", 0);

@@ -63,17 +63,6 @@ function escapeForMarkdown(value: string): string {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
-function asLabeledCallout(type: string, title: string, text: string): string {
-  const lines = escapeForMarkdown(text).split("\n");
-  if (lines.length === 0 || (lines.length === 1 && !lines[0])) {
-    return "";
-  }
-  return [
-    `> [!${type}] ${title}`,
-    ...lines.map((line) => `> ${line || ""}`),
-  ].join("\n");
-}
-
 function rangeStart(range: string | undefined): number {
   const match = String(range ?? "").match(/^(\d+)/);
   return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
@@ -88,7 +77,7 @@ function asHighlightLine(highlight: string): string {
   return mark ? `==${mark}==` : "";
 }
 
-/** Wrap the mark in a paragraph only when the API actually returned extra context. */
+/** 只使用接口实际返回、且包含划线原文的段落上下文。 */
 function wrapMarkInParagraph(
   highlight: string,
   context?: string,
@@ -103,51 +92,36 @@ function wrapMarkInParagraph(
   return `${paragraph.slice(0, index)}==${mark}==${paragraph.slice(index + mark.length)}`;
 }
 
-function highlightSource(
-  highlight: string,
-  context?: string,
-): { text: string; hasParagraph: boolean } {
-  const wrapped = wrapMarkInParagraph(highlight, context);
-  if (wrapped) return { text: wrapped, hasParagraph: true };
-  return { text: asHighlightLine(highlight), hasParagraph: false };
+function highlightSource(highlight: string, context?: string): string {
+  return wrapMarkInParagraph(highlight, context) ?? asHighlightLine(highlight);
 }
 
-function renderThoughtBlock(
-  text: string,
-  language: "zh-CN" | "en",
-  kind: "thought" | "review" = "thought",
-): string {
-  const title =
-    kind === "review"
-      ? language === "en"
-        ? "Review"
-        : "书评"
-      : language === "en"
-        ? "Thought"
-        : "想法";
-  return asLabeledCallout("comment", title, text);
+function renderThoughtBlock(text: string, language: "zh-CN" | "en"): string {
+  const title = language === "en" ? "Review" : "书评";
+  return [
+    `> ${title}`,
+    ">",
+    ...escapeForMarkdown(text)
+      .split("\n")
+      .map((line) => (line ? `> ${line}` : ">")),
+  ].join("\n");
 }
 
-/** Keep a highlight and its thoughts in one visual unit. */
+/** 原文段落和对应书评相邻输出，书评不再包裹原文。 */
 function renderNoteUnit(
-  source: { text: string; hasParagraph: boolean } | null,
+  source: string | null,
   thoughts: string[],
   language: "zh-CN" | "en",
-  kind: "thought" | "review" = "thought",
 ): string {
-  const thoughtTexts = thoughts.map((value) => textOf(value)).filter(Boolean);
-  if (thoughtTexts.length === 0) {
-    if (!source?.text) return "";
-    if (source.hasParagraph) {
-      const heading = language === "en" ? "Excerpt" : "书摘";
-      return asLabeledCallout("quote", heading, source.text);
-    }
-    return source.text;
-  }
-  const body = source?.text
-    ? [source.text, "", ...thoughtTexts].join("\n")
-    : thoughtTexts.join("\n\n");
-  return renderThoughtBlock(body, language, kind);
+  return [
+    source,
+    ...thoughts
+      .map(textOf)
+      .filter(Boolean)
+      .map((text) => renderThoughtBlock(text, language)),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function formatImportedAt(isoDate: string): string {
@@ -242,8 +216,8 @@ function bookmarkMatchesReview(
 ): boolean {
   const bookmarkRange = textOf(bookmark.range);
   const reviewRange = textOf(review.range);
-  if (bookmarkRange && reviewRange && bookmarkRange === reviewRange) {
-    return true;
+  if (bookmarkRange && reviewRange) {
+    return bookmarkRange === reviewRange;
   }
   const markText = textOf(bookmark.markText);
   const abstract = textOf(review.abstract);
@@ -259,6 +233,7 @@ function paragraphContextForBookmark(
   const candidates = [
     textOf(bookmark.context),
     textOf(bookmark.abstract),
+    ...linkedReviews.map((review) => textOf(review.context)),
     ...linkedReviews.map((review) => textOf(review.abstract)),
   ].filter(Boolean);
   return (
@@ -297,15 +272,16 @@ function renderBookmark(
 function renderStandaloneReview(
   review: WereadReviewBody,
   language: "zh-CN" | "en",
-  kind: "thought" | "review" = "thought",
 ): string {
   const id = textOf(review.reviewId) || "unknown";
   const abstract = textOf(review.abstract);
-  const source = abstract ? highlightSource(abstract, undefined) : null;
+  const source = abstract
+    ? highlightSource(abstract, textOf(review.context))
+    : null;
   const content = textOf(review.content);
   return [
     wereadReviewMarker(id),
-    renderNoteUnit(source, content ? [content] : [], language, kind),
+    renderNoteUnit(source, content ? [content] : [], language),
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -417,7 +393,7 @@ export function buildWereadGeneratedBody(input: WereadMarkdownInput): string {
   if (bookReviews.length > 0) {
     lines.push(language === "en" ? "## Book review" : "## 书评", "");
     for (const review of bookReviews) {
-      lines.push(renderStandaloneReview(review, language, "review"), "");
+      lines.push(renderStandaloneReview(review, language), "");
     }
   }
 

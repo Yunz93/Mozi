@@ -7,6 +7,7 @@ mod secure_settings;
 mod system_fonts;
 mod url_encode;
 mod weread;
+mod weread_skill;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use sample_notes::{CopySampleNotesResult, SAMPLE_NOTES_FOLDER_NAME};
@@ -352,6 +353,39 @@ fn resolve_enforced_window_size(
     (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
 }
 
+// 启动恢复与屏幕适配保持纯函数，便于覆盖不同缩放和负坐标显示器。
+fn resolve_startup_window_size(
+    current: Option<(f64, f64)>,
+    scale: f64,
+    saved_logical: Option<(f64, f64)>,
+) -> (f64, f64) {
+    saved_logical
+        .filter(|(width, height)| is_usable_logical_window_size(*width, *height))
+        .unwrap_or_else(|| resolve_enforced_window_size(current, scale, None))
+}
+
+fn fit_window_size_to_work_area(size: (f64, f64), available: (f64, f64)) -> (f64, f64) {
+    (
+        size.0.clamp(MIN_WINDOW_WIDTH.min(available.0), available.0),
+        size.1
+            .clamp(MIN_WINDOW_HEIGHT.min(available.1), available.1),
+    )
+}
+
+fn fit_window_position_to_work_area(
+    position: (i32, i32),
+    outer_size: (u32, u32),
+    area_position: (i32, i32),
+    area_size: (u32, u32),
+) -> (i32, i32) {
+    let max_x = area_position.0 as i64 + area_size.0.saturating_sub(outer_size.0) as i64;
+    let max_y = area_position.1 as i64 + area_size.1.saturating_sub(outer_size.1) as i64;
+    (
+        (position.0 as i64).clamp(area_position.0 as i64, max_x) as i32,
+        (position.1 as i64).clamp(area_position.1 as i64, max_y) as i32,
+    )
+}
+
 fn resolve_scale_change_logical_size(
     last_good: Option<(f64, f64)>,
     new_scale: f64,
@@ -395,80 +429,193 @@ fn window_logical_inner_size(window: &tauri::WebviewWindow) -> Option<(f64, f64)
     Some((size.width as f64 / scale, size.height as f64 / scale))
 }
 
+fn window_uses_system_geometry(window: &tauri::WebviewWindow) -> bool {
+    window.is_fullscreen().unwrap_or(false) || window.is_maximized().unwrap_or(false)
+}
+
+fn window_work_area(window: &tauri::WebviewWindow) -> Option<tauri::Monitor> {
+    window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten())
+}
+
+fn available_window_inner_size(
+    window: &tauri::WebviewWindow,
+    monitor: &tauri::Monitor,
+) -> (f64, f64) {
+    let scale = monitor.scale_factor().max(1.0);
+    let frame = match (window.outer_size(), window.inner_size()) {
+        (Ok(outer), Ok(inner)) => (
+            outer.width.saturating_sub(inner.width),
+            outer.height.saturating_sub(inner.height),
+        ),
+        _ => (0, 0),
+    };
+    (
+        monitor
+            .work_area()
+            .size
+            .width
+            .saturating_sub(frame.0)
+            .max(1) as f64
+            / scale,
+        monitor
+            .work_area()
+            .size
+            .height
+            .saturating_sub(frame.1)
+            .max(1) as f64
+            / scale,
+    )
+}
+
 fn window_has_usable_logical_size(window: &tauri::WebviewWindow) -> bool {
-    match window_logical_inner_size(window) {
-        Some((width, height)) => is_usable_logical_window_size(width, height),
-        None => false,
+    let Some((width, height)) = window_logical_inner_size(window) else {
+        return false;
+    };
+    let available = window_work_area(window)
+        .map(|monitor| available_window_inner_size(window, &monitor))
+        .unwrap_or((MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT));
+    width.is_finite()
+        && height.is_finite()
+        && width + 0.5 >= MIN_WINDOW_WIDTH.min(available.0)
+        && height + 0.5 >= MIN_WINDOW_HEIGHT.min(available.1)
+}
+
+fn apply_window_geometry(window: &tauri::WebviewWindow, requested: (f64, f64)) {
+    // 全屏和最大化的几何由系统管理，不能在恢复时强制改成普通窗口尺寸。
+    if window_uses_system_geometry(window) {
+        return;
+    }
+    let monitor = window_work_area(window);
+    let available = monitor
+        .as_ref()
+        .map(|monitor| available_window_inner_size(window, monitor));
+    let target = available
+        .map(|area| fit_window_size_to_work_area(requested, area))
+        .unwrap_or(requested);
+    let _ = window.set_min_size(Some(tauri::LogicalSize::new(
+        MIN_WINDOW_WIDTH.min(target.0),
+        MIN_WINDOW_HEIGHT.min(target.1),
+    )));
+    let current = window_logical_inner_size(window);
+    if !current
+        .map(|current| logical_sizes_close(current, target))
+        .unwrap_or(false)
+    {
+        let _ = window.set_size(tauri::LogicalSize::new(target.0, target.1));
+    }
+    if let (Some(monitor), Ok(position), Ok(size)) =
+        (monitor, window.outer_position(), window.outer_size())
+    {
+        let area = monitor.work_area();
+        let fitted = fit_window_position_to_work_area(
+            (position.x, position.y),
+            (size.width, size.height),
+            (area.position.x, area.position.y),
+            (area.size.width, area.size.height),
+        );
+        if fitted != (position.x, position.y) {
+            let _ = window.set_position(tauri::PhysicalPosition::new(fitted.0, fitted.1));
+        }
     }
 }
 
 fn ensure_usable_window_size(window: &tauri::WebviewWindow, last_good: Option<(f64, f64)>) {
-    let _ = window.set_min_size(Some(tauri::LogicalSize::new(
-        MIN_WINDOW_WIDTH,
-        MIN_WINDOW_HEIGHT,
-    )));
     let scale = window
         .scale_factor()
         .ok()
         .filter(|value| *value > 0.0)
         .unwrap_or(1.0);
     let current = window_logical_inner_size(window);
-    let (width, height) = resolve_enforced_window_size(current, scale, last_good);
-    let should_apply = match current {
-        Some((current_width, current_height)) => {
-            (current_width - width).abs() > 1.0 || (current_height - height).abs() > 1.0
-        }
-        None => true,
+    let target = if window_has_usable_logical_size(window) {
+        current.unwrap()
+    } else {
+        resolve_enforced_window_size(current, scale, last_good)
     };
-    if !should_apply {
+    apply_window_geometry(window, target);
+}
+
+const LOGICAL_WINDOW_SIZE_FILE: &str = "window-logical-size.json";
+static INITIAL_WINDOW_GEOMETRY_READY: AtomicBool = AtomicBool::new(false);
+
+fn read_saved_logical_window_size(app: &tauri::AppHandle) -> Option<(f64, f64)> {
+    let path = app
+        .path()
+        .app_config_dir()
+        .ok()?
+        .join(LOGICAL_WINDOW_SIZE_FILE);
+    serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
+}
+
+fn persist_logical_window_size(app: &tauri::AppHandle) {
+    if !INITIAL_WINDOW_GEOMETRY_READY.load(Ordering::SeqCst) {
         return;
     }
-    let _ = window.set_size(tauri::LogicalSize::new(width, height));
-    if current
-        .map(|(current_width, current_height)| {
-            !is_usable_logical_window_size(current_width, current_height)
-        })
-        .unwrap_or(true)
-    {
-        let _ = window.center();
+    let Some(size) = app.state::<WindowLogicalSizeMemory>().last("main") else {
+        return;
+    };
+    let result = (|| -> Result<(), String> {
+        let directory = app
+            .path()
+            .app_config_dir()
+            .map_err(|error| error.to_string())?;
+        fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+        let content = serde_json::to_string(&size).map_err(|error| error.to_string())?;
+        write_text_file_atomic_at(&directory.join(LOGICAL_WINDOW_SIZE_FILE), &content)
+    })();
+    if let Err(error) = result {
+        log::warn!("Failed to persist logical window size: {error}");
     }
 }
 
+fn restore_initial_window_geometry(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let current = window_logical_inner_size(&window);
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let saved = read_saved_logical_window_size(app);
+        let target = resolve_startup_window_size(current, scale, saved);
+        if cfg!(debug_assertions) {
+            log::info!("窗口初始化：当前={current:?}，缩放={scale}，已存逻辑尺寸={saved:?}，目标={target:?}");
+        }
+        apply_window_geometry(&window, target);
+    }
+    enforce_all_window_sizes(app);
+    INITIAL_WINDOW_GEOMETRY_READY.store(true, Ordering::SeqCst);
+    persist_logical_window_size(app);
+}
+
 fn remember_usable_window_size(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    if window_uses_system_geometry(window) {
+        return;
+    }
     let Some(size) = window_logical_inner_size(window) else {
         return;
     };
     let Ok(scale) = window.scale_factor() else {
         return;
     };
-    if scale > 0.0 && is_usable_logical_window_size(size.0, size.1) {
+    if scale > 0.0 && window_has_usable_logical_size(window) {
         app.state::<WindowLogicalSizeMemory>()
             .remember(window.label(), size, scale);
     }
 }
 
-fn restore_remembered_logical_size(
-    window: &tauri::WebviewWindow,
-    last_good: Option<(f64, f64)>,
-) {
+fn restore_remembered_logical_size(window: &tauri::WebviewWindow, last_good: Option<(f64, f64)>) {
     let Some((width, height)) =
         last_good.filter(|(width, height)| is_usable_logical_window_size(*width, *height))
     else {
         return;
     };
-    let _ = window.set_min_size(Some(tauri::LogicalSize::new(
-        MIN_WINDOW_WIDTH,
-        MIN_WINDOW_HEIGHT,
-    )));
-    if let Some(current) = window_logical_inner_size(window) {
-        if logical_sizes_close(current, (width, height)) {
-            return;
-        }
-    }
-    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+    apply_window_geometry(window, (width, height));
 }
 
 fn preserve_logical_size_on_monitor_change(window: &tauri::WebviewWindow) -> bool {
+    if window_uses_system_geometry(window) {
+        return false;
+    }
     let Ok(scale) = window.scale_factor() else {
         return false;
     };
@@ -623,6 +770,10 @@ fn webview_for_window_event(window: &tauri::Window) -> Option<tauri::WebviewWind
 
 fn persist_window_state(app: &tauri::AppHandle, require_settled: bool) {
     use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+    // 销毁阶段查询窗口可能已失败，逻辑尺寸应先从已验证的内存快照落盘。
+    if !require_settled {
+        persist_logical_window_size(app);
+    }
     // The plugin writes physical pixels. Skip mid-DPI-move frames so a ~400px
     // or blown-up transitional size is not what the next launch restores.
     if require_settled
@@ -638,6 +789,10 @@ fn persist_window_state(app: &tauri::AppHandle, require_settled: bool) {
         .any(|window| !window_has_usable_logical_size(window))
     {
         return;
+    }
+    // 稳定调整后也保存，避免原生退出未经过窗口关闭回调时丢失最后的尺寸。
+    if require_settled {
+        persist_logical_window_size(app);
     }
     if let Err(error) = app.save_window_state(StateFlags::all()) {
         log::warn!("Failed to persist window state: {error}");
@@ -717,6 +872,7 @@ pub fn run() {
             publishing::publish_wechat_draft,
             weread::weread_gateway,
             weread::weread_download_cover,
+            weread_skill::weread_update_skill,
             upload_image_to_hosting,
             check_macos_update,
             install_macos_update,
@@ -747,6 +903,11 @@ pub fn run() {
                     new_inner_size,
                     ..
                 } => {
+                    if let Some(webview) = webview_for_window_event(window) {
+                        if window_uses_system_geometry(&webview) {
+                            return;
+                        }
+                    }
                     let memory = window.app_handle().state::<WindowLogicalSizeMemory>();
                     let last_good = memory.last(window.label());
                     let (width, height) = resolve_scale_change_logical_size(
@@ -755,20 +916,8 @@ pub fn run() {
                         new_inner_size.width,
                         new_inner_size.height,
                     );
-                    let _ = window.set_min_size(Some(tauri::LogicalSize::new(
-                        MIN_WINDOW_WIDTH,
-                        MIN_WINDOW_HEIGHT,
-                    )));
-                    let incoming_logical = if *scale_factor > 0.0 {
-                        (
-                            new_inner_size.width as f64 / *scale_factor,
-                            new_inner_size.height as f64 / *scale_factor,
-                        )
-                    } else {
-                        (0.0, 0.0)
-                    };
-                    if !logical_sizes_close(incoming_logical, (width, height)) {
-                        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                    if let Some(webview) = webview_for_window_event(window) {
+                        apply_window_geometry(&webview, (width, height));
                     }
                     if last_good.is_some() {
                         memory.remember_scale_transition(window.label(), *scale_factor);
@@ -785,10 +934,12 @@ pub fn run() {
                     }
                     let memory = webview.app_handle().state::<WindowLogicalSizeMemory>();
                     match window_logical_inner_size(&webview) {
-                        Some(size) if is_usable_logical_window_size(size.0, size.1) => {
+                        Some(size) if window_has_usable_logical_size(&webview) => {
                             let scale = webview.scale_factor().ok().filter(|value| *value > 0.0);
                             if let Some(scale) = scale {
-                                memory.remember(webview.label(), size, scale);
+                                if !window_uses_system_geometry(&webview) {
+                                    memory.remember(webview.label(), size, scale);
+                                }
                             }
                             persist_window_state(webview.app_handle(), true);
                         }
@@ -841,7 +992,7 @@ pub fn run() {
             if let tauri::RunEvent::Ready = &event {
                 // Plugin restore runs on window-ready and can override conf.json
                 // min sizes with a physical-pixel snapshot from another display.
-                enforce_all_window_sizes(app);
+                restore_initial_window_geometry(app);
             }
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
                 enforce_all_window_sizes(app);
@@ -998,22 +1149,44 @@ async fn register_allowed_path(
 #[tauri::command]
 async fn delete_path_recursively(path: String, app: tauri::AppHandle) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let canonical = canonicalize_existing_path(&path)?;
-        ensure_path_allowed(app.state::<SecurityState>().inner(), &canonical)?;
-
-        if canonical.is_dir() {
-            fs::remove_dir_all(&canonical).map_err(|e| {
-                format!("Failed to delete directory {}: {}", canonical.display(), e)
-            })?;
-        } else {
-            fs::remove_file(&canonical)
-                .map_err(|e| format!("Failed to delete file {}: {}", canonical.display(), e))?;
-        }
-
-        Ok(())
+        delete_path_recursively_at(&path, app.state::<SecurityState>().inner())
     })
     .await
     .map_err(|e| format!("Failed to join delete task: {}", e))?
+}
+
+fn delete_path_recursively_at(path: &str, security_state: &SecurityState) -> Result<(), String> {
+    let candidate = Path::new(path);
+    let parent = candidate
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = candidate
+        .file_name()
+        .ok_or_else(|| format!("Failed to resolve deletion entry {}", path))?;
+    // 只解析父目录，最终目录项若是符号链接，必须删除链接本身而非其目标。
+    let entry_path = fs::canonicalize(parent)
+        .map_err(|e| format!("Failed to resolve parent directory {}: {}", path, e))?
+        .join(file_name);
+    ensure_path_allowed(security_state, &entry_path)?;
+    let metadata = fs::symlink_metadata(&entry_path)
+        .map_err(|e| format!("Failed to inspect deletion entry {}: {}", path, e))?;
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::FileTypeExt;
+        if metadata.file_type().is_symlink_dir() {
+            return fs::remove_dir(&entry_path)
+                .map_err(|e| format!("Failed to delete directory link {}: {}", path, e));
+        }
+    }
+
+    let result = if metadata.is_dir() {
+        fs::remove_dir_all(&entry_path)
+    } else {
+        fs::remove_file(&entry_path)
+    };
+    result.map_err(|e| format!("Failed to delete entry {}: {}", path, e))
 }
 
 /// Must stay `async`: this waits for a child process (`open` / `explorer` /
@@ -1100,6 +1273,12 @@ async fn copy_sample_notes(
 
     let source = Path::new(&resource_dir);
     let target = target_root.join(SAMPLE_NOTES_FOLDER_NAME);
+    let resolved_target = canonicalize_scope_path(&target.to_string_lossy())?;
+    if !resolved_target.starts_with(&target_root) {
+        return Err(
+            "Sample notes directory redirects outside the authorized workspace".to_string(),
+        );
+    }
 
     println!("[copy_sample_notes] Source: {:?}", source);
     println!("[copy_sample_notes] Target: {:?}", target);
@@ -1149,6 +1328,119 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn delete_path_regular_entries_keeps_the_authorized_boundary() {
+        let temp_dir = create_test_directory("delete-regular");
+        let allowed = temp_dir.join("vault");
+        fs::create_dir(&allowed).expect("create vault");
+        let note = allowed.join("note.md");
+        fs::write(&note, "delete me").expect("write note");
+        let folder = allowed.join("folder");
+        fs::create_dir(&folder).expect("create folder");
+        fs::write(folder.join("nested.md"), "delete nested").expect("write nested");
+        let outside = temp_dir.join("outside.md");
+        fs::write(&outside, "keep outside").expect("write outside");
+        let state = SecurityState {
+            allowed_paths: Mutex::new(vec![AllowedPathEntry {
+                path: fs::canonicalize(&allowed).expect("canonical vault"),
+                recursive: true,
+            }]),
+        };
+        delete_path_recursively_at(note.to_str().expect("note path"), &state).expect("delete file");
+        delete_path_recursively_at(folder.to_str().expect("folder path"), &state)
+            .expect("delete folder");
+        assert!(!note.exists());
+        assert!(!folder.exists());
+        assert!(
+            delete_path_recursively_at(outside.to_str().expect("outside path"), &state).is_err()
+        );
+        assert!(outside.exists());
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_path_symlink_removes_only_the_link() {
+        use std::os::unix::fs::symlink;
+        let temp_dir = create_test_directory("delete-symlink");
+        let target = temp_dir.join("important.md");
+        let link = temp_dir.join("alias.md");
+        fs::write(&target, "keep original").expect("write target");
+        symlink(&target, &link).expect("create link");
+        let state = SecurityState {
+            allowed_paths: Mutex::new(vec![AllowedPathEntry {
+                path: fs::canonicalize(&temp_dir).expect("canonical root"),
+                recursive: true,
+            }]),
+        };
+
+        delete_path_recursively_at(link.to_str().expect("link path"), &state).expect("delete link");
+
+        assert_eq!(
+            fs::read_to_string(&target).expect("target survives"),
+            "keep original"
+        );
+        assert!(fs::symlink_metadata(&link).is_err());
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_path_symlink_can_remove_dangling_and_outside_links() {
+        use std::os::unix::fs::symlink;
+        let temp_dir = create_test_directory("delete-outside-symlink");
+        let allowed = temp_dir.join("vault");
+        fs::create_dir(&allowed).expect("create vault");
+        let outside = temp_dir.join("outside.md");
+        fs::write(&outside, "keep outside").expect("write outside");
+        let state = SecurityState {
+            allowed_paths: Mutex::new(vec![AllowedPathEntry {
+                path: fs::canonicalize(&allowed).expect("canonical vault"),
+                recursive: true,
+            }]),
+        };
+        for (name, target) in [
+            ("outside.md", outside.clone()),
+            ("dangling.md", temp_dir.join("missing")),
+        ] {
+            let link = allowed.join(name);
+            symlink(target, &link).expect("create link");
+            delete_path_recursively_at(link.to_str().expect("link path"), &state)
+                .expect("delete link");
+            assert!(fs::symlink_metadata(&link).is_err());
+        }
+        assert_eq!(
+            fs::read_to_string(&outside).expect("outside survives"),
+            "keep outside"
+        );
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_path_directory_symlink_preserves_its_target_contents() {
+        use std::os::unix::fs::symlink;
+        let temp_dir = create_test_directory("delete-directory-symlink");
+        let target = temp_dir.join("notes");
+        fs::create_dir(&target).expect("create target");
+        fs::write(target.join("note.md"), "keep note").expect("write note");
+        let link = temp_dir.join("alias");
+        symlink(&target, &link).expect("create directory link");
+        let state = SecurityState {
+            allowed_paths: Mutex::new(vec![AllowedPathEntry {
+                path: fs::canonicalize(&temp_dir).expect("canonical root"),
+                recursive: true,
+            }]),
+        };
+        delete_path_recursively_at(link.to_str().expect("link path"), &state).expect("delete link");
+        assert_eq!(
+            fs::read_to_string(target.join("note.md")).expect("note survives"),
+            "keep note"
+        );
+        assert!(fs::symlink_metadata(&link).is_err());
+        cleanup_test_directory(&temp_dir);
+    }
 
     #[test]
     fn opened_file_paths_from_args_resolves_relative_markdown_paths() {
@@ -1213,6 +1505,58 @@ mod tests {
         let flags = StateFlags::all();
         assert!(flags.contains(StateFlags::SIZE));
         assert!(flags.contains(StateFlags::POSITION));
+    }
+
+    #[test]
+    fn startup_restores_logical_size_independently_of_monitor_scale() {
+        assert_eq!(
+            resolve_startup_window_size(Some((2400.0, 1600.0)), 1.0, Some((1200.0, 800.0))),
+            (1200.0, 800.0)
+        );
+        assert_eq!(
+            resolve_startup_window_size(Some((1000.0, 700.0)), 2.0, Some((2000.0, 1400.0))),
+            (2000.0, 1400.0)
+        );
+        assert_eq!(
+            resolve_startup_window_size(Some((1000.0, 700.0)), 2.0, Some((0.0, f64::NAN))),
+            (1000.0, 700.0)
+        );
+    }
+
+    #[test]
+    fn restored_window_fits_the_current_monitor_work_area() {
+        assert_eq!(
+            fit_window_size_to_work_area((2400.0, 1600.0), (1440.0, 870.0)),
+            (1440.0, 870.0)
+        );
+        assert_eq!(
+            fit_window_size_to_work_area((1200.0, 800.0), (1920.0, 1040.0)),
+            (1200.0, 800.0)
+        );
+        assert_eq!(
+            fit_window_size_to_work_area((1200.0, 800.0), (800.0, 600.0)),
+            (800.0, 600.0)
+        );
+    }
+
+    #[test]
+    fn restored_window_position_keeps_the_entire_frame_visible() {
+        assert_eq!(
+            fit_window_position_to_work_area((1700, 100), (1200, 800), (0, 24), (1920, 1016)),
+            (720, 100)
+        );
+        assert_eq!(
+            fit_window_position_to_work_area((2400, -800), (1200, 800), (0, 24), (1920, 1016)),
+            (720, 24)
+        );
+        assert_eq!(
+            fit_window_position_to_work_area((-1700, 100), (1200, 800), (-1920, 24), (1920, 1016)),
+            (-1700, 100)
+        );
+        assert_eq!(
+            fit_window_position_to_work_area((-500, 500), (1200, 800), (-1920, 24), (1920, 1016)),
+            (-1200, 240)
+        );
     }
 
     #[test]

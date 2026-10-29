@@ -107,6 +107,19 @@ export const handleSmartEnter: StateCommand = ({
 
   // 代码块内使用默认行为
   if (isInsideFencedCode(state, main.from)) {
+    const quote = parseStructuredLine(state.doc.lineAt(main.from).text).quote;
+    if (quote) {
+      const insert = `\n${quote.indent}${quote.raw}`;
+      dispatch(
+        state.update({
+          changes: { from: main.from, insert },
+          selection: { anchor: main.from + insert.length },
+          scrollIntoView: true,
+          userEvent: "input",
+        }),
+      );
+      return true;
+    }
     return insertNewlineAndIndent({ state, dispatch });
   }
 
@@ -247,7 +260,12 @@ export function createHandleSmartBackspace(
           structured.quote.depth > 1
             ? `${structured.quote.indent}${buildQuoteRaw(structured.quote.depth - 1, structured.quote.spacedStyle)}${structured.quote.content}`
             : `${structured.quote.indent}${structured.quote.content}`;
-        return replaceCurrentLine(state, dispatch, nextText, nextText.length);
+        return replaceCurrentLine(
+          state,
+          dispatch,
+          nextText,
+          nextText.length - structured.quote.content.length,
+        );
       }
     }
 
@@ -383,7 +401,7 @@ export function createHandleSmartShiftTab(
     if (insideFencedCode) {
       const handled = updateSelectedLines(state, dispatch, (lineText) => {
         const indent = getLeadingIndent(lineText);
-        return `${removeIndentUnit(indent)}${lineText.slice(indent.length)}`;
+        return `${removeIndentUnit(indent, getIndentUnit(state))}${lineText.slice(indent.length)}`;
       });
 
       return handled || indentLess({ state, dispatch });
@@ -415,7 +433,7 @@ export function createHandleSmartShiftTab(
     // 普通文本
     const handled = updateSelectedLines(state, dispatch, (lineText) => {
       const indent = getLeadingIndent(lineText);
-      return `${removeIndentUnit(indent)}${lineText.slice(indent.length)}`;
+      return `${removeIndentUnit(indent, getIndentUnit(state))}${lineText.slice(indent.length)}`;
     });
 
     return handled || indentLess({ state, dispatch });
@@ -423,6 +441,13 @@ export function createHandleSmartShiftTab(
 }
 
 // ==================== 粘贴处理 ====================
+
+function escapeMarkdownUrl(url: string): string {
+  // 括号目标使用尖括号形式，阅读解析器与实时预览的目标收集器都能完整读取。
+  return /[()]/.test(url)
+    ? `<${url.replace(/</g, "%3C").replace(/>/g, "%3E")}>`
+    : url;
+}
 
 export function handleStructuredPaste(
   view: EditorView,
@@ -446,7 +471,7 @@ export function handleStructuredPaste(
       return false;
     }
     event.preventDefault();
-    const url = normalized.trim();
+    const url = escapeMarkdownUrl(normalized.trim());
     view.dispatch(
       state.update({
         changes: {
@@ -472,7 +497,10 @@ export function handleStructuredPaste(
     }
     const selectedText = state.doc.sliceString(selection.from, selection.to);
     event.preventDefault();
-    insertText(view, `[${selectedText}](${normalized.trim()})`);
+    insertText(
+      view,
+      `[${selectedText}](${escapeMarkdownUrl(normalized.trim())})`,
+    );
     return true;
   }
 

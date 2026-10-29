@@ -1,3 +1,5 @@
+import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
+
 export interface CloseTabSafelyOptions {
   tabId: string | null | undefined;
   forceSave: (
@@ -19,6 +21,7 @@ export async function closeTabSafely(
   const tabId = options.tabId;
   if (!tabId) return false;
 
+  flushActiveEditorPendingChanges();
   if (options.hasUnsavedChanges(tabId)) {
     const saved = await options.forceSave(undefined, { trigger: "system" });
     if (!saved) {

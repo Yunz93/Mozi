@@ -875,6 +875,13 @@ export default {
   settings_wereadIncludeHotDesc:
     "Append a Popular highlights section labeled as other readers’ marks, not your notes.",
   settings_wereadOpenImport: "Open import dialog",
+  settings_wereadUpdateSkill: "Update WeRead Skill",
+  settings_wereadSkillUpdating: "Updating Skill…",
+  settings_wereadSkillUpdateDesc:
+    "Download the official Skill documents. Imports also update and retry the current request when an upgrade is required.",
+  settings_wereadSkillUpdated: "WeRead Skill updated to {version}.",
+  settings_wereadSkillUpdateFailed:
+    "Skill update failed. The previous version was kept: {message}",
   settings_wereadGuide1:
     "Import content is highlights plus personal thoughts. Bookmarks are counted only and cannot be exported.",
   settings_wereadGuide2:

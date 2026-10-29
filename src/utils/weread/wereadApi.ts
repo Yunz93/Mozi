@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriEnvironment } from "../../types/filesystem";
-import { WEREAD_SKILL_VERSION } from "./wereadConstants";
 import type {
   WereadBestBookmarksResponse,
   WereadBookInfo,
@@ -273,4 +272,11 @@ export async function downloadWereadCover(
   }
 }
 
-export { WEREAD_SKILL_VERSION };
+export async function updateWereadSkill(): Promise<string> {
+  if (!isTauriEnvironment()) {
+    throw new WereadGatewayError(
+      "WeRead import is available in the desktop app only.",
+    );
+  }
+  return invoke<string>("weread_update_skill");
+}
