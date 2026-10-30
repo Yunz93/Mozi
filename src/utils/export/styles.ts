@@ -112,6 +112,37 @@ export function extractGithubMarkdownThemeVars(
   return vars;
 }
 
+/** 预先计算 sRGB 混色，避免 WebView 生成 html2canvas 无法读取的 color()。 */
+function mixExportSrgbColors(
+  base: string,
+  overlay: [number, number, number, number],
+  baseWeight: number,
+): string {
+  const hex = base.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i);
+  const channels = hex
+    ? [...hex.slice(1).map((part) => Number.parseInt(part, 16)), 1]
+    : base
+        .match(/^rgba?\(([^)]+)\)$/)?.[1]
+        .split(",")
+        .map(Number);
+  if (!channels || channels.length < 3) {
+    throw new Error(`Unsupported export theme color: ${base}`);
+  }
+  const baseAlpha = (channels[3] ?? 1) * baseWeight;
+  const overlayAlpha = overlay[3] * (1 - baseWeight);
+  const alpha = baseAlpha + overlayAlpha;
+  const rgb = channels
+    .slice(0, 3)
+    .map((channel, index) =>
+      alpha === 0
+        ? 0
+        : Math.round(
+            (channel * baseAlpha + overlay[index] * overlayAlpha) / alpha,
+          ),
+    );
+  return `rgba(${rgb.join(", ")}, ${Number(alpha.toFixed(4))})`;
+}
+
 export function buildExportStyles(
   theme: "light" | "dark",
   fontFamily?: string,
@@ -630,38 +661,30 @@ ${exportDelStrikeBlock}
     .export-document .markdown-body .mp-callout-warning,
     .export-document .markdown-body .mp-callout-caution {
       border-left-color: #d97706;
-      background: color-mix(in srgb, #d97706 10%, transparent);
+      background: rgba(217, 119, 6, 0.1);
     }
 
     .export-document .markdown-body .mp-callout-error,
     .export-document .markdown-body .mp-callout-danger,
     .export-document .markdown-body .mp-callout-bug {
       border-left-color: #dc2626;
-      background: color-mix(in srgb, #dc2626 10%, transparent);
+      background: rgba(220, 38, 38, 0.1);
     }
 
     .export-document .markdown-body .mp-callout-success,
     .export-document .markdown-body .mp-callout-tip {
       border-left-color: #16a34a;
-      background: color-mix(in srgb, #16a34a 10%, transparent);
+      background: rgba(22, 163, 74, 0.1);
     }
 
     .export-document .markdown-body .mp-callout-quote {
-      border-left-color: color-mix(
-        in srgb,
-        var(--mp-doc-accent, #7c3aed) 55%,
-        #d4a017
-      );
-      background: color-mix(
-        in srgb,
-        var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04)) 72%,
-        rgba(235, 203, 139, 0.22)
-      );
+      border-left-color: ${mixExportSrgbColors(tokens.accent, [212, 160, 23, 1], 0.55)};
+      background: ${mixExportSrgbColors(tokens.quoteBg, [235, 203, 139, 0.22], 0.72)};
     }
 
     .export-document .markdown-body .mp-callout-comment {
       border-left-color: #0f766e;
-      background: color-mix(in srgb, #0f766e 10%, transparent);
+      background: rgba(15, 118, 110, 0.1);
     }
 
     .export-document .markdown-body code {

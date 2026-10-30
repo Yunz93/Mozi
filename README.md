@@ -9,7 +9,7 @@
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
 <p align="center">
-  <img src="./docs/assets/mozi-preview.png" alt="墨知" width="720">
+  <img src="./src-tauri/resources/sample-notes/resources/01-live-writing.png" alt="墨知" width="720">
 </p>
 
 ## 下载安装
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v1.2.0 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v1.2.1 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
@@ -44,58 +44,153 @@ xattr -cr /Applications/墨知.app
 
 运行 `.exe` 安装。SmartScreen 提示时选「更多信息」→「仍要运行」。安装后可在 **设置 → 关于** 检查 GitHub Release 更新。
 
-## 新功能介绍
+## 特色功能
 
-### Live 模式
+跟着内置 [功能导览](./src-tauri/resources/sample-notes/03-功能导览.md) 逐项体验。以下截图来自独立演示知识库，均随示例保存在本地。
 
-正式版只保留 Live 和阅读，已去掉纯编辑和分屏。Live 边写边渲染，所见即所得。
+### 本地知识库与多窗口
+
+文件夹就是知识库，笔记以普通 `.md` 文件保存。左侧管理目录、笔记和附件，回收站用于找回误删文件。通过命令面板或 `Cmd/Ctrl+Shift+Alt+N` 新建窗口，分别查看不同材料。
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787670952816.png" alt="Live 模式" width="200">
+  <img src="./src-tauri/resources/sample-notes/resources/01-live-writing.png" alt="演示知识库与实时预览" width="800">
 </p>
 
-### 一键发布
+### 实时预览与 Markdown 排版
 
-- **微信公众号草稿**：配好公众号后，按预渲染样式发到草稿。用公众号助手查看后再发布。
-- **Simple Blog**：配套博客网页，部署到 Vercel 后即可从墨知推送上线。仓库地址、公开站点与 GitHub Token 在 **设置 → 发布** 里填写。
+Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格、任务列表、Callout、脚注、代码高亮、KaTeX 公式与 Mermaid 图表。编辑区的「显示纯文本」可以查看 Markdown 源码。
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787151343910.png" alt="一键发布" width="400">
+  <img src="./src-tauri/resources/sample-notes/resources/20-markdown-reading.png" alt="阅读模式中的代码与公式" width="800">
 </p>
 
-### 图片分享
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/22-mermaid.png" alt="Mermaid 流程图与时序图" width="800">
+</p>
 
-一键把当前文章生成分享长图，适合发到社交媒体。
+### 斜杠菜单与命令面板
+
+空行输入 `/`，插入表格、代码、提示块、待办或 Mermaid 图表；`/3x4` 可以快速插入表格。按 `Cmd/Ctrl+Shift+P` 搜索命令，找到新建窗口、定位文件等操作。
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787581997392.png" alt="图片分享" width="400">
+  <img src="./src-tauri/resources/sample-notes/resources/16-slash-menu.png" alt="斜杠插入菜单" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/17-command-palette.png" alt="命令面板" width="800">
+</p>
+
+### 双链、嵌入与关系图
+
+支持 `[[笔记名]]`、标题跳转、显示别名、本地图片和笔记片段嵌入，以及 Obsidian 高亮与注释。右侧查看目录、反向链接、出链、未解析链接、邻域图和相关笔记。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/19-links.png" alt="双链示例与链接侧栏" width="800">
+</p>
+
+### 全库搜索与本地索引
+
+在关键词、语义和混合搜索之间切换，点击命中内容回到原文。在 **设置 → 索引** 查看状态、重建索引和配置排除路径。本地语义检索需要先下载模型并完成索引，也可使用兼容的语义接口。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/18-search.png" alt="搜索结果与原文片段" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/07-local-index.png" alt="本地索引设置" width="800">
 </p>
 
 ### 小知助手
 
-内置本地语义检索，支持全库搜索；也可配置在线模型做智能问答，回答会带来源。
+先用「仅检索」查看来源片段，再按需生成带引用的回答，点击来源回到笔记。当前版本需先完成 AI 供应商配置；仅检索不调用在线模型，生成回答会把检索片段发送给所选模型。
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669944524.png" alt="小知助手" width="400">
+  <img src="./src-tauri/resources/sample-notes/resources/02-vault-retrieval.png" alt="仅检索结果与来源定位" width="800">
+</p>
+
+### AI 增强与 Wiki 生成
+
+支持 Gemini、OpenAI、DeepSeek、GLM、Kimi、Xiaomi MiMo，用于笔记增强、Wiki 生成和问库。各供应商独立保存密钥、接口地址与模型，可使用预设或自定义模型 ID。套餐密钥需填写套餐专用地址，密钥通过本机安全存储保存。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/12-ai-providers.png" alt="六家 AI 供应商配置" width="800">
 </p>
 
 ### Excalidraw 画板
 
-侧边栏新建即可使用，也兼容 Obsidian 的 `.excalidraw.md`。笔记里可用 `![[drawing.excalidraw]]` 嵌入预览。
+右键点击侧边栏空白处或文件夹，新建画板，使用图形、箭头和文字整理结构。兼容 `.excalidraw` 与 Obsidian `.excalidraw.md`，可通过 `![[drawing.excalidraw]]` 嵌入笔记。
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787152633377.png" alt="Excalidraw 画板" width="600">
+  <img src="./src-tauri/resources/sample-notes/resources/21-excalidraw.png" alt="实际绘制的写作流程" width="800">
 </p>
 
-### Markdown 便捷编辑
+### 微信读书笔记导入
 
-空行输入 `/` 可插入表格、提示文本、代码块、Mermaid 图表和待办事项，对 Markdown 新手比较友好。
+在 **设置 → 读书笔记同步 → 微信读书** 配置 Skill API Key，选择书籍后导入划线和想法。支持合并、跳过或覆盖，目录结构、本地封面和热门划线统一在设置中配置，并可更新 Skill。书摘关联评论，划线高亮；原始数据缺少上下文时保留已有原文，书签只统计数量。
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669306323.png" alt="斜杠菜单" width="300">
+  <img src="./src-tauri/resources/sample-notes/resources/03-weread-settings.png" alt="微信读书导入与 Skill 更新设置" width="800">
 </p>
 
-项目地址：[github.com/Yunz93/Mozi](https://github.com/Yunz93/Mozi)，欢迎 Star / Fork。
+### PDF、HTML 与长图分享
+
+顶部 **导出** 提供 PDF 和 HTML。**长图分享** 对话框提供生成纵向 PNG、预览、保存、复制和系统分享入口。下图展示导出菜单与长图生成前的界面。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="PDF 与 HTML 导出菜单" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/15-long-image.png" alt="长图分享操作入口" width="800">
+</p>
+
+### 微信公众号草稿
+
+配置公众号后，从 **发布** 选择微信公众号，检查标题、作者、摘要、封面和手机排版预览。提交到草稿箱后仍需在公众号平台完成正式发布。再次提交可更新已有草稿；本次演示只展示预览界面。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/05-wechat-draft.png" alt="公众号草稿与手机预览" width="800">
+</p>
+
+### Simple Blog 发布
+
+部署配套博客后，在 **设置 → 发布** 填写仓库地址、公开站点和 GitHub 令牌。发布同步文章与图片并写回文章链接，`status` 记录写作状态，`is_publish` 记录博客发布状态。下图展示配置入口。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/06-simple-blog.png" alt="Simple Blog 仓库与站点配置" width="800">
+</p>
+
+### 本地图片与可选图床
+
+图片可留在知识库并使用相对路径引用。需要上传时，可配置 GitHub、S3 兼容服务、阿里云 OSS、七牛云或自定义 API。内置示例的图片统一放在 `示例笔记/resources`，离线可查看。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/11-image-hosting.png" alt="本地保存与图床选项" width="800">
+</p>
+
+### 外观、属性与快捷键
+
+选择明暗主题、界面语言、字体和字号；为新笔记配置 frontmatter 模板，添加或排序分类、标签、状态、Slug 与别名等字段；按习惯调整快捷键。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/08-appearance.png" alt="外观设置" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/09-metadata.png" alt="笔记属性模板" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/10-shortcuts.png" alt="快捷键设置" width="800">
+</p>
+
+### 应用更新
+
+在 **设置 → 关于** 查看版本并检查 GitHub Release 更新，按提示下载安装包。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/13-updates.png" alt="版本与检查更新" width="800">
+</p>
 
 ## 常用快捷键
 

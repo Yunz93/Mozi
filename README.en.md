@@ -9,7 +9,7 @@ A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. T
 > Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
 <p align="center">
-  <img src="./docs/assets/mozi-preview.png" alt="Mozi" width="720">
+  <img src="./src-tauri/resources/sample-notes/resources/01-live-writing.png" alt="Mozi" width="720">
 </p>
 
 ## Download
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 Pin a release (optional):
 
 ```bash
-RELEASE_TAG=v1.0.7 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v1.2.1 bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:
@@ -44,58 +44,153 @@ See [Development guide: macOS signing and notarization](./docs/DEVELOPMENT.en.md
 
 Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run anyway**. After install, **Settings → About** can check for newer GitHub Release builds.
 
-## What's new
+## Features
 
-### Live mode
+Follow the bundled [feature guide in Chinese](./src-tauri/resources/sample-notes/03-功能导览.md) to try each feature. These screenshots come from a separate demo vault and are bundled locally with the samples.
 
-The official build keeps Live and Reading only. Source-only editing and split view are gone. Live renders as you type.
+### Local vaults and multiple windows
+
+A vault is a folder of ordinary `.md` files. Manage notes, folders, and attachments in the sidebar, and recover deleted files from the trash. Open another window from the command palette or with `Cmd/Ctrl+Shift+Alt+N` to work with more than one source.
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787670952816.png" alt="Live mode" width="200">
+  <img src="./src-tauri/resources/sample-notes/resources/01-live-writing.png" alt="Demo vault and Live editing" width="800">
 </p>
 
-### One-click publish
+### Live editing and Markdown formatting
 
-- **WeChat Official Account drafts**: after you configure the account, Mozi sends a pre-rendered draft. Review it in WeChat's draft tools, then publish.
-- **Simple Blog**: a companion site. Deploy it on Vercel, then push posts from Mozi. Set the repo URL, public site, and GitHub token under **Settings → Publishing**.
+Live mode renders Markdown as you write; Reading mode is for reviewing the finished article. Tables, task lists, callouts, footnotes, code highlighting, KaTeX math, and Mermaid diagrams are supported. Use Show plain text in the editor to inspect the Markdown source.
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787151343910.png" alt="One-click publish" width="400">
+  <img src="./src-tauri/resources/sample-notes/resources/20-markdown-reading.png" alt="Code and math in Reading mode" width="800">
 </p>
 
-### Long-image share
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/22-mermaid.png" alt="Mermaid flowchart and sequence diagram" width="800">
+</p>
 
-Turn the current article into a single tall image for social posts.
+### Slash inserts and command palette
+
+Type `/` on an empty line to insert a table, code fence, callout, task list, or Mermaid diagram. `/3x4` inserts a table directly. Press `Cmd/Ctrl+Shift+P` to find commands such as New window and Locate current file.
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787581997392.png" alt="Long-image share" width="400">
+  <img src="./src-tauri/resources/sample-notes/resources/16-slash-menu.png" alt="Slash insert menu" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/17-command-palette.png" alt="Command palette" width="800">
+</p>
+
+### Wiki links, embeds, and link graph
+
+Use Wiki links, heading links, display aliases, local images, and note-section embeds, along with Obsidian-style highlights and comments. The right sidebar shows the outline, backlinks, outgoing and unresolved links, a neighborhood graph, and related notes.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/19-links.png" alt="Wiki links and link sidebar" width="800">
+</p>
+
+### Vault search and local indexing
+
+Switch between keyword, semantic, and hybrid search, then open a result in its source note. Check status, rebuild the index, and exclude paths under **Settings → Indexing**. Local semantic search requires the model download and a completed index; a compatible embedding endpoint is also an option.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/18-search.png" alt="Search results and source snippets" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/07-local-index.png" alt="Local index settings" width="800">
 </p>
 
 ### XiaoZhi assistant
 
-Built-in local semantic search across the vault. Optionally point at an online model for Q&A with source citations.
+Use Retrieve only to inspect source snippets, or generate an answer with citations and follow them back to the notes. The current version requires an AI provider configuration first. Retrieval alone makes no online model call; generating an answer sends the retrieved snippets to the selected model.
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669944524.png" alt="XiaoZhi assistant" width="400">
+  <img src="./src-tauri/resources/sample-notes/resources/02-vault-retrieval.png" alt="Retrieval results and source navigation" width="800">
 </p>
 
-### Excalidraw
+### AI enhancement and Wiki generation
 
-Create a board from the sidebar. Obsidian `.excalidraw.md` files work too. Embed a preview with `![[drawing.excalidraw]]`.
+Choose Gemini, OpenAI, DeepSeek, GLM, Kimi, or Xiaomi MiMo for note enhancement, Wiki generation, and vault Q&A. Each provider keeps its own key, endpoint, and model settings, with presets or a custom model ID. Subscription-specific keys require the matching endpoint. Keys are kept in secure local storage.
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787152633377.png" alt="Excalidraw" width="600">
+  <img src="./src-tauri/resources/sample-notes/resources/12-ai-providers.png" alt="Six AI provider options" width="800">
 </p>
 
-### Slash inserts
+### Excalidraw boards
 
-Type `/` on an empty line to insert a table, callout, code fence, Mermaid diagram, or todo. Useful if you are still learning Markdown.
+Right-click an empty area or folder in the sidebar to create a board, then sketch with shapes, arrows, and text. Both `.excalidraw` and Obsidian `.excalidraw.md` are supported. Embed a board in a note with `![[drawing.excalidraw]]`.
 
 <p>
-  <img src="https://raw.githubusercontent.com/Yunz93/PicRepo/main/images/墨知正式版-1787669306323.png" alt="Slash menu" width="300">
+  <img src="./src-tauri/resources/sample-notes/resources/21-excalidraw.png" alt="Writing workflow drawn in Mozi" width="800">
 </p>
 
-Repo: [github.com/Yunz93/Mozi](https://github.com/Yunz93/Mozi). Stars and forks welcome.
+### WeRead note import
+
+Configure a Skill API key under **Settings → Reading notes sync → WeRead**, then choose books to import highlights and thoughts. Merge, skip, or overwrite existing notes; configure folders, local covers, and popular highlights in Settings, where you can also update the Skill. Excerpts stay linked to comments and marked text is highlighted. Missing source context is left as supplied; bookmarks are counted only.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/03-weread-settings.png" alt="WeRead import and Skill update settings" width="800">
+</p>
+
+### PDF, HTML, and long-image sharing
+
+The **Export** menu offers PDF and HTML. The **Long-image share** dialog provides controls to generate a tall PNG, preview it, save it, copy it, or use system sharing. The screenshots show the export menu and the dialog before image generation.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="PDF and HTML export menu" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/15-long-image.png" alt="Long-image sharing controls" width="800">
+</p>
+
+### WeChat Official Account drafts
+
+After configuring an Official Account, choose WeChat from **Publish**, then review the title, author, digest, cover, and mobile preview. Submission creates a draft for final review and publication on the WeChat platform. Resubmitting can update the existing draft. This demo shows the preview only.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/05-wechat-draft.png" alt="WeChat draft and mobile preview" width="800">
+</p>
+
+### Simple Blog publishing
+
+Deploy the companion blog, then enter the repository, public site URL, and GitHub token under **Settings → Publishing**. Publishing syncs the article and images and writes back its URL. `status` tracks the writing stage; `is_publish` tracks blog publication. The screenshot shows the configuration screen.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/06-simple-blog.png" alt="Simple Blog repository and site settings" width="800">
+</p>
+
+### Local images and optional image hosting
+
+Keep images in the vault and reference them with relative paths. For uploads, configure GitHub, S3-compatible storage, Aliyun OSS, Qiniu, or a custom API. Bundled sample images live together in `示例笔记/resources` and are available offline.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/11-image-hosting.png" alt="Local storage and image-hosting options" width="800">
+</p>
+
+### Appearance, properties, and shortcuts
+
+Choose the theme, interface language, font, and text size. Configure the frontmatter template for new notes, including field order for categories, tags, status, Slug, and aliases. Customize shortcuts to suit your workflow.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/08-appearance.png" alt="Appearance settings" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/09-metadata.png" alt="Note property template" width="800">
+</p>
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/10-shortcuts.png" alt="Shortcut settings" width="800">
+</p>
+
+### App updates
+
+View the installed version and check for GitHub Release updates under **Settings → About**, then follow the prompts to download an installer.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/13-updates.png" alt="Version and update check" width="800">
+</p>
 
 ## Keyboard shortcuts
 
@@ -108,8 +203,8 @@ Defaults below; the full list lives in **Settings → Shortcuts**.
 | `Cmd/Ctrl + 1` ~ `5`                    | Sidebar / outline / view mode / theme / AI enhance |
 | `Cmd + Shift + F`                       | In-file search                                     |
 | `Cmd + Shift + S`                       | Sidebar search                                     |
-| `Cmd + Shift + K` / `L`                 | Open vault / locate current file                   |
-| `Cmd + Shift + H`                       | Export PDF                                         |
+| `Cmd + Shift + B` / `J`                 | Open vault / locate current file                   |
+| `Cmd + Shift + E`                       | Export PDF                                         |
 | `Cmd/Ctrl + N` / `Cmd/Ctrl + Shift + N` | New note / new folder                              |
 | `Cmd/Ctrl + Shift + Alt + N`            | New window (desktop)                               |
 | `Cmd/Ctrl + W`                          | Close tab                                          |

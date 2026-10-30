@@ -1,11 +1,60 @@
 import { describe, it, expect } from "vitest";
+import { createRequire } from "node:module";
+import { MARKDOWN_STYLE_PRESETS } from "../markdownStyle";
 import {
   buildExportDocument,
   buildExportStyles,
   extractGithubMarkdownThemeVars,
 } from "./styles";
 
+const { parseColor } = createRequire(import.meta.url)(
+  "html2canvas/dist/lib/css/types/color.js",
+) as { parseColor: (context: unknown, value: string) => number };
+
 describe("buildExportStyles", () => {
+  it.each(
+    MARKDOWN_STYLE_PRESETS.flatMap((preset) =>
+      (["light", "dark"] as const).map((theme) => ({ preset, theme })),
+    ),
+  )(
+    "keeps $preset $theme callout colors readable by html2canvas",
+    ({ preset, theme }) => {
+      const css = buildExportStyles(
+        theme,
+        undefined,
+        undefined,
+        "",
+        undefined,
+        undefined,
+        preset,
+      );
+      const blocks = Array.from(
+        css.matchAll(
+          /\.mp-callout-(?:caution|bug|tip|quote|comment)\s*\{([^}]+)\}/g,
+        ),
+      );
+      expect(blocks).toHaveLength(5);
+      const colors = blocks.flatMap((block) =>
+        Array.from(
+          block[1].matchAll(/(?:background|border-left-color):\s*([^;]+);/g),
+          (match) => match[1],
+        ),
+      );
+      expect(colors).toHaveLength(10);
+      for (const value of colors) {
+        expect(() => parseColor({}, value)).not.toThrow();
+      }
+      expect(colors).toContain("rgba(22, 163, 74, 0.1)");
+    },
+  );
+
+  it("preserves the themed quote tint and its transparency without CSS mixing", () => {
+    const css = buildExportStyles("light");
+    const quote = css.match(/\.mp-callout-quote\s*\{([^}]+)\}/)?.[1];
+    expect(quote).toContain("border-left-color: rgba(147, 143, 105, 1)");
+    expect(quote).toContain("background: rgba(185, 195, 165, 0.1336)");
+  });
+
   it("removes github-markdown heading bottom borders in export body", () => {
     const css = buildExportStyles("light");
     expect(css).toMatch(
