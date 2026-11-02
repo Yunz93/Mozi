@@ -246,6 +246,11 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       renderer.parsedContent.bodyHTML,
       renderer.requiresAsyncEnhancement,
     ]);
+    // 保持同一份 HTML 对象，避免无关重渲染清掉图片地址、图表和标题定位标识。
+    const markdownPreviewInnerHtml = useMemo(
+      () => ({ __html: markdownPreviewMarkup }),
+      [markdownPreviewMarkup],
+    );
 
     // Scroll sync hook
     const scroll = usePreviewScroll({ onScroll });
@@ -1102,12 +1107,9 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
                 </div>
               ) : (
                 <article
+                  key={currentFilePath ?? activeTabId}
                   className={`markdown-body preview-pane-document ${isWindows ? "preview-pane-document-windows" : ""} ${isCompact ? "preview-pane-document-compact" : ""} ${hasActiveFile ? "" : "h-full"}`}
-                  dangerouslySetInnerHTML={{
-                    __html: renderer.requiresAsyncEnhancement
-                      ? renderer.enhancedBodyHtml
-                      : renderer.parsedContent.bodyHTML,
-                  }}
+                  dangerouslySetInnerHTML={markdownPreviewInnerHtml}
                 />
               )}
             </div>

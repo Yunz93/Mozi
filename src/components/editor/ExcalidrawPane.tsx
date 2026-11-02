@@ -42,6 +42,34 @@ export const ExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
   onContentChangeForTab,
 }) => {
   const { t } = useI18n();
+  const activeTabId = useAppStore((state) => state.activeTabId);
+  const content = useAppStore((state) =>
+    state.activeTabId ? state.fileContents[state.activeTabId] : undefined,
+  );
+
+  // 未读取和空文件必须区分，避免空场景的初始化回调阻止磁盘内容载入。
+  if (content === undefined) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+        {t("excalidraw_loading")}
+      </div>
+    );
+  }
+
+  return (
+    <LoadedExcalidrawPane
+      key={activeTabId}
+      onContentChange={onContentChange}
+      onContentChangeForTab={onContentChangeForTab}
+    />
+  );
+};
+
+const LoadedExcalidrawPane: React.FC<ExcalidrawPaneProps> = ({
+  onContentChange,
+  onContentChangeForTab,
+}) => {
+  const { t } = useI18n();
   const content = useAppStore(selectContent);
   const activeTabId = useAppStore((state) => state.activeTabId);
   const hasUnsavedChanges = useAppStore((state) =>

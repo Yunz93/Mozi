@@ -134,14 +134,14 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### PDF、HTML 与长图分享
 
-顶部 **导出** 提供 PDF 和 HTML。**长图分享** 对话框提供生成纵向 PNG、预览、保存、复制和系统分享入口。下图展示导出菜单与长图生成前的界面。
+顶部 **导出** 提供 PDF 和 HTML。**长图分享** 对话框提供生成纵向 PNG、预览、保存、复制和系统分享入口。下图展示导出菜单与生成后的长图预览。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="PDF 与 HTML 导出菜单" width="800">
 </p>
 
 <p>
-  <img src="./src-tauri/resources/sample-notes/resources/15-long-image.png" alt="长图分享操作入口" width="800">
+  <img src="./src-tauri/resources/sample-notes/resources/15-long-image.png" alt="生成后的长图预览" width="800">
 </p>
 
 ### 微信公众号草稿

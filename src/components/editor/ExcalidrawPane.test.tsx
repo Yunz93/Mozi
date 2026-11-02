@@ -15,6 +15,7 @@ const { serializeAsJSON, drawing, writeFile, readFile } = vi.hoisted(() => ({
           files: Record<string, unknown>,
         ) => void),
     autoChange: true,
+    initialScenes: [] as Array<{ elements: unknown[] }>,
   },
   writeFile: vi.fn(async (_path: string, _content: string) => {}),
   readFile: vi.fn(async (_path: string) => "# Other note"),
@@ -31,7 +32,9 @@ vi.mock("@excalidraw/excalidraw", () => ({
   serializeAsJSON,
   Excalidraw: ({
     onChange,
+    initialData,
   }: {
+    initialData: { elements: unknown[] };
     onChange: (
       elements: unknown[],
       appState: Record<string, unknown>,
@@ -40,8 +43,9 @@ vi.mock("@excalidraw/excalidraw", () => ({
   }) => {
     drawing.onChange = onChange;
     useEffect(() => {
+      drawing.initialScenes.push(initialData);
       if (drawing.autoChange) onChange([{ id: "dirty" }], {}, {});
-    }, [onChange]);
+    }, [onChange, initialData]);
     return <div data-testid="excalidraw-mock" />;
   },
 }));
@@ -84,6 +88,7 @@ describe("ExcalidrawPane tab switch flush", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     drawing.autoChange = true;
+    drawing.initialScenes = [];
     writeFile.mockClear();
     readFile.mockClear();
     serializeAsJSON.mockClear();
@@ -120,6 +125,90 @@ describe("ExcalidrawPane tab switch flush", () => {
     cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it.each(["json", "obsidian"])(
+    "loads an existing %s drawing before accepting canvas initialization changes",
+    async (format) => {
+      const drawingFile =
+        useAppStore.getState().files[format === "json" ? 1 : 0];
+      const scene = JSON.stringify({
+        type: "excalidraw",
+        elements: [{ id: "existing-rectangle", type: "rectangle" }],
+        appState: {},
+        files: {},
+      });
+      const diskContent =
+        format === "json"
+          ? scene
+          : OBSIDIAN_MD.replace(/\{"type":"excalidraw"[^\n]+/, scene);
+      let resolveRead!: (content: string) => void;
+      readFile.mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            resolveRead = resolve;
+          }),
+      );
+      useAppStore.setState({
+        openTabs: [],
+        activeTabId: null,
+        currentFilePath: null,
+        fileContents: {},
+        lastSavedContent: {},
+        rootFolderPath: "/vault",
+      });
+      const { ExcalidrawPane } = await import("./ExcalidrawPane");
+      function ActiveDrawing() {
+        const activeId = useAppStore((state) => state.activeTabId);
+        return activeId ? (
+          <ExcalidrawPane onContentChange={() => undefined} />
+        ) : null;
+      }
+      render(<ActiveDrawing />);
+      const operations = renderHook(() => useFileOperations());
+      let opening!: Promise<void>;
+      await act(async () => {
+        opening = operations.result.current.handleFileSelect(drawingFile);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      act(() => vi.advanceTimersByTime(500));
+      expect(drawing.initialScenes).toEqual([]);
+      expect(
+        useAppStore.getState().fileContents[drawingFile.id],
+      ).toBeUndefined();
+      expect(writeFile).not.toHaveBeenCalled();
+      await act(async () => {
+        resolveRead(diskContent);
+        await opening;
+      });
+      expect(drawing.initialScenes[0]?.elements).toEqual([
+        { id: "existing-rectangle", type: "rectangle" },
+      ]);
+      expect(useAppStore.getState().getActiveContent()).toBe(diskContent);
+      expect(writeFile).not.toHaveBeenCalled();
+    },
+  );
+
+  it("opens a loaded empty file as an editable empty drawing", async () => {
+    drawing.autoChange = false;
+    const tabId = "/vault/b.excalidraw";
+    useAppStore.setState({
+      activeTabId: tabId,
+      openTabs: [tabId],
+      fileContents: { [tabId]: "" },
+      lastSavedContent: { [tabId]: "" },
+    });
+    const { ExcalidrawPane } = await import("./ExcalidrawPane");
+    const pane = render(<ExcalidrawPane onContentChange={() => undefined} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(pane.queryByTestId("excalidraw-mock")).not.toBeNull();
+    expect(drawing.initialScenes[0]?.elements).toEqual([]);
+    expect(useAppStore.getState().hasUnsavedChanges(tabId)).toBe(false);
+    expect(writeFile).not.toHaveBeenCalled();
   });
 
   it.each([

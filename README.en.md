@@ -134,14 +134,14 @@ Configure a Skill API key under **Settings → Reading notes sync → WeRead**, 
 
 ### PDF, HTML, and long-image sharing
 
-The **Export** menu offers PDF and HTML. The **Long-image share** dialog provides controls to generate a tall PNG, preview it, save it, copy it, or use system sharing. The screenshots show the export menu and the dialog before image generation.
+The **Export** menu offers PDF and HTML. The **Long-image share** dialog provides controls to generate a tall PNG, preview it, save it, copy it, or use system sharing. The screenshots show the export menu and a generated image ready to save or copy.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="PDF and HTML export menu" width="800">
 </p>
 
 <p>
-  <img src="./src-tauri/resources/sample-notes/resources/15-long-image.png" alt="Long-image sharing controls" width="800">
+  <img src="./src-tauri/resources/sample-notes/resources/15-long-image.png" alt="Generated long-image preview" width="800">
 </p>
 
 ### WeChat Official Account drafts

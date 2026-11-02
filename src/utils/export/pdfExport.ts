@@ -78,22 +78,11 @@ export async function exportToPdf(
       "PDF export timed out while preparing HTML",
     );
 
-    const safeScale = computeSafePdfRenderScale(
-      renderTarget.scrollWidth,
-      renderTarget.scrollHeight,
-    );
-    notifyIfExportScaleDegraded(safeScale, options?.onScaleDegraded);
-
     const pdfOptions: Html2PdfSetOptions & Html2PdfPagebreakOptions = {
       margin: [12, 12, 12, 12],
       filename: filename.endsWith(".pdf") ? filename : `${filename}.pdf`,
       image: { type: "jpeg", quality: 0.92 },
       enableLinks: true,
-      html2canvas: buildHtml2CanvasRasterOptions({
-        scale: safeScale,
-        backgroundColor,
-        renderTarget,
-      }),
       jsPDF: {
         unit: "mm",
         format: "a4",
@@ -111,13 +100,33 @@ export async function exportToPdf(
 
     const worker = html2pdf()
       .set(pdfOptions as Html2PdfSetOptions)
-      .from(renderTarget)
-      .toPdf();
+      .from(renderTarget);
 
     let pdfArrayBuffer: ArrayBuffer;
     try {
+      // PDF 克隆会按纸张宽度重新排版；背景与安全缩放都必须以克隆容器为准。
+      const container: HTMLElement = await withExportTimeout(
+        worker.toContainer().get("container"),
+        EXPORT_PDF_PREPARE_TIMEOUT_MS,
+        "PDF export timed out while preparing page layout",
+      );
+      container.style.backgroundColor = backgroundColor;
+      const safeScale = computeSafePdfRenderScale(
+        container.scrollWidth,
+        container.scrollHeight,
+      );
+      notifyIfExportScaleDegraded(safeScale, options?.onScaleDegraded);
+      const rasterOptions = buildHtml2CanvasRasterOptions({
+        scale: safeScale,
+        backgroundColor,
+        renderTarget,
+      });
+      // 让 html2canvas 测量重新排版后的容器，避免按原尺寸截断或补出色块。
+      delete rasterOptions.width;
+      delete rasterOptions.height;
+      const pdfWorker = worker.set({ html2canvas: rasterOptions }).toPdf();
       pdfArrayBuffer = await withExportTimeout(
-        worker.outputPdf("arraybuffer"),
+        pdfWorker.outputPdf("arraybuffer"),
         EXPORT_PDF_RENDER_TIMEOUT_MS,
         "PDF export timed out while rendering",
       );

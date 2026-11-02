@@ -4,6 +4,7 @@ import React, { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -419,5 +420,65 @@ describe("PreviewPane", () => {
     expect(mockRenderMermaidDiagrams).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
+  });
+
+  it("preserves hydrated images and heading targets across layout rerenders", async () => {
+    const { usePreviewRenderer } = await import("./hooks");
+    const bodyHTML =
+      '<h2>Excalidraw 画板</h2><img data-preview-pending-src="resources/board.png">';
+    vi.mocked(usePreviewRenderer).mockReturnValue({
+      parsedContent: { frontmatter: null, bodyHTML },
+      enhancedBodyHtml: bodyHTML,
+      sanitizedHtmlPreview: "",
+      requiresAsyncEnhancement: false,
+    });
+    seedMarkdownStore({
+      fileContents: { "/vault/notes/a.md": "## Excalidraw 画板" },
+    });
+    const pane = render(
+      <PreviewPane previewRenderActive previewLayoutActive />,
+    );
+    const heading = pane.container.querySelector("article h2")!;
+    const image = pane.container.querySelector("article img")!;
+    expect(heading.id).toBe("excalidraw-画板");
+    image.setAttribute("src", "blob:hydrated-drawing");
+    image.removeAttribute("data-preview-pending-src");
+
+    pane.rerender(
+      <PreviewPane density="compact" previewRenderActive previewLayoutActive />,
+    );
+    expect(pane.container.querySelector("article h2")).toBe(heading);
+    expect(pane.container.querySelector("article h2")?.id).toBe(
+      "excalidraw-画板",
+    );
+    expect(
+      pane.container.querySelector("article img")?.getAttribute("src"),
+    ).toBe("blob:hydrated-drawing");
+
+    act(() =>
+      seedMarkdownStore({
+        activeTabId: "/vault/notes/b.md",
+        currentFilePath: "/vault/notes/b.md",
+        fileContents: { "/vault/notes/b.md": "## Excalidraw 画板" },
+      }),
+    );
+    expect(pane.container.querySelector("article img")).not.toBe(image);
+    expect(
+      pane.container.querySelector("article img")?.getAttribute("src"),
+    ).toBeNull();
+
+    vi.mocked(usePreviewRenderer).mockReturnValue({
+      parsedContent: { frontmatter: null, bodyHTML: "<p>Updated content</p>" },
+      enhancedBodyHtml: "<p>Updated content</p>",
+      sanitizedHtmlPreview: "",
+      requiresAsyncEnhancement: false,
+    });
+    pane.rerender(
+      <PreviewPane density="compact" previewRenderActive previewLayoutActive />,
+    );
+    expect(pane.container.querySelector("article")?.textContent).toBe(
+      "Updated content",
+    );
+    expect(pane.container.querySelector("article img")).toBeNull();
   });
 });
