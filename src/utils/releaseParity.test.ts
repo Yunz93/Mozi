@@ -58,4 +58,20 @@ describe("release parity fixture", () => {
     expect(html).toContain("attachments/archive.zip");
     expect(shouldUseAsyncPreviewEnhancement(html, true)).toBe(true);
   });
+
+  it("pins the same Node major for CI and release builds", () => {
+    const versions = ["ci.yml", "release.yml"].flatMap((name) => {
+      const workflow = readFileSync(
+        resolve(import.meta.dirname, "../../.github/workflows", name),
+        "utf8",
+      );
+      const matches = [
+        ...workflow.matchAll(/node-version:\s*["']?([^\s"']+)/g),
+      ];
+      expect(matches.length).toBeGreaterThan(0);
+      return matches.map((match) => match[1]);
+    });
+    expect(versions.every((version) => /^\d+$/.test(version))).toBe(true);
+    expect(new Set(versions).size).toBe(1);
+  });
 });

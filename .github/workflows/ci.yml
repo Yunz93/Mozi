@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - master
-      - 'codex/**'
+      - "codex/**"
   pull_request:
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: lts/*
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
