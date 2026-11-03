@@ -164,7 +164,7 @@ export const RightRail: React.FC<RightRailProps> = ({
 
       {isOpen ? (
         <div
-          className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
+          className="workspace-resize-handle absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
           onMouseDown={handleResizeStart}
           aria-hidden
         >

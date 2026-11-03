@@ -28,6 +28,7 @@ import {
   normalizeTabSize,
 } from "../utils/editorPreferences";
 import { resolveLastNonSplitViewMode } from "../utils/viewMode";
+import { normalizeUiAccentColor } from "../utils/uiAccentColor";
 import { normalizeMetadataFields } from "../utils/metadataFields";
 import { normalizeTrashFolder } from "../utils/trashFolder";
 import { normalizeWikiFolder } from "../utils/wikiGeneration";
@@ -178,6 +179,11 @@ export const useAppStore = create<AppState>()(
             persistedSettings.themeMode ?? defaultSettings.themeMode,
           ),
           themeFollowSystem: persistedSettings.themeFollowSystem === true,
+          uiAccentColor: normalizeUiAccentColor(
+            persistedSettings.uiAccentColor,
+          ),
+          showReadingProperties:
+            persistedSettings.showReadingProperties !== false,
           markdownStylePreset: normalizeMarkdownStylePreset(
             persistedSettings.markdownStylePreset,
           ),

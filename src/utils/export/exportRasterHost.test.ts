@@ -1,6 +1,13 @@
 /** @vitest-environment happy-dom */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { exportToHtml } from "./htmlExport";
+import {
+  getMarkdownStyleTokens,
+  MARKDOWN_STYLE_PRESETS,
+} from "../markdownStyle";
 import {
   EXPORT_RASTER_HOST_CLASS,
   EXPORT_RASTER_STYLE_ID,
@@ -17,7 +24,65 @@ describe("mountExportHtmlForRasterization", () => {
   afterEach(() => {
     document.getElementById(EXPORT_RASTER_STYLE_ID)?.remove();
     document.body.innerHTML = "";
+    document.getElementById("test-app-theme")?.remove();
+    document.documentElement.classList.remove("dark");
   });
+
+  it.each(MARKDOWN_STYLE_PRESETS)(
+    "keeps %s raster headings independent of the app theme cascade",
+    async (preset) => {
+      const appStyle = document.createElement("style");
+      appStyle.id = "test-app-theme";
+      appStyle.textContent =
+        readFileSync(
+          resolve(process.cwd(), "src/styles/markdown-theme.css"),
+          "utf8",
+        ) +
+        readFileSync(resolve(process.cwd(), "src/styles/preview.css"), "utf8");
+      document.head.appendChild(appStyle);
+      document.documentElement.classList.add("dark");
+      const html = await exportToHtml("# 导出标题", {
+        theme: "dark",
+        markdownStylePreset: preset,
+      });
+      const { host, renderTarget } = mountExportHtmlForRasterization(html);
+      const article = renderTarget.querySelector<HTMLElement>("article")!;
+      expect(
+        getComputedStyle(article).getPropertyValue("--mp-doc-heading-1").trim(),
+      ).toBe(getMarkdownStyleTokens(preset, "dark").heading1);
+      disposeExportRasterHost(host);
+    },
+  );
+
+  it.each(["light", "dark"] as const)(
+    "keeps %s HTML and raster backgrounds consistent with the workspace",
+    async (theme) => {
+      const workspaceCss = readFileSync(
+        resolve(process.cwd(), "src/styles/workspace.css"),
+        "utf8",
+      );
+      const selector = theme === "dark" ? "\\.dark" : ":root";
+      const canvasColor = workspaceCss.match(
+        new RegExp(`${selector}\\s*\\{[^}]*--workspace-canvas:\\s*([^;]+)`),
+      )?.[1];
+      expect(canvasColor).toBeTruthy();
+      const html = await exportToHtml("正文和==划线==\n\n> 书评", { theme });
+      const { host, backgroundColor } = mountExportHtmlForRasterization(html);
+      const css =
+        document.getElementById(EXPORT_RASTER_STYLE_ID)?.textContent ?? "";
+      expect(
+        css.match(/html, body\s*\{[^}]*background-color:\s*([^;]+)/)?.[1],
+      ).toBe(canvasColor);
+      expect(backgroundColor).toBe(canvasColor);
+      const options = buildHtml2CanvasRasterOptions({
+        scale: 1,
+        backgroundColor,
+        renderTarget: host,
+      });
+      expect(options.backgroundColor).toBe(canvasColor);
+      disposeExportRasterHost(host);
+    },
+  );
 
   it("injects export CSS into document.head for html2canvas", () => {
     const html = `<!DOCTYPE html><html data-theme="light"><head><style>
@@ -116,6 +181,25 @@ describe("disposeAllExportRasterArtifacts", () => {
 
     expect(document.getElementById(EXPORT_RASTER_STYLE_ID)).toBeNull();
     expect(document.querySelector(`.${EXPORT_RASTER_HOST_CLASS}`)).toBeNull();
+  });
+
+  it("keeps a newer raster session intact when an old cancelled session finishes", () => {
+    const html = (color: string) =>
+      `<html><head><style>.export-document { color: ${color}; }</style></head><body><div class="export-document">Visible note</div></body></html>`;
+    const oldSession = mountExportHtmlForRasterization(html("red"));
+    disposeAllExportRasterArtifacts();
+    const newSession = mountExportHtmlForRasterization(html("blue"));
+    const newStyles = document.getElementById(EXPORT_RASTER_STYLE_ID);
+    expect(newStyles?.textContent).toContain("color: blue");
+
+    disposeExportRasterHost(oldSession.host);
+
+    expect(document.getElementById(EXPORT_RASTER_STYLE_ID)).toBe(newStyles);
+    expect(newStyles?.textContent).toContain("color: blue");
+    expect(document.body.contains(newSession.host)).toBe(true);
+    expect(newSession.renderTarget.textContent).toBe("Visible note");
+    disposeExportRasterHost(newSession.host);
+    expect(document.getElementById(EXPORT_RASTER_STYLE_ID)).toBeNull();
   });
 });
 

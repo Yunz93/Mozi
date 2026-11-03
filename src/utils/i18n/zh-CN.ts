@@ -46,6 +46,9 @@ export default {
   app_untitledDrawing: "未命名画板",
   app_untitledFolder: "未命名文件夹",
 
+  app_brandName: "墨知",
+  toolbar_more: "更多操作",
+  view_edit: "编辑",
   toolbar_hideSidebar: "隐藏侧边栏",
   toolbar_showSidebar: "显示侧边栏",
   toolbar_saving: "保存中...",
@@ -195,7 +198,8 @@ export default {
   askVault_retrieving: "检索中…",
   askVault_ask: "生成回答",
   askVault_asking: "生成中…",
-  askVault_retrieveHint: "只检索片段、不调用 AI；可先检查来源再生成。",
+  askVault_retrieveHint:
+    "只检索片段，不调用生成模型；语义检索按索引设置使用嵌入模型，远端接口会收到搜索问题。",
   askVault_confirmSendHint:
     "将发送 {count} 段笔记给模型。点片段可跳回原文；生成结果不会静默改写笔记。",
   askVault_toggleSources: "显示将发送的片段",
@@ -474,6 +478,19 @@ export default {
   settings_languageLabel: "显示语言",
   settings_interfaceDesc: "切换应用界面的显示语言。",
   settings_themeLabel: "外观主题",
+  settings_uiAccentColor: "主题色",
+  settings_uiAccentColorDesc:
+    "用于界面选中态、主要按钮和焦点提示，自动适配浅色与深色模式。",
+  settings_uiAccentDefault: "默认",
+  settings_uiAccentBlue: "蓝色",
+  settings_uiAccentGreen: "绿色",
+  settings_uiAccentPurple: "紫色",
+  settings_uiAccentRose: "玫瑰色",
+  settings_uiAccentCustomShort: "自定义",
+  settings_uiAccentCustom: "自定义颜色",
+  settings_showReadingProperties: "阅读模式显示属性",
+  settings_showReadingPropertiesDesc:
+    "在正文上方显示紧凑属性表。关闭后不影响笔记里的属性数据。",
   settings_themeLight: "浅色",
   settings_themeDark: "深色",
   settings_themeSystem: "跟随系统",
@@ -894,7 +911,7 @@ export default {
   notifications_longImageExportFailed: "生成长图失败",
   notifications_exportTimedOut: "导出超时。请缩短笔记或关掉复杂图表后重试。",
   notifications_exportEmptyOutput: "导出结果为空。可能是内容过大或渲染失败。",
-  notifications_exportTooLarge: "内容太大，无法完整导出。请缩短笔记后重试。",
+  notifications_exportTooLarge: "文档过长或过大，无法完整导出。请分段导出。",
   notifications_exportPrepareFailed: "准备导出 HTML 失败。",
   notifications_exportRasterFailed: "把页面画成图片失败。",
   notifications_longImageCopied: "图片已复制到剪贴板",
@@ -1001,6 +1018,8 @@ export default {
     "当前 DeepSeek 模型不可用。请在设置里重新选择一个可用模型。",
   notifications_noKnowledgeBaseForWiki:
     "当前没有可用于创建 Wiki 文件的知识库目录。",
+  notifications_wikiSourceChanged:
+    "来源笔记已切换或修改，未替换原文；已生成的 Wiki 可在知识库中查看。",
   notifications_wikiCreated: "Wiki 已创建：{name}",
   notifications_wikiCreateFailed: "生成 Wiki 失败，请检查 AI 设置后再试。",
   notifications_failedOpenLinkInBrowser: "在浏览器中打开链接失败",

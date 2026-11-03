@@ -21,7 +21,9 @@ export function flattenFiles(nodes: FileNode[]): FileNode[] {
   );
 }
 
-export function isMarkdownFile(node: FileNode): boolean {
+export function isMarkdownFile(
+  node: FileNode | Pick<FileNode, "name">,
+): boolean {
   return /\.(md|markdown)$/i.test(node.name);
 }
 

@@ -100,7 +100,9 @@ body {
 /* 设置面板和发布弹窗表单控件：统一系统 UI 字体与控件高度，下拉与输入框对齐 */
 .settings-panel select,
 .settings-panel
-  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not(
+    [type="color"]
+  ),
 .settings-panel textarea,
 .publish-form-panel select,
 .publish-form-panel

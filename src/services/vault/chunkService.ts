@@ -1,4 +1,5 @@
 import { parseFrontmatter } from "../../utils/frontmatter";
+import { isMarkdownFile } from "../../utils/markdownLinkUtils";
 import {
   createHeadingSlug,
   flattenHeadingNodes,
@@ -102,6 +103,7 @@ export function chunkMarkdownFile(options: {
   vaultRoot: string;
   content: string;
 }): TextChunk[] {
+  if (!isMarkdownFile({ name: options.path })) return [];
   const path = normalizePath(options.path);
   const relPath = getRelPath(path, options.vaultRoot);
   const { frontmatter, body } = parseFrontmatter(options.content);

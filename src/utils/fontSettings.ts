@@ -243,7 +243,7 @@ const presetDataUrlCache = new Map<string, Promise<string>>();
 const UI_FONT_FALLBACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 const CONTENT_FONT_FALLBACK =
-  '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
 const CODE_FONT_FALLBACK =
   '"SFMono-Regular", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace';
 

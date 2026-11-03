@@ -13,6 +13,7 @@ import { useI18n } from "../../../hooks/useI18n";
 import type { SettingsTabProps } from "../types";
 import { useFontOptions } from "../useFontOptions";
 import { SettingsSelect } from "../SettingsSelect";
+import { normalizeUiAccentColor } from "../../../utils/uiAccentColor";
 
 interface InterfaceTabProps extends SettingsTabProps {
   isOpen: boolean;
@@ -29,6 +30,18 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
   const currentUiFontValue =
     settings.uiFontFamily?.trim() || DEFAULT_UI_FONT_FAMILY;
   const uiFontOptions = buildFontOptions(currentUiFontValue);
+  const selectedAccentColor = normalizeUiAccentColor(settings.uiAccentColor);
+  const accentOptions = [
+    {
+      value: "default",
+      color: "#a65f43",
+      label: t("settings_uiAccentDefault"),
+    },
+    { value: "#3b82f6", color: "#3b82f6", label: t("settings_uiAccentBlue") },
+    { value: "#22a06b", color: "#22a06b", label: t("settings_uiAccentGreen") },
+    { value: "#8b5cf6", color: "#8b5cf6", label: t("settings_uiAccentPurple") },
+    { value: "#db6480", color: "#db6480", label: t("settings_uiAccentRose") },
+  ];
 
   const themeOptions: Array<{
     value: "light" | "dark" | "system";
@@ -94,11 +107,7 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
                         });
                       }
                     }}
-                    className={`rounded-xl border px-3 py-2.5 text-sm transition-all ${
-                      isSelected
-                        ? "border-accent-DEFAULT bg-accent-DEFAULT/10 text-gray-900 dark:text-white ring-2 ring-accent-DEFAULT/20"
-                        : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-200 hover:border-accent-DEFAULT/60"
-                    }`}
+                    className={`workspace-settings-theme-choice border px-3 py-2 text-sm ${isSelected ? "is-active" : ""}`}
                   >
                     {option.label}
                   </button>
@@ -107,6 +116,63 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("settings_themeDesc")}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {t("settings_uiAccentColor")}
+            </div>
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label={t("settings_uiAccentColor")}
+            >
+              {accentOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  title={option.label}
+                  aria-pressed={selectedAccentColor === option.value}
+                  className={`workspace-settings-accent-choice ${selectedAccentColor === option.value ? "is-active" : ""}`}
+                  onClick={() =>
+                    onUpdateSettings({ uiAccentColor: option.value })
+                  }
+                >
+                  <span
+                    className="workspace-settings-accent-swatch"
+                    style={{ backgroundColor: option.color }}
+                    aria-hidden
+                  />
+                  {option.label}
+                </button>
+              ))}
+              <label
+                htmlFor="ui-accent-color"
+                className={`workspace-settings-accent-choice ${accentOptions.some((option) => option.value === selectedAccentColor) ? "" : "is-active"}`}
+              >
+                <input
+                  id="ui-accent-color"
+                  type="color"
+                  aria-label={t("settings_uiAccentCustom")}
+                  title={t("settings_uiAccentCustom")}
+                  className="workspace-settings-color-input"
+                  value={
+                    selectedAccentColor === "default"
+                      ? settings.themeMode === "dark"
+                        ? "#d49b7e"
+                        : "#a65f43"
+                      : selectedAccentColor
+                  }
+                  onChange={(event) =>
+                    onUpdateSettings({ uiAccentColor: event.target.value })
+                  }
+                />
+                {t("settings_uiAccentCustomShort")}
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("settings_uiAccentColorDesc")}
             </p>
           </div>
 
@@ -131,7 +197,7 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
               {t("settings_uiFontDesc")}
             </p>
             <div
-              className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+              className="workspace-settings-font-preview border px-4 py-3 text-sm"
               style={{ fontFamily: getResolvedUiFontFamily(settings) }}
             >
               {t("settings_uiFontPreview")}

@@ -101,9 +101,8 @@ export const Dialog: React.FC<DialogProps> = ({
       <div
         ref={dialogRef}
         className={`
-          relative flex w-full flex-col overflow-hidden rounded-2xl
-          border border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl
-          dark:border-white/10 dark:bg-gray-900/95
+          workspace-dialog relative flex w-full flex-col overflow-hidden rounded-2xl
+          border shadow-2xl
           max-h-[88vh]
           animate-scale-in
           focus:outline-none

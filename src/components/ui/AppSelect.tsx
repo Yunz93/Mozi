@@ -87,6 +87,8 @@ export const AppSelect: React.FC<AppSelectProps> = ({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        // 下拉优先消费 Esc，避免设置或通用弹窗在同次按键中一起关闭。
+        event.stopPropagation();
         setOpen(false);
         buttonRef.current?.focus();
       }
@@ -95,13 +97,13 @@ export const AppSelect: React.FC<AppSelectProps> = ({
     const handleReposition = () => updateMenuPosition();
 
     document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("resize", handleReposition);
     window.addEventListener("scroll", handleReposition, true);
 
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("resize", handleReposition);
       window.removeEventListener("scroll", handleReposition, true);
     };

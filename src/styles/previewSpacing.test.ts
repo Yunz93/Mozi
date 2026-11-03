@@ -136,17 +136,17 @@ describe("preview spacing CSS", () => {
     );
   });
 
-  it("uses a tighter heading scale than github-markdown defaults", () => {
+  it("uses the approved editorial heading hierarchy", () => {
     const css = readFileSync(
       resolve(process.cwd(), "src/styles/preview.css"),
       "utf8",
     );
 
     expect(css).toMatch(
-      /\.preview-pane-document\.markdown-body h1\s*\{[^}]*font-size:\s*1\.6em;/m,
+      /\.preview-pane-document\.markdown-body h1\s*\{[^}]*font-size:\s*2\.5em;/m,
     );
     expect(css).toMatch(
-      /\.preview-pane-document\.markdown-body h2\s*\{[^}]*font-size:\s*1\.35em;/m,
+      /\.preview-pane-document\.markdown-body h2\s*\{[^}]*font-size:\s*1\.65em;/m,
     );
     expect(css).toMatch(
       /\.preview-pane-document\.markdown-body h3\s*\{[^}]*font-size:\s*1\.2em;/m,

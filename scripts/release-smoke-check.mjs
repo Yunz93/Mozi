@@ -258,7 +258,7 @@ const checklist = [
   "Compare Editor mode styling against dev: caret, frontmatter colors, markdown token colors, and line wrapping.",
   "Verify wikilinks and embeds in Preview: [[file]], [[#heading]], ![[image.png]], and non-image attachments.  [auto: releaseSmokeAuto.test.ts + releaseParity.test.ts]",
   "Click external links from Preview and confirm the system browser opens.",
-  "Switch between Editor / Preview / Split, resize the window, and confirm layout widths stay stable.",
+  "Switch between live preview, plain Markdown source, and reading; resize the window and confirm layout widths stay stable.",
   "For tagged releases with createUpdaterArtifacts=true, confirm updater signature assets and latest.json are attached to the GitHub Release.",
 ];
 

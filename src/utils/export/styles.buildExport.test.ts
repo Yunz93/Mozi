@@ -51,8 +51,8 @@ describe("buildExportStyles", () => {
   it("preserves the themed quote tint and its transparency without CSS mixing", () => {
     const css = buildExportStyles("light");
     const quote = css.match(/\.mp-callout-quote\s*\{([^}]+)\}/)?.[1];
-    expect(quote).toContain("border-left-color: rgba(147, 143, 105, 1)");
-    expect(quote).toContain("background: rgba(185, 195, 165, 0.1336)");
+    expect(quote).toContain("border-left-color: rgba(187, 124, 47, 1)");
+    expect(quote).toContain("background: rgba(207, 158, 109, 0.1048)");
   });
 
   it("removes github-markdown heading bottom borders in export body", () => {
@@ -68,10 +68,10 @@ describe("buildExportStyles", () => {
   it("matches preview heading font-size scale in export body", () => {
     const css = buildExportStyles("light");
     expect(css).toMatch(
-      /\.export-document \.markdown-body h1\s*\{[^}]*font-size:\s*1\.6em;/m,
+      /\.export-document \.markdown-body h1\s*\{[^}]*font-size:\s*2\.5em;/m,
     );
     expect(css).toMatch(
-      /\.export-document \.markdown-body h2\s*\{[^}]*font-size:\s*1\.35em;/m,
+      /\.export-document \.markdown-body h2\s*\{[^}]*font-size:\s*1\.65em;/m,
     );
     expect(css).toMatch(
       /\.export-document \.markdown-body h3\s*\{[^}]*font-size:\s*1\.2em;/m,

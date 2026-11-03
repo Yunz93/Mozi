@@ -74,10 +74,17 @@ export async function upsertChunkPaths(options: {
   contentsByPath?: Record<string, string>;
   excludeGlobs?: string[];
 }): Promise<ChunkIndexSnapshot> {
-  const byPath = { ...options.snapshot.byPath };
+  const byPath = Object.fromEntries(
+    Object.entries(options.snapshot.byPath).filter(([path]) =>
+      isMarkdownFile({ name: path }),
+    ),
+  );
   for (const rawPath of options.paths) {
     const path = normalizePath(rawPath);
-    if (pathMatchesAnyGlob(path, options.excludeGlobs, options.vaultRoot)) {
+    if (
+      !isMarkdownFile({ name: path }) ||
+      pathMatchesAnyGlob(path, options.excludeGlobs, options.vaultRoot)
+    ) {
       delete byPath[path];
       continue;
     }

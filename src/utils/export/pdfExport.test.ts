@@ -7,7 +7,14 @@ const { worker, saveExportFile } = vi.hoisted(() => {
     set: vi.fn(),
     from: vi.fn(),
     toContainer: vi.fn(),
-    get: vi.fn(async () => document.createElement("div")),
+    get: vi.fn(async () => {
+      const container = document.createElement("div");
+      Object.defineProperties(container, {
+        scrollWidth: { value: 703, configurable: true },
+        scrollHeight: { value: 1000, configurable: true },
+      });
+      return container;
+    }),
     toPdf: vi.fn(),
     outputPdf: vi.fn(async () => new ArrayBuffer(8)),
   };
@@ -36,8 +43,8 @@ describe("PDF clone layout", () => {
   });
 
   it.each([
-    ["dark", "#0d1117"],
-    ["light", "#ffffff"],
+    ["dark", "#24272b"],
+    ["light", "#faf8f3"],
   ])(
     "keeps the %s theme background when html2pdf clones the document",
     async (theme, color) => {
@@ -81,8 +88,38 @@ describe("PDF clone layout", () => {
     expect(worker.set.mock.calls.at(-1)![0].html2canvas.scale).toBeCloseTo(0.7);
   });
 
+  it("rejects an oversized PDF before rasterization and removes its blocking overlay", async () => {
+    const overlay = document.createElement("div");
+    overlay.className = "html2pdf__overlay";
+    const container = document.createElement("div");
+    Object.defineProperties(container, {
+      scrollWidth: { value: 703 },
+      scrollHeight: { value: 200_000 },
+    });
+    overlay.appendChild(container);
+    document.body.appendChild(overlay);
+    worker.get.mockResolvedValueOnce(container);
+
+    await expect(
+      exportToPdf(
+        '<html><head></head><body><div class="export-document">Too long</div></body></html>',
+        "test",
+      ),
+    ).rejects.toThrow(/too large.*split/i);
+
+    expect(worker.toPdf).not.toHaveBeenCalled();
+    expect(saveExportFile).not.toHaveBeenCalled();
+    expect(document.body.contains(overlay)).toBe(false);
+    expect(document.querySelector(".mp-export-raster-host")).toBeNull();
+    expect(document.getElementById("mp-export-raster-styles")).toBeNull();
+  });
+
   it("fits wide Mermaid diagrams to the PDF page without resizing nested SVGs", async () => {
     const container = document.createElement("div");
+    Object.defineProperties(container, {
+      scrollWidth: { value: 703 },
+      scrollHeight: { value: 1000 },
+    });
     container.innerHTML = `<div class="mermaid"><svg width="1000" height="180" viewBox="0 0 1000 180"><svg width="40" height="20"></svg></svg></div>`;
     worker.get.mockResolvedValueOnce(container);
     await exportToPdf(

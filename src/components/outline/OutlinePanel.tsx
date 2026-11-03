@@ -159,7 +159,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = React.memo(
           </div>
           <p className="empty-message">{t("outline_empty")}</p>
           <div
-            className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
+            className="workspace-resize-handle absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
             onMouseDown={handleResizeStart}
             aria-hidden
           >
@@ -198,7 +198,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = React.memo(
         </div>
         {!isCollapsed && tree}
         <div
-          className="absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
+          className="workspace-resize-handle absolute inset-y-0 left-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
           onMouseDown={handleResizeStart}
           aria-hidden
         >

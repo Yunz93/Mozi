@@ -127,6 +127,31 @@ describe("SplitView scroll handshake", () => {
     } as never);
   });
 
+  it("does not let a queued 250ms tab restore overwrite a newer heading jump", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
+    renderSplitView();
+    mockPreviewSyncScrollTo.mockClear();
+    beginHeadingNavigationLock();
+
+    act(() => vi.advanceTimersByTime(250));
+
+    expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
+  });
+
+  it("preserves initial tab restoration but skips its late correction during pending navigation", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
+    beginHeadingNavigationLock();
+    renderSplitView();
+    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0, {
+      immediate: true,
+    });
+    mockPreviewSyncScrollTo.mockClear();
+    act(() => vi.advanceTimersByTime(250));
+    expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
+  });
+
   it("does not sync preview scroll in editor-only mode", async () => {
     renderSplitView();
 

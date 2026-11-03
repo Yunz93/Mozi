@@ -2,27 +2,41 @@
   scrollbar-gutter: stable;
 }
 
+.preview-pane-properties-layout {
+  box-sizing: border-box;
+  padding: 0 var(--pane-content-px);
+}
+
 .preview-pane-properties {
   border-radius: 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.72;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.preview-pane-properties-fields {
+  table-layout: fixed;
+}
+
+.preview-pane-properties-cell {
+  overflow-wrap: anywhere;
 }
 
 .preview-pane-properties-header {
-  font-size: 0.8em;
-  padding: 0.4rem 0.55rem;
+  font-size: 0.85em;
+  padding: 0.3rem 0.5rem;
   letter-spacing: 0.14em;
 }
 
 .preview-pane-properties .table-cell {
-  padding-top: 0.16rem !important;
-  padding-bottom: 0.16rem !important;
+  padding-top: 0.12rem !important;
+  padding-bottom: 0.12rem !important;
   padding-left: 0.45rem !important;
   padding-right: 0.45rem !important;
 }
 
 .preview-pane-properties-cell:first-child {
-  width: 5.5rem !important;
+  width: 5rem !important;
+  white-space: normal;
 }
 
 .preview-pane-properties-input {
@@ -645,15 +659,16 @@
 
 .preview-pane-document.markdown-body h1 {
   color: var(--mp-doc-heading-1, var(--mp-doc-accent, #7c3aed));
-  /* 覆盖 github-markdown 的 2em，缩小与 h2 的级差 */
-  font-size: 1.6em;
+  border-bottom: none;
+  padding-bottom: 0;
+  font-size: 2.5em;
 }
 
 .preview-pane-document.markdown-body h2 {
   color: var(--mp-doc-heading-2, var(--mp-doc-accent, #7c3aed));
   border-bottom: none;
   padding-bottom: 0;
-  font-size: 1.35em;
+  font-size: 1.65em;
 }
 
 .preview-pane-document.markdown-body h3 {
@@ -727,6 +742,10 @@
 .preview-pane-document.markdown-body mark {
   color: var(--mp-doc-mark-text, inherit);
   background: var(--mp-doc-mark-bg, rgba(235, 203, 139, 0.45));
+  border-radius: 0.15em;
+  padding-inline: 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .preview-pane-document.markdown-body a.tag,
@@ -740,7 +759,9 @@
 }
 
 .preview-pane-document.markdown-body hr {
-  border-color: var(--mp-doc-border, rgba(124, 58, 237, 0.18));
+  height: 1px;
+  border: 0;
+  background: var(--mp-doc-border, rgba(124, 58, 237, 0.18));
 }
 
 .preview-pane-document.markdown-body blockquote {
@@ -749,6 +770,14 @@
   background: var(--mp-doc-quote-bg, rgba(124, 58, 237, 0.04));
   border-radius: 0 14px 14px 0;
   padding: 0.9rem 1rem;
+}
+
+/* 普通书评使用轻量引文，提示块继续保留各自的语义配色。 */
+.preview-pane-document.markdown-body blockquote:not(.mp-callout) {
+  border-left: 1px solid var(--mp-doc-muted, #746f67);
+  background: transparent;
+  border-radius: 0;
+  padding: 0.15rem 1rem;
 }
 
 .preview-pane-document.markdown-body code {
@@ -1158,9 +1187,9 @@
 
 /* 提示块使用各自的强调色，避免深色普通引用覆盖其背景和逻辑边框。 */
 .dark .preview-pane-document.markdown-body blockquote:not(.mp-callout) {
-  border-left-color: var(--mp-doc-accent, rgba(192, 132, 252, 0.32));
+  border-left-color: var(--mp-doc-muted, #aaa79e);
   color: var(--mp-doc-quote-text, #ddd6fe);
-  background: var(--mp-doc-quote-bg, rgba(192, 132, 252, 0.06));
+  background: transparent;
 }
 
 .dark .preview-html-document {

@@ -7,6 +7,7 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { createPortal } from "react-dom";
+import { BookOpen, Plus } from "lucide-react";
 import { FileTreeItem } from "./FileTree";
 import { TrashView } from "./TrashView";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -258,7 +259,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     const { t } = useI18n();
     const { readFile } = useFileSystem();
     const fileContents = useAppStore((state) => state.fileContents);
-    const themeMode = useAppStore((state) => state.settings.themeMode);
     const trashFolder = useAppStore((state) => state.settings.trashFolder);
     const showNotification = useAppStore((state) => state.showNotification);
 
@@ -393,9 +393,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
       () =>
         ({
           "--sidebar-width": `${width}px`,
-          backgroundColor: themeMode === "dark" ? "#000000" : "#f8fafc",
         }) as React.CSSProperties,
-      [themeMode, width],
+      [width],
     );
 
     const handleCopyRelativePath = useCallback(
@@ -461,7 +460,22 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
           }
         `}
         >
-          <div className="px-4 pt-3 pb-4 flex flex-col gap-3">
+          <div className="workspace-sidebar-header px-4 pt-3 pb-4 flex flex-col gap-3">
+            <div className="workspace-brand-row">
+              <div className="workspace-brand">
+                <BookOpen size={21} aria-hidden />
+                <span>{t("app_brandName")}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => openNewFileDialog(undefined, t("app_untitled"))}
+                className="workspace-new-note"
+                title={t("sidebar_newNote")}
+                aria-label={t("sidebar_newNote")}
+              >
+                <Plus size={16} aria-hidden />
+              </button>
+            </div>
             <div className="flex justify-end items-center px-2 md:hidden">
               <button
                 onClick={onClose}
@@ -481,7 +495,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
             </div>
 
             <div className="flex items-center gap-2.5 md:mt-1">
-              <div className="flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-gray-200/80 bg-white/70 py-0 pl-3 pr-1 transition-colors focus-within:border-gray-300 focus-within:bg-white/90 dark:border-white/10 dark:bg-[#141a25] dark:focus-within:border-white/20 dark:focus-within:bg-[#181f2c]">
+              <div className="workspace-search flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-gray-200/80 bg-white/70 py-0 pl-3 pr-1 transition-colors focus-within:border-gray-300 focus-within:bg-white/90 dark:border-white/10 dark:bg-[#141a25] dark:focus-within:border-white/20 dark:focus-within:bg-[#181f2c]">
                 <span className="pointer-events-none flex shrink-0 items-center text-gray-400 dark:text-gray-500">
                   <svg
                     className="h-4 w-4"
@@ -546,23 +560,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                   </svg>
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => openNewFileDialog(undefined, t("app_untitled"))}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/80 dark:border-white/10 bg-white/72 dark:bg-[#141a25] text-gray-700 dark:text-gray-200 shadow-sm transition-colors hover:bg-white dark:hover:bg-[#181f2c] active:scale-95"
-                title={t("sidebar_newNote")}
-              >
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
             </div>
           </div>
 
@@ -634,13 +631,13 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                   {searchResults.map(({ file, filenameMatched, snippets }) => (
                     <div
                       key={file.id}
-                      className="rounded-2xl border border-gray-200/70 bg-white/72 p-3 shadow-sm transition-colors hover:border-gray-300 hover:bg-white/90 dark:border-white/10 dark:bg-[#121923] dark:hover:border-white/20 dark:hover:bg-[#18212e]"
+                      className="workspace-search-result rounded-2xl border border-gray-200/70 bg-white/72 p-3 shadow-sm transition-colors hover:border-gray-300 hover:bg-white/90 dark:border-white/10 dark:bg-[#121923] dark:hover:border-white/20 dark:hover:bg-[#18212e]"
                     >
                       <button
                         onClick={() => void handleSearchResultSelect(file)}
-                        className="flex w-full min-w-0 items-start justify-between gap-3 text-left"
+                        className="flex w-full min-w-0 flex-col items-start gap-1.5 text-left"
                       >
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 w-full">
                           <div
                             className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100"
                             title={file.name.replace(/\.md$/i, "")}
@@ -658,7 +655,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                           </div>
                         </div>
                         {filenameMatched && (
-                          <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                          <span className="workspace-search-match shrink-0 px-2 py-0.5 text-[11px] font-semibold">
                             {t("sidebar_filenameMatched")}
                           </span>
                         )}
@@ -732,7 +729,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
             )}
           </div>
 
-          <div className="p-3 space-y-2">
+          <div className="workspace-sidebar-footer p-3 space-y-2">
             <div>
               <div className="flex items-center gap-1">
                 <button
@@ -810,7 +807,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
 
           {isOpen && (
             <div
-              className="absolute inset-y-0 right-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
+              className="workspace-resize-handle absolute inset-y-0 right-0 hidden w-1 cursor-col-resize md:block opacity-0 hover:opacity-100 transition-opacity"
               onMouseDown={handleResizeStart}
               aria-hidden
             >

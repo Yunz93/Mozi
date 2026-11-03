@@ -237,7 +237,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       style={uiScaleStyle}
     >
       <div
-        className="relative flex overflow-hidden rounded-2xl border border-gray-200/50 bg-white/95 shadow-2xl backdrop-blur-xl transition-shadow animate-scale-in dark:border-white/10 dark:bg-gray-900/95"
+        className="workspace-dialog workspace-settings relative flex overflow-hidden rounded-2xl border shadow-2xl animate-scale-in"
         style={{
           width,
           height,
@@ -250,7 +250,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="relative flex min-h-0 shrink-0 flex-col border-r border-gray-200/50 bg-gray-50/50 p-3 dark:border-white/5 dark:bg-black/20"
+          className="workspace-settings-nav relative flex min-h-0 shrink-0 flex-col border-r p-3"
           style={{ width: navWidth }}
         >
           <div className="mb-2 shrink-0 px-3 py-4">
@@ -265,11 +265,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? "bg-white text-gray-900 shadow-sm dark:bg-white/10 dark:text-white"
-                    : "text-gray-500 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5"
-                }`}
+                className={`workspace-settings-nav-button px-3 py-2.5 text-left text-sm font-medium ${activeTab === tab.id ? "is-active" : ""}`}
+                aria-current={activeTab === tab.id ? "page" : undefined}
               >
                 {tab.label}
               </button>
@@ -291,10 +288,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {renderActiveTab()}
           </div>
 
-          <div className="flex justify-end border-t border-gray-200/50 p-4 dark:border-white/10">
+          <div className="workspace-settings-footer flex justify-end border-t p-4">
             <button
               onClick={onClose}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-6 py-2 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 active:scale-95 dark:bg-white dark:text-black"
+              className="workspace-settings-done inline-flex items-center gap-1.5 px-5 text-sm font-medium"
             >
               <svg
                 className="h-4 w-4"

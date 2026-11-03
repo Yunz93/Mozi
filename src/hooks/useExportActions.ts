@@ -22,7 +22,8 @@ function setExportInFlight(next: boolean): void {
   exportInFlight = next;
   exportFlightListeners.forEach((listener) => listener());
 }
-import { useAppStore, selectContent } from "../store/appStore";
+import { useAppStore } from "../store/appStore";
+import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
 import { exportToHtml, downloadHtml, exportToPdf } from "../utils/export";
 import type { LongImageSharePayload } from "../components/share/longImageSharePayload";
 import {
@@ -59,11 +60,7 @@ function isNonMarkdownExportFile(
  * Publish actions live in usePublishActions.
  */
 export function useExportActions(highlighter?: ShikiHighlighter | null) {
-  const { files, activeTabId, rootFolderPath, settings, showNotification } =
-    useAppStore();
-  const content = useAppStore(selectContent);
-  const previewFontFamily = buildPreviewExportFontFamily(settings);
-  const codeFontFamily = buildCodeExportFontFamily(settings);
+  const { settings, showNotification } = useAppStore();
   const exportInFlightRef = useRef(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -85,10 +82,12 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
   }, []);
 
   const handleExportToPdf = useCallback(async () => {
-    if (
-      !activeTabId ||
-      useAppStore.getState().fileContents[activeTabId] === undefined
-    ) {
+    // 刷新防抖输入后读取同一份快照，避免沿用渲染时的旧正文与配置。
+    flushActiveEditorPendingChanges();
+    const { files, activeTabId, rootFolderPath, settings, fileContents } =
+      useAppStore.getState();
+    const content = activeTabId ? fileContents[activeTabId] : undefined;
+    if (!activeTabId || content === undefined) {
       showNotification(
         t(settings.language, "notifications_noFileToExport"),
         "error",
@@ -120,8 +119,8 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         title: activeFile.name.replace(".md", ""),
         theme: settings.themeMode,
         includeTOC: false,
-        fontFamily: previewFontFamily,
-        codeFontFamily,
+        fontFamily: buildPreviewExportFontFamily(settings),
+        codeFontFamily: buildCodeExportFontFamily(settings),
         fontSettings: settings,
         fontSize: settings.fontSize,
         codeFontSize: Math.max(12, settings.fontSize - 2),
@@ -179,29 +178,14 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     } finally {
       endExport();
     }
-  }, [
-    activeTabId,
-    beginExport,
-    content,
-    endExport,
-    files,
-    rootFolderPath,
-    previewFontFamily,
-    codeFontFamily,
-    highlighter,
-    settings.fontSize,
-    settings.language,
-    settings.markdownStylePreset,
-    settings.orderedListMode,
-    settings.themeMode,
-    showNotification,
-  ]);
+  }, [beginExport, endExport, highlighter, showNotification]);
 
   const handleExportToHtml = useCallback(async () => {
-    if (
-      !activeTabId ||
-      useAppStore.getState().fileContents[activeTabId] === undefined
-    ) {
+    flushActiveEditorPendingChanges();
+    const { files, activeTabId, rootFolderPath, settings, fileContents } =
+      useAppStore.getState();
+    const content = activeTabId ? fileContents[activeTabId] : undefined;
+    if (!activeTabId || content === undefined) {
       showNotification(
         t(settings.language, "notifications_noFileToExport"),
         "error",
@@ -236,8 +220,8 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
         title: activeFile.name.replace(".md", ""),
         theme: settings.themeMode,
         includeTOC: false,
-        fontFamily: previewFontFamily,
-        codeFontFamily,
+        fontFamily: buildPreviewExportFontFamily(settings),
+        codeFontFamily: buildCodeExportFontFamily(settings),
         fontSettings: settings,
         fontSize: settings.fontSize,
         codeFontSize: Math.max(12, settings.fontSize - 2),
@@ -289,30 +273,15 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
     } finally {
       endExport();
     }
-  }, [
-    activeTabId,
-    beginExport,
-    content,
-    endExport,
-    files,
-    rootFolderPath,
-    previewFontFamily,
-    codeFontFamily,
-    highlighter,
-    settings.fontSize,
-    settings.language,
-    settings.markdownStylePreset,
-    settings.orderedListMode,
-    settings.themeMode,
-    showNotification,
-  ]);
+  }, [beginExport, endExport, highlighter, showNotification]);
 
   const buildLongImageSharePayload =
     useCallback(async (): Promise<LongImageSharePayload | null> => {
-      if (
-        !activeTabId ||
-        useAppStore.getState().fileContents[activeTabId] === undefined
-      ) {
+      flushActiveEditorPendingChanges();
+      const { files, activeTabId, settings, fileContents } =
+        useAppStore.getState();
+      const content = activeTabId ? fileContents[activeTabId] : undefined;
+      if (!activeTabId || content === undefined) {
         showNotification(
           t(settings.language, "notifications_noFileToExport"),
           "error",
@@ -336,8 +305,8 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
           title: activeFile.name.replace(".md", ""),
           theme: settings.themeMode,
           includeTOC: false,
-          fontFamily: previewFontFamily,
-          codeFontFamily,
+          fontFamily: buildPreviewExportFontFamily(settings),
+          codeFontFamily: buildCodeExportFontFamily(settings),
           fontSettings: settings,
           fontSize: getScaledEditorFontSize(
             settings.fontSize,
@@ -362,23 +331,7 @@ export function useExportActions(highlighter?: ShikiHighlighter | null) {
       } finally {
         endExport();
       }
-    }, [
-      activeTabId,
-      beginExport,
-      codeFontFamily,
-      content,
-      endExport,
-      files,
-      highlighter,
-      previewFontFamily,
-      settings.fontSize,
-      settings.language,
-      settings.markdownStylePreset,
-      settings.orderedListMode,
-      settings.themeMode,
-      settings.uiFontSize,
-      showNotification,
-    ]);
+    }, [beginExport, endExport, highlighter, showNotification]);
 
   return {
     handleExportToPdf,

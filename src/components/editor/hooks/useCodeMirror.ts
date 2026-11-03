@@ -245,12 +245,8 @@ export function useCodeMirror(
   const pendingImeContentSyncRef = useRef<string | null>(null);
   const imeSyncListenerScheduledRef = useRef(false);
 
-  // Update initial content ref when content changes before initialization
-  useEffect(() => {
-    if (!viewRef.current) {
-      initialContentRef.current = content || "";
-    }
-  }, [content]);
+  // 布局阶段会先创建视图，初始化文本不能等普通 effect 再更新。
+  initialContentRef.current = content || "";
 
   useEffect(() => {
     const view = viewRef.current;
@@ -390,6 +386,8 @@ export function useCodeMirror(
       pendingContentChangeIsLargeRef.current || isLargeEditorState(view.state);
     pendingContentChangeIsLargeRef.current = false;
     const emitted = view.state.doc.toString();
+    // 切换或卸载时不要把未变更的旧视图再次上报给新文档的回调。
+    if (emitted === lastEmittedContentRef.current) return;
     lastEmittedContentRef.current = emitted;
     onChangeRef.current(emitted, { skipHistory: isLarge });
   }, []);
@@ -521,6 +519,8 @@ export function useCodeMirror(
       });
 
       viewRef.current = view;
+      // 初始化和缓存恢复不是用户输入，立即建立基线供同步刷新判断。
+      lastEmittedContentRef.current = view.state.doc.toString();
       setViewReady(true);
     } catch (error) {
       console.error("CodeMirror initialization failed:", error);

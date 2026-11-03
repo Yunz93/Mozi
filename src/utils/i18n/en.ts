@@ -48,6 +48,9 @@ export default {
   app_untitledDrawing: "Untitled Drawing",
   app_untitledFolder: "Untitled Folder",
 
+  app_brandName: "Mozi",
+  toolbar_more: "More actions",
+  view_edit: "Edit",
   toolbar_hideSidebar: "Hide sidebar",
   toolbar_showSidebar: "Show sidebar",
   toolbar_saving: "Saving...",
@@ -218,7 +221,7 @@ export default {
   askVault_ask: "Generate answer",
   askVault_asking: "Generating…",
   askVault_retrieveHint:
-    "Retrieve snippets without calling AI — review sources first if you want.",
+    "Retrieve snippets without a generation model. Semantic retrieval follows your embedding settings; remote endpoints receive the query.",
   askVault_confirmSendHint:
     "{count} snippet(s) will be sent to the model. Click a snippet to jump back. Generated text is never applied silently.",
   askVault_toggleSources: "Show snippets to send",
@@ -505,6 +508,19 @@ export default {
   settings_languageLabel: "Display language",
   settings_interfaceDesc: "Choose the language used by the app interface.",
   settings_themeLabel: "Appearance",
+  settings_uiAccentColor: "Accent color",
+  settings_uiAccentColorDesc:
+    "Used for selections, primary buttons and focus indicators. Adapts to light and dark modes.",
+  settings_uiAccentDefault: "Default",
+  settings_uiAccentBlue: "Blue",
+  settings_uiAccentGreen: "Green",
+  settings_uiAccentPurple: "Purple",
+  settings_uiAccentRose: "Rose",
+  settings_uiAccentCustomShort: "Custom",
+  settings_uiAccentCustom: "Custom color",
+  settings_showReadingProperties: "Show properties in reading mode",
+  settings_showReadingPropertiesDesc:
+    "Show a compact properties table above the note. Hiding it keeps the note's metadata intact.",
   settings_themeLight: "Light",
   settings_themeDark: "Dark",
   settings_themeSystem: "Follow system",
@@ -967,7 +983,7 @@ export default {
   notifications_exportEmptyOutput:
     "Export produced an empty image. The note may be too large to rasterize.",
   notifications_exportTooLarge:
-    "The note is too large to export fully. Shorten it and retry.",
+    "The document is too long or too large to export fully. Split it into smaller sections and export again.",
   notifications_exportPrepareFailed: "Failed while preparing export HTML.",
   notifications_exportRasterFailed:
     "Failed while turning the page into an image.",
@@ -1098,6 +1114,8 @@ export default {
     "The selected DeepSeek model is unavailable. Pick another model in settings.",
   notifications_noKnowledgeBaseForWiki:
     "No knowledge base folder is available for creating the wiki file.",
+  notifications_wikiSourceChanged:
+    "The source note changed. Its text was preserved; any created Wiki is available in the vault.",
   notifications_wikiCreated: "Wiki created: {name}",
   notifications_wikiCreateFailed:
     "Failed to generate the wiki article. Check your AI settings and try again.",

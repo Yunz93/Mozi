@@ -20,12 +20,7 @@ export const EXPORT_REQUESTED_RENDER_SCALE = 2.5;
 /** 非 Windows 长图导出可保留更多纵向像素，避免过早降采样。 */
 export const LONG_IMAGE_MAX_CANVAS_DIMENSION = 30000;
 
-/**
- * Absolute floor on the render scale. We allow sub-1.0 scales for very long
- * documents because a grainy raster is strictly better than a Windows WebView2
- * renderer crash from canvas-dimension overflow. Below ~0.1 the output is
- * not legible at all, so we cap there.
- */
+/** 保持可读性的最小缩放；无法同时满足清晰度和画布上限时，拒绝导出并提示分段。 */
 export const EXPORT_MIN_RENDER_SCALE = 0.1;
 
 /**
@@ -40,16 +35,25 @@ export function computeSafePdfRenderScale(
   requestedScale: number = EXPORT_REQUESTED_RENDER_SCALE,
   maxCanvasDimension: number = EXPORT_MAX_CANVAS_DIMENSION,
 ): number {
-  const safeWidth =
-    containerWidthPx > 0
-      ? maxCanvasDimension / containerWidthPx
-      : requestedScale;
-  const safeHeight =
-    containerHeightPx > 0
-      ? maxCanvasDimension / containerHeightPx
-      : requestedScale;
+  if (
+    [
+      containerWidthPx,
+      containerHeightPx,
+      requestedScale,
+      maxCanvasDimension,
+    ].some((value) => !Number.isFinite(value) || value <= 0)
+  ) {
+    throw new Error("Invalid export dimensions or scale while preparing HTML.");
+  }
+  const safeWidth = maxCanvasDimension / containerWidthPx;
+  const safeHeight = maxCanvasDimension / containerHeightPx;
   const bounded = Math.min(requestedScale, safeWidth, safeHeight);
-  return Math.max(EXPORT_MIN_RENDER_SCALE, bounded);
+  if (bounded < EXPORT_MIN_RENDER_SCALE) {
+    throw new Error(
+      "Export document is too large to fit the max canvas size. Split it into smaller sections before exporting.",
+    );
+  }
+  return bounded;
 }
 
 export function computeSafeLongImageRenderScale(
@@ -74,6 +78,7 @@ export const EXPORT_RASTER_HOST_CLASS = "mp-export-raster-host";
 export const EXPORT_IMAGE_WAIT_TIMEOUT_MS = 12_000;
 export const EXPORT_HTML2CANVAS_TIMEOUT_MS = 120_000;
 export const EXPORT_FONTS_READY_TIMEOUT_MS = 8_000;
+const rasterStylesByHost = new WeakMap<HTMLDivElement, HTMLStyleElement>();
 
 export interface ExportRasterHostStyleSnapshot {
   visibility: string;
@@ -211,7 +216,7 @@ export function mountExportHtmlForRasterization(
     parsed.documentElement.getAttribute("data-theme") === "dark"
       ? "dark"
       : "light";
-  const backgroundColor = theme === "dark" ? "#0d1117" : "#ffffff";
+  const backgroundColor = theme === "dark" ? "#24272b" : "#faf8f3";
 
   removeExportRasterStyles();
   const styleElement = document.createElement("style");
@@ -220,6 +225,7 @@ export function mountExportHtmlForRasterization(
   document.head.appendChild(styleElement);
 
   const host = document.createElement("div");
+  rasterStylesByHost.set(host, styleElement);
   host.className = EXPORT_RASTER_HOST_CLASS;
   host.setAttribute("aria-hidden", "true");
   host.style.position = "fixed";
@@ -270,7 +276,9 @@ export async function prepareExportRenderTargetForRasterization(
 }
 
 export function disposeExportRasterHost(host: HTMLDivElement): void {
-  removeExportRasterStyles();
+  // 旧任务可能在关闭窗口后才结束，不能按全局 ID 删除新任务的样式。
+  rasterStylesByHost.get(host)?.remove();
+  rasterStylesByHost.delete(host);
   if (host.parentNode) {
     host.parentNode.removeChild(host);
   }

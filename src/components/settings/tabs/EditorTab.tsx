@@ -221,7 +221,7 @@ export const EditorTab: React.FC<EditorTabProps> = ({
                 {t("settings_editorFontDesc")}
               </p>
               <div
-                className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+                className="workspace-settings-font-preview mt-2 border px-4 py-3 text-sm"
                 style={{
                   fontFamily: getResolvedEditorFontFamily(settings),
                   fontSize: `${settings.fontSize}px`,
@@ -247,7 +247,7 @@ export const EditorTab: React.FC<EditorTabProps> = ({
                 {t("settings_previewFontDesc")}
               </p>
               <div
-                className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+                className="workspace-settings-font-preview mt-2 border px-4 py-3 text-sm"
                 style={{
                   fontFamily: getResolvedPreviewFontFamily(settings),
                   fontSize: `${settings.fontSize}px`,
@@ -273,7 +273,7 @@ export const EditorTab: React.FC<EditorTabProps> = ({
                 {t("settings_codeFontDesc")}
               </p>
               <div
-                className="mt-2 rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-200"
+                className="workspace-settings-font-preview mt-2 border px-4 py-3 text-sm"
                 style={{
                   fontFamily: getResolvedCodeFontFamily(settings),
                   fontSize: `${settings.fontSize}px`,
@@ -291,6 +291,16 @@ export const EditorTab: React.FC<EditorTabProps> = ({
           {t("settings_editorBehavior")}
         </h3>
         <div className="space-y-4">
+          <SettingsToggle
+            label={t("settings_showReadingProperties")}
+            description={t("settings_showReadingPropertiesDesc")}
+            checked={settings.showReadingProperties !== false}
+            onToggle={() =>
+              onUpdateSettings({
+                showReadingProperties: settings.showReadingProperties === false,
+              })
+            }
+          />
           <SettingsToggle
             label={t("settings_readableLineLength")}
             description={t("settings_readableLineLengthDesc")}

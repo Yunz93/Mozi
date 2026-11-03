@@ -268,13 +268,14 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     });
 
     // Register/unregister preview pane
+    const { registerPane, unregisterPane } = navigation;
     useEffect(() => {
       const container = previewRef.current;
       if (!container || !activeTabId) return;
 
-      navigation.registerPane(container);
-      return () => navigation.unregisterPane(container);
-    }, [activeTabId, navigation]);
+      registerPane(container);
+      return () => unregisterPane(container);
+    }, [activeTabId, registerPane, unregisterPane]);
 
     // Expose imperative handle
     useImperativeHandle(
@@ -613,15 +614,17 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       renderer.parsedContent.bodyHTML,
     ]);
 
-    // Cleanup on unmount
+    // 同一文档重渲染保留在途定位，仅切换文档或卸载时清理。
+    const { cancelScrollSync } = scroll;
+    const { clearScrollRetries } = navigation;
     useEffect(() => {
       return () => {
         mermaidRenderQueuedRef.current = false;
         mermaidRenderRunningRef.current = false;
-        scroll.cancelScrollSync();
-        navigation.clearScrollRetries();
+        cancelScrollSync();
+        clearScrollRetries();
       };
-    }, [scroll, navigation]);
+    }, [activeTabId, cancelScrollSync, clearScrollRetries]);
 
     // Asset preview (image/video/PDF)
     const [assetPreviewSrc, setAssetPreviewSrc] = useState("");
@@ -990,57 +993,62 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
               previewFileType === "html" ? "preview-pane-frame-html" : ""
             } ${hasActiveFile && previewFileType !== "html" ? "" : "h-full"}`}
           >
-            {isMarkdownPreview && parsedFrontmatter && (
-              <div className="preview-pane-properties editor-pane-width-constrained mx-auto mb-4 w-full rounded-xl overflow-hidden bg-gray-50/50 dark:bg-white/5 animate-fade-in group/metadata">
-                <div className="preview-pane-properties-header px-4 py-2 bg-gray-100/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
-                  <span>{t("preview_properties")}</span>
-                </div>
-                <div className="p-2 table w-full">
-                  {frontmatterEntries.map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="table-row hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                    >
-                      <div className="preview-pane-properties-cell table-cell py-1.5 px-2 w-32 whitespace-nowrap text-gray-500 dark:text-gray-400 font-medium align-top">
-                        {key}
-                      </div>
-                      <div className="preview-pane-properties-cell table-cell py-1.5 px-2 text-gray-800 dark:text-gray-200 align-top">
-                        {key === "link" &&
-                        typeof value === "string" &&
-                        isExternalLink(value) &&
-                        isValidExternalUrl(value) ? (
-                          <a
-                            href={value}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex max-w-full break-all py-0.5 text-accent-DEFAULT underline underline-offset-2 hover:opacity-80"
-                          >
-                            {value}
-                          </a>
-                        ) : Array.isArray(value) ? (
-                          <div className="preview-pane-properties-multi-value">
-                            {getFrontmatterDisplayItems(value).map(
-                              (item, index) => (
-                                <span
-                                  key={`${key}-${index}-${item}`}
-                                  className={`preview-pane-properties-multi-value-item ${item ? "" : "is-empty"}`}
-                                >
-                                  {item || "\u2014"}
-                                </span>
-                              ),
+            {isMarkdownPreview &&
+              parsedFrontmatter &&
+              settings.showReadingProperties !== false && (
+                <div className="preview-pane-properties-layout editor-pane-width-constrained mx-auto mb-4">
+                  <div className="preview-pane-properties w-full rounded-xl overflow-hidden bg-gray-50/50 dark:bg-white/5 animate-fade-in group/metadata">
+                    <div className="preview-pane-properties-header px-4 py-2 bg-gray-100/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
+                      <span>{t("preview_properties")}</span>
+                    </div>
+                    <div className="preview-pane-properties-fields p-1.5 table w-full">
+                      {frontmatterEntries.map(([key, value]) => (
+                        <div
+                          key={key}
+                          className="table-row hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        >
+                          <div className="preview-pane-properties-cell table-cell py-1.5 px-2 w-32 whitespace-nowrap text-gray-500 dark:text-gray-400 font-medium align-top">
+                            {key}
+                          </div>
+                          <div className="preview-pane-properties-cell table-cell py-1.5 px-2 text-gray-800 dark:text-gray-200 align-top">
+                            {key === "link" &&
+                            typeof value === "string" &&
+                            isExternalLink(value) &&
+                            isValidExternalUrl(value) ? (
+                              <a
+                                href={value}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex max-w-full break-all py-0.5 text-accent-DEFAULT underline underline-offset-2 hover:opacity-80"
+                              >
+                                {value}
+                              </a>
+                            ) : Array.isArray(value) ? (
+                              <div className="preview-pane-properties-multi-value">
+                                {getFrontmatterDisplayItems(value).map(
+                                  (item, index) => (
+                                    <span
+                                      key={`${key}-${index}-${item}`}
+                                      className={`preview-pane-properties-multi-value-item ${item ? "" : "is-empty"}`}
+                                    >
+                                      {item || "\u2014"}
+                                    </span>
+                                  ),
+                                )}
+                              </div>
+                            ) : (
+                              <div className="preview-pane-properties-static whitespace-pre-wrap break-words py-0.5">
+                                {getFrontmatterDisplayItems(value)[0] ||
+                                  "\u2014"}
+                              </div>
                             )}
                           </div>
-                        ) : (
-                          <div className="preview-pane-properties-static whitespace-pre-wrap break-words py-0.5">
-                            {getFrontmatterDisplayItems(value)[0] || "\u2014"}
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             <div
               className={`editor-pane-sheet preview-pane-sheet w-full ${

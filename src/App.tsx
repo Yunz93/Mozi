@@ -25,6 +25,7 @@ import { resolvePreviewOnlyViewModeTransition } from "./utils/viewModeSession";
 import { getNextViewMode } from "./utils/viewMode";
 import { useShikiHighlighter } from "./hooks/useShikiHighlighter";
 import { useThemeSync } from "./hooks/useThemeSync";
+import { useUiAccentColor } from "./hooks/useUiAccentColor";
 import { useSystemThemeFollow } from "./hooks/useSystemThemeFollow";
 import { useAIAnalyze } from "./hooks/useAIAnalyze";
 import { useFileOperations } from "./hooks/useFileOperations";
@@ -176,6 +177,7 @@ const App: React.FC = () => {
 
   useSystemThemeFollow();
   useThemeSync(settings.themeMode, settings.themeFollowSystem);
+  useUiAccentColor(settings.uiAccentColor, settings.themeMode);
   useLayoutEffect(() => {
     const scaledFontSize = getScaledEditorFontSize(
       settings.fontSize,
@@ -997,7 +999,7 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <div
-        className="flex h-screen flex-col overflow-hidden text-sm"
+        className="workspace-root flex h-screen flex-col overflow-hidden text-sm"
         style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
       >
         {(() => {
@@ -1009,7 +1011,7 @@ const App: React.FC = () => {
           if (!shouldInsetForMacOverlayTitlebar) return null;
           return (
             <div
-              className="h-[28px] w-full shrink-0 bg-gray-50 dark:bg-black"
+              className="workspace-titlebar h-[28px] w-full shrink-0"
               data-tauri-drag-region
               onMouseDown={(event) => {
                 if (event.button !== 0) return;
@@ -1061,10 +1063,11 @@ const App: React.FC = () => {
 
           <main
             ref={mainContentRef}
-            className="flex-1 flex flex-col h-full min-w-0 bg-gray-50 dark:bg-black"
+            className="workspace-surface flex-1 flex flex-col h-full min-w-0"
           >
             <Toolbar
               fileName={activeFile?.name || ""}
+              folderName={activeFile?.path?.split(/[/\\]/).at(-2)}
               viewMode={viewMode}
               onViewModeChange={handleToolbarViewModeChange}
               onAIAnalyze={requestAIAnalyze}

@@ -452,6 +452,25 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         return;
       }
 
+      const sourceDoc = view.state.doc;
+      if (
+        sourceDoc.sliceString(menuState.from, menuState.to).trim() !==
+        menuState.text.trim()
+      ) {
+        closeSelectionMenu();
+        showNotification(t("notifications_wikiSourceChanged"), "warning");
+        return;
+      }
+      const source = useAppStore.getState();
+      let contextChanged = false;
+      const unsubscribe = useAppStore.subscribe((state) => {
+        if (
+          state.activeTabId !== source.activeTabId ||
+          state.rootFolderPath !== source.rootFolderPath
+        ) {
+          contextChanged = true;
+        }
+      });
       setIsGeneratingWiki(true);
       try {
         const replacement = await onGenerateWikiFromSelection({
@@ -461,6 +480,15 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         });
 
         if (!replacement) {
+          return;
+        }
+
+        if (
+          contextChanged ||
+          !view.dom.isConnected ||
+          view.state.doc !== sourceDoc
+        ) {
+          showNotification(t("notifications_wikiSourceChanged"), "warning");
           return;
         }
 
@@ -476,6 +504,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
         });
         closeSelectionMenu();
       } finally {
+        unsubscribe();
         setIsGeneratingWiki(false);
       }
     }, [
@@ -483,6 +512,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       codeMirror.view,
       onGenerateWikiFromSelection,
       selectionMenu,
+      showNotification,
+      t,
     ]);
 
     const handleUploadLocalImage = useCallback(async () => {

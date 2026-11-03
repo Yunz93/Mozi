@@ -4,7 +4,7 @@
 
 [English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
 
-本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。正式版以 Live 模式写作，并可一键发到微信公众号草稿或 Simple Blog。
+本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.0.0 统一了写作、阅读、设置和启动页的外观，保留 Live 实时预览、知识检索，以及微信公众号草稿和 Simple Blog 发布。
 
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v1.2.1 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.0 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
@@ -47,6 +47,20 @@ xattr -cr /Applications/墨知.app
 ## 特色功能
 
 跟着内置 [功能导览](./src-tauri/resources/sample-notes/03-功能导览.md) 逐项体验。以下截图来自独立演示知识库，均随示例保存在本地。
+
+### 2.0.0 工作区与启动页
+
+默认使用 macOS 或 Windows 的系统无衬线字体。浅色采用暖白表面，深色采用金属灰，侧栏、正文、上下栏和设置保持一致。顶部按主题、小知助手、编辑、阅读、发布、更多排列，只显示图标，悬停可查看名称；知识库名称入口仍在左下，设置在右侧。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/23-theme-dark.png" alt="2.0.0 金属灰工作区与纯图标工具栏" width="800">
+</p>
+
+打开知识库和恢复工作区时也使用相同的主题与字体。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/25-startup.png" alt="沿用工作区主题的知识库启动页" width="800">
+</p>
 
 ### 本地知识库与多窗口
 
@@ -102,7 +116,7 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### 小知助手
 
-先用「仅检索」查看来源片段，再按需生成带引用的回答，点击来源回到笔记。当前版本需先完成 AI 供应商配置；仅检索不调用在线模型，生成回答会把检索片段发送给所选模型。
+先用「仅检索」查看来源片段，再按需生成带引用的回答，点击来源回到笔记。当前版本需先完成 AI 供应商配置；仅检索不调用生成模型，若语义检索配置了远端 embedding 接口，仍会把查询发送到该接口。生成回答会把问题和检索片段发送给所选模型。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/02-vault-retrieval.png" alt="仅检索结果与来源定位" width="800">
@@ -110,7 +124,7 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### AI 增强与 Wiki 生成
 
-支持 Gemini、OpenAI、DeepSeek、GLM、Kimi、Xiaomi MiMo，用于笔记增强、Wiki 生成和问库。各供应商独立保存密钥、接口地址与模型，可使用预设或自定义模型 ID。套餐密钥需填写套餐专用地址，密钥通过本机安全存储保存。
+支持 Gemini、OpenAI、DeepSeek、GLM、Kimi、Xiaomi MiMo，用于笔记增强、Wiki 生成和问库。顶部 **更多 → AI 增强** 处理当前笔记，选中文字后可从右键菜单生成 Wiki，设置中可调整 Wiki 保存目录和生成提示词。各供应商独立保存密钥与模型，支持兼容接口的供应商可设置地址，也可使用预设或自定义模型 ID。套餐密钥需填写套餐专用地址，密钥通过本机安全存储保存。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/12-ai-providers.png" alt="六家 AI 供应商配置" width="800">
@@ -134,10 +148,10 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### PDF、HTML 与长图分享
 
-顶部 **导出** 提供 PDF 和 HTML。**长图分享** 对话框提供生成纵向 PNG、预览、保存、复制和系统分享入口。下图展示导出菜单与生成后的长图预览。
+顶部 **更多** 中的图标分别提供 **导出 PDF**、**导出 HTML** 和 **长图分享**，悬停可查看名称。长图对话框可生成纵向 PNG、预览、保存、复制和系统分享。导出前会读取编辑器的最新输入。
 
 <p>
-  <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="PDF 与 HTML 导出菜单" width="800">
+  <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="更多菜单中的 PDF、HTML 和长图入口" width="800">
 </p>
 
 <p>
@@ -170,11 +184,19 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### 外观、属性与快捷键
 
-选择明暗主题、界面语言、字体和字号；为新笔记配置 frontmatter 模板，添加或排序分类、标签、状态、Slug 与别名等字段；按习惯调整快捷键。
+在 **设置 → 界面** 选择明暗主题、界面语言和界面字体。主题色支持默认、蓝、绿、紫、玫瑰色，自定义取色器紧接预设排列，选中态、主要按钮和焦点提示随主题色变化。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/08-appearance.png" alt="外观设置" width="800">
 </p>
+
+在 **设置 → 编辑器** 调整正文、阅读与代码字体，控制可读行宽。阅读模式的属性表更紧凑，与正文同宽；关闭「阅读模式显示属性」即可隐藏表格，笔记里的 frontmatter 数据仍会保留。
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/24-reading-properties.png" alt="紧凑的阅读属性表及显示设置" width="800">
+</p>
+
+在 **设置 → 元数据** 配置新笔记的 frontmatter 模板，添加或排序分类、标签、状态、Slug 与别名等字段；在 **设置 → 快捷键** 调整键位。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/09-metadata.png" alt="笔记属性模板" width="800">
@@ -285,7 +307,7 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### AI 供应商配置
 
-在设置的 AI 页面选择 Gemini、OpenAI、DeepSeek、GLM、Kimi 或 Xiaomi MiMo，可用于内容增强、Wiki 生成和问库。每家供应商独立保存密钥、接口地址和模型，切换供应商不会覆盖其他配置。
+在设置的 AI 页面选择 Gemini、OpenAI、DeepSeek、GLM、Kimi 或 Xiaomi MiMo，可用于内容增强、Wiki 生成和问库。每家供应商独立保存密钥与模型，支持兼容接口的供应商可设置地址，切换供应商不会覆盖其他配置。
 
 GLM、Kimi、Xiaomi MiMo 默认使用官方标准 API；套餐密钥需填写套餐对应的专用地址。模型可使用预设或自定义 ID，Kimi 和 MiMo 也可加载账号可用的模型列表。GLM 使用文档预设，不请求未公开的模型枚举接口。密钥通过应用的安全存储保存，不写入普通设置缓存。
 

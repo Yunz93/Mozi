@@ -1,4 +1,5 @@
 import React from "react";
+import { BookOpen } from "lucide-react";
 import { useI18n } from "../hooks/useI18n";
 
 export const KnowledgeBaseOnboarding: React.FC<{
@@ -9,26 +10,26 @@ export const KnowledgeBaseOnboarding: React.FC<{
   const { t } = useI18n();
   return (
     <div
-      className="ui-scaled min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 flex items-center justify-center p-6"
+      className="workspace-startup ui-scaled min-h-screen flex items-center justify-center p-6"
       style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
     >
-      <div className="w-full max-w-xl rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-md shadow-xl p-8">
+      <div className="workspace-startup-panel w-full max-w-xl p-8">
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold tracking-tight">
-            M
+          <div className="workspace-startup-brand w-10 h-10 flex items-center justify-center">
+            <BookOpen size={24} aria-hidden />
           </div>
           <div>
             <h1 className="text-xl font-semibold">
               {t("app_chooseKnowledgeBase")}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="workspace-startup-description text-sm">
               {t("app_chooseKnowledgeBaseDesc")}
             </p>
           </div>
         </div>
         <button
           onClick={onOpen}
-          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black font-medium hover:opacity-90 transition-opacity"
+          className="workspace-startup-open w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-medium"
         >
           <svg
             className="w-4 h-4"

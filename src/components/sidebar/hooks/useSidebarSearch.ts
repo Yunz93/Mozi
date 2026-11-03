@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import type { FileNode, SearchMode } from "../../../types";
+import { ViewMode } from "../../../types";
+import { flattenHeadingNodes, parseHeadings } from "../../../utils/outline";
+import { requestPreviewHeadingScroll } from "../../../utils/previewNavigationBridge";
 import { useAppStore } from "../../../store/appStore";
 import {
   isTrashRootName,
@@ -58,23 +61,21 @@ const normalizeSearchTarget = (text: string): string => {
     .trim();
 };
 
-const collectParagraphMatches = (
+export const collectParagraphMatches = (
   content: string,
   query: string,
 ): SidebarSearchSnippet[] => {
-  const normalizedQuery = normalizeSearchTarget(query);
+  // 正文按字面匹配，保留标点和连续空格，避免将查询清洗为空串。
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
   const lowerContent = content.toLowerCase();
   const snippets: SidebarSearchSnippet[] = [];
   const seenRanges = new Set<string>();
 
-  const positions: number[] = [];
   let pos = 0;
-  while ((pos = lowerContent.indexOf(normalizedQuery, pos)) !== -1) {
-    positions.push(pos);
-    pos += normalizedQuery.length;
-  }
-
-  for (const matchPos of positions) {
+  while (snippets.length < 3) {
+    const matchPos = lowerContent.indexOf(normalizedQuery, pos);
+    if (matchPos === -1) break;
     let start = matchPos;
     while (start > 0 && content[start - 1] !== "\n") start--;
     while (start < content.length && /\s/.test(content[start])) start++;
@@ -82,6 +83,8 @@ const collectParagraphMatches = (
     let end = matchPos + normalizedQuery.length;
     while (end < content.length && content[end] !== "\n") end++;
     while (end > start && /\s/.test(content[end - 1])) end--;
+    // 同一段只返回一次，跳过段内重复命中，避免长文档收集全部位置。
+    pos = Math.max(matchPos + normalizedQuery.length, end);
 
     const line = content.slice(0, start).split("\n").length;
     const key = `${start}-${end}`;
@@ -97,7 +100,7 @@ const collectParagraphMatches = (
     }
   }
 
-  return snippets.slice(0, 3);
+  return snippets;
 };
 
 export function useSidebarSearch(
@@ -344,11 +347,32 @@ export function useSidebarSearch(
 
   const handleSearchResultSelect = useCallback(
     async (file: FileNode, snippet?: SidebarSearchSnippet) => {
+      const originRoot = useAppStore.getState().rootFolderPath;
       await onFileSelect(file);
-      if (snippet && snippet.end > snippet.start) {
-        requestEditorRangeFocus(file.id, snippet.start, snippet.end, {
-          alignTopRatio: 0.3,
-        });
+      const state = useAppStore.getState();
+      if (state.activeTabId !== file.id || state.rootFolderPath !== originRoot)
+        return;
+      if (snippet) {
+        if (state.viewMode === ViewMode.PREVIEW) {
+          const content =
+            state.fileContents[file.id] ?? contentCacheRef.current.get(file.id);
+          if (content !== undefined) {
+            const heading = flattenHeadingNodes(parseHeadings(content))
+              .filter(
+                (node) => node.line !== undefined && node.line <= snippet.line,
+              )
+              .at(-1);
+            if (heading) {
+              requestPreviewHeadingScroll(file.id, heading.id, {
+                alignTopRatio: 0.3,
+              });
+            }
+          }
+        } else if (snippet.end > snippet.start) {
+          requestEditorRangeFocus(file.id, snippet.start, snippet.end, {
+            alignTopRatio: 0.3,
+          });
+        }
       }
       if (window.innerWidth < 768) onClose();
     },

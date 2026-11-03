@@ -31,6 +31,14 @@ import {
 import { clearMarkdownCache, renderMarkdown } from "./markdown";
 
 describe("extractWechatDraftDefaults", () => {
+  it("摘要保留链接文字而不是替换占位符", () => {
+    expect(
+      extractWechatDraftDefaults(
+        "阅读 [Example](https://example.com) 获取信息。",
+        "/note.md",
+      ).digest,
+    ).toBe("阅读 Example 获取信息。");
+  });
   it("prefers frontmatter values when available", () => {
     const defaults = extractWechatDraftDefaults(
       `---

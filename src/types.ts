@@ -286,6 +286,10 @@ export interface AppSettings {
   lastKnowledgeBasePath?: string;
   lastOpenedFilePath?: string;
   themeMode: ThemeMode;
+  /** 界面主题色，default 表示沿用明暗主题的默认强调色。 */
+  uiAccentColor: string;
+  /** 阅读模式是否显示笔记属性，不影响文件中的元数据。 */
+  showReadingProperties: boolean;
   /** When true, themeMode follows the OS light/dark preference automatically. */
   themeFollowSystem: boolean;
   metadataFields: MetadataField[];

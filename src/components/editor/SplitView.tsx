@@ -292,6 +292,8 @@ export const SplitView: React.FC<SplitViewProps> = ({
 
       const resyncAfterTransition = () => {
         transitionCleanupRef.current = null;
+        // 新的标题定位优先，旧视图的延迟恢复不能把正文拉回原位置。
+        if (isHeadingNavigationLocked()) return;
         if (isEditorVisibleMode(viewMode)) {
           editorPaneRef.current?.syncScrollTo(anchorPercentage, {
             immediate: true,
@@ -438,7 +440,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
   if (isExcalidrawActive) {
     return (
       <ErrorBoundary>
-        <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black">
+        <div className="workspace-surface flex-1 min-h-0 min-w-0 flex flex-col">
           <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
             <Suspense
               fallback={
@@ -460,7 +462,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
   return (
     <ErrorBoundary>
       <div
-        className="flex-1 min-h-0 min-w-0 flex flex-col bg-[#f8fafc] dark:bg-black"
+        className="workspace-surface flex-1 min-h-0 min-w-0 flex flex-col"
         data-markdown-style={settings.markdownStylePreset}
         style={markdownStyleVariables as React.CSSProperties}
       >
@@ -486,7 +488,8 @@ export const SplitView: React.FC<SplitViewProps> = ({
           </div>
 
           <div
-            className="w-3 hover:bg-accent-DEFAULT/50 z-10 absolute h-full flex items-center justify-center"
+            className="workspace-split-divider w-3 z-10 absolute h-full flex items-center justify-center"
+            data-resizing={isResizing}
             style={{
               left: `${editorWidth}%`,
               opacity: isSplitView ? 1 : 0,
@@ -520,7 +523,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
         </div>
 
         {activeTabId && (
-          <div className="shrink-0 border-t border-gray-200/50 bg-[#f8fafc] dark:border-white/5 dark:bg-black">
+          <div className="workspace-document-footer shrink-0 border-t">
             <div className="mx-auto flex w-full max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 md:px-5">
               <WritingStatsDisplay
                 className="min-w-0 flex-1 border-t-0 px-0 py-0"

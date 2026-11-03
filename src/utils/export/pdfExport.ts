@@ -65,6 +65,7 @@ export async function exportToPdf(
 
   const { host, renderTarget, theme, backgroundColor } =
     mountExportHtmlForRasterization(htmlContent);
+  let pdfContainer: HTMLElement | undefined;
 
   try {
     await withExportTimeout(
@@ -110,6 +111,7 @@ export async function exportToPdf(
         EXPORT_PDF_PREPARE_TIMEOUT_MS,
         "PDF export timed out while preparing page layout",
       );
+      pdfContainer = container;
       container.style.backgroundColor = backgroundColor;
       // 纸张比预览列窄时只缩小图表外层，保留内部 SVG 的坐标系。
       container
@@ -148,6 +150,9 @@ export async function exportToPdf(
       description: "PDF Document",
     });
   } finally {
+    // 尺寸检查或光栅化失败时，库不会自行移除透明遮罩；仅清理本次导出的克隆。
+    const overlay = pdfContainer?.parentElement;
+    if (overlay?.classList.contains("html2pdf__overlay")) overlay.remove();
     disposeExportRasterHost(host);
   }
 }

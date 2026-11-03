@@ -5,18 +5,31 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import {
+  Download,
+  FileText,
+  Image,
+  Lightbulb,
+  LoaderCircle,
+  Moon,
+  MoreHorizontal,
+  PanelLeft,
+  Sparkles,
+  Sun,
+  Upload,
+} from "lucide-react";
+import {
   getExportInFlight,
   subscribeExportInFlight,
 } from "../../hooks/useExportActions";
 import { ViewMode, type ThemeMode } from "../../types";
-import { ViewModeToggle } from "../toolbar/ViewModeToggle";
-import { AIButton } from "../toolbar/AIButton";
+import { ViewModeToggle } from "./ViewModeToggle";
 import { useI18n } from "../../hooks/useI18n";
 import { isTauriEnvironment } from "../../types/filesystem";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface ToolbarProps {
   fileName: string;
+  folderName?: string;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onAIAnalyze: () => void;
@@ -39,6 +52,7 @@ interface ToolbarProps {
 export const Toolbar: React.FC<ToolbarProps> = React.memo(
   ({
     fileName,
+    folderName,
     viewMode,
     onViewModeChange,
     onAIAnalyze,
@@ -58,54 +72,96 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
     isPreviewOnlyFile = false,
   }) => {
     const { t } = useI18n();
-    const isDark = themeMode === "dark";
-    const displayFileName = fileName.replace(/\.md$/i, "");
-    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-    const exportMenuRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      if (!isExportMenuOpen) return;
-      const handlePointerDown = (event: MouseEvent) => {
-        if (!exportMenuRef.current?.contains(event.target as Node)) {
-          setIsExportMenuOpen(false);
-        }
-      };
-      const handleEscape = (event: KeyboardEvent) => {
-        if (event.key === "Escape") setIsExportMenuOpen(false);
-      };
-      document.addEventListener("mousedown", handlePointerDown);
-      document.addEventListener("keydown", handleEscape);
-      return () => {
-        document.removeEventListener("mousedown", handlePointerDown);
-        document.removeEventListener("keydown", handleEscape);
-      };
-    }, [isExportMenuOpen]);
-
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const menuTriggerRef = useRef<HTMLButtonElement>(null);
     const isExporting = useSyncExternalStore(
       subscribeExportInFlight,
       getExportInFlight,
       getExportInFlight,
     );
-    const exportDisabled = isPreviewOnlyFile || !fileName || isExporting;
-    const canShowExport = Boolean(onExportPdf || onExportHtml);
+    const documentDisabled = isPreviewOnlyFile || !fileName;
+    const exportDisabled = documentDisabled || isExporting;
+    const displayFileName = fileName.replace(/\.md$/i, "");
+
+    useEffect(() => {
+      if (!isMenuOpen) return;
+      const getMenuItems = () =>
+        Array.from(
+          menuRef.current?.querySelectorAll<HTMLButtonElement>(
+            '[role="menuitem"]:not(:disabled)',
+          ) ?? [],
+        );
+      getMenuItems()[0]?.focus();
+      const handlePointerDown = (event: MouseEvent) => {
+        if (!menuRef.current?.contains(event.target as Node))
+          setIsMenuOpen(false);
+      };
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setIsMenuOpen(false);
+          menuTriggerRef.current?.focus();
+        } else if (event.key === "Tab") {
+          menuTriggerRef.current?.focus();
+          setIsMenuOpen(false);
+        } else if (
+          [
+            "ArrowDown",
+            "ArrowUp",
+            "ArrowRight",
+            "ArrowLeft",
+            "Home",
+            "End",
+          ].includes(event.key) &&
+          menuRef.current?.contains(event.target as Node)
+        ) {
+          const items = getMenuItems();
+          if (!items.length) return;
+          event.preventDefault();
+          const currentIndex = items.indexOf(
+            document.activeElement as HTMLButtonElement,
+          );
+          const nextIndex =
+            event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? items.length - 1
+                : (currentIndex +
+                    (["ArrowDown", "ArrowRight"].includes(event.key) ? 1 : -1) +
+                    items.length) %
+                  items.length;
+          items[nextIndex].focus();
+        }
+      };
+      document.addEventListener("mousedown", handlePointerDown);
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", handlePointerDown);
+        document.removeEventListener("keydown", handleKeyDown);
+      };
+    }, [isMenuOpen]);
+
+    const runMenuAction = (action: () => void) => {
+      setIsMenuOpen(false);
+      action();
+    };
 
     return (
-      <div
-        className="ui-scaled sticky top-0 z-20 flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b border-transparent bg-gray-50 dark:bg-black px-4 py-3 md:px-6 md:py-2"
-        data-tauri-drag-region
-      >
+      <div className="app-toolbar ui-scaled" data-tauri-drag-region>
         <div
-          className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden md:gap-4"
+          className="app-toolbar-document"
           onMouseDown={(event) => {
-            if (event.button !== 0) return;
-            const isMac =
-              typeof navigator !== "undefined" &&
-              /Mac/.test(navigator.platform ?? "");
-            if (!isMac || !isTauriEnvironment()) return;
-            const target = event.target as HTMLElement | null;
             if (
-              target?.closest(
-                'button, input, textarea, select, a, [role=\"button\"]',
+              event.button !== 0 ||
+              !/Mac/.test(navigator.platform ?? "") ||
+              !isTauriEnvironment()
+            )
+              return;
+            const target = event.target as HTMLElement;
+            if (
+              target.closest(
+                'button, input, textarea, select, a, [role="button"]',
               )
             )
               return;
@@ -115,307 +171,171 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
           <button
             type="button"
             onClick={onMenuClick}
+            className="app-toolbar-icon"
             data-tauri-drag-region="false"
-            className="inline-flex h-8 w-8 items-center justify-center -ml-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
-            title={
-              isSidebarOpen
-                ? t("toolbar_hideSidebar")
-                : t("toolbar_showSidebar")
-            }
-            aria-label={
-              isSidebarOpen
-                ? t("toolbar_hideSidebar")
-                : t("toolbar_showSidebar")
-            }
+            title={t(
+              isSidebarOpen ? "toolbar_hideSidebar" : "toolbar_showSidebar",
+            )}
+            aria-label={t(
+              isSidebarOpen ? "toolbar_hideSidebar" : "toolbar_showSidebar",
+            )}
             aria-expanded={isSidebarOpen}
           >
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden
-            >
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <line
-                x1={isSidebarOpen ? 9 : 6}
-                y1="4"
-                x2={isSidebarOpen ? 9 : 6}
-                y2="20"
-              />
-            </svg>
+            <PanelLeft size={14} aria-hidden />
           </button>
-
-          <div className="flex flex-col min-w-0">
-            {fileName ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm md:text-base"
-                    title={displayFileName}
-                  >
-                    {displayFileName}
-                  </span>
-                  {isSaving && (
-                    <span className="flex items-center gap-1 text-[10px] text-gray-400 font-medium animate-pulse">
-                      <svg
-                        className="w-2.5 h-2.5 animate-spin"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="none"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      {t("toolbar_saving")}
-                    </span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <span className="text-gray-400 text-sm font-medium">
-                {t("toolbar_noFileSelected")}
+          {folderName && fileName && (
+            <span className="app-toolbar-folder" title={folderName}>
+              <span className="app-toolbar-folder-name">{folderName}</span>
+              <span className="app-toolbar-folder-divider" aria-hidden>
+                /
               </span>
-            )}
-          </div>
+            </span>
+          )}
+          <span className="app-toolbar-title" title={displayFileName}>
+            {displayFileName || t("toolbar_noFileSelected")}
+          </span>
+          {isSaving && (
+            <span className="app-toolbar-saving" role="status">
+              <LoaderCircle size={12} className="animate-spin" aria-hidden />
+              {t("toolbar_saving")}
+            </span>
+          )}
         </div>
-
-        <div
-          className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap"
-          data-tauri-drag-region="false"
-        >
+        <div className="app-toolbar-actions" data-tauri-drag-region="false">
           <button
+            type="button"
             onClick={onToggleTheme}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-            title={
-              isDark ? t("toolbar_switchToLight") : t("toolbar_switchToDark")
-            }
+            className="app-toolbar-icon"
+            title={t(
+              themeMode === "dark"
+                ? "toolbar_switchToLight"
+                : "toolbar_switchToDark",
+            )}
+            aria-label={t(
+              themeMode === "dark"
+                ? "toolbar_switchToLight"
+                : "toolbar_switchToDark",
+            )}
           >
-            {isDark ? (
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
+            {themeMode === "dark" ? (
+              <Sun size={14} aria-hidden />
             ) : (
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
+              <Moon size={14} aria-hidden />
             )}
           </button>
-
-          <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
-            <AIButton
-              onClick={onAIAnalyze}
-              isLoading={isAnalyzing}
-              disabled={!fileName || isPreviewOnlyFile}
-            />
-            {onAskVault ? (
-              <button
-                type="button"
-                onClick={onAskVault}
-                disabled={isPreviewOnlyFile}
-                aria-pressed={isAskVaultOpen}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${
-                  isAskVaultOpen
-                    ? "bg-sky-100 text-sky-700 dark:bg-sky-400/20 dark:text-sky-200"
-                    : "bg-white/80 dark:bg-white/[0.06] text-sky-600 dark:text-sky-300 hover:bg-white dark:hover:bg-white/10"
-                }`}
-                title={t("askVault_title")}
-                aria-label={t("askVault_title")}
+          {onAskVault && (
+            <button
+              type="button"
+              onClick={onAskVault}
+              disabled={isPreviewOnlyFile}
+              aria-label={t("askVault_title")}
+              aria-pressed={isAskVaultOpen}
+              title={t("askVault_title")}
+              className={`app-toolbar-assistant ${isAskVaultOpen ? "is-active" : ""}`}
+            >
+              <Lightbulb size={14} aria-hidden />
+            </button>
+          )}
+          <ViewModeToggle
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+            previewOnly={isPreviewOnlyFile}
+          />
+          {onPublish && (
+            <button
+              type="button"
+              onClick={onPublish}
+              disabled={isPublishing || documentDisabled}
+              className="app-toolbar-publish"
+              title={t(isPublishing ? "toolbar_publishing" : "toolbar_publish")}
+              aria-label={t(
+                isPublishing ? "toolbar_publishing" : "toolbar_publish",
+              )}
+            >
+              {isPublishing ? (
+                <LoaderCircle size={14} className="animate-spin" aria-hidden />
+              ) : (
+                <Upload size={14} aria-hidden />
+              )}
+            </button>
+          )}
+          <div className="app-toolbar-menu-anchor" ref={menuRef}>
+            <button
+              ref={menuTriggerRef}
+              type="button"
+              onClick={() => setIsMenuOpen((open) => !open)}
+              className="app-toolbar-icon"
+              title={t("toolbar_more")}
+              aria-label={t("toolbar_more")}
+              aria-expanded={isMenuOpen}
+              aria-haspopup="menu"
+            >
+              <MoreHorizontal size={14} aria-hidden />
+            </button>
+            {isMenuOpen && (
+              <div
+                role="menu"
+                aria-orientation="horizontal"
+                aria-label={t("toolbar_more")}
+                className="app-toolbar-menu"
               >
-                <svg
-                  className="h-3.5 w-3.5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                  <path d="M12 7.5v.01" />
-                  <path d="M10.5 11a1.5 1.5 0 1 1 2.2 1.3c-.5.4-.7.7-.7 1.2" />
-                </svg>
-              </button>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
-            <ViewModeToggle
-              viewMode={viewMode}
-              onViewModeChange={onViewModeChange}
-              previewOnly={isPreviewOnlyFile}
-            />
-          </div>
-
-          {(onPublish || canShowExport || onShareLongImage) && (
-            <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200/70 dark:border-white/10 bg-gray-100/80 dark:bg-white/[0.05] px-2 py-1 shadow-sm shadow-black/5">
-              {onPublish && (
-                <button
-                  onClick={onPublish}
-                  disabled={isPublishing || isPreviewOnlyFile || !fileName}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
-                  title={
-                    isPublishing
-                      ? t("toolbar_publishing")
-                      : t("toolbar_publish")
-                  }
-                >
-                  {isPublishing ? (
-                    <svg
-                      className="h-4 w-4 animate-spin"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 0 1 8-8v3a5 5 0 0 0-5 5H4z"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                  )}
-                </button>
-              )}
-
-              {canShowExport && (
-                <div className="relative" ref={exportMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (exportDisabled) return;
-                      setIsExportMenuOpen((open) => !open);
-                    }}
-                    disabled={exportDisabled}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
-                    title={t("toolbar_export")}
-                    aria-expanded={isExportMenuOpen}
-                    aria-haspopup="menu"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                  </button>
-                  {isExportMenuOpen && (
-                    <div
-                      role="menu"
-                      className="absolute right-0 top-full z-40 mt-1 min-w-[10.5rem] overflow-hidden rounded-xl border border-gray-200/80 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-[#121923]"
-                    >
-                      {onExportPdf && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={isExporting}
-                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
-                          onClick={() => {
-                            setIsExportMenuOpen(false);
-                            onExportPdf();
-                          }}
-                        >
-                          {t("toolbar_exportPdf")}
-                        </button>
-                      )}
-                      {onExportHtml && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={isExporting}
-                          className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
-                          onClick={() => {
-                            setIsExportMenuOpen(false);
-                            onExportHtml();
-                          }}
-                        >
-                          {t("toolbar_exportHtml")}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {onShareLongImage && (
                 <button
                   type="button"
-                  onClick={onShareLongImage}
-                  disabled={!fileName || isPreviewOnlyFile}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200/70 dark:border-white/10 bg-white/85 dark:bg-white/[0.03] text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none"
-                  title={t("toolbar_shareLongImage")}
+                  role="menuitem"
+                  title={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
+                  aria-label={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
+                  disabled={documentDisabled || isAnalyzing}
+                  onClick={() => runMenuAction(onAIAnalyze)}
                 >
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <path d="M21 15l-5-5L5 21" />
-                  </svg>
+                  {isAnalyzing ? (
+                    <LoaderCircle
+                      size={14}
+                      className="animate-spin"
+                      aria-hidden
+                    />
+                  ) : (
+                    <Sparkles size={14} aria-hidden />
+                  )}
                 </button>
-              )}
-            </div>
-          )}
+                {onExportPdf && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    title={t("toolbar_exportPdf")}
+                    aria-label={t("toolbar_exportPdf")}
+                    disabled={exportDisabled}
+                    onClick={() => runMenuAction(onExportPdf)}
+                  >
+                    <Download size={14} aria-hidden />
+                  </button>
+                )}
+                {onExportHtml && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    title={t("toolbar_exportHtml")}
+                    aria-label={t("toolbar_exportHtml")}
+                    disabled={exportDisabled}
+                    onClick={() => runMenuAction(onExportHtml)}
+                  >
+                    <FileText size={14} aria-hidden />
+                  </button>
+                )}
+                {onShareLongImage && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    title={t("toolbar_shareLongImage")}
+                    aria-label={t("toolbar_shareLongImage")}
+                    disabled={documentDisabled}
+                    onClick={() => runMenuAction(onShareLongImage)}
+                  >
+                    <Image size={14} aria-hidden />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

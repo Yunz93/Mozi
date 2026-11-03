@@ -1,0 +1,166 @@
+/* 弹窗、设置导航和表单沿用工作区的系统字体与配色。 */
+.workspace-dialog {
+  color: var(--workspace-text);
+  background: var(--workspace-menu);
+  border-color: var(--workspace-border);
+  border-radius: 12px;
+}
+.workspace-settings {
+  background: var(--workspace-canvas);
+}
+.workspace-settings-nav {
+  background: var(--workspace-sidebar);
+  border-color: var(--workspace-divider);
+}
+.workspace-settings-nav > [role="separator"]:is(:hover, :active) {
+  background: var(--workspace-border);
+}
+.workspace-settings-nav-button {
+  min-height: 36px;
+  border-radius: 6px;
+  color: var(--workspace-muted);
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+.workspace-settings-nav-button:hover {
+  background: var(--workspace-hover);
+  color: var(--workspace-text);
+}
+.workspace-settings-nav-button.is-active {
+  color: var(--workspace-accent);
+  background: var(--workspace-active);
+}
+.workspace-settings-footer {
+  border-color: transparent;
+  background: var(--workspace-canvas);
+}
+.workspace-settings-done {
+  min-height: 34px;
+  border-radius: 6px;
+  color: var(--workspace-primary-text);
+  background: var(--workspace-primary-bg);
+}
+.workspace-settings-done:hover {
+  background: var(--workspace-primary-hover);
+}
+.workspace-settings
+  :is(h2, h3, h4, label, .text-gray-700, .text-gray-800, .text-gray-900) {
+  color: var(--workspace-text);
+}
+.workspace-settings :is(.text-gray-400, .text-gray-500, .text-gray-600) {
+  color: var(--workspace-muted);
+}
+.workspace-settings .settings-panel {
+  color: var(--workspace-text);
+}
+.workspace-settings-theme-choice,
+.workspace-settings-font-preview {
+  border-radius: 6px;
+  border-color: var(--workspace-border);
+  color: var(--workspace-text);
+  background: var(--workspace-menu);
+}
+.workspace-settings-theme-choice:hover {
+  border-color: var(--workspace-accent);
+}
+.workspace-settings-theme-choice.is-active {
+  color: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+  background: var(--workspace-active);
+}
+.workspace-settings-accent-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 6px;
+  color: var(--workspace-muted);
+  font-size: 0.875em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.workspace-settings-accent-choice:hover {
+  background: var(--workspace-hover);
+}
+.workspace-settings-accent-choice.is-active {
+  background: var(--workspace-active);
+  border-color: var(--workspace-accent);
+  color: var(--workspace-accent);
+}
+.workspace-settings-accent-swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgb(127 127 127 / 35%);
+  border-radius: 50%;
+}
+.workspace-settings-color-input {
+  width: 14px;
+  height: 14px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.workspace-settings-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.workspace-settings-color-input::-webkit-color-swatch {
+  border: 1px solid rgb(127 127 127 / 35%);
+  border-radius: 50%;
+}
+.workspace-settings
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not(
+    [type="color"]
+  ),
+.workspace-settings textarea,
+.workspace-settings select,
+.workspace-settings .app-select-trigger {
+  min-height: 36px;
+  border-radius: 6px;
+  border-color: var(--workspace-border);
+  background: var(--workspace-menu);
+  color: var(--workspace-text);
+}
+.workspace-settings :is(input, textarea, select):focus,
+.workspace-settings .app-select-trigger:focus {
+  border-color: var(--workspace-accent);
+  box-shadow: 0 0 0 2px var(--workspace-active);
+}
+.workspace-settings
+  :is(
+    [aria-invalid="true"],
+    .border-red-300,
+    .border-red-400,
+    .border-red-500
+  ) {
+  border-color: #ef4444;
+}
+.workspace-settings
+  :is(input[type="checkbox"], input[type="radio"], input[type="range"]) {
+  accent-color: var(--workspace-accent);
+}
+.workspace-settings button:focus-visible {
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: 2px;
+}
+.app-select-menu,
+.dark .app-select-menu {
+  background: var(--workspace-menu);
+  border-color: var(--workspace-border);
+  border-radius: 8px;
+}
+.app-select-menu .app-select-option {
+  color: var(--workspace-text);
+}
+.app-select-menu .app-select-option:hover:not(:disabled),
+.app-select-menu .app-select-option:focus:not(:disabled) {
+  background: var(--workspace-hover);
+}
+.app-select-menu .app-select-option.is-active {
+  background: var(--workspace-active);
+  color: var(--workspace-accent);
+}

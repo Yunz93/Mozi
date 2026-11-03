@@ -42,7 +42,7 @@ import { requestPreviewHeadingScroll } from "../../utils/previewNavigationBridge
 import { requestVaultLinkIndexRebuild } from "../../services/vault/linkIndexEvents";
 import type { AskVaultCitation } from "../../types/vaultIndex";
 import type { RetrieveHit } from "../../types/vaultIndex";
-import type { FileNode } from "../../types";
+import { ViewMode, type FileNode } from "../../types";
 import { AppSelect } from "../ui/AppSelect";
 import { LAYOUT, clamp, getStoredPanelWidth } from "../../config/layout";
 
@@ -537,6 +537,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
 
   const handleOpenCitation = useCallback(
     async (citation: AskVaultCitation) => {
+      const originRoot = useAppStore.getState().rootFolderPath;
       const file: FileNode = {
         id: citation.path,
         name: citation.path.split(/[/\\]/).pop() || citation.path,
@@ -545,7 +546,28 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       };
       await onOpenFile(file);
       try {
-        const content = fileContents[citation.path] ?? (await readFile(file));
+        const openedState = useAppStore.getState();
+        if (
+          openedState.activeTabId !== file.id ||
+          openedState.rootFolderPath !== originRoot
+        )
+          return;
+        // 打开文档后读取新缓冲，避免旧闭包中的空内容算出错误选区。
+        const openedContent =
+          openedState.fileContents[citation.path] ?? (await readFile(file));
+        const state = useAppStore.getState();
+        if (
+          state.activeTabId !== file.id ||
+          state.rootFolderPath !== originRoot
+        )
+          return;
+        const content = state.fileContents[citation.path] ?? openedContent;
+        if (state.viewMode === ViewMode.PREVIEW) {
+          if (citation.headingAnchor) {
+            requestPreviewHeadingScroll(citation.path, citation.headingAnchor);
+          }
+          return;
+        }
         const range = citationEditorRange(
           content,
           citation.startLine,
@@ -554,14 +576,11 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         requestEditorRangeFocus(citation.path, range.start, range.end, {
           alignTopRatio: 0.25,
         });
-        if (citation.headingAnchor) {
-          requestPreviewHeadingScroll(citation.path, citation.headingAnchor);
-        }
       } catch {
         // Opening the file is still useful even if focus fails.
       }
     },
-    [fileContents, onOpenFile, readFile],
+    [onOpenFile, readFile],
   );
 
   const handleInsertAnswer = useCallback(() => {

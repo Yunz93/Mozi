@@ -4,7 +4,7 @@ Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
-A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. The official build writes in Live mode and can publish to WeChat drafts or Simple Blog in one click.
+A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.0.0 gives writing, reading, settings, and startup screens a consistent appearance, with Live editing, vault retrieval, WeChat drafts, and Simple Blog publishing.
 
 > Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 Pin a release (optional):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v1.2.1 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.0 bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:
@@ -47,6 +47,20 @@ Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run
 ## Features
 
 Follow the bundled [feature guide in Chinese](./src-tauri/resources/sample-notes/03-功能导览.md) to try each feature. These screenshots come from a separate demo vault and are bundled locally with the samples.
+
+### The 2.0.0 workspace and startup screens
+
+Mozi uses the macOS or Windows system sans-serif font by default. Warm light and metallic-gray dark themes extend across the sidebar, document, toolbars, and settings. The top toolbar has icons for theme, XiaoZhi, editing, reading, publishing, and more actions, in that order. Hover for names. The vault entry remains at the bottom left, with Settings beside it on the right.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/23-theme-dark.png" alt="2.0.0 metallic-gray workspace and icon-only toolbar" width="800">
+</p>
+
+Opening a vault and restoring a workspace use the same theme and fonts.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/25-startup.png" alt="Vault startup screen using the workspace theme" width="800">
+</p>
 
 ### Local vaults and multiple windows
 
@@ -102,7 +116,7 @@ Switch between keyword, semantic, and hybrid search, then open a result in its s
 
 ### XiaoZhi assistant
 
-Use Retrieve only to inspect source snippets, or generate an answer with citations and follow them back to the notes. The current version requires an AI provider configuration first. Retrieval alone makes no online model call; generating an answer sends the retrieved snippets to the selected model.
+Use Retrieve only to inspect source snippets, or generate an answer with citations and follow them back to the notes. The current version requires an AI provider configuration first. Retrieve only does not call a generation model. Semantic retrieval can still send the query to a configured remote embedding endpoint. Generating an answer sends the question and retrieved snippets to the selected model.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/02-vault-retrieval.png" alt="Retrieval results and source navigation" width="800">
@@ -110,7 +124,7 @@ Use Retrieve only to inspect source snippets, or generate an answer with citatio
 
 ### AI enhancement and Wiki generation
 
-Choose Gemini, OpenAI, DeepSeek, GLM, Kimi, or Xiaomi MiMo for note enhancement, Wiki generation, and vault Q&A. Each provider keeps its own key, endpoint, and model settings, with presets or a custom model ID. Subscription-specific keys require the matching endpoint. Keys are kept in secure local storage.
+Choose Gemini, OpenAI, DeepSeek, GLM, Kimi, or Xiaomi MiMo for note enhancement, Wiki generation, and vault Q&A. Open **More actions → AI Enhance** for the current note, or select text and use the context menu to generate a Wiki. Settings let you choose its save folder and generation prompts. Each provider keeps its own key and model settings, with presets or a custom model ID. Providers with compatible APIs also accept a custom endpoint. Subscription-specific keys require the matching endpoint. Keys are kept in secure local storage.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/12-ai-providers.png" alt="Six AI provider options" width="800">
@@ -134,10 +148,10 @@ Configure a Skill API key under **Settings → Reading notes sync → WeRead**, 
 
 ### PDF, HTML, and long-image sharing
 
-The **Export** menu offers PDF and HTML. The **Long-image share** dialog provides controls to generate a tall PNG, preview it, save it, copy it, or use system sharing. The screenshots show the export menu and a generated image ready to save or copy.
+The top **More actions** menu has icons for **Export PDF**, **Export HTML**, and **Long-image share**. Hover for their names. The image dialog can generate a tall PNG, preview it, save it, copy it, or use system sharing. Exports capture the editor's latest input before rendering.
 
 <p>
-  <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="PDF and HTML export menu" width="800">
+  <img src="./src-tauri/resources/sample-notes/resources/14-export.png" alt="PDF, HTML, and long-image actions in the More menu" width="800">
 </p>
 
 <p>
@@ -170,11 +184,19 @@ Keep images in the vault and reference them with relative paths. For uploads, co
 
 ### Appearance, properties, and shortcuts
 
-Choose the theme, interface language, font, and text size. Configure the frontmatter template for new notes, including field order for categories, tags, status, Slug, and aliases. Customize shortcuts to suit your workflow.
+Choose the theme, interface language, and UI font under **Settings → Interface**. Pick the default, blue, green, purple, or rose accent, or use the custom color picker beside the presets. Selections, primary buttons, and focus indicators follow the chosen accent.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/08-appearance.png" alt="Appearance settings" width="800">
 </p>
+
+Under **Settings → Editor**, choose document, reading, and code fonts and adjust readable line length. The compact Reading properties table aligns with the prose. Turn off Show properties in reading mode to hide it while preserving the note's frontmatter.
+
+<p>
+  <img src="./src-tauri/resources/sample-notes/resources/24-reading-properties.png" alt="Compact Reading properties and visibility setting" width="800">
+</p>
+
+Set up the new-note frontmatter template under **Settings → Metadata**, including field order for categories, tags, status, Slug, and aliases. Customize keys under **Settings → Shortcuts**.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/09-metadata.png" alt="Note property template" width="800">

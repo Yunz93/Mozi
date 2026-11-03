@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
-import { useFileSystem } from "./useFileSystem";
 import { isExcalidrawWorkspaceFile } from "../utils/excalidrawDocument";
 import { isPreviewOnlyFile } from "../utils/fileTypes";
 import {
@@ -14,9 +13,10 @@ import {
   parseMetadataTemplateValue,
   mergeAiEnhanceFrontmatter,
 } from "../utils/metadataFields";
-import { type AppLanguage, type Frontmatter } from "../types";
+import { type AppLanguage, type AppSettings, type Frontmatter } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { joinFsPath } from "../utils/pathHelpers";
+import { preserveOpenTabNodes } from "../utils/fileTree";
 import {
   buildWikiBacklink,
   buildWikiSupplementSections,
@@ -137,8 +137,10 @@ function extractDocumentTitle(
 async function resolveUniqueWikiFileName(
   baseName: string,
   folderPath: string,
-): Promise<string> {
+  isCurrent: () => boolean,
+): Promise<string | null> {
   const fs = await getFileSystem();
+  if (!isCurrent()) return null;
   const normalizedBase = sanitizeWikiFileName(baseName);
 
   for (let index = 0; index < 100; index += 1) {
@@ -147,7 +149,9 @@ async function resolveUniqueWikiFileName(
     const separator = folderPath.includes("\\") ? "\\" : "/";
     const fullPath = `${folderPath}${folderPath.endsWith(separator) ? "" : separator}${candidate}`;
 
-    if (!(await fs.fileExists(fullPath))) {
+    const exists = await fs.fileExists(fullPath);
+    if (!isCurrent()) return null;
+    if (!exists) {
       return candidate;
     }
   }
@@ -228,12 +232,9 @@ export function useAIAnalyze() {
     setAnalyzing,
     showNotification,
     setSettingsOpen,
-    currentFilePath,
-    rootFolderPath,
     isAnalyzing,
   } = useAppStore();
   const content = useAppStore(selectContent);
-  const { createFile, refreshFileTree } = useFileSystem();
   const [isAiEnhanceConfirmOpen, setAiEnhanceConfirmOpen] = useState(false);
 
   const requestAIAnalyze = useCallback(() => {
@@ -327,46 +328,75 @@ export function useAIAnalyze() {
       from: number;
       to: number;
     }): Promise<string | null> => {
-      if (!content) return null;
-
+      const origin = useAppStore.getState();
+      const sourceContent = selectContent(origin);
+      if (!sourceContent || !origin.activeTabId || origin.isAnalyzing)
+        return null;
       const selectedText = sanitizeWikiLinkAlias(selection.text);
-      if (!selectedText) {
-        return null;
-      }
-      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      if (!selectedText) return null;
 
-      try {
-        ensureAIConfiguration(hydratedSettings);
-      } catch (error) {
-        showNotification(
-          localizeAiOrKnownError(
-            hydratedSettings.language,
-            error,
-            "notifications_aiConfigFirst",
-          ),
-          "error",
+      let contextChanged = false;
+      const unsubscribe = useAppStore.subscribe((state) => {
+        if (
+          state.rootFolderPath !== origin.rootFolderPath ||
+          state.activeTabId !== origin.activeTabId ||
+          state.currentFilePath !== origin.currentFilePath
+        ) {
+          contextChanged = true;
+        }
+      });
+      const isCurrent = () => {
+        const state = useAppStore.getState();
+        return (
+          !contextChanged &&
+          state.rootFolderPath === origin.rootFolderPath &&
+          state.activeTabId === origin.activeTabId &&
+          state.currentFilePath === origin.currentFilePath
         );
-        setSettingsOpen(true);
-        return null;
-      }
-
-      if (!rootFolderPath) {
-        showNotification(
-          t(hydratedSettings.language, "notifications_noKnowledgeBaseForWiki"),
-          "error",
-        );
-        return null;
-      }
-
-      setAnalyzing(true);
+      };
+      let hydratedSettings: AppSettings | null = null;
+      let ownsAnalyzing = false;
       try {
-        const documentTitle = extractDocumentTitle(content, currentFilePath);
+        hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+        if (!isCurrent() || useAppStore.getState().isAnalyzing) return null;
+        try {
+          ensureAIConfiguration(hydratedSettings);
+        } catch (error) {
+          showNotification(
+            localizeAiOrKnownError(
+              hydratedSettings.language,
+              error,
+              "notifications_aiConfigFirst",
+            ),
+            "error",
+          );
+          setSettingsOpen(true);
+          return null;
+        }
+
+        if (!origin.rootFolderPath) {
+          showNotification(
+            t(
+              hydratedSettings.language,
+              "notifications_noKnowledgeBaseForWiki",
+            ),
+            "error",
+          );
+          return null;
+        }
+
+        setAnalyzing(true);
+        ownsAnalyzing = true;
+        const documentTitle = extractDocumentTitle(
+          sourceContent,
+          origin.currentFilePath,
+        );
         const currentFileName = stripMarkdownExtension(
-          getFileNameFromPath(currentFilePath),
+          getFileNameFromPath(origin.currentFilePath),
         );
         const sourceWikiTarget = currentFileName || documentTitle;
         const context = buildContextSnippet(
-          content,
+          sourceContent,
           selection.from,
           selection.to,
         );
@@ -378,10 +408,11 @@ export function useAIAnalyze() {
             documentTitle,
             currentFileName,
             isFrontmatterSelection:
-              selection.to <= getFrontmatterBlockLength(content),
+              selection.to <= getFrontmatterBlockLength(sourceContent),
           },
           hydratedSettings,
         );
+        if (!isCurrent()) return null;
 
         const wikiFolder = normalizeWikiFolder(hydratedSettings.wikiFolder);
         const archiveCategory = sanitizeWikiArchiveSegment(
@@ -389,18 +420,21 @@ export function useAIAnalyze() {
           getDefaultWikiCategory(hydratedSettings.language),
         );
         const targetFolder = joinFsPath(
-          rootFolderPath,
+          origin.rootFolderPath,
           wikiFolder,
           archiveCategory,
         );
         const fs = await getFileSystem();
+        if (!isCurrent()) return null;
         await fs.createDirectory(targetFolder);
-        await refreshFileTree();
-
+        if (!isCurrent()) return null;
         const targetFileName = await resolveUniqueWikiFileName(
           result.title || selectedText,
           targetFolder,
+          isCurrent,
         );
+        if (!targetFileName || !isCurrent()) return null;
+
         const wikiTarget = `${wikiFolder}/${archiveCategory}/${stripMarkdownExtension(targetFileName)}`;
         const nextFileContent = buildGeneratedWikiContent({
           language: hydratedSettings.language,
@@ -416,27 +450,31 @@ export function useAIAnalyze() {
           citations: result.citations || [],
         });
 
-        const newFile = await createFile(
-          targetFileName,
+        // 创建文件只写入请求时的路径，异步完成后不向其他知识库插入节点。
+        await fs.createFile(
+          joinFsPath(targetFolder, targetFileName),
           nextFileContent,
-          targetFolder,
         );
-        if (!newFile) {
-          throw new Error("Failed to create the wiki file.");
-        }
-
+        if (!isCurrent()) return null;
+        const fileNodes = await fs.readDirectory(origin.rootFolderPath);
+        if (!isCurrent()) return null;
+        const state = useAppStore.getState();
+        state.setFiles(
+          preserveOpenTabNodes(fileNodes, state.openTabs, state.files),
+        );
         showNotification(
           t(hydratedSettings.language, "notifications_wikiCreated", {
-            name: newFile.name,
+            name: targetFileName,
           }),
           "success",
         );
         return `[[${wikiTarget}|${selectedText}]]`;
       } catch (error) {
+        if (!isCurrent()) return null;
         console.error("AI wiki generation failed:", error);
         showNotification(
           localizeAiOrKnownError(
-            hydratedSettings.language,
+            hydratedSettings?.language ?? origin.settings.language,
             error,
             "notifications_wikiCreateFailed",
           ),
@@ -444,19 +482,11 @@ export function useAIAnalyze() {
         );
         return null;
       } finally {
-        setAnalyzing(false);
+        unsubscribe();
+        if (ownsAnalyzing) setAnalyzing(false);
       }
     },
-    [
-      content,
-      currentFilePath,
-      rootFolderPath,
-      setAnalyzing,
-      showNotification,
-      setSettingsOpen,
-      createFile,
-      refreshFileTree,
-    ],
+    [setAnalyzing, showNotification, setSettingsOpen],
   );
 
   return {

@@ -1039,6 +1039,19 @@ pub fn run() {
 }
 
 fn write_text_file_atomic_at(path: &Path, content: &str) -> Result<(), String> {
+    use std::io::Write;
+
+    let existing_permissions = match fs::metadata(path) {
+        Ok(metadata) => {
+            let permissions = metadata.permissions();
+            if permissions.readonly() {
+                return Err(format!("Cannot write read-only file {}", path.display()));
+            }
+            Some(permissions)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("Failed to inspect {}: {error}", path.display())),
+    };
     let parent = path
         .parent()
         .ok_or_else(|| format!("Failed to resolve parent directory for {}", path.display()))?;
@@ -1057,14 +1070,30 @@ fn write_text_file_atomic_at(path: &Path, content: &str) -> Result<(), String> {
         nanos
     ));
 
+    let mut temporary_created = false;
     let write_result = (|| {
-        fs::write(&temp_path, content).map_err(|error| {
+        let mut temporary = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|error| {
+                format!("Failed to create temporary file {}: {error}", temp_path.display())
+            })?;
+        temporary_created = true;
+        // 写入正文前恢复原权限，避免私人笔记的内容短暂暴露在默认权限的临时文件中。
+        if let Some(permissions) = existing_permissions {
+            temporary.set_permissions(permissions).map_err(|error| {
+                format!("Failed to preserve permissions for {}: {error}", path.display())
+            })?;
+        }
+        temporary.write_all(content.as_bytes()).map_err(|error| {
             format!(
                 "Failed to write temporary file {}: {}",
                 temp_path.display(),
                 error
             )
         })?;
+        drop(temporary);
         fs::rename(&temp_path, path).map_err(|error| {
             format!(
                 "Failed to replace {} with temporary file: {}",
@@ -1075,7 +1104,7 @@ fn write_text_file_atomic_at(path: &Path, content: &str) -> Result<(), String> {
         Ok(())
     })();
 
-    if write_result.is_err() {
+    if write_result.is_err() && temporary_created {
         let _ = fs::remove_file(&temp_path);
     }
     write_result
@@ -1632,6 +1661,47 @@ mod tests {
             "temporary file should be removed after rename"
         );
 
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_text_file_atomic_at_preserves_private_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = create_test_directory("atomic-write-private");
+        let target = temp_dir.join("note.md");
+        fs::write(&target, "private note").expect("write original");
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).expect("private permissions");
+
+        write_text_file_atomic_at(&target, "updated private note").expect("save private note");
+
+        assert_eq!(fs::read_to_string(&target).unwrap(), "updated private note");
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(fs::read_dir(&temp_dir).unwrap().count(), 1);
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn write_text_file_atomic_at_rejects_readonly_targets_without_replacing_content() {
+        let temp_dir = create_test_directory("atomic-write-readonly");
+        let target = temp_dir.join("note.md");
+        fs::write(&target, "read-only note").expect("write original");
+        let original_permissions = fs::metadata(&target).unwrap().permissions();
+        let mut readonly_permissions = original_permissions.clone();
+        readonly_permissions.set_readonly(true);
+        fs::set_permissions(&target, readonly_permissions).expect("read-only permissions");
+
+        let result = write_text_file_atomic_at(&target, "must not overwrite");
+
+        assert!(result.is_err(), "原子替换不能绕过只读文件保护");
+        assert_eq!(fs::read_to_string(&target).unwrap(), "read-only note");
+        assert!(fs::metadata(&target).unwrap().permissions().readonly());
+        assert_eq!(fs::read_dir(&temp_dir).unwrap().count(), 1);
+        fs::set_permissions(&target, original_permissions).expect("restore fixture permissions");
         cleanup_test_directory(&temp_dir);
     }
 

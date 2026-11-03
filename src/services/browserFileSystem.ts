@@ -3,6 +3,12 @@ import type { IFileSystem } from "../types/filesystem";
 import { useAppStore } from "../store/appStore";
 import { sanitizeTrashFolder } from "../utils/trashFolder";
 
+type IterableDirectoryHandle = FileSystemDirectoryHandle & {
+  entries(): AsyncIterableIterator<
+    [string, FileSystemFileHandle | FileSystemDirectoryHandle]
+  >;
+};
+
 /**
  * Browser File System using File System Access API
  * Provides a fallback for non-Tauri environments
@@ -269,51 +275,9 @@ export class BrowserFileSystem implements IFileSystem {
    * Rename a file (creates a new file with new name, deletes old)
    */
   async renameFile(oldPath: string, newName: string): Promise<string> {
-    try {
-      // Callers pass the final basename (including the correct extension).
-      const normalizedName =
-        newName.trim() || oldPath.split(/[/\\]/).pop() || newName;
-      // Read old content
-      const content = await this.readFile(oldPath);
-
-      // Create new file with new name
-      if (this.directoryHandle) {
-        const oldRelativePath = this.getRelativePath(oldPath);
-        const parentPath = oldRelativePath.substring(
-          0,
-          oldRelativePath.lastIndexOf("/"),
-        );
-        const newRelativePath = parentPath
-          ? `${parentPath}/${normalizedName}`
-          : normalizedName;
-
-        // Create new file
-        const newHandle = await this.getFileHandle(
-          this.directoryHandle,
-          newRelativePath,
-          true,
-        );
-        const writable = await newHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
-
-        // Delete old file
-        await this.deleteFile(oldPath);
-
-        const newPath = this.rootPath
-          ? `${this.rootPath}/${newRelativePath}`
-          : newRelativePath;
-        this.fileHandles.set(newPath, newHandle);
-        this.invalidateObjectUrl(oldPath);
-        this.invalidateObjectUrl(newPath);
-        return newPath;
-      }
-
-      throw new Error("Cannot rename without directory context");
-    } catch (error) {
-      console.error("Failed to rename file:", error);
-      throw error;
-    }
+    const normalizedName =
+      newName.trim() || oldPath.split(/[/\\]/).pop() || newName;
+    return this.renameEntry(oldPath, normalizedName, false);
   }
 
   async renameEntry(
@@ -562,43 +526,167 @@ export class BrowserFileSystem implements IFileSystem {
     const destinationRelativePath = targetRelativeDir
       ? `${targetRelativeDir}/${entryName}`
       : entryName;
+    const sourceParentPath = sourceRelativePath
+      .split("/")
+      .slice(0, -1)
+      .join("/");
+    const sourceParent =
+      await this.getCanonicalDirectoryHandle(sourceParentPath);
+    const sourceHandle = await this.getCanonicalEntry(
+      sourceParent,
+      sourceName,
+      kind,
+    );
+    if (!sourceHandle) throw new Error("Source entry not found");
+    const targetParent =
+      await this.getCanonicalDirectoryHandle(targetRelativeDir);
 
-    if (kind === "file") {
-      const sourceHandle =
-        sourcePath.startsWith("browser-") && this.fileHandles.has(sourcePath)
-          ? this.fileHandles.get(sourcePath)!
-          : await this.getFileHandle(this.directoryHandle, sourceRelativePath);
-      const file = await sourceHandle.getFile();
-      const targetHandle = await this.getFileHandle(
-        this.directoryHandle,
-        destinationRelativePath,
-        true,
-      );
-      const writable = await targetHandle.createWritable();
-      await writable.write(await file.arrayBuffer());
-      await writable.close();
-      await this.deleteFile(sourcePath);
-
-      const nextPath = `${this.rootPath}/${destinationRelativePath}`;
-      this.fileHandles.set(nextPath, targetHandle);
-      this.invalidateObjectUrl(sourcePath);
-      this.invalidateObjectUrl(nextPath);
-      return nextPath;
+    if (
+      sourceHandle.kind === "directory" &&
+      (await sourceHandle.resolve(targetParent)) !== null
+    ) {
+      throw new Error("Cannot move a directory into itself or its descendants");
     }
 
-    const sourceHandle = await this.getDirectoryHandle(
-      this.directoryHandle,
-      sourceRelativePath,
+    const existingTarget = await this.getCanonicalEntry(
+      targetParent,
+      entryName,
+      kind,
     );
-    const targetHandle = await this.getDirectoryHandle(
-      this.directoryHandle,
-      destinationRelativePath,
-      true,
-    );
-    await this.copyDirectoryContents(sourceHandle, targetHandle);
-    await this.deleteFile(sourcePath);
+    if (existingTarget) {
+      if (!(await sourceHandle.isSameEntry(existingTarget))) {
+        throw new Error("A file with this name already exists.");
+      }
+      if (entryName === sourceHandle.name) return sourcePath;
+      await this.renameAliasedEntry(
+        sourceHandle,
+        sourceParent,
+        targetParent,
+        entryName,
+        sourceParentPath,
+      );
+    } else {
+      await this.copyEntry(sourceHandle, targetParent, entryName);
+      await this.deleteFile(sourcePath);
+    }
+
+    const nextPath = `${this.rootPath}/${destinationRelativePath}`;
+    this.fileHandles.delete(sourcePath);
     this.invalidateObjectUrl(sourcePath, true);
-    return `${this.rootPath}/${destinationRelativePath}`;
+    this.invalidateObjectUrl(nextPath, true);
+    return nextPath;
+  }
+
+  /** 先以目录中的真实名称取 handle，避免 Chromium 把大小写别名视作不同路径。 */
+  private async getCanonicalEntry(
+    parent: FileSystemDirectoryHandle,
+    name: string,
+    kind: "file" | "directory",
+  ): Promise<FileSystemFileHandle | FileSystemDirectoryHandle | null> {
+    let requested: FileSystemFileHandle | FileSystemDirectoryHandle;
+    try {
+      requested =
+        kind === "file"
+          ? await parent.getFileHandle(name)
+          : await parent.getDirectoryHandle(name);
+    } catch (error) {
+      if ((error as Error).name === "NotFoundError") return null;
+      throw error;
+    }
+    const foldedName = name.normalize("NFC").toLowerCase();
+    let alias: FileSystemFileHandle | FileSystemDirectoryHandle | undefined;
+    for await (const [actualName, entry] of (
+      parent as IterableDirectoryHandle
+    ).entries()) {
+      if (actualName === name) return entry;
+      if (actualName.normalize("NFC").toLowerCase() === foldedName)
+        alias = entry;
+    }
+    return alias ?? requested;
+  }
+
+  private async getCanonicalDirectoryHandle(
+    path: string,
+  ): Promise<FileSystemDirectoryHandle> {
+    let directory = this.directoryHandle!;
+    for (const part of path.split("/").filter(Boolean)) {
+      const entry = await this.getCanonicalEntry(directory, part, "directory");
+      if (!entry || entry.kind !== "directory")
+        throw new Error("Directory not found");
+      directory = entry;
+    }
+    return directory;
+  }
+
+  private async copyEntry(
+    source: FileSystemFileHandle | FileSystemDirectoryHandle,
+    parent: FileSystemDirectoryHandle,
+    name: string,
+  ): Promise<FileSystemFileHandle | FileSystemDirectoryHandle> {
+    if (source.kind === "directory") {
+      const target = await parent.getDirectoryHandle(name, { create: true });
+      await this.copyDirectoryContents(source, target);
+      return target;
+    }
+    const file = await source.getFile();
+    const bytes = await file.arrayBuffer();
+    const target = await parent.getFileHandle(name, { create: true });
+    const writable = await target.createWritable();
+    try {
+      await writable.write(bytes);
+      await writable.close();
+    } catch (error) {
+      await writable.abort().catch(() => {});
+      throw error;
+    }
+    return target;
+  }
+
+  /** 完整备份后才删除原条目；回滚失败时保留备份并报告位置，绝不清理唯一副本。 */
+  private async renameAliasedEntry(
+    source: FileSystemFileHandle | FileSystemDirectoryHandle,
+    sourceParent: FileSystemDirectoryHandle,
+    targetParent: FileSystemDirectoryHandle,
+    newName: string,
+    sourceParentPath: string,
+  ): Promise<void> {
+    let backupName: string;
+    do {
+      backupName = `.mozi-rename-${crypto.randomUUID()}`;
+    } while (
+      await this.getCanonicalEntry(sourceParent, backupName, source.kind)
+    );
+    const recursive = source.kind === "directory";
+    let sourceRemovalStarted = false;
+    let backup: FileSystemFileHandle | FileSystemDirectoryHandle;
+    try {
+      backup = await this.copyEntry(source, sourceParent, backupName);
+      sourceRemovalStarted = true;
+      await sourceParent.removeEntry(source.name, { recursive });
+      await this.copyEntry(backup, targetParent, newName);
+    } catch (error) {
+      if (sourceRemovalStarted) {
+        try {
+          await targetParent
+            .removeEntry(newName, { recursive })
+            .catch((removeError: Error) => {
+              if (removeError.name !== "NotFoundError") throw removeError;
+            });
+          await this.copyEntry(backup!, sourceParent, source.name);
+        } catch {
+          const backupPath = [this.rootPath, sourceParentPath, backupName]
+            .filter(Boolean)
+            .join("/");
+          throw new Error(
+            `Rename failed; original data is preserved at ${backupPath}.`,
+            { cause: error },
+          );
+        }
+      }
+      await sourceParent.removeEntry(backupName, { recursive }).catch(() => {});
+      throw error;
+    }
+    await sourceParent.removeEntry(backupName, { recursive }).catch(() => {});
   }
 
   async getFileObjectUrl(path: string): Promise<string> {
@@ -655,24 +743,10 @@ export class BrowserFileSystem implements IFileSystem {
     sourceHandle: FileSystemDirectoryHandle,
     targetHandle: FileSystemDirectoryHandle,
   ): Promise<void> {
-    for await (const [name, entry] of (sourceHandle as any).entries()) {
-      if (entry.kind === "file") {
-        const file = await (entry as FileSystemFileHandle).getFile();
-        const writableHandle = await targetHandle.getFileHandle(name, {
-          create: true,
-        });
-        const writable = await writableHandle.createWritable();
-        await writable.write(await file.arrayBuffer());
-        await writable.close();
-      } else {
-        const nextTarget = await targetHandle.getDirectoryHandle(name, {
-          create: true,
-        });
-        await this.copyDirectoryContents(
-          entry as FileSystemDirectoryHandle,
-          nextTarget,
-        );
-      }
+    for await (const [name, entry] of (
+      sourceHandle as IterableDirectoryHandle
+    ).entries()) {
+      await this.copyEntry(entry, targetHandle, name);
     }
   }
 

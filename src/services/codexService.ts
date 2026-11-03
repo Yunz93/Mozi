@@ -70,6 +70,7 @@ export async function generateCodexJson<T>(
     settings.codexApiBaseUrl,
     "https://api.openai.com/v1",
   );
+  const model = settings.codexModel?.trim() || "gpt-5.2-codex";
   const response = await fetchWithTimeout(`${baseUrl}/responses`, {
     method: "POST",
     headers: {
@@ -77,12 +78,11 @@ export async function generateCodexJson<T>(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: settings.codexModel?.trim() || "gpt-5.2-codex",
+      model,
       instructions: systemPrompt ?? resolveProviderSystemPrompt(settings),
       input: `${prompt}\n\nReturn JSON only.`,
-      reasoning: {
-        effort: "medium",
-      },
+      // 默认 Codex 保留原有推理力度，其余模型由服务端采用兼容的默认参数。
+      ...(model === "gpt-5.2-codex" ? { reasoning: { effort: "medium" } } : {}),
       text: {
         format: {
           type: "json_object",
@@ -97,7 +97,7 @@ export async function generateCodexJson<T>(
     console.error("OpenAI responses request failed:", {
       status: response.status,
       error: payload.error ?? null,
-      model: settings.codexModel?.trim() || "gpt-5.2-codex",
+      model,
       baseUrl,
     });
     throw new Error(

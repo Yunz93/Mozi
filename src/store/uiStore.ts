@@ -28,6 +28,10 @@ import {
 import { normalizeNewNoteLocation } from "../utils/newNoteLocation";
 import { getPreferredShortcutModifierToken } from "../utils/shortcuts";
 import { DEFAULT_INDEX_EXCLUDE_GLOBS } from "../utils/pathGlob";
+import {
+  DEFAULT_UI_ACCENT_COLOR,
+  normalizeUiAccentColor,
+} from "../utils/uiAccentColor";
 
 function normalizeThemeMode(themeMode: unknown): AppSettings["themeMode"] {
   return themeMode === "dark" ? "dark" : "light";
@@ -244,6 +248,8 @@ export const defaultSettings: AppSettings = {
   lastKnowledgeBasePath: "",
   lastOpenedFilePath: "",
   themeMode: "dark",
+  uiAccentColor: DEFAULT_UI_ACCENT_COLOR,
+  showReadingProperties: true,
   themeFollowSystem: false,
   metadataFields: DEFAULT_METADATA_FIELDS,
   autoSaveInterval: 60000,
@@ -306,6 +312,8 @@ export function createUISlice(
           ...settings,
           language: normalizeLanguage(settings.language),
           themeMode: normalizeThemeMode(settings.themeMode),
+          uiAccentColor: normalizeUiAccentColor(settings.uiAccentColor),
+          showReadingProperties: settings.showReadingProperties !== false,
           themeFollowSystem: settings.themeFollowSystem === true,
           markdownStylePreset: normalizeMarkdownStylePreset(
             settings.markdownStylePreset,
@@ -335,6 +343,12 @@ export function createUISlice(
             themeMode: normalizeThemeMode(
               updates.themeMode ?? state.settings.themeMode,
             ),
+            uiAccentColor: normalizeUiAccentColor(
+              updates.uiAccentColor ?? state.settings.uiAccentColor,
+            ),
+            showReadingProperties:
+              (updates.showReadingProperties ??
+                state.settings.showReadingProperties) !== false,
             themeFollowSystem:
               typeof updates.themeFollowSystem === "boolean"
                 ? updates.themeFollowSystem

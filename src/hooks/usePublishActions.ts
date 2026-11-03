@@ -32,6 +32,9 @@ import { localizeKnownError, t, type TranslationKey } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
 import { isMarkdownFile } from "../utils/fileTypes";
 import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
+import { acquireDocumentWrite } from "../services/filesystem/documentWriteQueue";
+import { notifyVaultFileSaved } from "../services/vault/linkIndexEvents";
+import { sameDocumentText } from "../utils/documentText";
 
 // Publishing can legitimately take a while (image uploads, GitHub tree
 // writes). Keep the timeout generous - a premature timeout is worse than a
@@ -97,15 +100,13 @@ export function usePublishActions(
       let timeoutId: number | null = null;
       const publishPromise = invoke<T>(command, payload);
       publishInFlightRef.current = publishPromise;
-      void publishPromise.catch(() => {
-        // If the UI timeout wins the race, the later invoke reject must not
-        // become an unhandledrejection toast.
-      });
-      void publishPromise.finally(() => {
+      const clearInFlight = () => {
         if (publishInFlightRef.current === publishPromise) {
           publishInFlightRef.current = null;
         }
-      });
+      };
+      // 两条分支都消费结果，避免 finally 派生出无人接收的拒绝。
+      void publishPromise.then(clearInFlight, clearInFlight);
 
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = window.setTimeout(() => {
@@ -132,50 +133,66 @@ export function usePublishActions(
       updates: Frontmatter,
       backfillFailedKey: TranslationKey,
     ) => {
-      const stateBeforeWrite = useAppStore.getState();
-      const latestContent = stateBeforeWrite.fileContents[fileId];
-      if (!latestContent) {
-        return false;
-      }
-
-      const linkedContent = refreshDocumentUpdateTime(
-        updateFrontmatter(latestContent, updates),
-      );
-      if (linkedContent === latestContent) {
-        return true;
-      }
-
+      const originRoot = useAppStore.getState().rootFolderPath;
+      const release = await acquireDocumentWrite(filePath);
       try {
         const fs = await getFileSystem();
-        await fs.writeFile(filePath, linkedContent);
-
-        const stateAfterWrite = useAppStore.getState();
-        if (!stateAfterWrite.openTabs.includes(fileId)) {
-          return true;
-        }
-
-        if (
-          !shouldApplyPublishWriteback(
-            stateAfterWrite.fileContents[fileId],
-            latestContent,
+        while (true) {
+          flushActiveEditorPendingChanges();
+          const state = useAppStore.getState();
+          const node = findFileInTree(state.files, fileId);
+          if (
+            state.rootFolderPath !== originRoot ||
+            !state.openTabs.includes(fileId) ||
+            node?.path !== filePath
           )
-        ) {
-          stateAfterWrite.showNotification(
-            t(settings.language, "notifications_publishContentChangedDuring"),
-            "warning",
+            return false;
+          const source = state.fileContents[fileId];
+          if (source === undefined) return false;
+          const diskContent = await fs.readFile(filePath);
+          if (!sameDocumentText(diskContent, state.lastSavedContent[fileId])) {
+            state.showNotification(
+              t(settings.language, "notifications_publishContentChangedDuring"),
+              "warning",
+            );
+            return false;
+          }
+          // 读取磁盘期间继续输入或切库时，重新取得上下文再合并。
+          const afterRead = useAppStore.getState();
+          if (
+            afterRead.rootFolderPath !== originRoot ||
+            !afterRead.openTabs.includes(fileId)
+          )
+            return false;
+          if (afterRead.fileContents[fileId] !== source) continue;
+          const linkedContent = refreshDocumentUpdateTime(
+            updateFrontmatter(source, updates),
           );
+          // 元数据先合入缓冲，后续排队的保存也会取得同一份最新内容。
+          state.updateTabContent(fileId, linkedContent);
+          await fs.writeFile(filePath, linkedContent);
+          notifyVaultFileSaved(filePath, linkedContent);
+          flushActiveEditorPendingChanges();
+          const latest = useAppStore.getState();
+          if (
+            latest.rootFolderPath !== originRoot ||
+            !latest.openTabs.includes(fileId)
+          ) {
+            return true;
+          }
+          latest.markAsSaved(fileId, linkedContent);
+          // 慢写盘期间的新输入继续合并保存，绝不标成旧快照已保存。
+          if (latest.fileContents[fileId] !== linkedContent) continue;
           return true;
         }
-
-        stateAfterWrite.updateTabContent(fileId, linkedContent);
-        stateAfterWrite.markAsSaved(fileId, linkedContent);
-        return true;
       } catch (error) {
         console.error("Failed to backfill publish metadata:", error);
         useAppStore
           .getState()
           .showNotification(t(settings.language, backfillFailedKey), "error");
         return false;
+      } finally {
+        release();
       }
     },
     [settings.language],
@@ -470,7 +487,7 @@ export function usePublishActions(
         );
 
         // Remote publish succeeded — now write local publish markers.
-        await backfillFrontmatter(
+        const backfilled = await backfillFrontmatter(
           targetTabId,
           activeFile.path,
           publishedUrl
@@ -478,6 +495,14 @@ export function usePublishActions(
             : { is_publish: true },
           "notifications_publishBackfillFailed",
         );
+
+        if (!backfilled) {
+          showNotification(
+            t(language, "notifications_publishBackfillFailed"),
+            "warning",
+          );
+          return true;
+        }
 
         if (!publishedUrl) {
           showNotification(

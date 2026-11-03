@@ -121,10 +121,16 @@ export async function updateFilesInIndex(options: {
     contentsByPath,
     reresolveAll = true,
   } = options;
-  const outbounds = { ...snapshot.outbounds };
+  const indexablePaths = new Set(listMarkdownPaths(files));
+  const outbounds = Object.fromEntries(
+    Object.entries(snapshot.outbounds).filter(([path]) =>
+      indexablePaths.has(normalizePath(path)),
+    ),
+  );
 
   for (const rawPath of paths) {
     const path = normalizePath(rawPath);
+    if (!indexablePaths.has(path)) continue;
     try {
       const content =
         contentsByPath?.[path] ??
@@ -174,10 +180,16 @@ export async function reindexFileContents(options: {
   vaultRoot: string;
 }): Promise<LinkIndexSnapshot> {
   const { snapshot, pathContents, files, vaultRoot } = options;
-  const outbounds = { ...snapshot.outbounds };
+  const indexablePaths = new Set(listMarkdownPaths(files));
+  const outbounds = Object.fromEntries(
+    Object.entries(snapshot.outbounds).filter(([path]) =>
+      indexablePaths.has(normalizePath(path)),
+    ),
+  );
 
   for (const [rawPath, content] of Object.entries(pathContents)) {
     const path = normalizePath(rawPath);
+    if (!indexablePaths.has(path)) continue;
     outbounds[path] = extractAndResolveOutboundWikiLinks(
       path,
       content,

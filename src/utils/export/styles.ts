@@ -169,6 +169,8 @@ export function buildExportStyles(
   const normalizedStylePreset =
     normalizeMarkdownStylePreset(markdownStylePreset);
   const tokens = getMarkdownStyleTokens(normalizedStylePreset, theme);
+  const backgroundColor = theme === "dark" ? "#24272b" : "#faf8f3";
+  const secondaryBackgroundColor = theme === "dark" ? "#24272b" : "#f1eee7";
   const attachmentImageShadow =
     theme === "dark"
       ? "0 20px 44px rgba(0, 0, 0, 0.3)"
@@ -183,8 +185,8 @@ export function buildExportStyles(
   // html2canvas does not resolve CSS custom properties, so every var(--mp-doc-*)
   // would render as an invalid value and fall back to initial/inherit.
   const cssVarValues: Record<string, string> = {
-    "--bg-primary": theme === "dark" ? "#0d1117" : "#ffffff",
-    "--bg-secondary": theme === "dark" ? "#161b22" : "#f6f8fa",
+    "--bg-primary": backgroundColor,
+    "--bg-secondary": secondaryBackgroundColor,
     "--text-primary": tokens.text,
     "--text-secondary": tokens.muted,
     "--border-color": tokens.border,
@@ -218,8 +220,8 @@ export function buildExportStyles(
     ${katexCss}
 
     :root {
-      --bg-primary: ${theme === "dark" ? "#0d1117" : "#ffffff"};
-      --bg-secondary: ${theme === "dark" ? "#161b22" : "#f6f8fa"};
+      --bg-primary: ${backgroundColor};
+      --bg-secondary: ${secondaryBackgroundColor};
       --text-primary: ${tokens.text};
       --text-secondary: ${tokens.muted};
       --border-color: ${tokens.border};
@@ -242,7 +244,7 @@ ${markdownStyleCssVariables}
 
     .export-stage {
       min-height: 100vh;
-      background: ${theme === "dark" ? "rgba(0, 0, 0, 0.5)" : "rgba(249, 250, 251, 0.6)"};
+      background: ${backgroundColor};
       padding: 0;
     }
 
@@ -269,6 +271,7 @@ ${markdownStyleCssVariables}
     }
 
     .export-document .markdown-body {
+${markdownStyleCssVariables}
       box-sizing: border-box;
       min-width: 200px;
       max-width: none;
@@ -410,7 +413,7 @@ ${markdownStyleCssVariables}
     /* 与 preview.css 标题阶梯一致，覆盖 github-markdown 默认字号 */
     .export-document .markdown-body h1 {
       color: var(--mp-doc-heading-1);
-      font-size: 1.6em;
+      font-size: 2.5em;
       border-bottom: none;
       padding-bottom: 0;
     }
@@ -418,7 +421,7 @@ ${markdownStyleCssVariables}
       color: var(--mp-doc-heading-2);
       border-bottom: none;
       padding-bottom: 0;
-      font-size: 1.35em;
+      font-size: 1.65em;
     }
     .export-document .markdown-body h3 {
       color: var(--mp-doc-heading-3);
@@ -614,6 +617,10 @@ ${exportDelStrikeBlock}
     .export-document .markdown-body mark {
       color: var(--mp-doc-mark-text);
       background: var(--mp-doc-mark-bg);
+      border-radius: 0.15em;
+      padding-inline: 0.1em;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
 
     .export-document .markdown-body a.tag,
@@ -636,6 +643,13 @@ ${exportDelStrikeBlock}
 
     .export-document .markdown-body blockquote.mp-callout {
       border-left-width: 4px;
+    }
+
+    .export-document .markdown-body blockquote:not(.mp-callout) {
+      border-left: 1px solid var(--mp-doc-muted);
+      background: transparent;
+      border-radius: 0;
+      padding: 0.15rem 1rem;
     }
 
     .export-document .markdown-body .mp-callout-title {
@@ -848,8 +862,9 @@ ${exportDelStrikeBlock}
     }
 
     .export-document .markdown-body hr {
+      height: 1px;
+      border: 0;
       background-color: var(--mp-doc-border);
-      border-color: var(--mp-doc-border);
     }
 
     /* Mermaid: mirror preview.css container styling and nested-SVG guards.

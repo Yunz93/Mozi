@@ -1,6 +1,9 @@
 /** @vitest-environment happy-dom */
 
 import React, { createRef } from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import postcss from "postcss";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
@@ -12,6 +15,18 @@ import {
 } from "@testing-library/react";
 import { useAppStore } from "../../store/appStore";
 import type { PreviewPaneHandle } from "./PreviewPane";
+import { useWikiLinkNavigation as useNavigationHook } from "./hooks";
+import {
+  useWikiLinkNavigation as useRealWikiLinkNavigation,
+  type UseWikiLinkNavigationOptions,
+} from "./hooks/useWikiLinkNavigation";
+import {
+  __resetPreviewNavigationBridgeForTests,
+  flushPendingPreviewHeadingScroll,
+  registerPreviewPane,
+  requestPreviewHeadingScroll,
+  unregisterPreviewPane,
+} from "../../utils/previewNavigationBridge";
 
 const {
   mockNavigateToWikilink,
@@ -25,12 +40,16 @@ const {
   mockRenderMermaidDiagrams,
   mockResetMermaidPlaceholders,
   mockOpenExternalUrl,
+  mockRegisterPane,
+  mockUnregisterPane,
 } = vi.hoisted(() => ({
   mockNavigateToWikilink: vi.fn(async () => true),
   mockNavigateToHashLink: vi.fn(() => true),
   mockHandleFileSelect: vi.fn(async () => {}),
   mockHandleRevealInExplorer: vi.fn(async () => {}),
   mockOpenExternalUrl: vi.fn(async () => {}),
+  mockRegisterPane: vi.fn(),
+  mockUnregisterPane: vi.fn(),
   mockMountPdfPreview: vi.fn<
     (
       container: HTMLElement,
@@ -137,8 +156,8 @@ vi.mock("./hooks", async (importOriginal) => {
     useWikiLinkNavigation: vi.fn(() => ({
       navigateToWikilink: mockNavigateToWikilink,
       navigateToHashLink: mockNavigateToHashLink,
-      registerPane: vi.fn(),
-      unregisterPane: vi.fn(),
+      registerPane: mockRegisterPane,
+      unregisterPane: mockUnregisterPane,
       scrollToReference: vi.fn(),
       findHeadingElement: vi.fn(),
       findBlockElement: vi.fn(),
@@ -156,6 +175,17 @@ vi.mock("../../utils/externalLinks", () => ({
 }));
 
 import { PreviewPane } from "./PreviewPane";
+
+const defaultMockNavigation = vi
+  .mocked(useNavigationHook)
+  .getMockImplementation()!;
+let realNavigation: ReturnType<typeof useRealWikiLinkNavigation> | null = null;
+
+function useTrackedWikiLinkNavigation(options: UseWikiLinkNavigationOptions) {
+  const navigation = useRealWikiLinkNavigation(options);
+  realNavigation = navigation;
+  return navigation;
+}
 
 function seedMarkdownStore(
   overrides: Partial<ReturnType<typeof useAppStore.getState>> = {},
@@ -193,6 +223,8 @@ function seedMarkdownStore(
 describe("PreviewPane", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRegisterPane.mockReset();
+    mockUnregisterPane.mockReset();
     vi.stubGlobal("requestIdleCallback", (callback: IdleRequestCallback) => {
       callback({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline);
       return 1;
@@ -203,6 +235,8 @@ describe("PreviewPane", () => {
 
   afterEach(() => {
     cleanup();
+    vi.mocked(useNavigationHook).mockImplementation(defaultMockNavigation);
+    realNavigation = null;
     vi.unstubAllGlobals();
     useAppStore.setState({
       files: [],
@@ -210,6 +244,128 @@ describe("PreviewPane", () => {
       activeTabId: null,
       fileContents: {},
     } as never);
+  });
+
+  it.each([false, true])(
+    "keeps real local Wiki retries across a rerender, with document change=%s",
+    async (changeDocument) => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (callback: FrameRequestCallback) => {
+          callback(0);
+          return 1;
+        },
+      );
+      vi.mocked(useNavigationHook).mockImplementation(
+        useTrackedWikiLinkNavigation,
+      );
+      seedMarkdownStore({
+        fileContents: {
+          "/vault/notes/a.md": "# Hello\n\n## Late target\nPending section",
+        },
+      });
+      try {
+        const mounted = render(<PreviewPane />);
+        const pane = document.querySelector<HTMLElement>(
+          ".preview-scroll-container",
+        )!;
+        Object.defineProperties(pane, {
+          clientHeight: { value: 400 },
+          scrollHeight: { value: 3000 },
+        });
+        pane.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+        const scrollTo = vi.fn();
+        pane.scrollTo = scrollTo;
+        await act(async () => {
+          expect(await realNavigation!.navigateToWikilink("#Late target")).toBe(
+            true,
+          );
+        });
+        expect(scrollTo).not.toHaveBeenCalled();
+        mockCancelScrollSync.mockClear();
+
+        if (changeDocument) {
+          act(() =>
+            useAppStore.setState({
+              activeTabId: "/vault/notes/b.md",
+              currentFilePath: "/vault/notes/b.md",
+              fileContents: { "/vault/notes/b.md": "# Another note" },
+            }),
+          );
+        } else {
+          mounted.rerender(<PreviewPane density="compact" />);
+        }
+        const heading = document.createElement("h2");
+        heading.id = "late-target";
+        heading.textContent = "Late target";
+        heading.getBoundingClientRect = () =>
+          ({ top: 1600, height: 40 }) as DOMRect;
+        pane.querySelector("article.markdown-body")!.appendChild(heading);
+        act(() => vi.advanceTimersByTime(48));
+
+        if (changeDocument) {
+          expect(scrollTo).not.toHaveBeenCalled();
+          expect(mockCancelScrollSync).toHaveBeenCalled();
+        } else {
+          expect(scrollTo).toHaveBeenCalledWith({
+            top: 1420,
+            behavior: "smooth",
+          });
+          expect(mockCancelScrollSync).not.toHaveBeenCalled();
+        }
+      } finally {
+        cleanup();
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("keeps real pending heading retries through a normal pane rerender", () => {
+    __resetPreviewNavigationBridgeForTests();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    const tabId = "/vault/notes/a.md";
+    mockRegisterPane.mockImplementation((element: HTMLElement) => {
+      registerPreviewPane(tabId, element);
+      flushPendingPreviewHeadingScroll(tabId);
+    });
+    mockUnregisterPane.mockImplementation((element: HTMLElement) => {
+      unregisterPreviewPane(tabId, element);
+    });
+    try {
+      const mounted = render(<PreviewPane />);
+      const pane = document.querySelector<HTMLElement>(
+        ".preview-scroll-container",
+      )!;
+      Object.defineProperties(pane, {
+        clientHeight: { value: 400 },
+        scrollHeight: { value: 3000 },
+      });
+      pane.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+      const scrollTo = vi.fn();
+      pane.scrollTo = scrollTo;
+      expect(requestPreviewHeadingScroll(tabId, "late-target")).toBe(false);
+
+      mounted.rerender(<PreviewPane density="compact" />);
+      const heading = document.createElement("h2");
+      heading.id = "late-target";
+      heading.textContent = "Late target";
+      heading.getBoundingClientRect = () =>
+        ({ top: 1600, height: 40 }) as DOMRect;
+      pane.querySelector("article.markdown-body")!.appendChild(heading);
+      vi.advanceTimersByTime(16);
+
+      expect(scrollTo).toHaveBeenCalledWith({ top: 1528, behavior: "auto" });
+      expect(mockRegisterPane).toHaveBeenCalledOnce();
+      expect(mockUnregisterPane).not.toHaveBeenCalled();
+    } finally {
+      __resetPreviewNavigationBridgeForTests();
+      vi.useRealTimers();
+    }
   });
 
   it("renders markdown preview article and frontmatter properties", async () => {
@@ -229,6 +385,75 @@ describe("PreviewPane", () => {
       document.querySelector('a[href="https://example.com/doc"]'),
     ).toBeTruthy();
   });
+
+  it.each([
+    [true, "comfortable"],
+    [false, "comfortable"],
+    [true, "compact"],
+    [false, "compact"],
+  ] as const)(
+    "shares prose insets with properties when readable width is %s and density is %s",
+    async (readableLineLength, density) => {
+      useAppStore.setState({
+        settings: { ...useAppStore.getState().settings, readableLineLength },
+      });
+      const style = document.createElement("style");
+      const layoutSelectors = new Set([
+        ".editor-pane-layout",
+        ".editor-pane-frame",
+        ".editor-pane-sheet",
+        ".editor-pane-width-constrained",
+        ".preview-pane-properties-layout",
+        ".preview-pane-document.markdown-body",
+      ]);
+      // 只检查横向布局，排除模拟器不支持的选择器与底部留白嵌套变量。
+      style.textContent = ["editor.css", "preview.css"]
+        .flatMap((name) => {
+          const rules: string[] = [];
+          postcss
+            .parse(
+              readFileSync(resolve(process.cwd(), "src/styles", name), "utf8"),
+            )
+            .walkRules((rule) => {
+              if (
+                layoutSelectors.has(rule.selector) &&
+                rule.parent?.type === "root"
+              ) {
+                rules.push(rule.toString());
+              }
+            });
+          return rules;
+        })
+        .join("\n")
+        .replace(
+          "var(--preview-content-bottom, var(--pane-content-bottom))",
+          "0px",
+        );
+      document.head.appendChild(style);
+      try {
+        render(
+          <PreviewPane
+            density={density}
+            previewRenderActive
+            previewLayoutActive
+          />,
+        );
+        await screen.findByText("Properties");
+        const properties = document.querySelector(".preview-pane-properties")!;
+        const article = document.querySelector(".preview-pane-document")!;
+        const propertiesLayout = getComputedStyle(properties.parentElement!);
+        const sheetLayout = getComputedStyle(article.parentElement!);
+        const proseLayout = getComputedStyle(article);
+        expect(propertiesLayout.maxWidth).toBe(sheetLayout.maxWidth);
+        expect(sheetLayout.maxWidth).toBe("100%");
+        expect(propertiesLayout.paddingLeft).toBe(proseLayout.paddingLeft);
+        expect(propertiesLayout.paddingRight).toBe(proseLayout.paddingRight);
+        expect(parseFloat(propertiesLayout.paddingLeft)).toBeGreaterThan(0);
+      } finally {
+        style.remove();
+      }
+    },
+  );
 
   it("routes click events to wikilink, external, local, and hash handlers", async () => {
     mockResolveAttachmentTarget.mockResolvedValue({

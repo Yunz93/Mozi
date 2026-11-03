@@ -224,7 +224,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         <div
           ref={itemRef}
           className={`
-          group relative flex items-center py-2 px-3 transition-all duration-200 mx-2 rounded-lg text-sm border border-transparent
+          workspace-tree-row group relative flex items-center py-2 px-3 mx-2 rounded-lg text-sm border border-transparent
           ${canOpen ? "cursor-pointer" : "cursor-not-allowed"}
           ${
             isActive
@@ -239,6 +239,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
           style={{ paddingLeft: `${level * 8 + 12}px` }}
           aria-selected={isActive}
           aria-disabled={!canOpen}
+          data-drag-over={isDragOver || undefined}
           draggable={!node.isTrash}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
@@ -252,11 +253,11 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
           {isActive && (
             <span
               aria-hidden
-              className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-accent-DEFAULT"
+              className="workspace-tree-indicator absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
             />
           )}
           <span
-            className={`mr-2.5 shrink-0 transition-colors ${
+            className={`workspace-tree-icon mr-2.5 shrink-0 transition-colors ${
               isActive
                 ? "text-accent-DEFAULT"
                 : canOpen
@@ -297,7 +298,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
             )}
           </span>
           <span className="truncate min-w-0 flex-1">{displayName}</span>
-          {typeBadge && (
+          {typeBadge && typeBadge !== "MD" && (
             <span
               className={`ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide leading-none ${
                 canOpen

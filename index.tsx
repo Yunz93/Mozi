@@ -20,6 +20,8 @@ import "./src/styles/markdown-theme.css";
 import "./src/styles/editor.css";
 import "./src/styles/preview.css";
 import "./src/styles/components.css";
+import "./src/styles/workspace.css";
+import "./src/styles/workspace-settings.css";
 
 // Ensure process.env exists for some libraries
 if (typeof window !== "undefined" && !window.process) {

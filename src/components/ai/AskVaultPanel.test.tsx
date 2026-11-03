@@ -11,12 +11,24 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskVaultPanel } from "./AskVaultPanel";
 import { defaultSettings, useAppStore } from "../../store/appStore";
+import { ViewMode } from "../../types";
+import {
+  __resetPreviewNavigationBridgeForTests,
+  registerPreviewPane,
+} from "../../utils/previewNavigationBridge";
 import type { RetrieveHit } from "../../types/vaultIndex";
 
 const mocks = vi.hoisted(() => ({
   retrieve: vi.fn(),
   answer: vi.fn(),
   history: vi.fn(),
+  editorFocus: vi.fn(),
+}));
+vi.mock("../../utils/editorSelectionBridge", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../utils/editorSelectionBridge")
+  >()),
+  requestEditorRangeFocus: mocks.editorFocus,
 }));
 vi.mock("../../hooks/useI18n", () => ({
   useI18n: () => ({ t: (key: string) => key, language: "en" }),
@@ -69,13 +81,16 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-function renderPanel() {
+function renderPanel(
+  overrides: Partial<React.ComponentProps<typeof AskVaultPanel>> = {},
+) {
   return render(
     <AskVaultPanel
       open
       onClose={() => {}}
       onOpenFile={() => {}}
       readFile={async () => ""}
+      {...overrides}
     />,
   );
 }
@@ -103,6 +118,8 @@ beforeEach(() => {
     retrievedAt: 0,
   });
   mocks.history.mockReset().mockResolvedValue(undefined);
+  mocks.editorFocus.mockReset();
+  __resetPreviewNavigationBridgeForTests();
   useAppStore.setState({
     settings: {
       ...defaultSettings,
@@ -112,6 +129,8 @@ beforeEach(() => {
     },
     rootFolderPath: "/vault",
     currentFilePath: "/vault/a.md",
+    activeTabId: "/vault/a.md",
+    viewMode: ViewMode.LIVE,
     linkIndexProgress: {
       phase: "idle",
       done: 0,
@@ -130,6 +149,203 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  __resetPreviewNavigationBridgeForTests();
+  vi.unstubAllGlobals();
+});
+
+describe("AskVaultPanel 来源定位视图", () => {
+  it("丢弃切库后延迟完成的来源打开请求", async () => {
+    const opening = deferred<void>();
+    const target = hit("/vault/source.md");
+    mocks.retrieve.mockResolvedValueOnce([target]);
+    const onOpenFile = vi.fn((file) => {
+      useAppStore.setState({
+        activeTabId: file.id,
+        currentFilePath: file.path,
+        fileContents: { [file.id]: "source" },
+      });
+      return opening.promise;
+    });
+    renderPanel({ onOpenFile });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "question" },
+    });
+    await retrieve();
+    fireEvent.click(
+      document.querySelector<HTMLButtonElement>(".ask-vault-source-item")!,
+    );
+    await waitFor(() => expect(onOpenFile).toHaveBeenCalledOnce());
+    await act(async () => {
+      useAppStore.setState({ rootFolderPath: "/other-vault" });
+      opening.resolve();
+    });
+    expect(mocks.editorFocus).not.toHaveBeenCalled();
+  });
+
+  it("读盘期间有新缓冲时用最新内容计算来源选区", async () => {
+    const reading = deferred<string>();
+    const target = hit("/vault/source.md");
+    target.chunk.startLine = 3;
+    target.chunk.endLine = 3;
+    mocks.retrieve.mockResolvedValueOnce([target]);
+    const readFile = vi.fn(() => reading.promise);
+    renderPanel({
+      readFile,
+      onOpenFile: async (file) => {
+        useAppStore.setState({
+          activeTabId: file.id,
+          currentFilePath: file.path,
+          fileContents: {},
+        });
+      },
+    });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "question" },
+    });
+    await retrieve();
+    fireEvent.click(
+      document.querySelector<HTMLButtonElement>(".ask-vault-source-item")!,
+    );
+    await waitFor(() => expect(readFile).toHaveBeenCalledOnce());
+    const latest = "# Updated longer\n\nlatest text\n";
+    await act(async () => {
+      useAppStore.setState({ fileContents: { [target.chunk.path]: latest } });
+      reading.resolve("old\n\nstale\n");
+    });
+    expect(mocks.editorFocus).toHaveBeenCalledWith(
+      target.chunk.path,
+      latest.indexOf("latest text"),
+      latest.length,
+      { alignTopRatio: 0.25 },
+    );
+  });
+
+  it("读盘后若已选择另一篇文档，不发送迟到的定位", async () => {
+    const reading = deferred<string>();
+    const target = hit("/vault/source.md");
+    mocks.retrieve.mockResolvedValueOnce([target]);
+    const readFile = vi.fn(() => reading.promise);
+    renderPanel({
+      readFile,
+      onOpenFile: async (file) => {
+        useAppStore.setState({
+          activeTabId: file.id,
+          currentFilePath: file.path,
+          fileContents: {},
+        });
+      },
+    });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "question" },
+    });
+    await retrieve();
+    fireEvent.click(
+      document.querySelector<HTMLButtonElement>(".ask-vault-source-item")!,
+    );
+    await waitFor(() => expect(readFile).toHaveBeenCalledOnce());
+    await act(async () => {
+      useAppStore.setState({
+        activeTabId: "/vault/other.md",
+        currentFilePath: "/vault/other.md",
+      });
+      reading.resolve("source\n");
+    });
+    expect(mocks.editorFocus).not.toHaveBeenCalled();
+  });
+
+  it.each([ViewMode.PREVIEW, ViewMode.LIVE])(
+    "在%s只定位可见面板并读取新打开的正文",
+    async (mode) => {
+      const target = hit("/vault/source.md");
+      target.chunk.headingAnchor = "conclusion";
+      target.chunk.startLine = 3;
+      target.chunk.endLine = 3;
+      target.chunk.text = "Conclusion snippet";
+      mocks.retrieve.mockResolvedValueOnce([target]);
+      useAppStore.setState({ viewMode: mode, fileContents: {} });
+      const content = "# Intro\n\n## Conclusion\nLatest source text";
+      const container = document.createElement("div");
+      container.innerHTML =
+        '<article class="markdown-body"><h2 id="conclusion">Conclusion</h2></article>';
+      document.body.appendChild(container);
+      Object.defineProperties(container, {
+        clientHeight: { value: 400 },
+        scrollHeight: { value: 3000 },
+      });
+      const heading = container.querySelector("h2")!;
+      heading.getBoundingClientRect = () =>
+        ({ top: 1600, height: 40 }) as DOMRect;
+      container.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+      const scrollTo = vi.fn();
+      container.scrollTo = scrollTo;
+      registerPreviewPane(target.chunk.path, container);
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        (callback: FrameRequestCallback) => {
+          callback(0);
+          return 1;
+        },
+      );
+      const readFile = vi.fn(async () => "stale disk contents");
+      renderPanel({
+        readFile,
+        onOpenFile: async (file) => {
+          useAppStore.setState({
+            activeTabId: file.id,
+            currentFilePath: file.path,
+            fileContents: { [file.id]: content },
+          });
+        },
+      });
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "question" },
+      });
+      await retrieve();
+      fireEvent.click(
+        document.querySelector<HTMLButtonElement>(".ask-vault-source-item")!,
+      );
+      await waitFor(() => {
+        if (mode === ViewMode.PREVIEW) expect(scrollTo).toHaveBeenCalled();
+        else expect(mocks.editorFocus).toHaveBeenCalled();
+      });
+      expect(readFile).not.toHaveBeenCalled();
+      if (mode === ViewMode.PREVIEW) {
+        expect(mocks.editorFocus).not.toHaveBeenCalled();
+        expect(scrollTo).toHaveBeenCalledWith({ top: 1528, behavior: "auto" });
+      } else {
+        expect(scrollTo).not.toHaveBeenCalled();
+        expect(mocks.editorFocus).toHaveBeenCalledWith(
+          target.chunk.path,
+          9,
+          23,
+          { alignTopRatio: 0.25 },
+        );
+      }
+      container.remove();
+    },
+  );
+
+  it("无标题的阅读来源只打开文档，不聚焦隐藏编辑器", async () => {
+    mocks.retrieve.mockResolvedValueOnce([hit("/vault/plain.md")]);
+    useAppStore.setState({ viewMode: ViewMode.PREVIEW });
+    const onOpenFile = vi.fn(async (file) => {
+      useAppStore.setState({
+        activeTabId: file.id,
+        currentFilePath: file.path,
+        fileContents: { [file.id]: "Plain source" },
+      });
+    });
+    renderPanel({ onOpenFile });
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "question" },
+    });
+    await retrieve();
+    fireEvent.click(
+      document.querySelector<HTMLButtonElement>(".ask-vault-source-item")!,
+    );
+    await waitFor(() => expect(onOpenFile).toHaveBeenCalledOnce());
+    expect(mocks.editorFocus).not.toHaveBeenCalled();
+  });
 });
 
 describe("AskVaultPanel 检索身份", () => {
