@@ -111,6 +111,12 @@ export async function exportToPdf(
         "PDF export timed out while preparing page layout",
       );
       container.style.backgroundColor = backgroundColor;
+      // 纸张比预览列窄时只缩小图表外层，保留内部 SVG 的坐标系。
+      container
+        .querySelectorAll<SVGElement>(".mermaid > svg")
+        .forEach((svg) => {
+          svg.style.setProperty("max-width", "100%", "important");
+        });
       const safeScale = computeSafePdfRenderScale(
         container.scrollWidth,
         container.scrollHeight,

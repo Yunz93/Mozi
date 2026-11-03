@@ -80,4 +80,19 @@ describe("PDF clone layout", () => {
     );
     expect(worker.set.mock.calls.at(-1)![0].html2canvas.scale).toBeCloseTo(0.7);
   });
+
+  it("fits wide Mermaid diagrams to the PDF page without resizing nested SVGs", async () => {
+    const container = document.createElement("div");
+    container.innerHTML = `<div class="mermaid"><svg width="1000" height="180" viewBox="0 0 1000 180"><svg width="40" height="20"></svg></svg></div>`;
+    worker.get.mockResolvedValueOnce(container);
+    await exportToPdf(
+      '<html><head></head><body><div class="export-document">Diagram</div></body></html>',
+      "test",
+    );
+    const diagram = container.querySelector(".mermaid > svg") as SVGElement;
+    expect(diagram.style.maxWidth).toBe("100%");
+    expect(diagram.style.getPropertyPriority("max-width")).toBe("important");
+    expect(diagram.querySelector("svg")?.getAttribute("width")).toBe("40");
+    expect(diagram.querySelector("svg")?.getAttribute("style")).toBeNull();
+  });
 });
