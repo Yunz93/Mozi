@@ -885,11 +885,13 @@ ${exportDelStrikeBlock}
     }
 
     .export-document .markdown-body .mermaid > svg {
-      display: block;
+      /* 由容器居中，避免 html2canvas 将像素 margin 带入独立 SVG 后重复偏移。 */
+      display: inline-block;
       width: auto;
       height: auto;
       max-width: none !important;
-      margin: 0 auto;
+      margin: 0;
+      vertical-align: top;
     }
 
     .export-document .markdown-body .mermaid svg svg {

@@ -269,6 +269,10 @@ export async function prepareExportRenderTargetForRasterization(
   await renderMermaidDiagrams(renderTarget, {
     themeMode: theme === "dark" ? "dark" : "light",
   });
+  // 光栅图没有横向滚动，宽图只缩放根 SVG，保留内部坐标系。
+  renderTarget.querySelectorAll<SVGElement>(".mermaid > svg").forEach((svg) => {
+    svg.style.setProperty("max-width", "100%", "important");
+  });
   await waitForImages(renderTarget, EXPORT_IMAGE_WAIT_TIMEOUT_MS);
   await awaitDocumentFontsReady();
   patchExportDomForHtml2Canvas(renderTarget);
