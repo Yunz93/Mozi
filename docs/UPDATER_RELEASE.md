@@ -1,6 +1,6 @@
 # Updater Release Notes
 
-This repository uses the Tauri updater plugin for Windows in-app updates.
+This repository uses the Tauri updater plugin on Windows and the same signed updater artifacts for native macOS updates.
 
 ## Build configuration
 
@@ -61,9 +61,9 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
    - the app detects the newer version
    - release notes load
    - download and install complete successfully
-   - macOS uses the same DMG install script as the website (`xattr`, `ditto`, install into `/Applications`)
+   - macOS downloads the signed `.app.tar.gz` for the current architecture, verifies it before installation, and atomically replaces the app after all windows have saved
 
 ## Scope
 
 - Windows: in-app update checks and install flow use the Tauri updater plugin and signed NSIS artifacts.
-- macOS: in-app update checks GitHub Releases, downloads the architecture-matched DMG, then runs `scripts/install-macos.sh` (the same installer as the README one-liner). The app quits and relaunches after install so the single-instance plugin does not keep the old process.
+- macOS: in-app update reads `latest.json`, downloads the architecture-matched signed `.app.tar.gz`, and verifies its signature after download and again before installation. After every window saves successfully, it extracts the bundle, replaces the installed app atomically, and relaunches after the old process exits. Replacement failures restore the old bundle. The README one-line installer remains a separate DMG installation path through `scripts/install-macos.sh`.
