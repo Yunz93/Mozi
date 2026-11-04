@@ -73,6 +73,7 @@ import { buildWikiPreviewMarkup } from "../../utils/wikiPreviewMarkup";
 import { posAtClientPoint } from "./livePreview/shared";
 import { countLines, LARGE_FILE_THRESHOLDS } from "../../utils/performance";
 import { LiveSourceToggle } from "./LiveSourceToggle";
+import { isPreviewVisibleMode } from "../../utils/viewMode";
 import {
   findLocalImageAtPos,
   findWikiLinkNearPosition,
@@ -143,10 +144,25 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       (state) => state.toggleLiveSourceMarkdown,
     );
     const currentFilePath = useAppStore((state) => state.currentFilePath);
-    const liveWidgetsOn = isLivePreviewWidgetsEnabled(
+    const requestedLiveWidgets = isLivePreviewWidgetsEnabled(
       viewMode,
       liveSourceMarkdown,
     );
+    const editorLiveWidgetsRef = useRef({
+      documentKey: activeTabId,
+      enabled: requestedLiveWidgets,
+    });
+    // 阅读时保留隐藏编辑器的配置，避免无效的卸载、重装及滚动位置读取触发全局重排。
+    if (
+      !isPreviewVisibleMode(viewMode) ||
+      editorLiveWidgetsRef.current.documentKey !== activeTabId
+    ) {
+      editorLiveWidgetsRef.current = {
+        documentKey: activeTabId,
+        enabled: requestedLiveWidgets,
+      };
+    }
+    const liveWidgetsOn = editorLiveWidgetsRef.current.enabled;
     const showLiveSourceToggle = shouldShowLiveSourceToggle(
       viewMode,
       currentFilePath,

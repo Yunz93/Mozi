@@ -360,4 +360,31 @@ describe("SplitView scroll handshake", () => {
     expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
     expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
   });
+  it("keeps pane widths stable while switching between writing and reading", () => {
+    seedSplitViewStore({ viewMode: ViewMode.LIVE });
+    const pane = renderSplitView();
+    const editor = pane.container.querySelector('[data-testid="editor-pane"]')!;
+    const preview = pane.container.querySelector(
+      '[data-testid="preview-pane"]',
+    )!;
+    const editorWrapper = editor.parentElement!;
+    const previewWrapper = preview.parentElement!;
+    expect(editorWrapper.style.width).toBe("100%");
+    expect(previewWrapper.style.width).toBe("100%");
+    expect(previewWrapper.style.visibility).toBe("hidden");
+    act(() => useAppStore.getState().setViewMode(ViewMode.PREVIEW));
+    expect(editorWrapper.style.width).toBe("100%");
+    expect(previewWrapper.style.width).toBe("100%");
+    expect(editorWrapper.style.visibility).toBe("hidden");
+    expect(previewWrapper.style.visibility).toBe("visible");
+    expect(previewWrapper.style.transition).not.toContain("width");
+    act(() => useAppStore.getState().setViewMode(ViewMode.LIVE));
+    expect(pane.container.querySelector('[data-testid="editor-pane"]')).toBe(
+      editor,
+    );
+    expect(pane.container.querySelector('[data-testid="preview-pane"]')).toBe(
+      preview,
+    );
+    expect(editorWrapper.style.visibility).toBe("visible");
+  });
 });

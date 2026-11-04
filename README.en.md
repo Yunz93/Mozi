@@ -4,7 +4,7 @@ Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
-A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.0.0 gives writing, reading, settings, and startup screens a consistent appearance, with Live editing, vault retrieval, WeChat drafts, and Simple Blog publishing.
+A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.0.1 improves long-document scrolling, switching between editing and reading, and sidebar resizing in windowed mode, with Live editing, vault retrieval, WeChat drafts, and Simple Blog publishing.
 
 > Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 Pin a release (optional):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.0 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.1 bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:

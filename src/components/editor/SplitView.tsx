@@ -421,20 +421,44 @@ export const SplitView: React.FC<SplitViewProps> = ({
     [settings.markdownStylePreset, settings.themeMode],
   );
 
+  // 单栏切换保持两份文档宽度稳定，避免长文在宽度动画的每一帧重新换行和布局。
+  const overlayPanes = visualMode !== ViewMode.SPLIT;
   const editorPaneStyle: React.CSSProperties = {
-    width: `${editorWidth}%`,
+    width: overlayPanes ? "100%" : `${editorWidth}%`,
+    position: overlayPanes ? "absolute" : "relative",
+    inset: overlayPanes ? 0 : undefined,
+    visibility: editorActive ? "visible" : "hidden",
     opacity: editorActive ? 1 : 0,
     pointerEvents: editorActive ? "auto" : "none",
-    transition: isResizing ? "none" : `${PANE_TRANSITION}, opacity 120ms ease`,
-    willChange: isResizing ? "auto" : "width, opacity",
+    transition: isResizing
+      ? "none"
+      : overlayPanes
+        ? "opacity 120ms ease"
+        : `${PANE_TRANSITION}, opacity 120ms ease`,
+    willChange: isResizing
+      ? "auto"
+      : overlayPanes
+        ? "opacity"
+        : "width, opacity",
   };
 
   const previewPaneStyle: React.CSSProperties = {
-    width: `${previewWidth}%`,
+    width: overlayPanes ? "100%" : `${previewWidth}%`,
+    position: overlayPanes ? "absolute" : "relative",
+    inset: overlayPanes ? 0 : undefined,
+    visibility: previewActive ? "visible" : "hidden",
     opacity: previewActive ? 1 : 0,
     pointerEvents: previewActive ? "auto" : "none",
-    transition: isResizing ? "none" : `${PANE_TRANSITION}, opacity 120ms ease`,
-    willChange: isResizing ? "auto" : "width, opacity",
+    transition: isResizing
+      ? "none"
+      : overlayPanes
+        ? "opacity 120ms ease"
+        : `${PANE_TRANSITION}, opacity 120ms ease`,
+    willChange: isResizing
+      ? "auto"
+      : overlayPanes
+        ? "opacity"
+        : "width, opacity",
   };
 
   if (isExcalidrawActive) {

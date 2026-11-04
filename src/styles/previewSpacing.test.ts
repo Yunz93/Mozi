@@ -16,7 +16,7 @@ describe("preview spacing CSS", () => {
       /\.preview-pane-document\.markdown-body \.preview-source-blank-line\s*\{[^}]*height:\s*calc\(var\(--preview-line-height\) \* 1em\);/m,
     );
     expect(css).toMatch(
-      /\.preview-pane-document\.markdown-body > :has\(\+ \.preview-source-blank-line\)\s*\{[^}]*margin-bottom:\s*0;/m,
+      /\.preview-pane-document\.markdown-body > \.preview-before-source-blank-line\s*\{[^}]*margin-bottom:\s*0;/m,
     );
     expect(css).toMatch(
       /\.preview-pane-document\.markdown-body \.preview-source-blank-line \+ \*\s*\{[^}]*margin-top:\s*0;/m,
@@ -39,7 +39,7 @@ describe("preview spacing CSS", () => {
       /\.preview-pane-document\.markdown-body \.mp-callout p:empty\s*\{[^}]*display:\s*none;/m,
     );
     expect(css).toMatch(
-      /\.preview-pane-document\.markdown-body\s*\n\s*\.mp-callout\s*\n\s*:has\(\+ \.preview-source-blank-line\)\s*\{[^}]*margin-bottom:\s*0;/m,
+      /\.preview-pane-document\.markdown-body\s*\n\s*\.mp-callout\s*\n\s*\.preview-before-source-blank-line\s*\{[^}]*margin-bottom:\s*0;/m,
     );
   });
 
@@ -50,7 +50,7 @@ describe("preview spacing CSS", () => {
     );
 
     expect(css).toMatch(
-      /\.preview-pane-document\.markdown-body p:has\(\+ :is\(ul,\s*ol\)\)\s*\{[^}]*margin-bottom:\s*0;/m,
+      /\.preview-pane-document\.markdown-body p\.preview-before-list\s*\{[^}]*margin-bottom:\s*0;/m,
     );
     expect(css).toMatch(
       /\.preview-pane-document\.markdown-body p \+ :is\(ul,\s*ol\)\s*\{[^}]*margin-top:\s*0;/m,

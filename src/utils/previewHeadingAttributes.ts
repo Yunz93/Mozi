@@ -35,13 +35,21 @@ export function applyPreviewHeadingAttributes(
   });
 
   const assigned = new Set<HeadingNode>();
+  const matchedElements = new Set<HTMLElement>();
 
   const stamp = (element: HTMLElement, heading: HeadingNode) => {
-    element.id = heading.id;
-    element.dataset.headingId = heading.id;
-    element.dataset.headingSlug = createHeadingSlug(heading.text);
-    element.dataset.headingText = heading.text;
+    const text = heading.text;
+    const slug = createHeadingSlug(text);
+    // 保留预览再次激活时，不改写相同属性，避免重复通知观察器并使样式失效。
+    if (element.id !== heading.id) element.id = heading.id;
+    if (element.dataset.headingId !== heading.id)
+      element.dataset.headingId = heading.id;
+    if (element.dataset.headingSlug !== slug)
+      element.dataset.headingSlug = slug;
+    if (element.dataset.headingText !== text)
+      element.dataset.headingText = text;
     assigned.add(heading);
+    matchedElements.add(element);
   };
 
   const clear = (element: HTMLElement) => {
@@ -50,24 +58,36 @@ export function applyPreviewHeadingAttributes(
     element.removeAttribute("data-heading-text");
   };
 
-  // Pass 1: exact normalized text match (stable across DOM drift).
+  // 按规范化文字建立队列，重复标题仍按原顺序匹配，避免逐标题从头扫描大纲。
+  const headingsByText = new Map<
+    string,
+    { items: HeadingNode[]; next: number }
+  >();
+  for (const heading of headings) {
+    const text = normalizeHeadingText(heading.text);
+    const queue = headingsByText.get(text);
+    if (queue) queue.items.push(heading);
+    else headingsByText.set(text, { items: [heading], next: 0 });
+  }
   for (const element of headingElements) {
-    const domText = normalizeHeadingText(element.textContent ?? "");
-    const match = headings.find(
-      (heading) =>
-        !assigned.has(heading) &&
-        normalizeHeadingText(heading.text) === domText,
+    const queue = headingsByText.get(
+      normalizeHeadingText(element.textContent ?? ""),
     );
-    if (match) {
-      stamp(element, match);
-    }
+    if (!queue) continue;
+    while (
+      queue.next < queue.items.length &&
+      assigned.has(queue.items[queue.next])
+    )
+      queue.next++;
+    const match = queue.items[queue.next++];
+    if (match) stamp(element, match);
   }
 
   // Pass 2: fill remaining elements by outline order among unused headings.
   let unusedIndex = 0;
   const unusedHeadings = headings.filter((heading) => !assigned.has(heading));
   for (const element of headingElements) {
-    if (element.dataset.headingId) continue;
+    if (matchedElements.has(element)) continue;
     const heading = unusedHeadings[unusedIndex++];
     if (!heading) {
       clear(element);

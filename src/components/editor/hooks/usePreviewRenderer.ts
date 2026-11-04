@@ -86,13 +86,40 @@ export function usePreviewRenderer(
     hadHighlighterRef.current = hasHighlighter;
   }, [highlighter]);
 
-  // Parse markdown content
-  const parsedContent = useMemo(() => {
-    if (!enabled) {
-      return { frontmatter: null, bodyHTML: "" };
-    }
+  const parsedCacheRef = useRef<{
+    content: string;
+    path: typeof currentFilePath;
+    tab: typeof activeTabId;
+    highlighter: typeof highlighter;
+    themeMode: typeof themeMode;
+    markdownStylePreset: typeof markdownStylePreset;
+    orderedListMode: typeof orderedListMode;
+    isMarkdownPreview: boolean;
+    value: ReturnType<typeof renderMarkdownPreview>;
+  } | null>(null);
 
-    return renderMarkdownPreview({
+  const parsedContent = useMemo(() => {
+    const cached = parsedCacheRef.current;
+    const sameDocument =
+      cached !== null &&
+      cached.path === currentFilePath &&
+      cached.tab === activeTabId;
+    if (!enabled) {
+      // 只保留当前文档的最后一次预览；隐藏期间不解析输入，也不清空已就绪 DOM。
+      return sameDocument ? cached.value : { frontmatter: null, bodyHTML: "" };
+    }
+    if (
+      sameDocument &&
+      cached &&
+      cached.content === content &&
+      cached.highlighter === highlighter &&
+      cached.themeMode === themeMode &&
+      cached.markdownStylePreset === markdownStylePreset &&
+      cached.orderedListMode === orderedListMode &&
+      cached.isMarkdownPreview === isMarkdownPreview
+    )
+      return cached.value;
+    const value = renderMarkdownPreview({
       content,
       currentFilePath,
       highlighter,
@@ -101,9 +128,22 @@ export function usePreviewRenderer(
       markdownStylePreset,
       orderedListMode,
     });
+    parsedCacheRef.current = {
+      content,
+      path: currentFilePath,
+      tab: activeTabId,
+      highlighter,
+      themeMode,
+      markdownStylePreset,
+      orderedListMode,
+      isMarkdownPreview,
+      value,
+    };
+    return value;
   }, [
     content,
     currentFilePath,
+    activeTabId,
     enabled,
     highlighter,
     isMarkdownPreview,

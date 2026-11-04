@@ -118,8 +118,10 @@ export function useWorkspaceLayout(
 
   const outlineReservationWidth = useMemo(
     () =>
-      isOutlineOpen ? responsiveOutlineWidth + LAYOUT.GAP.OUTLINE_PANEL : 0,
-    [isOutlineOpen, responsiveOutlineWidth],
+      activeTabId && isOutlineOpen
+        ? responsiveOutlineWidth + LAYOUT.GAP.OUTLINE_PANEL
+        : 0,
+    [activeTabId, isOutlineOpen, responsiveOutlineWidth],
   );
 
   const maxSidebarWidthForViewport = useMemo(

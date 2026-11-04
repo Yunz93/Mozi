@@ -706,4 +706,30 @@ describe("PreviewPane", () => {
     );
     expect(pane.container.querySelector("article img")).toBeNull();
   });
+  it("retains rendered Mermaid SVG when returning to an unchanged reading pane", async () => {
+    const { usePreviewRenderer } = await import("./hooks");
+    const bodyHTML =
+      '<h2>Diagram</h2><div class="mermaid"><svg data-testid="ready-svg"><text>Ready</text></svg></div>';
+    vi.mocked(usePreviewRenderer).mockReturnValue({
+      parsedContent: { frontmatter: null, bodyHTML },
+      enhancedBodyHtml: bodyHTML,
+      sanitizedHtmlPreview: "",
+      requiresAsyncEnhancement: false,
+    });
+    mockResetMermaidPlaceholders.mockImplementationOnce((container) => {
+      container.querySelector(".mermaid")?.replaceChildren();
+    });
+    seedMarkdownStore();
+    const pane = render(
+      <PreviewPane previewRenderActive previewLayoutActive />,
+    );
+    const svg = pane.container.querySelector(".mermaid svg")!;
+    pane.rerender(
+      <PreviewPane previewRenderActive={false} previewLayoutActive={false} />,
+    );
+    pane.rerender(<PreviewPane previewRenderActive previewLayoutActive />);
+    expect(pane.container.querySelector(".mermaid svg")).toBe(svg);
+    expect(mockResetMermaidPlaceholders).not.toHaveBeenCalled();
+    mockResetMermaidPlaceholders.mockReset();
+  });
 });

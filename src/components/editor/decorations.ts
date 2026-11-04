@@ -15,7 +15,7 @@ import {
   type ViewUpdate,
   type EditorView,
 } from "@codemirror/view";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@codemirror/language";
 import { HighlightStyle } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { UNORDERED_LIST_REGEX, ORDERED_LIST_REGEX } from "./behavior";
@@ -23,6 +23,12 @@ import {
   getMarkdownListHangPrefixCharCount,
   getFrontmatterRange,
 } from "./behavior/core";
+
+import {
+  ensureLivePreviewViewportTree,
+  getLivePreviewDecorationRange,
+  ViewportDecorationWindow,
+} from "./livePreview/shared";
 
 // ==================== 语法高亮样式 ====================
 
@@ -238,10 +244,15 @@ export const frontmatterDecorations = ViewPlugin.fromClass(
 function buildFencedCodeDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const doc = view.state.doc;
-  const tree =
-    ensureSyntaxTree(view.state, doc.length, 75) ?? syntaxTree(view.state);
+  if (view.visibleRanges.length === 0) return Decoration.none;
+  const window = getLivePreviewDecorationRange(view);
+  const tree = ensureLivePreviewViewportTree(view, window.to);
+  const firstVisibleLine = doc.lineAt(window.from).number;
+  const lastVisibleLine = doc.lineAt(window.to).number;
 
   tree.iterate({
+    from: window.from,
+    to: window.to,
     enter: ({ name, from, to }) => {
       if (name !== "FencedCode") return;
 
@@ -249,8 +260,8 @@ function buildFencedCodeDecorations(view: EditorView): DecorationSet {
       const lastLineNumber = doc.lineAt(Math.max(from, to - 1)).number;
 
       for (
-        let lineNumber = firstLineNumber;
-        lineNumber <= lastLineNumber;
+        let lineNumber = Math.max(firstLineNumber, firstVisibleLine);
+        lineNumber <= Math.min(lastLineNumber, lastVisibleLine);
         lineNumber += 1
       ) {
         const line = doc.line(lineNumber);
@@ -276,6 +287,7 @@ function buildFencedCodeDecorations(view: EditorView): DecorationSet {
           Decoration.line({ class: classNames.join(" ") }),
         );
       }
+      return false;
     },
   });
 
@@ -286,16 +298,21 @@ export const fencedCodeDecorations = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
 
+    private readonly window = new ViewportDecorationWindow();
+
     constructor(view: EditorView) {
       this.decorations = buildFencedCodeDecorations(view);
+      this.window.mark(view);
     }
 
     update(update: ViewUpdate) {
       if (
         update.docChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
+        syntaxTree(update.startState) !== syntaxTree(update.state) ||
+        (update.viewportChanged && this.window.needsUpdate(update.view))
       ) {
         this.decorations = buildFencedCodeDecorations(update.view);
+        this.window.mark(update.view);
       }
     }
   },
@@ -340,15 +357,21 @@ function buildFencedLineSet(doc: Text): Set<number> {
   return inside;
 }
 
-function buildMarkdownListDecorations(view: EditorView): DecorationSet {
+function buildMarkdownListDecorations(
+  view: EditorView,
+  fencedLines: ReadonlySet<number>,
+): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const { doc } = view.state;
   const state = view.state;
   const frontmatter = getFrontmatterRange(state);
   const frontmatterClosingLine = frontmatter?.closingLineNumber ?? 0;
-  const fencedLines = buildFencedLineSet(doc);
+  if (view.visibleRanges.length === 0) return Decoration.none;
+  const window = getLivePreviewDecorationRange(view);
+  const firstLine = doc.lineAt(window.from).number;
+  const lastLine = doc.lineAt(window.to).number;
 
-  for (let lineNumber = 1; lineNumber <= doc.lines; lineNumber += 1) {
+  for (let lineNumber = firstLine; lineNumber <= lastLine; lineNumber += 1) {
     if (
       frontmatterClosingLine > 0 &&
       lineNumber > 1 &&
@@ -402,16 +425,32 @@ export const markdownListDecorations = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
 
+    private readonly window = new ViewportDecorationWindow();
+    private fencedDoc: Text | null = null;
+    private fencedLines: ReadonlySet<number> = new Set();
+
+    private build(view: EditorView): DecorationSet {
+      if (view.visibleRanges.length === 0) return Decoration.none;
+      // Text 不可变；仅文本变更时更新围栏归属，滚动和后台语法推进复用当前结果。
+      if (this.fencedDoc !== view.state.doc) {
+        this.fencedDoc = view.state.doc;
+        this.fencedLines = buildFencedLineSet(view.state.doc);
+      }
+      return buildMarkdownListDecorations(view, this.fencedLines);
+    }
+
     constructor(view: EditorView) {
-      this.decorations = buildMarkdownListDecorations(view);
+      this.decorations = this.build(view);
+      this.window.mark(view);
     }
 
     update(update: ViewUpdate) {
       if (
         update.docChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
+        (update.viewportChanged && this.window.needsUpdate(update.view))
       ) {
-        this.decorations = buildMarkdownListDecorations(update.view);
+        this.decorations = this.build(update.view);
+        this.window.mark(update.view);
       }
     }
   },

@@ -1,6 +1,10 @@
 /** @vitest-environment happy-dom */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { HeadingNode } from "./outline";
+import {
+  flattenHeadingNodes,
+  parseHeadings,
+  type HeadingNode,
+} from "./outline";
 import { applyPreviewHeadingAttributes } from "./previewHeadingAttributes";
 import {
   __resetPreviewNavigationBridgeForTests,
@@ -164,5 +168,89 @@ describe("applyPreviewHeadingAttributes", () => {
     ) as HTMLElement;
     expect(main.dataset.headingId).toBe("main-title");
     expect(embedded.dataset.headingId).toBeUndefined();
+  });
+  it("does not rewrite unchanged heading attributes on a retained preview", () => {
+    const container = document.createElement("div");
+    container.innerHTML =
+      '<article class="markdown-body"><h2>Chapter</h2></article>';
+    const headings: HeadingNode[] = [
+      { id: "chapter", level: 2, text: "Chapter", line: 1, children: [] },
+    ];
+    applyPreviewHeadingAttributes(container, headings);
+    const observer = new MutationObserver(() => {});
+    observer.observe(container, { attributes: true, subtree: true });
+    applyPreviewHeadingAttributes(container, headings);
+    expect(observer.takeRecords()).toHaveLength(0);
+    applyPreviewHeadingAttributes(container, [
+      { ...headings[0], id: "updated-chapter" },
+    ]);
+    expect(container.querySelector("h2")?.id).toBe("updated-chapter");
+    expect(
+      observer.takeRecords().some((record) => record.attributeName === "id"),
+    ).toBe(true);
+    observer.disconnect();
+  });
+
+  it("matches reordered headings without repeatedly reading the whole outline", () => {
+    const count = 150;
+    let textReads = 0;
+    const headings: HeadingNode[] = Array.from({ length: count }, (_, i) => ({
+      id: `heading-${i}`,
+      level: 2,
+      get text() {
+        textReads++;
+        return `Heading ${i}`;
+      },
+      line: i,
+      children: [],
+    }));
+    const container = document.createElement("div");
+    container.innerHTML =
+      '<article class="markdown-body">' +
+      Array.from(
+        { length: count },
+        (_, i) => `<h2>Heading ${count - i - 1}</h2>`,
+      ).join("") +
+      "</article>";
+    applyPreviewHeadingAttributes(container, headings);
+    expect(
+      Array.from(container.querySelectorAll("h2"), (node) => node.id),
+    ).toEqual(
+      Array.from({ length: count }, (_, i) => `heading-${count - i - 1}`),
+    );
+    expect(textReads).toBeLessThan(count * 5);
+  });
+  it("keeps repeated normalized titles assigned in outline order", () => {
+    const container = document.createElement("div");
+    container.innerHTML =
+      '<article class="markdown-body"><h2><strong>Chapter</strong></h2><h2>Chapter</h2></article>';
+    const headings: HeadingNode[] = [
+      { id: "chapter", level: 2, text: "**Chapter**", line: 1, children: [] },
+      { id: "chapter-1", level: 2, text: "Chapter", line: 3, children: [] },
+    ];
+    applyPreviewHeadingAttributes(container, headings);
+    expect(
+      Array.from(container.querySelectorAll("h2"), (node) => node.id),
+    ).toEqual(["chapter", "chapter-1"]);
+  });
+  it("updates retained heading ids when source changes but rendered text is identical", () => {
+    const container = document.createElement("div");
+    container.innerHTML =
+      '<article class="markdown-body"><h1>A &amp; B</h1></article>';
+    applyPreviewHeadingAttributes(
+      container,
+      flattenHeadingNodes(parseHeadings("# A &amp; B")),
+    );
+    const heading = container.querySelector("h1")!;
+    expect(heading.id).toBe("a-amp-b");
+    applyPreviewHeadingAttributes(
+      container,
+      flattenHeadingNodes(parseHeadings("# A &#38; B")),
+    );
+    expect(container.querySelector("h1")).toBe(heading);
+    expect(heading.id).toBe("a-38-b");
+    expect(heading.dataset.headingId).toBe("a-38-b");
+    applyPreviewHeadingAttributes(container, []);
+    expect(heading.dataset.headingId).toBeUndefined();
   });
 });

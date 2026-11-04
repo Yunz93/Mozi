@@ -30,7 +30,8 @@ export const LAYOUT = {
 
   /** Minimum workspace widths for different view modes */
   WORKSPACE: {
-    SINGLE_VIEW_MIN: 760,
+    // 单栏已支持紧凑布局；宽屏阅读宽度不能作为侧边栏拖拽的硬性预留。
+    SINGLE_VIEW_MIN: 360,
     SPLIT_MIN: 920,
     WITH_OUTLINE: {
       EDITOR: 620,

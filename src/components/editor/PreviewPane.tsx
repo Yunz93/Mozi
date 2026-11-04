@@ -58,11 +58,9 @@ import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
 } from "../../utils/attachmentResolver";
-import {
-  renderMermaidDiagrams,
-  resetMermaidPlaceholders,
-} from "../../utils/markdown-extensions";
+import { renderMermaidDiagrams } from "../../utils/markdown-extensions";
 import { flattenHeadingNodes, parseHeadings } from "../../utils/outline";
+import { applyPreviewBlockSpacing } from "../../utils/previewBlockSpacing";
 import { applyPreviewHeadingAttributes } from "../../utils/previewHeadingAttributes";
 import { parseFrontmatter } from "../../utils/frontmatter";
 import { openExternalUrl } from "../../utils/externalLinks";
@@ -385,6 +383,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       const container = previewRef.current;
       if (!container) return;
 
+      applyPreviewBlockSpacing(container);
       applyPreviewHeadingAttributes(container, flattenedHeadings, activeTabId);
     }, [
       activeTabId,
@@ -394,7 +393,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       previewRenderActive,
     ]);
 
-    const prevPreviewLayoutActiveRef = useRef<boolean | null>(null);
     const mermaidRenderRunningRef = useRef(false);
     const mermaidRenderQueuedRef = useRef(false);
 
@@ -453,30 +451,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       settings.themeMode,
     ]);
 
-    // When re-enabling the preview column after it was width-0, reset Mermaid placeholders so a
-    // later render pass re-parses from source. Avoid doing heavy work in layout effects so
-    // view-mode switches don't block a frame.
-    useLayoutEffect(() => {
-      const container = previewRef.current;
-      if (!isMarkdownPreview || !previewRenderActive || !container) {
-        prevPreviewLayoutActiveRef.current = previewLayoutActive;
-        return;
-      }
-
-      const prev = prevPreviewLayoutActiveRef.current;
-      prevPreviewLayoutActiveRef.current = previewLayoutActive;
-
-      if (previewLayoutActive && prev === false) {
-        resetMermaidPlaceholders(container);
-      }
-    }, [
-      isMarkdownPreview,
-      markdownPreviewMarkup,
-      previewLayoutActive,
-      previewRenderActive,
-      runMermaidInPreview,
-    ]);
-
+    // 已完成的图表随预览 DOM 保留；重新显示时仅渲染尚未就绪的图表。
     // Second pass after paint: Shiki/highlighter hydration and first-paint batching can leave the
     // first layout effect without diagram nodes; rAF runs after the current frame settles.
     useEffect(() => {
