@@ -91,6 +91,8 @@ git push origin v0.1.1
 
 CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的版本号同步为当前 tag 对应版本，再执行 Tauri 打包和 GitHub Release 上传。
 
+macOS 发布固定使用 `macos-15` Arm64 runner。若 macOS 任务一直未分配 runner，可在原任务停止后，手动触发 Release 工作流并指定 `release_tag`（如 `v2.0.1`）。手动补包只构建该既有标签的 macOS 文件，跳过 Windows；检出、版本同步和上传使用同一标签，不移动标签。完成后需重新下载并核对两端文件及 `latest.json`，避免把只有部分平台文件的 Release 当作发布完成。
+
 macOS 用户推荐使用一键安装脚本 `scripts/install-macos.sh`（自动下载 Release、执行 `xattr -cr` 并安装到 `/Applications`）。桌面应用设置页的「检查更新」在 macOS 上走同一套安装脚本，并显示下载进度。
 
 ### macOS 签名与公证

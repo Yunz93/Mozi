@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "补齐既有版本的 macOS 发布文件，例如 v2.0.1"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,8 +18,9 @@ jobs:
   build-macos:
     permissions:
       contents: write
-    runs-on: macos-latest
+    runs-on: macos-15
     env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
     steps:
@@ -21,6 +28,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -46,9 +54,7 @@ jobs:
         run: npm test -- src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts src/utils/prepareTauriSigningKey.test.ts
 
       - name: Sync app version from Git tag
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         run: npm run release:sync-version
 
       - name: Prepare updater signing key
@@ -93,8 +99,6 @@ jobs:
       - name: Compose release body
         id: release_body
         shell: bash
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           VERSION="${RELEASE_TAG#v}"
           {
@@ -109,8 +113,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY || '-' }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Release ${{ github.ref_name }}
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: Release ${{ env.RELEASE_TAG }}
           releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
           prerelease: false
@@ -118,6 +122,7 @@ jobs:
           args: --bundles app,dmg
 
   build-windows:
+    if: github.event_name != 'workflow_dispatch'
     permissions:
       contents: write
     runs-on: windows-latest
