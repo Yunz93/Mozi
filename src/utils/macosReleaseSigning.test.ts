@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
@@ -14,7 +15,15 @@ const releaseWorkflowPath = resolve(
 describe("macOS release signing configuration", () => {
   it("recovers macOS assets from an existing tag on a pinned Arm64 runner", () => {
     const workflow = load(readFileSync(releaseWorkflowPath, "utf8")) as {
-      on: Record<string, { inputs?: Record<string, { required: boolean }> }>;
+      on: Record<
+        string,
+        {
+          inputs?: Record<
+            string,
+            { required: boolean; default?: string; options?: string[] }
+          >;
+        }
+      >;
       jobs: Record<
         string,
         {
@@ -35,7 +44,25 @@ describe("macOS release signing configuration", () => {
       true,
     );
     const macos = workflow.jobs["build-macos"];
-    expect(macos["runs-on"]).toBe("macos-15");
+    expect(workflow.on.workflow_dispatch.inputs?.build_runner).toMatchObject({
+      default: "github-hosted",
+      options: ["github-hosted", "local-once"],
+    });
+    expect(macos["runs-on"]).toBe(
+      '${{ github.event_name == \'workflow_dispatch\' && inputs.build_runner == \'local-once\' && fromJSON(\'["self-hosted","macOS","ARM64","mozi-release-once"]\') || fromJSON(\'["macos-15"]\') }}',
+    );
+    expect(
+      macos.steps.find((step) => step.uses?.startsWith("swatinem/rust-cache@"))
+        ?.if,
+    ).toBe("inputs.build_runner != 'local-once'");
+    expect(
+      macos.steps.find((step) => step.uses?.startsWith("actions/setup-node@"))
+        ?.with?.cache,
+    ).toBe("${{ inputs.build_runner != 'local-once' && 'npm' || '' }}");
+    expect(
+      macos.steps.find((step) => step.uses?.startsWith("actions/setup-node@"))
+        ?.with?.["package-manager-cache"],
+    ).toBe("${{ inputs.build_runner != 'local-once' }}");
     expect(macos.env?.RELEASE_TAG).toBe(
       "${{ inputs.release_tag || github.ref_name }}",
     );
@@ -58,6 +85,48 @@ describe("macOS release signing configuration", () => {
     expect(workflow.jobs["build-windows"].if).toBe(
       "github.event_name != 'workflow_dispatch'",
     );
+  });
+
+  it("blocks local Apple credentials before host keychain or notarization changes", () => {
+    const workflow = load(readFileSync(releaseWorkflowPath, "utf8")) as {
+      jobs: Record<
+        string,
+        { steps: Array<{ name: string; if?: string; run?: string }> }
+      >;
+    };
+    const steps = workflow.jobs["build-macos"].steps;
+    const guard = steps.find(
+      (step) => step.name === "Check one-shot local signing scope",
+    );
+    expect(guard?.if).toBe("inputs.build_runner == 'local-once'");
+    expect(guard?.run).toBeTruthy();
+    for (const [certificate, apiKey, status] of [
+      ["", "", 0],
+      ["fake-apple-certificate", "", 1],
+      ["", "fake-apple-api-key", 1],
+    ] as const) {
+      const result = spawnSync("bash", ["-c", guard!.run!], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          APPLE_CERTIFICATE: certificate,
+          APPLE_API_KEY_CONTENT: apiKey,
+        },
+      });
+      expect(result.status).toBe(status);
+      expect(result.stdout + result.stderr).not.toContain("fake-apple-");
+    }
+    expect(
+      steps.find((step) => step.name === "Import Apple Developer certificate")
+        ?.if,
+    ).toBe(
+      "inputs.build_runner != 'local-once' && env.APPLE_CERTIFICATE != ''",
+    );
+    expect(
+      steps.find(
+        (step) => step.name === "Prepare Apple notarization credentials",
+      )?.if,
+    ).toBe("inputs.build_runner != 'local-once'");
   });
 
   it("configures hardened runtime entitlements for macOS bundles", () => {

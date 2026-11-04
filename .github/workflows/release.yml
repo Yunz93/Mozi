@@ -10,6 +10,14 @@ on:
         description: "补齐既有版本的 macOS 发布文件，例如 v2.0.1"
         required: true
         type: string
+      build_runner:
+        description: "构建环境；local-once 需要提前授权并注册一次性本机 runner"
+        required: true
+        default: github-hosted
+        type: choice
+        options:
+          - github-hosted
+          - local-once
 
 permissions:
   contents: write
@@ -18,7 +26,7 @@ jobs:
   build-macos:
     permissions:
       contents: write
-    runs-on: macos-15
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.build_runner == 'local-once' && fromJSON('["self-hosted","macOS","ARM64","mozi-release-once"]') || fromJSON('["macos-15"]') }}
     env:
       RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -30,16 +38,27 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
 
+      - name: Check one-shot local signing scope
+        if: inputs.build_runner == 'local-once'
+        shell: bash
+        run: |
+          if [[ -n "${APPLE_CERTIFICATE:-}" || -n "${APPLE_API_KEY_CONTENT:-}" ]]; then
+            echo "::error::本机一次性 runner 不处理 Apple 证书或公证私钥，请使用托管 runner。"
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
-          cache: npm
+          cache: ${{ inputs.build_runner != 'local-once' && 'npm' || '' }}
+          package-manager-cache: ${{ inputs.build_runner != 'local-once' }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Rust build artifacts
+        if: inputs.build_runner != 'local-once'
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
@@ -79,7 +98,7 @@ jobs:
           fi
 
       - name: Import Apple Developer certificate
-        if: env.APPLE_CERTIFICATE != ''
+        if: inputs.build_runner != 'local-once' && env.APPLE_CERTIFICATE != ''
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -87,6 +106,7 @@ jobs:
         run: bash scripts/import-apple-certificate.sh
 
       - name: Prepare Apple notarization credentials
+        if: inputs.build_runner != 'local-once'
         env:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}

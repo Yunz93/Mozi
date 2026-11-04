@@ -93,6 +93,10 @@ CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Carg
 
 macOS 发布固定使用 `macos-15` Arm64 runner。若 macOS 任务一直未分配 runner，可在原任务停止后，手动触发 Release 工作流并指定 `release_tag`（如 `v2.0.1`）。手动补包只构建该既有标签的 macOS 文件，跳过 Windows；检出、版本同步和上传使用同一标签，不移动标签。完成后需重新下载并核对两端文件及 `latest.json`，避免把只有部分平台文件的 Release 当作发布完成。
 
+手动补包默认仍使用托管 runner。只有得到本机所有者明确授权后，才可选择 `build_runner=local-once`，注册带 `mozi-release-once` 标签的 macOS Arm64 一次性 runner；执行一次任务后应确认其已注销。本机模式跳过 Rust 缓存上传，使用独立的 runner 工作目录；不得复用托管 runner 标签或在原项目检出目录执行 CI。
+
+本机模式也禁用 npm 缓存上传，并应设置独立的 npm 缓存及临时目录。该模式仅支持 Apple ad-hoc 签名与应用更新签名；若已配置 Apple 证书或公证私钥，会在签名准备前停止，需改用托管 runner，防止改变本机钥匙串或落地 Apple 私钥。任务结束后核对 runner 注销，清空本次临时凭据内容；不触碰原有证书和用户缓存。
+
 macOS 用户推荐使用一键安装脚本 `scripts/install-macos.sh`（自动下载 Release、执行 `xattr -cr` 并安装到 `/Applications`）。桌面应用设置页的「检查更新」在 macOS 上走同一套安装脚本，并显示下载进度。
 
 ### macOS 签名与公证
