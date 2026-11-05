@@ -4,7 +4,7 @@
 
 [English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
 
-本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.0.2 修复光标跳动和异步操作抢焦点的问题，并将 AI 增强移到主工具栏，显示处理进度，保留 Live 实时预览、知识检索，以及微信公众号草稿和 Simple Blog 发布。
+本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.1.0 完善 Live 表格编辑、代码块控件和图片属性，新增专注、打字机与可选智能标点，保留知识检索、微信公众号草稿和 Simple Blog 发布。
 
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.2 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.1.0 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
@@ -73,6 +73,8 @@ xattr -cr /Applications/墨知.app
 ### 实时预览与 Markdown 排版
 
 Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格、任务列表、Callout、脚注、代码高亮、KaTeX 公式与 Mermaid 图表。编辑区的「显示纯文本」可以查看 Markdown 源码。
+
+表格内输入即时写入正文，支持格式快捷键、多单元格复制粘贴、行列移动和对齐。代码块可切换语言和复制内容，右键图片可修改来源、说明与尺寸。在 **设置 → 编辑** 开启专注模式、打字机模式或智能标点，默认均关闭；F8、F9 分别切换专注与打字机模式。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/20-markdown-reading.png" alt="阅读模式中的代码与公式" width="800">

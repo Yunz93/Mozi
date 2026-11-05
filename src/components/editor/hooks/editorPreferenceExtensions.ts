@@ -18,8 +18,12 @@ import {
   normalizeTabSize,
 } from "../../../utils/editorPreferences";
 import { indentationGuides } from "./indentationGuides";
+import {
+  createWritingExperience,
+  type WritingPreferences,
+} from "./writingExperience";
 
-export interface EditorPreferenceOptions {
+export interface EditorPreferenceOptions extends WritingPreferences {
   autoPairBrackets: boolean;
   autoPairMarkdown: boolean;
   showLineNumbers: boolean;
@@ -36,6 +40,7 @@ export interface EditorPreferenceCompartments {
   indent: Compartment;
   indentGuides: Compartment;
   spellcheck: Compartment;
+  writing: Compartment;
 }
 
 export function createEditorPreferenceCompartments(): EditorPreferenceCompartments {
@@ -45,6 +50,7 @@ export function createEditorPreferenceCompartments(): EditorPreferenceCompartmen
     indent: new Compartment(),
     indentGuides: new Compartment(),
     spellcheck: new Compartment(),
+    writing: new Compartment(),
   };
 }
 
@@ -100,6 +106,7 @@ export function buildEditorPreferenceEffects(
   options: EditorPreferenceOptions,
 ) {
   return [
+    compartments.writing.reconfigure(createWritingExperience(options)),
     compartments.closeBrackets.reconfigure(
       buildCloseBracketsExtension(
         options.autoPairBrackets,
@@ -126,6 +133,7 @@ export function wrapEditorPreferenceExtensions(
   options: EditorPreferenceOptions,
 ): Extension[] {
   return [
+    compartments.writing.of(createWritingExperience(options)),
     compartments.closeBrackets.of(
       buildCloseBracketsExtension(
         options.autoPairBrackets,

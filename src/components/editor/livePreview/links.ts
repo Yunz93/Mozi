@@ -15,7 +15,6 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewContextFacet } from "./context";
 import { collectMarkdownLinkRanges } from "../../../utils/markdownInlineRanges";
 import { bindLivePreviewWidgetModClick } from "./clickableLinks";
@@ -99,10 +98,6 @@ class MarkdownLinkWidget extends WidgetType {
 export function buildLivePreviewLinkDecorations(
   view: EditorView,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
-    return Decoration.none;
-  }
-
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const wikiRanges = collectVisibleWikiRanges(view, 2);

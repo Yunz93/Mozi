@@ -7,6 +7,8 @@ import React, {
 import {
   Download,
   FileText,
+  Focus,
+  TextCursor,
   Image,
   Lightbulb,
   LoaderCircle,
@@ -27,6 +29,8 @@ import { useI18n } from "../../hooks/useI18n";
 import { isTauriEnvironment } from "../../types/filesystem";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AiEnhanceStage } from "../../hooks/useAIAnalyze";
+import { useAppStore } from "../../store/appStore";
+import { getActiveEditorView } from "../../utils/editorSelectionBridge";
 
 interface ToolbarProps {
   fileName: string;
@@ -75,6 +79,15 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
     isPreviewOnlyFile = false,
   }) => {
     const { t } = useI18n();
+    const focusMode = useAppStore((state) => state.settings.focusMode);
+    const typewriterMode = useAppStore(
+      (state) => state.settings.typewriterMode,
+    );
+    const updateSettings = useAppStore((state) => state.updateSettings);
+    const toggleWritingMode = (mode: "focusMode" | "typewriterMode") => {
+      updateSettings({ [mode]: !useAppStore.getState().settings[mode] });
+      getActiveEditorView()?.focus();
+    };
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -92,7 +105,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
       const getMenuItems = () =>
         Array.from(
           menuRef.current?.querySelectorAll<HTMLButtonElement>(
-            '[role="menuitem"]:not(:disabled)',
+            '[role="menuitem"]:not(:disabled), [role="menuitemcheckbox"]:not(:disabled)',
           ) ?? [],
         );
       getMenuItems()[0]?.focus();
@@ -325,6 +338,32 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                 aria-label={t("toolbar_more")}
                 className="app-toolbar-menu"
               >
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={focusMode === true}
+                  title={t("settings_focusMode")}
+                  aria-label={t("settings_focusMode")}
+                  disabled={documentDisabled || viewMode !== ViewMode.LIVE}
+                  onClick={() =>
+                    runMenuAction(() => toggleWritingMode("focusMode"))
+                  }
+                >
+                  <Focus size={14} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={typewriterMode === true}
+                  title={t("settings_typewriterMode")}
+                  aria-label={t("settings_typewriterMode")}
+                  disabled={documentDisabled || viewMode !== ViewMode.LIVE}
+                  onClick={() =>
+                    runMenuAction(() => toggleWritingMode("typewriterMode"))
+                  }
+                >
+                  <TextCursor size={14} aria-hidden />
+                </button>
                 {onExportPdf && (
                   <button
                     type="button"

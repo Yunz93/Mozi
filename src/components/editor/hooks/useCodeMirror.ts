@@ -52,6 +52,7 @@ import {
   scheduleLivePreviewMeasure,
 } from "../livePreview/shared";
 import { isEditorImeComposing } from "../behavior/imeGuard";
+import { flushLiveTableInput } from "../livePreview/tables";
 import { subscribeEditorDocumentPathRemap } from "../../../utils/editorSelectionBridge";
 
 export { getEditorTooltipSpace };
@@ -79,6 +80,9 @@ export interface UseCodeMirrorOptions {
   useTabs?: boolean;
   showIndentationGuides?: boolean;
   spellcheck?: boolean;
+  focusMode?: boolean;
+  typewriterMode?: boolean;
+  smartPunctuation?: boolean;
   convertHtmlOnPaste?: boolean;
   onChange: (content: string, meta?: CodeMirrorContentChangeMeta) => void;
   onScroll?: () => void;
@@ -130,6 +134,9 @@ export function useCodeMirror(
     useTabs = DEFAULT_PREFERENCES.useTabs,
     showIndentationGuides = DEFAULT_PREFERENCES.showIndentationGuides,
     spellcheck = DEFAULT_PREFERENCES.spellcheck,
+    focusMode = false,
+    typewriterMode = false,
+    smartPunctuation = false,
     convertHtmlOnPaste = true,
     onChange,
     onScroll,
@@ -149,6 +156,9 @@ export function useCodeMirror(
       useTabs,
       showIndentationGuides,
       spellcheck,
+      focusMode,
+      typewriterMode,
+      smartPunctuation,
     }),
     [
       autoPairBrackets,
@@ -159,6 +169,9 @@ export function useCodeMirror(
       useTabs,
       showIndentationGuides,
       spellcheck,
+      focusMode,
+      typewriterMode,
+      smartPunctuation,
     ],
   );
 
@@ -414,6 +427,7 @@ export function useCodeMirror(
 
     const view = viewRef.current;
     if (!view || isSyncingContentRef.current) return;
+    flushLiveTableInput(view);
 
     const isLarge =
       pendingContentChangeIsLargeRef.current || isLargeEditorState(view.state);

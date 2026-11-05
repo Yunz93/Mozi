@@ -12,7 +12,6 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   ensureLivePreviewViewportTree,
   getLivePreviewDecorationRange,
@@ -83,10 +82,6 @@ function selectionOnLine(state: EditorState, from: number): boolean {
 export function buildLivePreviewTaskDecorations(
   view: EditorView,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
-    return Decoration.none;
-  }
-
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const parseTo = maxVisibleParseTo(view);

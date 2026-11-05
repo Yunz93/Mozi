@@ -431,6 +431,11 @@
 .app-toolbar-menu button:hover {
   background: var(--workspace-hover);
 }
+
+.app-toolbar-menu button[aria-checked="true"] {
+  color: var(--workspace-accent);
+  background: var(--workspace-active);
+}
 .app-toolbar button:disabled,
 .workspace-view-modes button:disabled {
   opacity: 0.4;

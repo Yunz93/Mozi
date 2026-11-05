@@ -13,7 +13,6 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   collectVisibleWikiRanges,
   ensureLivePreviewViewportTree,
@@ -118,10 +117,6 @@ function shouldRevealMark(
 export function buildLivePreviewHideDecorations(
   view: EditorView,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
-    return Decoration.none;
-  }
-
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const parseTo = maxVisibleParseTo(view);
@@ -175,8 +170,12 @@ export function buildLivePreviewHideDecorations(
       }
 
       if (HIDEABLE_MARK_NODES.has(name)) {
-        if (hasSkipAncestor(state, from)) return;
         const parent = findInlineParent(state, from, to, markdownConstructs);
+        if (
+          hasSkipAncestor(state, from) &&
+          !(name === "CodeMark" && parent?.name === "InlineCode")
+        )
+          return;
         // Image/Link widgets replace the whole construct when inactive.
         if (
           (parent?.name === "Image" || parent?.name === "Link") &&

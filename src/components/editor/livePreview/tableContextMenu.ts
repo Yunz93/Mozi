@@ -13,7 +13,14 @@ export type LiveTableStructureOp =
   | "deleteRow"
   | "insertColumnLeft"
   | "insertColumnRight"
-  | "deleteColumn";
+  | "deleteColumn"
+  | "moveRowUp"
+  | "moveRowDown"
+  | "moveColumnLeft"
+  | "moveColumnRight"
+  | "alignLeft"
+  | "alignCenter"
+  | "alignRight";
 
 export interface LiveTableMenuTarget {
   view: EditorView;
@@ -22,6 +29,8 @@ export interface LiveTableMenuTarget {
   col: number;
   readValue: () => string;
   canDeleteColumn: boolean;
+  rowCount: number;
+  columnCount: number;
   apply: (op: LiveTableStructureOp, value: string) => void;
 }
 
@@ -43,6 +52,8 @@ const MENU_ITEMS: MenuItem[] = [
   { type: "action", op: "insertRowAbove", labelKey: "table_insertRowAbove" },
   { type: "action", op: "insertRowBelow", labelKey: "table_insertRowBelow" },
   { type: "action", op: "deleteRow", labelKey: "table_deleteRow" },
+  { type: "action", op: "moveRowUp", labelKey: "table_moveRowUp" },
+  { type: "action", op: "moveRowDown", labelKey: "table_moveRowDown" },
   { type: "sep" },
   {
     type: "action",
@@ -55,6 +66,12 @@ const MENU_ITEMS: MenuItem[] = [
     labelKey: "table_insertColumnRight",
   },
   { type: "action", op: "deleteColumn", labelKey: "table_deleteColumn" },
+  { type: "action", op: "moveColumnLeft", labelKey: "table_moveColumnLeft" },
+  { type: "action", op: "moveColumnRight", labelKey: "table_moveColumnRight" },
+  { type: "sep" },
+  { type: "action", op: "alignLeft", labelKey: "table_alignLeft" },
+  { type: "action", op: "alignCenter", labelKey: "table_alignCenter" },
+  { type: "action", op: "alignRight", labelKey: "table_alignRight" },
   { type: "sep" },
   {
     type: "command",
@@ -144,7 +161,14 @@ export function openLiveTableContextMenu(
     }
 
     const disabled =
-      item.disabled || (item.op === "deleteColumn" && !target.canDeleteColumn);
+      item.disabled ||
+      (item.op === "deleteColumn" && !target.canDeleteColumn) ||
+      (item.op === "moveRowUp" && target.logicalRow <= 1) ||
+      (item.op === "moveRowDown" &&
+        (target.logicalRow === 0 ||
+          target.logicalRow >= target.rowCount - 1)) ||
+      (item.op === "moveColumnLeft" && target.col === 0) ||
+      (item.op === "moveColumnRight" && target.col >= target.columnCount - 1);
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "cm-live-preview-table-menu-item";
@@ -202,6 +226,21 @@ export function openLiveTableContextMenu(
     if (e.key === "Escape") {
       e.preventDefault();
       closeLiveTableContextMenu();
+    } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+      e.preventDefault();
+      const items = Array.from(
+        menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+      );
+      if (!items.length) return;
+      const index = items.indexOf(document.activeElement as HTMLButtonElement);
+      const next =
+        e.key === "Home"
+          ? 0
+          : e.key === "End"
+            ? items.length - 1
+            : (index + (e.key === "ArrowUp" ? -1 : 1) + items.length) %
+              items.length;
+      items[next].focus();
     }
   };
   const onScroll = () => closeLiveTableContextMenu();

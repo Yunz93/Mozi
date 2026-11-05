@@ -52,6 +52,7 @@ import {
 import { buildLivePreviewLinkDecorations, livePreviewLinks } from "./links";
 import { livePreviewMermaid } from "./mermaid";
 import { livePreviewMath } from "./math";
+import { livePreviewCodeBlocks } from "./codeBlocks";
 
 function createView(
   doc: string,
@@ -114,6 +115,29 @@ describe("live preview hide formatting", () => {
     views.push(view);
     return view;
   }
+
+  it("隐藏非活动行内代码的反引号，同时保留代码正文和围栏内字面量", () => {
+    const doc =
+      "正文 `a ** b`\n\n```text\n`literal`\n| a | b |\n| --- | --- |\n| 1 | 2 |\n```\n\naway";
+    const view = mount(doc, doc.length - 1, [livePreviewTables]);
+    const hidden: string[] = [];
+    buildLivePreviewHideDecorations(view).between(0, doc.length, (from, to) => {
+      hidden.push(doc.slice(from, to));
+    });
+    expect(hidden.filter((text) => text === "`")).toHaveLength(2);
+    expect(hidden).not.toContain("a ** b");
+    expect(view.dom.querySelector(".cm-live-preview-table")).toBeNull();
+    expect(view.state.doc.toString()).toBe(doc);
+  });
+
+  it("代码块控件不隐藏未闭合四反引号块里的三反引号正文", () => {
+    const doc = "````js\nlet x=1;\n```\n";
+    const view = mount(doc, 0, [livePreviewCodeBlocks]);
+    expect(view.dom.querySelector(".cm-live-code-closing")).toBeNull();
+    expect(view.dom.textContent).toContain("let x=1;");
+    expect(view.dom.textContent).toContain("```");
+    expect(view.state.doc.toString()).toBe(doc);
+  });
 
   it("hides emphasis marks when the cursor is away", () => {
     const view = mount("hello **world**\n\naway", 20);

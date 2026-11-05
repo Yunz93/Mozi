@@ -25,6 +25,17 @@ export type SoftOffKind =
   | "link"
   | "formatting";
 
+/** 仅按当前块的复杂度降级，文档变长不会撤掉正在使用的编辑能力。 */
+export function livePreviewBlockReason(
+  kind: SoftOffKind,
+  chars: number,
+  items = 0,
+): string | null {
+  const limit = kind === "mermaid" ? 40_000 : 200_000;
+  if (chars <= limit && items <= 10_000) return null;
+  return t(useAppStore.getState().settings.language, "editor_blockBudget");
+}
+
 export function getLivePreviewOptimizationMode(
   state: EditorState,
 ): LivePreviewOptimizationMode {

@@ -25,11 +25,7 @@ import {
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
-import {
-  getLivePreviewOptimizationMode,
-  SoftOffPlaceholderWidget,
-  softOffReason,
-} from "./softOff";
+import { livePreviewBlockReason, SoftOffPlaceholderWidget } from "./softOff";
 
 class MermaidWidget extends WidgetType {
   constructor(
@@ -270,11 +266,6 @@ export function buildMermaidDecorations(
   scanRanges?: readonly CoverageRange[],
 ): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
-  const mode = getLivePreviewOptimizationMode(state);
-  const reason = softOffReason(mode, "mermaid");
-  if (mode === "large") {
-    return { decorations: Decoration.none, coverage };
-  }
 
   const builder = new RangeSetBuilder<Decoration>();
   const ctx = state.facet(livePreviewContextFacet);
@@ -303,6 +294,7 @@ export function buildMermaidDecorations(
         coverage.push({ from, to });
         if (selectionTouchesRange(state, from, to)) return;
 
+        const reason = livePreviewBlockReason("mermaid", body.length);
         if (reason) {
           builder.add(
             from,

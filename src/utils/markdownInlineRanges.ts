@@ -6,9 +6,9 @@ import { parseMarkdownDestination } from "./markdownDestination";
  * leading space after `(` and spaces inside the path.
  */
 export const MARKDOWN_IMAGE_INLINE_RE =
-  /!\[([^\]]*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
+  /!\[((?:\\.|[^\\\]])*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
 export const MARKDOWN_LINK_INLINE_RE =
-  /(?<!!)\[([^\]]*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
+  /(?<!!)\[((?:\\.|[^\\\]])*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
 
 export interface MarkdownInlineRange {
   from: number;
@@ -31,11 +31,15 @@ function collectInlineRanges(
   let match: RegExpExecArray | null;
   while ((match = re.exec(slice)) !== null) {
     const full = match[0];
-    const alt = match[1] ?? "";
+    const rawAlt = match[1] ?? "";
+    const alt = rawAlt.replace(/\\([\\[\]])/g, "$1");
     const destRaw = match[2] ?? "";
     const fullFrom = from + match.index;
     const fullTo = fullFrom + full.length;
-    const destOffsetInFull = full.indexOf(destRaw, full.indexOf("("));
+    const destOffsetInFull = full.indexOf(
+      destRaw,
+      full.indexOf("[", 0) + rawAlt.length + 3,
+    );
     if (destOffsetInFull < 0) continue;
 
     const parsed = parseMarkdownDestination(destRaw);

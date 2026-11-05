@@ -11,7 +11,6 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import { renderKatexHtml } from "../../../utils/markdown-extensions";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   collectWikiLinkRanges,
   defineLivePreviewBlockDecorationField,
@@ -171,7 +170,7 @@ function buildMathDecorationsInScanRanges(
   scanRanges: readonly CoverageRange[],
 ): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
-  if (isLargeEditorState(state) || scanRanges.length === 0) {
+  if (scanRanges.length === 0) {
     return { decorations: Decoration.none, coverage };
   }
 
@@ -245,9 +244,6 @@ function buildMathDecorationsInScanRanges(
 }
 
 export function buildMathDecorations(state: EditorState): BlockDecorationBuild {
-  if (isLargeEditorState(state)) {
-    return { decorations: Decoration.none, coverage: [] };
-  }
   return buildMathDecorationsInScanRanges(state, [
     { from: 0, to: state.doc.length },
   ]);

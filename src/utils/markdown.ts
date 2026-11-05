@@ -321,6 +321,10 @@ const createMarkdownIt = () => {
 
     // Obsidian `![alt|300](url)` / `![alt|300x200](url)`：尺寸写在 alt 里。
     // 默认 renderer 会用 children 覆盖 alt，所以要先剥掉尺寸再交给它。
+    // 图片内部的转义和实体仍是 text_special，默认 alt 渲染器会漏掉这些字符。
+    for (const child of token.children ?? []) {
+      if (child.type === "text_special") child.type = "text";
+    }
     const rawAlt = self.renderInlineAsText(token.children || [], options, env);
     const sized = splitObsidianImageAlt(rawAlt);
     if (sized.width || sized.height) {

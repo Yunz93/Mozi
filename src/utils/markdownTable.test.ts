@@ -15,6 +15,7 @@ import {
   moveColumn,
   setColumnAlignment,
   setTableCell,
+  setTableCells,
   getCellContentRanges,
   locateCellInLine,
   resolveTableCursor,
@@ -32,6 +33,20 @@ const SAMPLE = [
   "| Ada  | 36  | London |",
   "| Bob  | 28  | Paris |",
 ];
+
+it("批量粘贴支持超过函数参数上限的行数，并保留原有未覆盖单元格", () => {
+  const table = findTableAt(SAMPLE, 0)!;
+  const rows = Array.from({ length: 150_000 }, (_, row) => [`第${row}行`]);
+  const updated = setTableCells(table, 1, 0, rows);
+  expect(updated.body).toHaveLength(150_000);
+  expect(updated.body[0]).toEqual(["第0行", "36", "London"]);
+  expect(updated.body[149_999]).toEqual(["第149999行", "", ""]);
+  expect(updated.endLine).toBe(150_001);
+  expect(table.body).toEqual([
+    ["Ada", "36", "London"],
+    ["Bob", "28", "Paris"],
+  ]);
+});
 
 describe("splitTableRow", () => {
   it("splits pipe rows with optional outer pipes", () => {

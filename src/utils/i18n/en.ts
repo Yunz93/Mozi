@@ -1308,4 +1308,31 @@ export default {
   index_embeddingDownloadSkip: "Not now",
   notifications_builtinEmbeddingSkipped:
     "Skipped downloading the built-in semantic model. Keyword search is still available.",
+  table_cellPosition: "Row {row}, column {col}",
+  table_moveRowUp: "Move row up",
+  table_moveRowDown: "Move row down",
+  table_moveColumnLeft: "Move column left",
+  table_moveColumnRight: "Move column right",
+  editor_blockBudget: "Large block. Click to edit its source.",
+  settings_focusMode: "Focus mode",
+  settings_focusModeDesc:
+    "Highlight the current paragraph and dim the surrounding text.",
+  settings_typewriterMode: "Typewriter mode",
+  settings_typewriterModeDesc:
+    "Keep the current line near the middle while typing. Clicking and manual scrolling stay natural.",
+  settings_smartPunctuation: "Smart punctuation",
+  settings_smartPunctuationDesc:
+    "Convert curly quotes, ellipses and dashes as you type, preserving code, math and properties.",
+  editor_codeLanguage: "Code language",
+  editor_copyCode: "Copy code",
+  editor_copiedCode: "Copied",
+  editor_editSource: "Edit source",
+  editor_imageProperties: "Image properties",
+  editor_imageAlt: "Image description",
+  editor_imageWidth: "Width (pixels)",
+  editor_imageHeight: "Height (pixels)",
+  editor_imageSource: "Image URL",
+  editor_imageChanged:
+    "The document changed. Reopen image properties to edit the current image.",
+  editor_plainCode: "Plain text",
 } as const;

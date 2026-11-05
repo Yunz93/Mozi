@@ -342,6 +342,30 @@ export const EditorTab: React.FC<EditorTabProps> = ({
               onUpdateSettings({ spellcheck: !settings.spellcheck })
             }
           />
+          <SettingsToggle
+            label={t("settings_focusMode")}
+            description={t("settings_focusModeDesc")}
+            checked={settings.focusMode === true}
+            onToggle={() =>
+              onUpdateSettings({ focusMode: !settings.focusMode })
+            }
+          />
+          <SettingsToggle
+            label={t("settings_typewriterMode")}
+            description={t("settings_typewriterModeDesc")}
+            checked={settings.typewriterMode === true}
+            onToggle={() =>
+              onUpdateSettings({ typewriterMode: !settings.typewriterMode })
+            }
+          />
+          <SettingsToggle
+            label={t("settings_smartPunctuation")}
+            description={t("settings_smartPunctuationDesc")}
+            checked={settings.smartPunctuation === true}
+            onToggle={() =>
+              onUpdateSettings({ smartPunctuation: !settings.smartPunctuation })
+            }
+          />
 
           <div className="flex items-start justify-between gap-4 border-t border-gray-200/70 pt-4 dark:border-white/10">
             <div className="min-w-0">

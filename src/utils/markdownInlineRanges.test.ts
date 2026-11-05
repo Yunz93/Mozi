@@ -5,6 +5,13 @@ import {
 } from "./markdownInlineRanges";
 
 describe("markdownInlineRanges", () => {
+  it("保留图片说明里的转义方括号和完整源码范围", () => {
+    const doc = "![a\\]b](<images/a (1).png>)";
+    const [image] = collectMarkdownImageRanges(doc);
+    expect(image?.alt).toBe("a]b");
+    expect(image?.url).toBe("images/a (1).png");
+    expect(doc.slice(image!.from, image!.to)).toBe(doc);
+  });
   it("keeps a remote image destination that contains a space", () => {
     const doc =
       "![M 記](https://raw.githubusercontent.com/Yunz93/PicRepo/main/image/M 記-1776170252301.png)";

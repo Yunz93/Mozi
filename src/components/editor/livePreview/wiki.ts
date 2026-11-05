@@ -35,7 +35,6 @@ import {
   parseWikiLinkReference,
   resolveWikiLinkFile,
 } from "../../../utils/wikiLinks";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import { livePreviewWikiQueue } from "./asyncQueue";
 import { livePreviewContextFacet } from "./context";
 import { bindLivePreviewWidgetModClick } from "./clickableLinks";
@@ -46,6 +45,7 @@ import {
   expandRangesToBlocks,
   getCachedMarkdownHtml,
   getLivePreviewDecorationRange,
+  ViewportDecorationWindow,
   hasSkipAncestor,
   livePreviewContextChanged,
   mergeCoverageRanges,
@@ -143,6 +143,7 @@ class WikiImageWidget extends WidgetType {
   toDOM(view: EditorView) {
     const wrap = document.createElement("span");
     wrap.className = "cm-live-preview-image-wrap cm-live-preview-wiki-embed";
+    wrap.dataset.mpImageLength = String(this.to - this.from);
     wrap.setAttribute("contenteditable", "false");
     wrap.title = `![[${this.rawSrc}]]`;
 
@@ -380,7 +381,6 @@ export function collectWikiAsyncJobs(
   state: EditorState,
   scanRanges?: readonly CoverageRange[],
 ): WikiAsyncJob[] {
-  if (isLargeEditorState(state)) return [];
   const jobs: WikiAsyncJob[] = [];
   const ctx = state.facet(livePreviewContextFacet);
   const ranges = scanRanges?.length
@@ -488,9 +488,6 @@ export function buildWikiDecorations(
   scanRanges?: readonly CoverageRange[],
 ): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
-  if (isLargeEditorState(state)) {
-    return { decorations: Decoration.none, coverage };
-  }
 
   const builder = new RangeSetBuilder<Decoration>();
   const ctx = state.facet(livePreviewContextFacet);
@@ -651,10 +648,14 @@ function dispatchWikiResolvedEffect(
 
 const wikiAsyncPlugin = ViewPlugin.fromClass(
   class {
+    private viewportWindow = new ViewportDecorationWindow();
     constructor(view: EditorView) {
-      for (const job of collectWikiAsyncJobs(view.state)) {
+      for (const job of collectWikiAsyncJobs(view.state, [
+        getLivePreviewDecorationRange(view),
+      ])) {
         this.enqueueJob(view, job);
       }
+      this.viewportWindow.mark(view);
     }
 
     update(update: ViewUpdate) {
@@ -677,26 +678,33 @@ const wikiAsyncPlugin = ViewPlugin.fromClass(
             ranges.push(range);
           }
         }
-        const merged = mergeCoverageRanges(ranges);
-        for (const job of collectWikiAsyncJobs(
-          update.state,
-          merged.length ? merged : undefined,
-        )) {
+        const viewport = getLivePreviewDecorationRange(update.view);
+        const merged = mergeCoverageRanges(ranges).filter(
+          (range) => range.to >= viewport.from && range.from <= viewport.to,
+        );
+        if (merged.length === 0) return;
+        for (const job of collectWikiAsyncJobs(update.state, merged)) {
           this.enqueueJob(update.view, job);
         }
         return;
       }
       if (livePreviewContextChanged(update)) {
-        for (const job of collectWikiAsyncJobs(update.state)) {
+        for (const job of collectWikiAsyncJobs(update.state, [
+          getLivePreviewDecorationRange(update.view),
+        ])) {
           this.enqueueJob(update.view, job);
         }
         return;
       }
-      if (update.selectionSet) {
+      if (
+        update.selectionSet ||
+        (update.viewportChanged && this.viewportWindow.needsUpdate(update.view))
+      ) {
         const viewport = getLivePreviewDecorationRange(update.view);
         for (const job of collectWikiAsyncJobs(update.state, [viewport])) {
           this.enqueueJob(update.view, job);
         }
+        this.viewportWindow.mark(update.view);
       }
     }
 

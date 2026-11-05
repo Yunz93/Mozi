@@ -241,11 +241,11 @@ export function livePreviewShouldRebuild(
   if (update.docChanged) return true;
   if (syntaxTree(update.startState) !== syntaxTree(update.state)) return true;
   if (!update.selectionSet) return false;
+  if (editorPointerSelecting) {
+    pendingMarkRefreshAfterPointer = true;
+    return false;
+  }
   if (mode === "marks") {
-    if (editorPointerSelecting) {
-      pendingMarkRefreshAfterPointer = true;
-      return false;
-    }
     return true;
   }
 
@@ -353,6 +353,10 @@ export function shouldRebuildLivePreviewDecorations(
   mode: "marks" | "widgets",
   window: ViewportDecorationWindow,
 ): boolean {
+  if (editorPointerSelecting && !update.docChanged) {
+    pendingMarkRefreshAfterPointer = true;
+    return false;
+  }
   if (
     livePreviewRefreshRequested(update) ||
     livePreviewShouldRebuild(update, mode)
@@ -559,6 +563,8 @@ export function defineLivePreviewBlockDecorationField(options: {
   changePad?: number;
   /** Extra rebuild triggers (async resolve effects, etc.) → full create. */
   rebuildOn?: (tr: Transaction) => boolean;
+  /** 表格的显式单元格激活需要在按下鼠标时立即响应。 */
+  rebuildDuringPointer?: boolean;
   /**
    * Rebuild when live-preview context facet identity changes (default true).
    * Set false for context-free fields (e.g. math).
@@ -599,6 +605,14 @@ export function defineLivePreviewBlockDecorationField(options: {
         transactionHasLivePreviewRefresh(tr);
 
       if (forceFull) {
+        if (
+          editorPointerSelecting &&
+          !tr.docChanged &&
+          !options.rebuildDuringPointer
+        ) {
+          pendingMarkRefreshAfterPointer = true;
+          return value;
+        }
         return normalizeBlockDecorationBuild(options.create(tr.state));
       }
 
@@ -620,6 +634,10 @@ export function defineLivePreviewBlockDecorationField(options: {
         if (
           !selectionAffectsCoverage(tr.startState, tr.state, value.coverage)
         ) {
+          return value;
+        }
+        if (editorPointerSelecting) {
+          pendingMarkRefreshAfterPointer = true;
           return value;
         }
         if (!options.createInRanges) {

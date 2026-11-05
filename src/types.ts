@@ -213,6 +213,9 @@ export interface AppSettings {
   useTabs: boolean;
   enableFolding: boolean;
   spellcheck: boolean;
+  focusMode: boolean;
+  typewriterMode: boolean;
+  smartPunctuation: boolean;
   showIndentationGuides: boolean;
   convertHtmlOnPaste: boolean;
   resourceFolder: string;

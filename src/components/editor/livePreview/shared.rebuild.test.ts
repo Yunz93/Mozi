@@ -101,6 +101,24 @@ describe("livePreviewShouldRebuild", () => {
     expect(livePreviewShouldRebuild(shim, "marks")).toBe(false);
     expect(livePreviewShouldRebuild(shim, "widgets")).toBe(false);
   });
+
+  it("跨行拖选时延后块显隐，避免图像或公式在手势中途折叠", () => {
+    const start = EditorState.create({
+      doc: "before\n\nimage\n\nafter",
+      selection: { anchor: 1 },
+    });
+    const next = start.update({ selection: { anchor: 1, head: 18 } }).state;
+    const update = {
+      docChanged: false,
+      selectionSet: true,
+      startState: start,
+      state: next,
+    } as never;
+    setEditorPointerSelecting(true);
+    expect(livePreviewShouldRebuild(update, "widgets")).toBe(false);
+    setEditorPointerSelecting(false);
+    expect(livePreviewShouldRebuild(update, "widgets")).toBe(true);
+  });
 });
 
 describe("ViewportDecorationWindow", () => {

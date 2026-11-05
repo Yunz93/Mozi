@@ -68,7 +68,7 @@ describe("live preview soft-off boundaries", () => {
     ).toBe("large");
   });
 
-  it("does not silently return empty for heavy tables/callouts/mermaid", () => {
+  it("长文中的轻量块保留原位呈现，不再按整文长度显示占位", () => {
     // Put mermaid/callout/table near the start so syntax tree parse covers them
     // even when the rest of the document is long.
     const heavyDoc =
@@ -88,7 +88,8 @@ describe("live preview soft-off boundaries", () => {
         tableSoftOff += 1;
       }
     });
-    expect(tableSoftOff).toBeGreaterThan(0);
+    expect(tableSoftOff).toBe(0);
+    expect(tables.size).toBeGreaterThan(0);
 
     const callouts = buildCalloutDecorations(state);
     expect(callouts.decorations.size).toBeGreaterThan(0);
@@ -99,10 +100,10 @@ describe("live preview soft-off boundaries", () => {
     expect(mermaid.decorations.size).toBeGreaterThan(0);
   });
 
-  it("large mode keeps math decorations empty but exposes a documented reason", () => {
+  it("超过五千行时仍保留小公式", () => {
     const largeDoc =
       docWithLines(LARGE_FILE_THRESHOLDS.LINE_COUNT + 1) + "\n\n$E=mc^2$\n";
-    const state = createState(largeDoc, largeDoc.length - 1);
+    const state = createState(largeDoc, 0);
     expect(getLivePreviewOptimizationMode(state)).toBe("large");
     const language = useAppStore.getState().settings.language;
     expect(softOffReason("large", "math")).toBe(
@@ -111,7 +112,7 @@ describe("live preview soft-off boundaries", () => {
       }),
     );
     const math = buildMathDecorations(state);
-    expect(math.decorations.size).toBe(0);
+    expect(math.decorations.size).toBe(1);
   });
 });
 

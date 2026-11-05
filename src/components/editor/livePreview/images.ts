@@ -11,7 +11,6 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
@@ -108,6 +107,7 @@ class MarkdownImageWidget extends WidgetType {
     wrap.className = "cm-live-preview-image-wrap";
     wrap.setAttribute("contenteditable", "false");
     wrap.title = this.rawSrc;
+    wrap.dataset.mpImageLength = String(this.to - this.from);
 
     const img = document.createElement("img");
     img.className = "cm-live-preview-image";
@@ -168,10 +168,6 @@ export function buildLivePreviewImageDecorations(
   scheduleResolve: (cacheKey: string, rawSrc: string) => void,
   failedCache: Set<string> = new Set(),
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
-    return Decoration.none;
-  }
-
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const ctx = state.facet(livePreviewContextFacet);

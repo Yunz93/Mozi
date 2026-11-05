@@ -736,3 +736,38 @@ export function setTableCell(
     endLine: table.startLine + 1 + body.length,
   };
 }
+
+/** 一次扩容并写入粘贴矩阵，避免逐格修改时反复复制整张表。 */
+export function setTableCells(
+  table: MarkdownTable,
+  logicalRow: number,
+  col: number,
+  rows: readonly (readonly string[])[],
+): MarkdownTable {
+  if (rows.length === 0) return table;
+  const firstRow = Math.max(0, logicalRow);
+  const firstCol = Math.max(0, col);
+  const width = rows.reduce((max, cells) => Math.max(max, cells.length), 0);
+  const columnCount = Math.max(table.columnCount, firstCol + width);
+  const rowCount = Math.max(logicalRowCount(table), firstRow + rows.length);
+  const previous = [table.header, ...table.body];
+  const values = Array.from({ length: rowCount }, (_, r) =>
+    Array.from({ length: columnCount }, (_, c) => previous[r]?.[c] ?? ""),
+  );
+  rows.forEach((cells, r) =>
+    cells.forEach((value, c) => {
+      values[firstRow + r][firstCol + c] = value;
+    }),
+  );
+  return {
+    ...table,
+    header: values[0],
+    body: values.slice(1),
+    columnCount,
+    endLine: table.startLine + rowCount,
+    alignments: Array.from(
+      { length: columnCount },
+      (_, c) => table.alignments[c] ?? "none",
+    ),
+  };
+}

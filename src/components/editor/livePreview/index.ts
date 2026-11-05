@@ -26,6 +26,7 @@ import {
 } from "./listAndHighlight";
 import { livePreviewLinks } from "./links";
 import { livePreviewGeometryRemeasure } from "./shared";
+import { livePreviewCodeBlocks } from "./codeBlocks";
 
 export type { LivePreviewContext };
 export { EMPTY_LIVE_PREVIEW_CONTEXT, livePreviewContextFacet };
@@ -53,6 +54,7 @@ export function createLivePreviewPluginExtensions(): Extension[] {
     livePreviewCaretAnchor,
     livePreviewGeometryRemeasure,
     livePreviewHideFormatting,
+    livePreviewCodeBlocks,
     livePreviewTaskCheckboxes,
     Prec.high(livePreviewListMarkers),
     livePreviewBlockquotes,

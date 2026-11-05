@@ -4,7 +4,7 @@ Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
-A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.0.2 keeps the caret in place during asynchronous updates and prevents delayed operations from taking focus. AI Enhance now sits in the main toolbar with progress updates, alongside Live editing, vault retrieval, WeChat drafts, and Simple Blog publishing.
+A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.1.0 improves Live table editing, code block controls, and image properties, and adds focus mode, typewriter mode, and optional smart punctuation, alongside vault retrieval, WeChat drafts, and Simple Blog publishing.
 
 > Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 Pin a release (optional):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.2 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.1.0 bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:
@@ -73,6 +73,8 @@ A vault is a folder of ordinary `.md` files. Manage notes, folders, and attachme
 ### Live editing and Markdown formatting
 
 Live mode renders Markdown as you write; Reading mode is for reviewing the finished article. Tables, task lists, callouts, footnotes, code highlighting, KaTeX math, and Mermaid diagrams are supported. Use Show plain text in the editor to inspect the Markdown source.
+
+Table input updates the document immediately, with formatting shortcuts, multi-cell copy and paste, row and column moves, and alignment. Code blocks offer language selection and copying; right-click an image to edit its source, description, and dimensions. Enable focus mode, typewriter mode, or smart punctuation in **Settings → Editor**; all are off by default. F8 and F9 toggle focus mode and typewriter mode respectively.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/20-markdown-reading.png" alt="Code and math in Reading mode" width="800">

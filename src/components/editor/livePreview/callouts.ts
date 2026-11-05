@@ -22,11 +22,7 @@ import {
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
-import {
-  getLivePreviewOptimizationMode,
-  SoftOffPlaceholderWidget,
-  softOffReason,
-} from "./softOff";
+import { livePreviewBlockReason, SoftOffPlaceholderWidget } from "./softOff";
 import { livePreviewContextFacet } from "./context";
 
 const CALLOUT_START = /^\s{0,3}>\s*\[!([A-Za-z0-9_-]+)\]([+-]?)\s*(.*)$/;
@@ -164,12 +160,6 @@ export function buildCalloutDecorations(
   scanRanges?: readonly CoverageRange[],
 ): BlockDecorationBuild {
   const coverage: CoverageRange[] = [];
-  const mode = getLivePreviewOptimizationMode(state);
-  const reason = softOffReason(mode, "callout");
-  // Large-file mode: leave source visible; banner covers why.
-  if (mode === "large") {
-    return { decorations: Decoration.none, coverage };
-  }
 
   const builder = new RangeSetBuilder<Decoration>();
   const ctx = state.facet(livePreviewContextFacet);
@@ -191,6 +181,7 @@ export function buildCalloutDecorations(
       if (selectionTouchesRange(state, absFrom, absTo)) continue;
       if (hasSkipAncestor(state, absFrom)) continue;
 
+      const reason = livePreviewBlockReason("callout", absTo - absFrom);
       if (reason) {
         ranges.push({
           from: absFrom,

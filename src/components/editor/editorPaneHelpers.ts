@@ -1,7 +1,7 @@
 import { ViewMode } from "../../types";
 import { isMarkdownFile } from "../../utils/fileTypes";
 import { findOpenWikiLinkAt } from "../../utils/wikiLinkEditor";
-import { parseMarkdownDestination } from "../../utils/markdownDestination";
+import { collectMarkdownImageRanges } from "../../utils/markdownInlineRanges";
 
 export function isLivePreviewWidgetsEnabled(
   viewMode: ViewMode,
@@ -56,7 +56,6 @@ export interface LocalImageMatch {
   to: number;
 }
 
-const STANDARD_IMAGE_RE = /!\[([^\]]*)\]\(\s*(<[^>\n]+>|[^)\n]+)\s*\)/g;
 const OBSIDIAN_IMAGE_RE = /!\[\[([^\]|]+?)(?:\|([^\]]*?))?\]\]/g;
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 
@@ -68,20 +67,20 @@ export function findLocalImageAtPos(
   lineFrom: number,
   lineText: string,
   pos: number,
+  includeRemote = false,
 ): LocalImageMatch | null {
   let match: RegExpExecArray | null;
 
-  STANDARD_IMAGE_RE.lastIndex = 0;
-  while ((match = STANDARD_IMAGE_RE.exec(lineText)) !== null) {
-    const mFrom = lineFrom + match.index;
-    const mTo = mFrom + match[0].length;
+  for (const image of collectMarkdownImageRanges(lineText)) {
+    const mFrom = lineFrom + image.from;
+    const mTo = lineFrom + image.to;
     if (pos >= mFrom && pos <= mTo) {
-      const src = parseMarkdownDestination(match[2]).path.trim();
-      if (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src)) {
+      const src = image.url.trim();
+      if (includeRemote || (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src))) {
         return {
           src,
           alt:
-            match[1] ||
+            image.alt ||
             src
               .split("/")
               .pop()
@@ -100,7 +99,10 @@ export function findLocalImageAtPos(
     const mTo = mFrom + match[0].length;
     if (pos >= mFrom && pos <= mTo) {
       const src = match[1].trim();
-      if (!isRemoteUrl(src) && IMAGE_EXT_RE.test(src)) {
+      if (
+        (IMAGE_EXT_RE.test(src) || isRemoteUrl(src)) &&
+        (includeRemote || !isRemoteUrl(src))
+      ) {
         return {
           src,
           alt:

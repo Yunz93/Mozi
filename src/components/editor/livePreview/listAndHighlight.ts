@@ -25,7 +25,6 @@ import {
   isInsideFencedCode,
   isWithinFrontmatterBlock,
 } from "../behavior/core";
-import { isLargeEditorState } from "../hooks/codeMirrorHelpers";
 import {
   defineLivePreviewBlockDecorationField,
   ensureLivePreviewViewportTree,
@@ -407,10 +406,6 @@ export function htmlCommentHideRange(
 export function buildLivePreviewListMarkerDecorations(
   view: EditorView,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
-    return Decoration.none;
-  }
-
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const parseTo = maxVisibleParseTo(view);
@@ -526,7 +521,7 @@ export function buildHighlightDecorationsInScanRanges(
   state: EditorState,
   scanRanges: readonly CoverageRange[],
 ): BlockDecorationBuild {
-  if (isLargeEditorState(state) || scanRanges.length === 0) {
+  if (scanRanges.length === 0) {
     return { decorations: Decoration.none, coverage: [] };
   }
 
@@ -698,10 +693,6 @@ const blockquoteOnlyLineDeco = Decoration.line({
 export function buildLivePreviewBlockquoteDecorations(
   view: EditorView,
 ): DecorationSet {
-  if (isLargeEditorState(view.state)) {
-    return Decoration.none;
-  }
-
   const builder = new RangeSetBuilder<Decoration>();
   const { state } = view;
   const parseTo = maxVisibleParseTo(view);

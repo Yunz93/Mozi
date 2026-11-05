@@ -71,8 +71,8 @@ import {
 } from "../../utils/attachmentResolver";
 import { buildWikiPreviewMarkup } from "../../utils/wikiPreviewMarkup";
 import { posAtClientPoint } from "./livePreview/shared";
-import { countLines, LARGE_FILE_THRESHOLDS } from "../../utils/performance";
 import { LiveSourceToggle } from "./LiveSourceToggle";
+import { ImagePropertiesDialog } from "./ImagePropertiesDialog";
 import { isPreviewVisibleMode } from "../../utils/viewMode";
 import {
   findLocalImageAtPos,
@@ -82,6 +82,7 @@ import {
   isPreviewModifierPressed,
   shouldShowLiveSourceToggle,
   relocateImageMarkdown,
+  isRemoteUrl,
   type LocalImageMatch,
 } from "./editorPaneHelpers";
 import { buildHostedImageFilename } from "../../utils/imageHostingFilename";
@@ -243,6 +244,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       match: LocalImageMatch;
     } | null>(null);
     const [isUploadingSingle, setIsUploadingSingle] = useState(false);
+    const [imageProperties, setImageProperties] = useState<{
+      match: LocalImageMatch;
+      original: string;
+      tabId: string | null;
+    } | null>(null);
 
     // Completion trigger ref
     const completionStartFrameRef = useRef<number | null>(null);
@@ -300,18 +306,29 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
     const handleSelectionContextMenu = useCallback(
       (event: MouseEvent, view: EditorView) => {
-        const clickPos = posAtClientPoint(view, event.clientX, event.clientY);
+        const imageWidget =
+          event.target instanceof Element
+            ? event.target.closest<HTMLElement>("[data-mp-image-length]")
+            : null;
+        const clickPos = imageWidget
+          ? view.posAtDOM(imageWidget)
+          : posAtClientPoint(view, event.clientX, event.clientY);
         const selection = view.state.selection.main;
 
         if (clickPos != null) {
           const line = view.state.doc.lineAt(clickPos);
-          const imgMatch = findLocalImageAtPos(line.from, line.text, clickPos);
+          const imgMatch = findLocalImageAtPos(
+            line.from,
+            line.text,
+            clickPos,
+            true,
+          );
           if (imgMatch) {
             event.preventDefault();
             closeSelectionMenu();
             setImageMenu({
-              x: event.clientX,
-              y: event.clientY,
+              x: Math.max(8, Math.min(event.clientX, window.innerWidth - 260)),
+              y: Math.max(8, Math.min(event.clientY, window.innerHeight - 150)),
               match: imgMatch,
             });
             return true;
@@ -350,24 +367,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     );
 
     // CodeMirror hook
-    const livePreviewOptimizationMode = useMemo(() => {
-      const lines = countLines(content);
-      const chars = content.length;
-      if (
-        lines > LARGE_FILE_THRESHOLDS.LINE_COUNT ||
-        chars > LARGE_FILE_THRESHOLDS.CHAR_COUNT
-      ) {
-        return "large" as const;
-      }
-      if (
-        lines > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_LINE_COUNT ||
-        chars > LARGE_FILE_THRESHOLDS.LIVE_PREVIEW_HEAVY_CHAR_COUNT
-      ) {
-        return "heavy" as const;
-      }
-      return "normal" as const;
-    }, [content]);
-
     const livePreviewContext = useMemo(
       () => ({
         sourceFilePath: currentFilePath,
@@ -436,6 +435,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       useTabs: settings.useTabs,
       showIndentationGuides: settings.showIndentationGuides,
       spellcheck: settings.spellcheck,
+      focusMode: settings.focusMode,
+      typewriterMode: settings.typewriterMode,
+      smartPunctuation: settings.smartPunctuation,
       convertHtmlOnPaste: settings.convertHtmlOnPaste,
       onChange: updateContent,
       onScroll: scrollSync.handleScroll,
@@ -968,20 +970,18 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             : ""
         }`}
         data-live-preview={liveWidgetsOn ? "true" : undefined}
+        onContextMenuCapture={(event) => {
+          if (
+            codeMirror.view &&
+            event.target instanceof Element &&
+            event.target.closest("[data-mp-image-length]")
+          ) {
+            if (handleSelectionContextMenu(event.nativeEvent, codeMirror.view))
+              event.stopPropagation();
+          }
+        }}
         style={layoutStyle}
       >
-        {liveWidgetsOn && livePreviewOptimizationMode !== "normal" && (
-          <div
-            className="live-preview-opt-banner"
-            role="status"
-            data-mode={livePreviewOptimizationMode}
-          >
-            {livePreviewOptimizationMode === "large"
-              ? t("editor_livePreviewLargeFileMode")
-              : t("editor_livePreviewHeavyFileMode")}
-          </div>
-        )}
-
         <div className="editor-pane-backdrop flex-1 min-h-0 overflow-hidden">
           {(isSaving || showLiveSourceToggle) && (
             <div className="editor-pane-chrome">
@@ -1098,10 +1098,28 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
               </div>
               <button
                 type="button"
+                className="mx-1.5 flex w-[calc(100%-12px)] rounded-lg px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-white/10 active:translate-y-px"
+                onClick={() => {
+                  if (!codeMirror.view) return;
+                  setImageProperties({
+                    match: imageMenu.match,
+                    original: codeMirror.view.state.doc.sliceString(
+                      imageMenu.match.from,
+                      imageMenu.match.to,
+                    ),
+                    tabId: activeTabId,
+                  });
+                  closeImageMenu();
+                }}
+              >
+                {t("editor_imageProperties")}
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   void handleUploadLocalImage();
                 }}
-                disabled={isUploadingSingle}
+                disabled={isUploadingSingle || isRemoteUrl(imageMenu.match.src)}
                 className="mx-1.5 flex w-[calc(100%-12px)] items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 dark:text-gray-200 dark:hover:bg-gray-700"
               >
                 {isUploadingSingle ? (
@@ -1144,6 +1162,34 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             </div>,
             document.body,
           )}
+        {imageProperties && imageProperties.tabId === activeTabId && (
+          <ImagePropertiesDialog
+            image={imageProperties.match}
+            original={imageProperties.original}
+            onClose={() => {
+              setImageProperties(null);
+              codeMirror.view?.focus();
+            }}
+            onSave={(markdown) => {
+              const view = codeMirror.view;
+              const { match, original } = imageProperties;
+              if (
+                view &&
+                view.state.doc.sliceString(match.from, match.to) === original
+              ) {
+                view.dispatch({
+                  changes: { from: match.from, to: match.to, insert: markdown },
+                  userEvent: "input.image.properties",
+                  scrollIntoView: false,
+                });
+                view.focus();
+              } else {
+                showNotification(t("editor_imageChanged"), "info");
+              }
+              setImageProperties(null);
+            }}
+          />
+        )}
       </div>
     );
   },

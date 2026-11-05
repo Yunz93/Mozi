@@ -87,6 +87,7 @@ export function isEditorImeComposing(view: EditorView): boolean {
   return (
     view.composing ||
     view.compositionStarted ||
+    Boolean(view.dom?.querySelector('[data-mp-composing="true"]')) ||
     (imeGuard(view)?.isComposing() ?? false)
   );
 }
