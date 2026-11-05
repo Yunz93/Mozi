@@ -92,8 +92,7 @@ export default {
   wechatDraftDialog_sourceUrlLabel: "原文链接",
   wechatDraftDialog_digestLabel: "摘要",
   wechatDraftDialog_coverLabel: "封面图",
-  wechatDraftDialog_coverDesc:
-    "封面图会上传为公众号缩略图素材。正文里的本地图片会自动转换为公众号可用图片。",
+  wechatDraftDialog_coverDesc: "默认使用正文首图，可选择、粘贴或拖入图片更换。",
   wechatDraftDialog_coverPasteHint: "也可直接粘贴或拖入图片作为封面。",
   wechatDraftDialog_pasteCoverFailed: "粘贴封面图失败，请重试。",
   wechatDraftDialog_pasteCoverNeedVault: "请先打开知识库，再粘贴封面图。",
@@ -935,10 +934,13 @@ export default {
     "请先在发布设置里填写公众号 AppSecret。",
   notifications_setWechatCoverFirst: "请先选择公众号封面图。",
   notifications_wechatTitleRequired: "请填写公众号图文标题。",
+  notifications_wechatErrorCode: "微信错误码：{code}。",
+  notifications_wechatRequestId: "微信请求标识：{rid}。",
+  notifications_wechatDirectRetryAttempted: "已尝试一次直连重试。",
   notifications_wechatIpAllowlist:
-    "当前出口 IP 不在公众号白名单。请到微信公众平台「基本配置」加入本机公网 IP 后再试。",
+    "微信拒绝了当前出口 IP。若已加入白名单，请核对 AppID 对应公众号的接口 IP 白名单，并检查代理或 VPN 是否改变出口。",
   notifications_wechatIpAllowlistWithIp:
-    "当前出口 IP {ip} 不在公众号白名单。请到微信公众平台「基本配置」加入该地址后再试。",
+    "微信拒绝了出口 IP {ip}。若该地址已加入白名单，请核对 AppID 对应公众号的接口 IP 白名单，检查代理或 VPN，并稍后重试。",
   notifications_wechatInvalidAppId:
     "公众号 AppID 无效。请到设置 → 发布核对 AppID。",
   notifications_wechatInvalidAppSecret:

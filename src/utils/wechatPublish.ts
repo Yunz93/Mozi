@@ -52,6 +52,8 @@ export interface PreparedWechatDraftPublish {
   previewHtml: string;
   imageAssets: WechatImageAsset[];
   unresolvedImages: string[];
+  /** 正文首图解析成功时，供未设置封面的草稿使用。 */
+  defaultCoverImagePath: string;
 }
 
 interface PrepareWechatDraftPublishOptions {
@@ -639,11 +641,20 @@ export async function prepareWechatDraftPublish(
   const previewHtml = previewHost.outerHTML;
   swapPreviewSourcesForPlaceholders(host);
 
+  const imageSources = new Set(
+    imageAssets.map((asset) => asset.sourcePath || asset.sourceUrl),
+  );
+  const defaultCoverImagePath =
+    Array.from(previewHost.querySelectorAll("img"))
+      .map((image) => image.getAttribute("src") || "")
+      .find((source) => imageSources.has(source)) || "";
+
   return {
     contentHtml: host.outerHTML,
     previewHtml,
     imageAssets,
     unresolvedImages,
+    defaultCoverImagePath,
   };
 }
 

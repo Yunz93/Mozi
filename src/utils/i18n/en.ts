@@ -99,7 +99,7 @@ export default {
   wechatDraftDialog_digestLabel: "Digest",
   wechatDraftDialog_coverLabel: "Cover image",
   wechatDraftDialog_coverDesc:
-    "The cover image is uploaded as a WeChat thumbnail asset. Local body images are converted into WeChat-hosted article images automatically.",
+    "Uses the first available article image. Choose, paste, or drop another to replace it.",
   wechatDraftDialog_coverPasteHint:
     "You can also paste or drop an image as the cover.",
   wechatDraftDialog_pasteCoverFailed:
@@ -1017,10 +1017,14 @@ export default {
   notifications_setWechatCoverFirst:
     "Choose a cover image for the WeChat draft first.",
   notifications_wechatTitleRequired: "Enter a title for the WeChat draft.",
+  notifications_wechatErrorCode: "WeChat error code: {code}.",
+  notifications_wechatRequestId: "WeChat request ID: {rid}.",
+  notifications_wechatDirectRetryAttempted:
+    "A direct connection retry was attempted.",
   notifications_wechatIpAllowlist:
-    "This machine's public IP is not in the Official Account IP allowlist. Add it under Settings → Basic Configuration, then retry.",
+    "WeChat rejected the current outbound IP. If it is already allowlisted, check the API IP allowlist for the configured AppID and whether a proxy or VPN changed the outbound IP.",
   notifications_wechatIpAllowlistWithIp:
-    "Public IP {ip} is not in the Official Account IP allowlist. Add that address under Settings → Basic Configuration, then retry.",
+    "WeChat rejected outbound IP {ip}. If it is already allowlisted, check the API IP allowlist for the configured AppID, check any proxy or VPN, and retry later.",
   notifications_wechatInvalidAppId:
     "The WeChat AppID is invalid. Check it in Settings → Publishing.",
   notifications_wechatInvalidAppSecret:

@@ -324,8 +324,12 @@ fn validate_wechat_publish_request_access(
     security_state: &SecurityState,
     request: &PublishWechatDraftRequest,
 ) -> Result<(), String> {
-    let cover_image_path = canonicalize_existing_path(&request.cover_image_path)?;
-    ensure_path_allowed(security_state, &cover_image_path)?;
+    if wechat::is_remote_image_source(&request.cover_image_path) {
+        wechat::validate_wechat_remote_image_url(&request.cover_image_path)?;
+    } else {
+        let cover_image_path = canonicalize_existing_path(&request.cover_image_path)?;
+        ensure_path_allowed(security_state, &cover_image_path)?;
+    }
 
     for asset in &request.image_assets {
         if let Some(source_path) = asset

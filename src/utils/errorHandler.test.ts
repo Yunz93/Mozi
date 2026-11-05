@@ -47,7 +47,9 @@ describe("reportUnhandledRuntimeError", () => {
     );
 
     expect(showNotification).toHaveBeenCalledWith(
-      t("zh-CN", "notifications_wechatIpAllowlistWithIp", { ip: "1.2.3.4" }),
+      t("zh-CN", "notifications_wechatIpAllowlistWithIp", { ip: "1.2.3.4" }) +
+        " " +
+        t("zh-CN", "notifications_wechatErrorCode", { code: 40164 }),
       "error",
     );
     expect(showNotification.mock.calls[0][0]).not.toBe(
@@ -65,9 +67,12 @@ describe("userFacingRuntimeErrorMessage", () => {
   });
 
   it("maps WeChat invoke payloads to the stepwise publish copy", () => {
-    const withIp = t("zh-CN", "notifications_wechatIpAllowlistWithIp", {
-      ip: "1.2.3.4",
-    });
+    const withIp =
+      t("zh-CN", "notifications_wechatIpAllowlistWithIp", {
+        ip: "1.2.3.4",
+      }) +
+      " " +
+      t("zh-CN", "notifications_wechatErrorCode", { code: 40164 });
     expect(userFacingRuntimeErrorMessage(WECHAT_IP_ERROR, "zh-CN")).toBe(
       withIp,
     );

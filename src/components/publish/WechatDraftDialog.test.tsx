@@ -1,7 +1,10 @@
 /** @vitest-environment happy-dom */
 
 import React from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -117,6 +120,7 @@ describe("WechatDraftDialog", () => {
         },
       ],
       unresolvedImages: [],
+      defaultCoverImagePath: "/notes/cover.png",
     });
     mockHydrate.mockImplementation(async (html: string) =>
       html.replace("/notes/cover.png", "blob:preview-cover"),
@@ -132,7 +136,14 @@ describe("WechatDraftDialog", () => {
     vi.clearAllMocks();
   });
 
-  it("keeps the draft submit button visible and disabled until a cover is chosen", async () => {
+  it("keeps the draft submit button visible and disabled when the note has no image", async () => {
+    mockPrepare.mockResolvedValue({
+      contentHtml: "<p>正文</p>",
+      previewHtml: "<p>正文</p>",
+      imageAssets: [],
+      unresolvedImages: [],
+      defaultCoverImagePath: "",
+    });
     render(
       <WechatDraftDialog
         isOpen
@@ -153,10 +164,8 @@ describe("WechatDraftDialog", () => {
 
     await waitFor(() => {
       expect(
-        document
-          .querySelector(".wechat-phone-preview img")
-          ?.getAttribute("src"),
-      ).toBe("blob:preview-cover");
+        document.querySelector(".wechat-phone-preview")?.textContent,
+      ).toContain("正文");
     });
   });
 
@@ -330,6 +339,106 @@ describe("WechatDraftDialog", () => {
     expect(tips?.textContent).not.toContain("a.png");
     expect(tips?.textContent).not.toContain("将上传");
     expect(tips?.querySelector("ul")).toBeNull();
+  });
+
+  it("keeps the preview image mounted while editing fields and refreshing publish metadata", async () => {
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    await waitFor(() =>
+      expect(document.querySelector(".wechat-phone-preview img")).toBeTruthy(),
+    );
+    const image = document.querySelector(".wechat-phone-preview img");
+    fireEvent.change(screen.getByDisplayValue("作者"), {
+      target: { value: "作者A" },
+    });
+    expect(document.querySelector(".wechat-phone-preview img")).toBe(image);
+
+    let finishRefresh!: (value: unknown) => void;
+    mockPrepare.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRefresh = resolve;
+      }),
+    );
+    act(() =>
+      useAppStore.setState({
+        fileContents: {
+          "/notes/post.md": "---\ntitle: 草稿标题\n---\n![图](cover.png)",
+        },
+      }),
+    );
+    await waitFor(() => expect(mockPrepare).toHaveBeenCalledTimes(2));
+    expect(document.querySelector(".wechat-phone-preview img")).toBe(image);
+    await act(async () =>
+      finishRefresh({
+        contentHtml: "<p>正文</p>",
+        previewHtml: '<img src="/notes/cover.png" alt="图">',
+        imageAssets: [],
+        unresolvedImages: [],
+        defaultCoverImagePath: "/notes/cover.png",
+      }),
+    );
+    await waitFor(() =>
+      expect(document.querySelector(".wechat-phone-preview img")).toBe(image),
+    );
+
+    mockPrepare.mockRejectedValueOnce(new Error("refresh failed"));
+    act(() =>
+      useAppStore.setState({
+        fileContents: {
+          "/notes/post.md": "---\nauthor: 作者A\n---\n![图](cover.png)",
+        },
+      }),
+    );
+    await screen.findByRole("alert");
+    expect(document.querySelector(".wechat-phone-preview img")).toBe(image);
+    expect(screen.getByRole("button", { name: "发布到草稿箱" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+
+    mockPrepare.mockReturnValueOnce(new Promise(() => {}));
+    act(() =>
+      useAppStore.setState({
+        currentFilePath: "/notes/other.md",
+        activeTabId: "/notes/other.md",
+        fileContents: { "/notes/other.md": "# 另一篇笔记" },
+      }),
+    );
+    await waitFor(() => expect(mockPrepare).toHaveBeenCalledTimes(4));
+    expect(document.querySelector(".wechat-phone-preview img")).toBeNull();
+  });
+
+  it("keeps field focus borders inside the form scrollport", () => {
+    render(
+      <WechatDraftDialog
+        isOpen
+        isSubmitting={false}
+        defaults={defaults}
+        onClose={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    const form = document.querySelector(".wechat-draft-form")!;
+    const fields = form.querySelectorAll("input[type='text'], textarea");
+    expect(fields.length).toBe(4);
+    for (const field of fields)
+      expect(field.classList.contains("wechat-draft-field")).toBe(true);
+    expect(form.classList.contains("-mx-1")).toBe(false);
+    const css = readFileSync(
+      resolve(process.cwd(), "src/styles/components.css"),
+      "utf8",
+    );
+    expect(css).toMatch(/\.wechat-draft-form\s*\{[^}]*padding:\s*0\.25rem/);
+    expect(css).toMatch(
+      /\.wechat-draft-field:focus\s*\{[^}]*box-shadow:\s*inset/,
+    );
   });
 
   it("keeps focus in the author field after each keystroke", async () => {

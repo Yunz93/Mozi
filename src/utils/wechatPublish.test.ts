@@ -250,7 +250,8 @@ describe("prepareWechatDraftPublish", () => {
       ],
       rootFolderPath: "/notes",
       currentFilePath: "/notes/post.md",
-      markdownContent: "![封面](cover.png)",
+      markdownContent:
+        "![内联图](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB)\n\n![封面](cover.png)",
       settings: {
         previewFontFamily: "Arial",
         codeFontFamily: "Menlo",
@@ -260,6 +261,7 @@ describe("prepareWechatDraftPublish", () => {
     });
 
     expect(prepared.imageAssets).toHaveLength(1);
+    expect(prepared.defaultCoverImagePath).toBe("/notes/cover.png");
     expect(prepared.contentHtml).toContain("__WECHAT_LOCAL_IMAGE_1__");
     expect(prepared.previewHtml).toContain("/notes/cover.png");
     expect(prepared.previewHtml).not.toContain("__WECHAT_LOCAL_IMAGE_1__");

@@ -2,6 +2,8 @@ import type { AppLanguage } from "../types";
 import {
   classifyWechatPublishError,
   extractWechatAllowlistIps,
+  extractWechatApiErrorCode,
+  extractWechatRequestId,
 } from "./wechatPublishErrors";
 import {
   classifyWereadError,
@@ -81,12 +83,26 @@ export function localizeKnownError(
   const wechatKind = classifyWechatPublishError(normalizedMessage);
   if (wechatKind === "ipAllowlist") {
     const ips = extractWechatAllowlistIps(normalizedMessage);
-    if (ips.length > 0) {
-      return t(language, "notifications_wechatIpAllowlistWithIp", {
-        ip: ips.join(language === "zh-CN" ? "、" : ", "),
-      });
-    }
-    return t(language, "notifications_wechatIpAllowlist");
+    const message =
+      ips.length > 0
+        ? t(language, "notifications_wechatIpAllowlistWithIp", {
+            ip: ips.join(language === "zh-CN" ? "、" : ", "),
+          })
+        : t(language, "notifications_wechatIpAllowlist");
+    const code = extractWechatApiErrorCode(normalizedMessage);
+    const rid = extractWechatRequestId(normalizedMessage);
+    return [
+      message,
+      code !== null
+        ? t(language, "notifications_wechatErrorCode", { code })
+        : "",
+      rid ? t(language, "notifications_wechatRequestId", { rid }) : "",
+      normalizedMessage.includes("[direct retry attempted]")
+        ? t(language, "notifications_wechatDirectRetryAttempted")
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
   if (wechatKind) {
     return t(language, wechatPublishErrorKeys[wechatKind]);

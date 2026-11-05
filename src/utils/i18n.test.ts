@@ -169,9 +169,15 @@ describe("localizeKnownError", () => {
 
   it("prints the blocked IP when WeChat returns one", () => {
     const message =
-      "WeChat API error 40164 during fetching access token: invalid ip 203.0.113.8, not in whitelist";
+      "WeChat API error 40164 during fetching access token: invalid ip 203.0.113.8, not in whitelist rid: abc-123 [direct retry attempted]";
     expect(localizeKnownError("zh-CN", message)).toContain("203.0.113.8");
     expect(localizeKnownError("en", message)).toContain("203.0.113.8");
+    for (const language of ["zh-CN", "en"] as const) {
+      const localized = localizeKnownError(language, message);
+      expect(localized).toContain("40164");
+      expect(localized).toContain("abc-123");
+    }
+    expect(localizeKnownError("zh-CN", message)).toContain("直连");
   });
 
   it("maps WeRead skill upgrade and API key errors", () => {

@@ -28,11 +28,15 @@ export function extractWechatAllowlistIps(message: string): string[] {
   return ips;
 }
 
+export function extractWechatRequestId(message: string): string | null {
+  return /\brid\s*[:=]\s*([a-zA-Z0-9_-]+)/i.exec(message)?.[1] ?? null;
+}
+
 function looksLikeWechatError(message: string): boolean {
   return /wechat/i.test(message) || /微信/i.test(message);
 }
 
-function apiCode(message: string): number | null {
+export function extractWechatApiErrorCode(message: string): number | null {
   const match = WECHAT_API_ERROR_RE.exec(message);
   if (!match) return null;
   const code = Number(match[1]);
@@ -53,7 +57,7 @@ export function classifyWechatPublishError(
   if (/WeChat AppSecret is required/i.test(normalized)) return "appSecret";
   if (/WeChat draft title is required/i.test(normalized)) return "title";
 
-  const code = apiCode(normalized);
+  const code = extractWechatApiErrorCode(normalized);
   const lower = normalized.toLowerCase();
 
   if (

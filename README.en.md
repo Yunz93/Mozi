@@ -160,7 +160,7 @@ The top **More actions** menu has icons for **Export PDF**, **Export HTML**, and
 
 ### WeChat Official Account drafts
 
-After configuring an Official Account, choose WeChat from **Publish**, then review the title, author, digest, cover, and mobile preview. Submission creates a draft for final review and publication on the WeChat platform. Resubmitting can update the existing draft. This demo shows the preview only.
+After configuring an Official Account, choose WeChat from **Publish**, then review the title, author, digest, cover, and mobile preview. If no cover is set, the first available article image is used; choose, paste, or drop another to replace it. Submission creates a draft for final review and publication on the WeChat platform. Resubmitting can update the existing draft. This demo shows the preview only.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/05-wechat-draft.png" alt="WeChat draft and mobile preview" width="800">
@@ -249,7 +249,7 @@ Common frontmatter: `title`, `aliases`, `slug`, `link` (filled after publish), `
 
 ## Publish to WeChat drafts
 
-Same settings tab: **App ID** and **App Secret** (App Secret stays in secure local storage only). From the toolbar, pick the WeChat channel: confirm title, author, digest, and source URL; pick the cover at publish time; local images in the body upload automatically. First publish stores `wechat_draft_media_id`; republishing updates that draft. One account and single-article drafts for now; server-side calls may require allowlisting the outbound IP on the WeChat platform.
+Same settings tab: **App ID** and **App Secret** (App Secret stays in secure local storage only). From the toolbar, pick the WeChat channel: confirm title, author, digest, and source URL; use the first article image as the default cover or replace it; local images in the body upload automatically. First publish stores `wechat_draft_media_id`; republishing updates that draft. One account and single-article drafts for now; server-side calls may require allowlisting the outbound IP on the WeChat platform.
 
 ## License
 

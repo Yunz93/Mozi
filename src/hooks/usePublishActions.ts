@@ -709,7 +709,7 @@ export function usePublishActions(
           ...prepared.imageAssets.map(
             (asset) => asset.sourcePath?.trim() || "",
           ),
-        ].filter(Boolean);
+        ].filter((path) => Boolean(path) && !/^https?:\/\//i.test(path));
         await Promise.all(
           pathsToAllow.map((path) =>
             invoke("register_allowed_path", { path, recursive: false }).catch(

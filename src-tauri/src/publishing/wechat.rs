@@ -25,8 +25,19 @@ pub(super) async fn publish_remote_wechat_draft(
         return Err("WeChat draft title is required.".to_string());
     }
 
-    let client = create_wechat_api_client()?;
-    let access_token = fetch_wechat_access_token(&client, app_id, app_secret).await?;
+    let mut client = create_wechat_api_client(false)?;
+    let access_token = match fetch_wechat_access_token(&client, app_id, app_secret).await {
+        Ok(token) => token,
+        Err(error) if should_retry_token_without_proxy(&error) => {
+            // 仅在取令牌被白名单拒绝时尝试一次直连，不重试创建或更新草稿。
+            publish_log("publish_wechat_draft: token rejected with 40164; retrying without proxy");
+            client = create_wechat_api_client(true)?;
+            fetch_wechat_access_token(&client, app_id, app_secret)
+                .await
+                .map_err(|error| format!("{} [direct retry attempted]", error))?
+        }
+        Err(error) => return Err(error),
+    };
     publish_log("publish_wechat_draft: access token ready");
 
     let mut content_html = request.content_html.clone();
@@ -36,8 +47,7 @@ pub(super) async fn publish_remote_wechat_draft(
     }
 
     let thumb_media_id =
-        upload_wechat_thumb_image(&client, &access_token, Path::new(&request.cover_image_path))
-            .await?;
+        upload_wechat_thumb_image(&client, &access_token, request.cover_image_path.trim()).await?;
 
     let article = WechatDraftArticleRequest {
         title: request.title.trim().to_string(),
@@ -78,12 +88,17 @@ pub(super) async fn publish_remote_wechat_draft(
     Ok(PublishWechatDraftResult { media_id })
 }
 
-fn create_wechat_api_client() -> Result<Client, String> {
-    Client::builder()
+fn should_retry_token_without_proxy(error: &str) -> bool {
+    error.starts_with("WeChat API error 40164 during fetching access token:")
+}
+
+fn create_wechat_api_client(without_proxy: bool) -> Result<Client, String> {
+    let builder = Client::builder()
         .connect_timeout(Duration::from_secs(WECHAT_API_CONNECT_TIMEOUT_SECS))
         .timeout(Duration::from_secs(WECHAT_API_REQUEST_TIMEOUT_SECS))
-        .user_agent("markdown-press")
-        .build()
+        .user_agent("markdown-press");
+    let builder = if without_proxy { builder.no_proxy() } else { builder };
+    builder.build()
         .map_err(|e| wechat_request_error("Failed to create WeChat API client", e))
 }
 
@@ -302,7 +317,7 @@ async fn wechat_api_upload_remote_url<T: DeserializeOwned>(
     wechat_api_upload_bytes(client, url, context, file_name, mime_type, bytes).await
 }
 
-fn validate_wechat_remote_image_url(remote_url: &str) -> Result<(), String> {
+pub(super) fn validate_wechat_remote_image_url(remote_url: &str) -> Result<(), String> {
     let parsed = reqwest::Url::parse(remote_url.trim())
         .map_err(|e| format!("Invalid remote image URL {}: {}", remote_url, e))?;
     if parsed.scheme() != "https" {
@@ -389,17 +404,26 @@ async fn upload_wechat_article_image(
         .ok_or_else(|| "WeChat article image upload did not return url.".to_string())
 }
 
+pub(super) fn is_remote_image_source(source: &str) -> bool {
+    reqwest::Url::parse(source.trim())
+        .map(|url| matches!(url.scheme(), "http" | "https"))
+        .unwrap_or(false)
+}
+
 async fn upload_wechat_thumb_image(
     client: &Client,
     access_token: &str,
-    source_path: &Path,
+    source: &str,
 ) -> Result<String, String> {
     let url = format!(
         "https://api.weixin.qq.com/cgi-bin/material/add_material?access_token={}&type=thumb",
         access_token
     );
-    let payload: WechatAddMaterialResponse =
-        wechat_api_upload_file(client, &url, source_path, "thumbnail image").await?;
+    let payload: WechatAddMaterialResponse = if is_remote_image_source(source) {
+        wechat_api_upload_remote_url(client, &url, source, "thumbnail image").await?
+    } else {
+        wechat_api_upload_file(client, &url, Path::new(source), "thumbnail image").await?
+    };
     wechat_api_error(payload.errcode, payload.errmsg, "uploading thumbnail image")?;
     payload
         .media_id
@@ -518,6 +542,21 @@ async fn update_wechat_draft(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_retries_allowlist_rejection_while_fetching_token() {
+        assert!(should_retry_token_without_proxy(
+            "WeChat API error 40164 during fetching access token: invalid ip 203.0.113.8, not in whitelist"
+        ));
+        for error in [
+            "WeChat API error 40125 during fetching access token: invalid appsecret",
+            "WeChat API error 40164 during creating draft: invalid ip",
+            "WeChat API error 40164 during updating draft: invalid ip",
+            "Failed to request WeChat access token: timeout",
+        ] {
+            assert!(!should_retry_token_without_proxy(error));
+        }
+    }
 
     #[test]
     fn classifies_stale_draft_media_errors() {

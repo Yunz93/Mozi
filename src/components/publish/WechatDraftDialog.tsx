@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { Dialog } from "../ui/Dialog";
@@ -48,11 +54,13 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   const [coverImagePath, setCoverImagePath] = useState("");
   const [coverPreviewSrc, setCoverPreviewSrc] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
+  const previewMarkup = useMemo(() => ({ __html: previewHtml }), [previewHtml]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(false);
   const [unresolvedImages, setUnresolvedImages] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const previewRequestId = useRef(0);
+  const previewNoteKeyRef = useRef<string | null>(null);
   const hydratedNoteKeyRef = useRef<string | null>(null);
 
   const files = useAppStore((state) => state.files);
@@ -103,7 +111,12 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
   }, [currentFilePath, defaults, isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !coverImagePath || !isTauriEnvironment()) {
+    if (
+      !isOpen ||
+      !coverImagePath ||
+      /^https?:\/\//i.test(coverImagePath) ||
+      !isTauriEnvironment()
+    ) {
       return;
     }
     void invoke("register_allowed_path", {
@@ -116,6 +129,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
 
   useEffect(() => {
     if (!isOpen || !currentFilePath || !markdownContent) {
+      previewNoteKeyRef.current = null;
       setPreviewHtml("");
       setUnresolvedImages([]);
       setPreviewError(false);
@@ -123,6 +137,10 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
       return;
     }
 
+    if (previewNoteKeyRef.current !== currentFilePath) {
+      previewNoteKeyRef.current = currentFilePath;
+      setPreviewHtml("");
+    }
     const requestId = previewRequestId.current + 1;
     previewRequestId.current = requestId;
     setPreviewLoading(true);
@@ -138,6 +156,10 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
           settings,
         });
         if (previewRequestId.current !== requestId) return;
+        // 已保存或手动选择的封面优先，预览刷新只补齐空封面。
+        setCoverImagePath(
+          (current) => current || prepared.defaultCoverImagePath || "",
+        );
         const hydrated = await hydrateWechatPreviewImages(
           prepared.previewHtml,
           currentFilePath,
@@ -147,7 +169,6 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
         setUnresolvedImages(prepared.unresolvedImages.filter(Boolean));
       } catch {
         if (previewRequestId.current !== requestId) return;
-        setPreviewHtml("");
         setUnresolvedImages([]);
         setPreviewError(true);
       } finally {
@@ -156,6 +177,11 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
         }
       }
     })();
+    return () => {
+      if (previewRequestId.current === requestId) {
+        previewRequestId.current += 1;
+      }
+    };
   }, [
     isOpen,
     files,
@@ -286,6 +312,8 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
 
   const canSubmit =
     !isSubmitting &&
+    !previewLoading &&
+    !previewError &&
     Boolean(title.trim()) &&
     Boolean(coverImagePath.trim()) &&
     unresolvedImages.length === 0;
@@ -305,7 +333,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
         onPaste={handleCoverPaste}
       >
         <div className="wechat-draft-layout">
-          <div className="wechat-draft-form -mx-1 min-h-0 min-w-0 space-y-3 overflow-y-auto px-1">
+          <div className="wechat-draft-form min-h-0 min-w-0 space-y-3">
             {defaults?.existingDraftMediaId && (
               <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-xs leading-5 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                 {t("wechatDraftDialog_updateHint")}
@@ -321,7 +349,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                 type="text"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white wechat-draft-field transition-colors"
               />
             </div>
 
@@ -334,7 +362,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                   type="text"
                   value={author}
                   onChange={(event) => setAuthor(event.target.value)}
-                  className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                  className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white wechat-draft-field transition-colors"
                 />
               </div>
 
@@ -347,7 +375,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                   value={contentSourceUrl}
                   onChange={(event) => setContentSourceUrl(event.target.value)}
                   placeholder="https://"
-                  className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                  className="w-full rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white wechat-draft-field transition-colors"
                 />
               </div>
             </div>
@@ -360,7 +388,7 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                 value={digest}
                 onChange={(event) => setDigest(event.target.value)}
                 rows={3}
-                className="w-full max-h-32 min-h-20 resize-y rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-DEFAULT/20 focus:border-accent-DEFAULT transition-all"
+                className="w-full max-h-32 min-h-20 resize-y rounded-xl border border-gray-200 dark:border-white/10 px-3 py-2 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white wechat-draft-field transition-colors"
               />
             </div>
 
@@ -381,9 +409,6 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                   </div>
                   <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
                     {t("wechatDraftDialog_coverDesc")}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
-                    {t("wechatDraftDialog_coverPasteHint")}
                   </p>
                 </div>
                 <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -433,19 +458,19 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                 {t("wechatDraftDialog_previewHint")}
               </p>
             </div>
-            <div className="wechat-phone-frame">
-              {previewLoading ? (
+            <div className="wechat-phone-frame" aria-busy={previewLoading}>
+              {previewLoading && !previewHtml ? (
                 <p className="wechat-phone-empty">
                   {t("wechatDraftDialog_previewLoading")}
                 </p>
-              ) : previewError ? (
+              ) : previewError && !previewHtml ? (
                 <p className="wechat-phone-empty">
                   {t("wechatDraftDialog_previewFailed")}
                 </p>
               ) : previewHtml ? (
                 <div
                   className="wechat-phone-preview"
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  dangerouslySetInnerHTML={previewMarkup}
                 />
               ) : (
                 <p className="wechat-phone-empty">
@@ -453,6 +478,14 @@ export const WechatDraftDialog: React.FC<WechatDraftDialogProps> = ({
                 </p>
               )}
             </div>
+            {previewError && previewHtml ? (
+              <p
+                role="alert"
+                className="mt-2 text-xs text-amber-700 dark:text-amber-200"
+              >
+                {t("wechatDraftDialog_previewFailed")}
+              </p>
+            ) : null}
           </aside>
         </div>
 
