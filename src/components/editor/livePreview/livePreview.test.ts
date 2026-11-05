@@ -26,6 +26,7 @@ import {
   clearLivePreviewWikiCaches,
 } from "./wiki";
 import { buildLivePreviewTableDecorations, livePreviewTables } from "./tables";
+import { livePreviewRefreshEffect } from "./shared";
 import {
   buildCalloutDecorations,
   findCalloutRanges,
@@ -818,6 +819,61 @@ describe("live preview hide formatting", () => {
     const bodyLine = text.split("\n").find((line) => line.includes("\\|"));
     expect(bodyLine).toBeDefined();
     expect(bodyLine!.split(/(?<!\\)\|/).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps table navigation focused when a background preview refresh arrives", async () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, doc.length - 1, [livePreviewTables]);
+    const cell = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="0"]',
+    ) as HTMLElement;
+    cell.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const editing = view.dom.querySelector(
+      ".cm-live-preview-table-cell-editing",
+    ) as HTMLElement;
+    expect(document.activeElement).toBe(editing);
+    editing.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
+    );
+    view.dispatch({ effects: livePreviewRefreshEffect.of(null) });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const next = view.dom.querySelector(
+      '.cm-live-preview-table-cell-editing[data-mp-col="1"]',
+    );
+    expect(next).not.toBeNull();
+    expect(document.activeElement).toBe(next);
+  });
+
+  it("does not steal focus after leaving a queued table cell navigation", async () => {
+    const doc = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\naway";
+    const view = mount(doc, doc.length - 1, [livePreviewTables]);
+    const cell = view.dom.querySelector(
+      'td[data-mp-row="1"][data-mp-col="0"]',
+    ) as HTMLElement;
+    cell.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const editing = view.dom.querySelector(
+      ".cm-live-preview-table-cell-editing",
+    ) as HTMLElement;
+    expect(document.activeElement).toBe(editing);
+    const input = document.createElement("input");
+    view.dom.parentElement!.appendChild(input);
+    editing.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
+    );
+    input.focus();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(document.activeElement).toBe(input);
+    input.remove();
   });
 
   it("does not yank the caret back to the table on blur commit", async () => {

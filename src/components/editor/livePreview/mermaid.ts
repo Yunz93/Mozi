@@ -15,11 +15,13 @@ import {
   resetMermaidPlaceholders,
 } from "../../../utils/markdown-extensions";
 import { livePreviewContextFacet } from "./context";
+import { preserveLivePreviewCaretOnLayoutChange } from "./caretAnchor";
 import {
   defineLivePreviewBlockDecorationField,
   selectionTouchesRange,
   scheduleLivePreviewMeasure,
   cancelPendingLivePreviewReveals,
+  isEditorPointerSelecting,
   type BlockDecorationBuild,
   type CoverageRange,
 } from "./shared";
@@ -85,6 +87,9 @@ class MermaidWidget extends WidgetType {
         return;
       }
       lastMeasuredHeight = height;
+      if (!isEditorPointerSelecting() && view.contentDOM.contains(wrap)) {
+        preserveLivePreviewCaretOnLayoutChange(view);
+      }
       scheduleLivePreviewMeasure(view);
     };
 

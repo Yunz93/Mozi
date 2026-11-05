@@ -168,6 +168,7 @@ const App: React.FC = () => {
     requestAIAnalyze,
     closeAiEnhanceConfirm,
     isAiEnhanceConfirmOpen,
+    aiEnhanceStage,
     handleGenerateWikiFromSelection,
   } = useAIAnalyze();
   const fileOps = useFileOperations();
@@ -1080,6 +1081,7 @@ const App: React.FC = () => {
               }}
               isAskVaultOpen={isAskVaultOpen}
               isAnalyzing={isAnalyzing}
+              aiEnhanceStage={aiEnhanceStage}
               isSaving={isSaving}
               isPublishing={isPublishing}
               isSidebarOpen={isSidebarOpen}

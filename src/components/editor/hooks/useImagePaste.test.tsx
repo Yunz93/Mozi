@@ -263,6 +263,8 @@ describe("useImagePaste local and fallback targets", () => {
     expect(context.view.state.doc.toString()).toMatch(
       /^prefix !\[\[resources\/a-[0-9a-f-]+\.png\]\]original body$/,
     );
+    expect(context.view.state.selection.main.anchor).toBe(0);
+    expect(context.view.state.selection.main.head).toBe(6);
   });
 
   it("preserves edits made while a local image is being saved", async () => {
@@ -303,8 +305,43 @@ describe("useImagePaste local and fallback targets", () => {
     expect(context.view.state.doc.toString()).toMatch(
       /^prefix !\[\[resources\/a-[0-9a-f-]+\.png\]\]original body$/,
     );
+    expect(context.view.state.selection.main.anchor).toBe(0);
+    expect(context.view.state.selection.main.head).toBe(6);
     error.mockRestore();
   });
+
+  it.each(["local", "upload"] as const)(
+    "preserves a newer selection while reading the pasted image (%s)",
+    async (pasteAction) => {
+      useAppStore.setState({
+        settings: {
+          ...useAppStore.getState().settings,
+          imageHosting: {
+            ...useAppStore.getState().settings.imageHosting,
+            pasteAction,
+          },
+        },
+      });
+      mocks.uploadImageToHosting.mockResolvedValue({
+        url: "https://example.com/read.png",
+      });
+      const context = setup();
+      const read = deferred<ArrayBuffer>();
+      context.file.arrayBuffer = () => read.promise;
+      const pending = context.result.current.handlePastedImage(
+        context.file,
+        context.view,
+      );
+      context.view.dispatch({ selection: { anchor: 0, head: 6 } });
+      await act(async () => {
+        read.resolve(new ArrayBuffer(0));
+        expect(await pending).toBe(true);
+      });
+      expect(context.view.state.doc.toString()).toMatch(/^prefix !\[/);
+      expect(context.view.state.selection.main.anchor).toBe(0);
+      expect(context.view.state.selection.main.head).toBe(6);
+    },
+  );
 
   it("checks the active tab immediately even before hook rerender", async () => {
     useAppStore.setState({

@@ -4,7 +4,7 @@
 
 [English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
 
-本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.0.1 改善长文滚动和编辑、阅读切换，并修复普通窗口中的侧栏拖拽，保留 Live 实时预览、知识检索，以及微信公众号草稿和 Simple Blog 发布。
+本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.0.2 修复光标跳动和异步操作抢焦点的问题，并将 AI 增强移到主工具栏，显示处理进度，保留 Live 实时预览、知识检索，以及微信公众号草稿和 Simple Blog 发布。
 
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.1 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.2 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
@@ -50,7 +50,7 @@ xattr -cr /Applications/墨知.app
 
 ### 2.0.0 工作区与启动页
 
-默认使用 macOS 或 Windows 的系统无衬线字体。浅色采用暖白表面，深色采用金属灰，侧栏、正文、上下栏和设置保持一致。顶部按主题、小知助手、编辑、阅读、发布、更多排列，只显示图标，悬停可查看名称；知识库名称入口仍在左下，设置在右侧。
+默认使用 macOS 或 Windows 的系统无衬线字体。浅色采用暖白表面，深色采用金属灰，侧栏、正文、上下栏和设置保持一致。顶部按主题、小知助手、AI 增强、编辑、阅读、发布、更多排列，只显示图标，悬停可查看名称；知识库名称入口仍在左下，设置在右侧。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/23-theme-dark.png" alt="2.0.0 金属灰工作区与纯图标工具栏" width="800">
@@ -104,7 +104,7 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### 全库搜索与本地索引
 
-在关键词、语义和混合搜索之间切换，点击命中内容回到原文。在 **设置 → 索引** 查看状态、重建索引和配置排除路径。本地语义检索需要先下载模型并完成索引，也可使用兼容的语义接口。
+在关键词、语义和混合搜索之间切换，点击命中内容回到原文。在 **设置 → 小知助手** 查看状态、重建索引和配置排除路径。本地语义检索需要先下载模型并完成索引，也可使用兼容的语义接口。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/18-search.png" alt="搜索结果与原文片段" width="800">
@@ -124,7 +124,7 @@ Live 实时预览边写边渲染，阅读模式用于检查成稿。支持表格
 
 ### AI 增强与 Wiki 生成
 
-支持 Gemini、OpenAI、DeepSeek、GLM、Kimi、Xiaomi MiMo，用于笔记增强、Wiki 生成和问库。顶部 **更多 → AI 增强** 处理当前笔记，选中文字后可从右键菜单生成 Wiki，设置中可调整 Wiki 保存目录和生成提示词。各供应商独立保存密钥与模型，支持兼容接口的供应商可设置地址，也可使用预设或自定义模型 ID。套餐密钥需填写套餐专用地址，密钥通过本机安全存储保存。
+支持 Gemini、OpenAI、DeepSeek、GLM、Kimi、Xiaomi MiMo，用于笔记增强、Wiki 生成和问库。顶部小知助手右侧的 **AI 增强** 处理当前笔记，依次显示准备、分析与整理结果的提示，选中文字后可从右键菜单生成 Wiki，设置中可调整 Wiki 保存目录和生成提示词。各供应商独立保存密钥与模型，支持兼容接口的供应商可设置地址，也可使用预设或自定义模型 ID。套餐密钥需填写套餐专用地址，密钥通过本机安全存储保存。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/12-ai-providers.png" alt="六家 AI 供应商配置" width="800">

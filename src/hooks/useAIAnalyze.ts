@@ -27,6 +27,8 @@ import {
 import { localizeKnownError, t } from "../utils/i18n";
 import { formatAiServiceError, isAiServiceError } from "../services/ai/errors";
 
+export type AiEnhanceStage = "preparing" | "analyzing" | "reviewing";
+
 function localizeAiOrKnownError(
   language: AppLanguage,
   error: unknown,
@@ -227,15 +229,13 @@ function getDefaultWikiCategory(language: AppLanguage): string {
  * Encapsulates AI-powered content analysis and selection-based wiki generation.
  */
 export function useAIAnalyze() {
-  const {
-    activeTabId,
-    setAnalyzing,
-    showNotification,
-    setSettingsOpen,
-    isAnalyzing,
-  } = useAppStore();
+  const { activeTabId, setAnalyzing, showNotification, setSettingsOpen } =
+    useAppStore();
   const content = useAppStore(selectContent);
   const [isAiEnhanceConfirmOpen, setAiEnhanceConfirmOpen] = useState(false);
+  const [aiEnhanceStage, setAiEnhanceStage] = useState<AiEnhanceStage | null>(
+    null,
+  );
 
   const requestAIAnalyze = useCallback(() => {
     const state = useAppStore.getState();
@@ -257,30 +257,34 @@ export function useAIAnalyze() {
   }, []);
 
   const handleAIAnalyze = useCallback(async () => {
-    if (isAnalyzing) return;
+    if (useAppStore.getState().isAnalyzing) return;
     if (!content || !activeTabId) return;
-    const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
-
-    try {
-      ensureAIConfiguration(hydratedSettings);
-    } catch (error) {
-      showNotification(
-        localizeAiOrKnownError(
-          hydratedSettings.language,
-          error,
-          "notifications_aiConfigFirst",
-        ),
-        "error",
-      );
-      setSettingsOpen(true);
-      return;
-    }
-
+    // 准备配置期间也占用任务状态，避免重复点击发起多个增强请求。
     setAnalyzing(true);
+    setAiEnhanceStage("preparing");
+    let taskLanguage = useAppStore.getState().settings.language;
     try {
+      const hydratedSettings = await hydrateSensitiveSettingsIntoStore();
+      taskLanguage = hydratedSettings.language;
+      try {
+        ensureAIConfiguration(hydratedSettings);
+      } catch (error) {
+        showNotification(
+          localizeAiOrKnownError(
+            taskLanguage,
+            error,
+            "notifications_aiConfigFirst",
+          ),
+          "error",
+        );
+        setSettingsOpen(true);
+        return;
+      }
       const { frontmatter: existingFrontmatter, body } =
         parseFrontmatter(content);
+      setAiEnhanceStage("analyzing");
       const result = await analyzeMarkdownWithProvider(body, hydratedSettings);
+      setAiEnhanceStage("reviewing");
       const today = new Date().toISOString().split("T")[0];
       const mergedFrontmatter = mergeAiEnhanceFrontmatter(existingFrontmatter, {
         title: result.seoTitle,
@@ -304,23 +308,17 @@ export function useAIAnalyze() {
       console.error("AI analysis failed:", error);
       showNotification(
         localizeAiOrKnownError(
-          hydratedSettings.language,
+          taskLanguage,
           error,
           "notifications_aiEnhanceFailed",
         ),
         "error",
       );
     } finally {
+      setAiEnhanceStage(null);
       setAnalyzing(false);
     }
-  }, [
-    activeTabId,
-    content,
-    isAnalyzing,
-    setAnalyzing,
-    showNotification,
-    setSettingsOpen,
-  ]);
+  }, [activeTabId, content, setAnalyzing, showNotification, setSettingsOpen]);
 
   const handleGenerateWikiFromSelection = useCallback(
     async (selection: {
@@ -494,6 +492,7 @@ export function useAIAnalyze() {
     requestAIAnalyze,
     closeAiEnhanceConfirm,
     isAiEnhanceConfirmOpen,
+    aiEnhanceStage,
     handleGenerateWikiFromSelection,
   };
 }

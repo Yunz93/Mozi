@@ -33,8 +33,8 @@ function setup(overrides: Partial<React.ComponentProps<typeof Toolbar>> = {}) {
     onShareLongImage: vi.fn(),
     ...overrides,
   };
-  render(<Toolbar {...props} />);
-  return { props, user: userEvent.setup() };
+  const rendered = render(<Toolbar {...props} />);
+  return { ...rendered, props, user: userEvent.setup() };
 }
 
 describe("Toolbar", () => {
@@ -55,6 +55,7 @@ describe("Toolbar", () => {
     expect(names.slice(1)).toEqual([
       "切换到深色模式",
       "小知助手",
+      "AI 增强",
       "实时预览",
       "阅读",
       "发布",
@@ -66,6 +67,8 @@ describe("Toolbar", () => {
     }
     await user.click(screen.getByRole("button", { name: "切换到深色模式" }));
     await user.click(screen.getByRole("button", { name: "小知助手" }));
+    await user.click(screen.getByRole("button", { name: "AI 增强" }));
+    expect(props.onAIAnalyze).toHaveBeenCalledOnce();
     await user.click(screen.getByRole("button", { name: "实时预览" }));
     await user.click(screen.getByRole("button", { name: "发布" }));
     expect(props.onToggleTheme).toHaveBeenCalledOnce();
@@ -79,12 +82,12 @@ describe("Toolbar", () => {
   it("preserves all relocated actions and closes the menu after each action", async () => {
     const { props, user } = setup();
     for (const [name, callback] of [
-      ["AI 增强", props.onAIAnalyze],
       ["导出 PDF", props.onExportPdf],
       ["导出 HTML", props.onExportHtml],
       ["长图分享", props.onShareLongImage],
     ] as const) {
       await user.click(screen.getByRole("button", { name: "更多操作" }));
+      expect(screen.queryByRole("menuitem", { name: "AI 增强" })).toBeNull();
       const item = screen.getByRole("menuitem", { name });
       expect(item.textContent).toBe("");
       expect(item.getAttribute("title")).toBe(name);
@@ -94,24 +97,52 @@ describe("Toolbar", () => {
     }
   });
 
+  it("keeps AI progress visible through each phase and clears it when finished", () => {
+    const { props, rerender } = setup({
+      isAnalyzing: true,
+      aiEnhanceStage: "preparing",
+    });
+    expect(screen.getByRole("status").textContent).toContain("正在准备笔记");
+    expect(
+      screen
+        .getByRole("button", { name: "AI 增强中" })
+        .getAttribute("aria-busy"),
+    ).toBe("true");
+    rerender(<Toolbar {...props} aiEnhanceStage="analyzing" />);
+    expect(screen.getByRole("status").textContent).toContain(
+      "正在分析并优化内容",
+    );
+    expect(screen.getByRole("status").textContent).toContain("原文暂不修改");
+    rerender(<Toolbar {...props} aiEnhanceStage="reviewing" />);
+    expect(screen.getByRole("status").textContent).toContain(
+      "正在整理增强结果",
+    );
+    rerender(<Toolbar {...props} isAnalyzing={false} aiEnhanceStage={null} />);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "AI 增强" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+  });
+
   it("supports menu keyboard navigation, Escape and outside dismissal", async () => {
     const { user } = setup();
     const trigger = screen.getByRole("button", { name: "更多操作" });
     await user.click(trigger);
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "AI 增强" }),
+      screen.getByRole("menuitem", { name: "导出 PDF" }),
     );
     await user.keyboard("{ArrowRight}");
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "导出 PDF" }),
+      screen.getByRole("menuitem", { name: "导出 HTML" }),
     );
     await user.keyboard("{ArrowLeft}");
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "AI 增强" }),
+      screen.getByRole("menuitem", { name: "导出 PDF" }),
     );
     await user.keyboard("{End}{ArrowRight}");
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "AI 增强" }),
+      screen.getByRole("menuitem", { name: "导出 PDF" }),
     );
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
@@ -139,7 +170,7 @@ describe("Toolbar", () => {
 
   it("blocks document operations for preview-only attachments", async () => {
     const { user } = setup({ isPreviewOnlyFile: true });
-    for (const name of ["小知助手", "实时预览", "发布"]) {
+    for (const name of ["小知助手", "AI 增强", "实时预览", "发布"]) {
       expect(
         (screen.getByRole("button", { name }) as HTMLButtonElement).disabled,
       ).toBe(true);
@@ -156,7 +187,11 @@ describe("Toolbar", () => {
     exportState.inFlight = true;
     const { user } = setup({ isAnalyzing: true });
     await user.click(screen.getByRole("button", { name: "更多操作" }));
-    for (const name of ["AI 增强中", "导出 PDF", "导出 HTML"]) {
+    expect(
+      (screen.getByRole("button", { name: "AI 增强中" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    for (const name of ["导出 PDF", "导出 HTML"]) {
       expect(
         (screen.getByRole("menuitem", { name }) as HTMLButtonElement).disabled,
       ).toBe(true);

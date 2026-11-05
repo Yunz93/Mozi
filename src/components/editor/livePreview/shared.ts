@@ -17,6 +17,7 @@ import { WIKI_LINK_REGEX } from "../../../utils/markdownLinkUtils";
 import { LRUCache } from "../../../utils/performance";
 import { isWithinFrontmatterBlock } from "../behavior/core";
 import { livePreviewContextFacet } from "./context";
+import { preserveLivePreviewCaretOnLayoutChange } from "./caretAnchor";
 import type { LivePreviewContext } from "./context";
 import {
   getCachedPreviewImageSrc,
@@ -815,7 +816,12 @@ export function bindLivePreviewWidgetResizeMeasure(
     });
   };
 
-  const observer = new ResizeObserver(remasure);
+  const observer = new ResizeObserver(() => {
+    if (!isEditorPointerSelecting() && view.contentDOM.contains(root)) {
+      preserveLivePreviewCaretOnLayoutChange(view);
+    }
+    remasure();
+  });
   observer.observe(root);
   queueMicrotask(remasure);
 
@@ -834,11 +840,21 @@ export function bindLivePreviewMediaMeasure(
   root: HTMLElement,
 ): void {
   const remasure = () => scheduleLivePreviewMeasure(view);
+  const settle = (event: Event) => {
+    if (
+      !isEditorPointerSelecting() &&
+      event.currentTarget instanceof Node &&
+      view.contentDOM.contains(event.currentTarget)
+    ) {
+      preserveLivePreviewCaretOnLayoutChange(view);
+    }
+    remasure();
+  };
   for (const node of root.querySelectorAll("img")) {
     const img = node as HTMLImageElement;
     if (img.complete) continue;
-    img.addEventListener("load", remasure, { once: true });
-    img.addEventListener("error", remasure, { once: true });
+    img.addEventListener("load", settle, { once: true });
+    img.addEventListener("error", settle, { once: true });
   }
   queueMicrotask(remasure);
 }
@@ -851,6 +867,9 @@ export function bindLivePreviewImageMeasure(
 ): void {
   const settle = () => {
     onSettle?.();
+    if (!isEditorPointerSelecting() && view.contentDOM.contains(img)) {
+      preserveLivePreviewCaretOnLayoutChange(view);
+    }
     scheduleLivePreviewMeasure(view);
   };
   if (img.complete && img.naturalHeight > 0) {
@@ -954,9 +973,19 @@ export function scheduleLivePreviewReveal(
   apply: (generation: number) => void,
 ): number {
   const generation = ++livePreviewRevealGeneration;
+  const sourceDoc = view.state.doc;
+  const ownerDocument = view.dom.ownerDocument;
+  const activeElement = ownerDocument.activeElement;
   window.setTimeout(() => {
     if (!isLivePreviewRevealCurrent(generation)) return;
     if (!view.dom.isConnected) return;
+    // 延迟展开只能作用于发起时的文档和焦点，切换文件或转去其他输入框后立即失效。
+    if (
+      view.state.doc !== sourceDoc ||
+      ownerDocument.activeElement !== activeElement ||
+      view.dom.closest('[aria-hidden="true"]')
+    )
+      return;
     apply(generation);
   }, 0);
   return generation;
@@ -1218,11 +1247,21 @@ export function bindLivePreviewClickToReveal(
     (event) => {
       event.preventDefault();
       event.stopPropagation();
+      const sourceDoc = view.state.doc;
+      const applyIfCurrent = (generation: number) => {
+        if (
+          view.state.doc !== sourceDoc ||
+          !view.hasFocus ||
+          view.dom.closest('[aria-hidden="true"]')
+        )
+          return;
+        apply(generation);
+      };
       scheduleLivePreviewReveal(view, (generation) => {
         if (view.dom.isConnected) view.focus();
-        invokeLivePreviewRevealApply(view, generation, apply);
+        invokeLivePreviewRevealApply(view, generation, applyIfCurrent);
         const reassert = () => {
-          invokeLivePreviewRevealApply(view, generation, apply);
+          invokeLivePreviewRevealApply(view, generation, applyIfCurrent);
         };
         // Wait for the replace widget to drop (layout) and for CM to finish
         // its own frame/selection flush. Dispatching from rAF itself can nest

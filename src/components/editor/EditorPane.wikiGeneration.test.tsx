@@ -19,6 +19,9 @@ import { EditorPane } from "./EditorPane";
 const mocks = vi.hoisted(() => ({
   useCodeMirror: vi.fn(),
   showNotification: vi.fn(),
+  uploadImageToHosting: vi.fn(),
+  resolveAttachmentTarget: vi.fn(),
+  readBinaryFile: vi.fn(async () => new Uint8Array([1, 2, 3])),
   scroll: {
     handleScroll: vi.fn(),
     cancelScrollSync: vi.fn(),
@@ -47,6 +50,18 @@ vi.mock("../../hooks/useFileSystem", () => ({
 }));
 vi.mock("../../hooks/useFileOperations", () => ({
   useFileOperations: () => mocks.fileOperations,
+}));
+vi.mock("../../services/imageHostingService", () => ({
+  isImageHostingEnabled: () => true,
+  uploadImageToHosting: mocks.uploadImageToHosting,
+}));
+vi.mock("../../utils/attachmentResolver", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../utils/attachmentResolver")>()),
+  resolveAttachmentTarget: mocks.resolveAttachmentTarget,
+}));
+vi.mock("@tauri-apps/plugin-fs", () => ({ readFile: mocks.readBinaryFile }));
+vi.mock("../../utils/imageHostingFilename", () => ({
+  buildHostedImageFilename: async () => "image.png",
 }));
 vi.mock("./livePreview/shared", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./livePreview/shared")>()),
@@ -140,6 +155,17 @@ describe("EditorPane asynchronous Wiki replacement", () => {
     expect(mocks.showNotification).not.toHaveBeenCalled();
   });
 
+  it("keeps a newer caret when Wiki generation finishes", async () => {
+    const generation = beginGeneration();
+    act(() => view.dispatch({ selection: { anchor: sourceText.length } }));
+    await generation.finish();
+    expect(view.state.doc.toString()).toBe(
+      "[[wiki/Alpha|alpha]] and original A",
+    );
+    expect(view.state.selection.main.head).toBe(view.state.doc.length);
+    expect(view.state.selection.main.empty).toBe(true);
+  });
+
   it("preserves another tab when the same EditorView is reused", async () => {
     const generation = beginGeneration();
     act(() => {
@@ -198,5 +224,57 @@ describe("EditorPane asynchronous Wiki replacement", () => {
     });
     if (generation.generate.mock.calls.length > 0) await generation.finish();
     expect(view.state.doc.toString()).toBe("new input " + sourceText);
+  });
+});
+
+describe("EditorPane asynchronous image upload replacement", () => {
+  it("keeps a newer selection when a local image finishes uploading", async () => {
+    const doc = "![image](resources/image.png)\n\n继续编辑正文";
+    view.setState(EditorState.create({ doc }));
+    useAppStore.setState({
+      fileContents: { [a.id]: doc },
+      settings: {
+        ...defaultSettings,
+        imageHosting: { ...defaultSettings.imageHosting, provider: "github" },
+      },
+    });
+    let finish!: (value: { url: string }) => void;
+    mocks.uploadImageToHosting.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    mocks.resolveAttachmentTarget.mockResolvedValue({
+      path: "/vault/resources/image.png",
+      name: "image.png",
+    });
+    render(<EditorPane />);
+    const options = mocks.useCodeMirror.mock.calls.at(
+      -1,
+    )![0] as UseCodeMirrorOptions;
+    act(() => {
+      options.onContextMenu!(new MouseEvent("contextmenu"), view);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "上传到图床" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mocks.uploadImageToHosting).toHaveBeenCalledOnce();
+    view.dispatch({
+      selection: { anchor: doc.indexOf("继续"), head: doc.length },
+    });
+    await act(async () => {
+      finish({ url: "https://example.com/hosted.png" });
+      await Promise.resolve();
+    });
+    expect(view.state.doc.toString()).toContain(
+      "https://example.com/hosted.png",
+    );
+    expect(
+      view.state.sliceDoc(
+        view.state.selection.main.from,
+        view.state.selection.main.to,
+      ),
+    ).toBe("继续编辑正文");
   });
 });

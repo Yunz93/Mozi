@@ -241,6 +241,39 @@ export function useCodeMirror(
   placeholderRef.current = placeholder;
   preferencesRef.current = preferences;
 
+  // 缓存重挂载与切换文档共用当前配置，不能恢复旧标签页保存的外观或 Live 模式。
+  const createCurrentConfigurationEffects = useCallback(
+    () => [
+      compartments.darkTheme.reconfigure(
+        EditorView.darkTheme.of(themeModeRef.current === "dark"),
+      ),
+      compartments.wrap.reconfigure(
+        wordWrapRef.current ? EditorView.lineWrapping : [],
+      ),
+      compartments.livePreview.reconfigure(
+        livePreviewEnabledRef.current
+          ? createLivePreviewPluginExtensions()
+          : [],
+      ),
+      compartments.livePreviewContext.reconfigure(
+        createLivePreviewContextExtension(livePreviewContextRef.current),
+      ),
+      compartments.keymap.reconfigure(
+        Prec.high(
+          keymap.of(createMarkdownKeyBindings(orderedListModeRef.current)),
+        ),
+      ),
+      compartments.placeholder.reconfigure(
+        cmPlaceholder(placeholderRef.current),
+      ),
+      ...buildEditorPreferenceEffects(
+        preferenceCompartments,
+        preferencesRef.current,
+      ),
+    ],
+    [compartments, preferenceCompartments],
+  );
+
   // IME 组合期间收到的外部内容，等 compositionend 后再应用
   const pendingImeContentSyncRef = useRef<string | null>(null);
   const imeSyncListenerScheduledRef = useRef(false);
@@ -508,19 +541,38 @@ export function useCodeMirror(
         documentKey != null
           ? editorStateCacheRef.current.get(documentKey)
           : undefined;
+      let state =
+        cachedState ??
+        EditorState.create({
+          doc: initialContentRef.current,
+          extensions,
+        });
+      // 缓存保留正文历史和选区，配置使用当前设置；最新正文在挂载前同步，避免首键回写旧内容。
+      if (cachedState) {
+        const cachedContent = cachedState.doc.toString();
+        state = cachedState.update({
+          ...(cachedContent !== initialContentRef.current
+            ? {
+                changes: getDocumentReplacementRange(
+                  cachedContent,
+                  initialContentRef.current,
+                ),
+              }
+            : {}),
+          effects: createCurrentConfigurationEffects(),
+          annotations: Transaction.addToHistory.of(false),
+        }).state;
+      }
       const view = new EditorView({
-        state:
-          cachedState ??
-          EditorState.create({
-            doc: initialContentRef.current,
-            extensions,
-          }),
+        state,
         parent: editorRef.current,
       });
 
       viewRef.current = view;
       // 初始化和缓存恢复不是用户输入，立即建立基线供同步刷新判断。
       lastEmittedContentRef.current = view.state.doc.toString();
+      // DOM 可能在选中文档后才挂载，实例与文档身份必须同时初始化，避免首键被误判为切换文档。
+      previousDocumentKeyRef.current = documentKey;
       setViewReady(true);
     } catch (error) {
       console.error("CodeMirror initialization failed:", error);
@@ -550,7 +602,12 @@ export function useCodeMirror(
       viewRef.current = null;
       setViewReady(false);
     };
-  }, [compartments.markdown, editorElementReady, flushPendingContentChange]);
+  }, [
+    compartments.markdown,
+    editorElementReady,
+    flushPendingContentChange,
+    createCurrentConfigurationEffects,
+  ]);
 
   // Sync external content changes (only when not typing)
   useEffect(() => {
@@ -609,10 +666,27 @@ export function useCodeMirror(
       };
 
       restoreScrollPosition();
+      const synchronizedState = viewNow.state;
+      const restoredScrollTop = scrollDom.scrollTop;
+      const restoredScrollLeft = scrollDom.scrollLeft;
+      const ownerDocument = viewNow.dom.ownerDocument;
+      const activeElementAfterSync = ownerDocument.activeElement;
+      const lostFocusDuringSync = shouldRestoreFocus && !viewNow.hasFocus;
       restoreScrollFrameRef.current = requestAnimationFrame(() => {
         restoreScrollFrameRef.current = null;
+        // 下一帧只修正本次回灌造成的布局变化，不能覆盖后来发生的输入、点选、滚动或焦点切换。
+        if (
+          viewRef.current !== viewNow ||
+          !viewNow.dom.isConnected ||
+          viewNow.state !== synchronizedState ||
+          ownerDocument.activeElement !== activeElementAfterSync ||
+          Math.abs(scrollDom.scrollTop - restoredScrollTop) > 1 ||
+          Math.abs(scrollDom.scrollLeft - restoredScrollLeft) > 1
+        ) {
+          return;
+        }
         restoreScrollPosition();
-        if (shouldRestoreFocus && !viewNow.hasFocus) {
+        if (lostFocusDuringSync && !viewNow.hasFocus) {
           viewNow.contentDOM.focus({ preventScroll: true });
         }
       });
@@ -662,34 +736,7 @@ export function useCodeMirror(
       // Re-apply live compartments so restored states pick up current theme/wrap.
       const scrollTop = view.scrollDOM.scrollTop;
       view.dispatch({
-        effects: [
-          compartments.darkTheme.reconfigure(
-            EditorView.darkTheme.of(themeModeRef.current === "dark"),
-          ),
-          compartments.wrap.reconfigure(
-            wordWrapRef.current ? EditorView.lineWrapping : [],
-          ),
-          compartments.livePreview.reconfigure(
-            livePreviewEnabledRef.current
-              ? createLivePreviewPluginExtensions()
-              : [],
-          ),
-          compartments.livePreviewContext.reconfigure(
-            createLivePreviewContextExtension(livePreviewContextRef.current),
-          ),
-          compartments.keymap.reconfigure(
-            Prec.high(
-              keymap.of(createMarkdownKeyBindings(orderedListModeRef.current)),
-            ),
-          ),
-          compartments.placeholder.reconfigure(
-            cmPlaceholder(placeholderRef.current),
-          ),
-          ...buildEditorPreferenceEffects(
-            preferenceCompartments,
-            preferencesRef.current,
-          ),
-        ],
+        effects: createCurrentConfigurationEffects(),
       });
       view.scrollDOM.scrollTop = scrollTop;
 
@@ -734,7 +781,7 @@ export function useCodeMirror(
     performExternalContentSync(safeContent);
     // compartments / preferenceCompartments 由 useMemo 固定，放进 deps 不会触发多余回灌；
     // 主题、换行、偏好等外观选项则刻意通过 ref 读取，避免它们变化时重放文档替换。
-  }, [content, documentKey, compartments, preferenceCompartments]);
+  }, [content, documentKey, createCurrentConfigurationEffects]);
 
   // Update word wrap
   const setWordWrap = useCallback(

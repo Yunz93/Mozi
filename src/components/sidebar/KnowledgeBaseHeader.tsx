@@ -36,7 +36,11 @@ export const KnowledgeBaseHeader: React.FC<KnowledgeBaseHeaderProps> = ({
       >
         <Folder size={16} className="shrink-0" aria-hidden />
         <p className="text-sm font-semibold truncate min-w-0">{label}</p>
-        <ChevronDown size={13} className="shrink-0 opacity-60" aria-hidden />
+        <ChevronDown
+          size={13}
+          className="ml-auto shrink-0 opacity-60"
+          aria-hidden
+        />
       </button>
       <button
         type="button"

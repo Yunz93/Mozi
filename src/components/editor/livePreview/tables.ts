@@ -934,13 +934,43 @@ const tableDecorationsField = defineLivePreviewBlockDecorationField({
 
 const tableFocusPlugin = ViewPlugin.fromClass(
   class {
+    private frame = 0;
+
     update(update: ViewUpdate) {
       const activeChanged =
         update.startState.field(activeTableCellField, false) !==
         update.state.field(activeTableCellField, false);
       if (activeChanged || update.docChanged) {
-        requestAnimationFrame(() => focusActiveCell(update.view));
+        if (this.frame) cancelAnimationFrame(this.frame);
+        const { view } = update;
+        const state = view.state;
+        const ownerDocument = view.dom.ownerDocument;
+        const activeElement = ownerDocument.activeElement;
+        this.frame = requestAnimationFrame(() => {
+          this.frame = 0;
+          // 单元格重建会丢失原 DOM 焦点；只恢复这一次重建，不能抢回用户后来转移的焦点。
+          const focusStayed =
+            ownerDocument.activeElement === activeElement ||
+            (activeElement &&
+              !activeElement.isConnected &&
+              ownerDocument.activeElement === ownerDocument.body);
+          if (
+            !view.dom.isConnected ||
+            view.state.doc !== state.doc ||
+            !view.state.selection.eq(state.selection) ||
+            view.state.field(activeTableCellField, false) !==
+              state.field(activeTableCellField, false) ||
+            !focusStayed ||
+            view.dom.closest('[aria-hidden="true"]')
+          )
+            return;
+          focusActiveCell(view);
+        });
       }
+    }
+
+    destroy() {
+      if (this.frame) cancelAnimationFrame(this.frame);
     }
   },
 );

@@ -9,6 +9,10 @@ import {
   livePreviewTheme,
 } from "./hideFormattingMarks";
 import { livePreviewImages } from "./images";
+import {
+  livePreviewCaretAnchor,
+  livePreviewCaretAnchoringEnabled,
+} from "./caretAnchor";
 import { livePreviewMath } from "./math";
 import { livePreviewTaskCheckboxes } from "./taskCheckboxes";
 import { livePreviewWiki } from "./wiki";
@@ -45,6 +49,8 @@ export function createLivePreviewContextExtension(
 export function createLivePreviewPluginExtensions(): Extension[] {
   const viewportInline: Extension[] = [
     livePreviewTheme,
+    livePreviewCaretAnchoringEnabled.of(true),
+    livePreviewCaretAnchor,
     livePreviewGeometryRemeasure,
     livePreviewHideFormatting,
     livePreviewTaskCheckboxes,

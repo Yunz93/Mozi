@@ -26,6 +26,7 @@ import { ViewModeToggle } from "./ViewModeToggle";
 import { useI18n } from "../../hooks/useI18n";
 import { isTauriEnvironment } from "../../types/filesystem";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { AiEnhanceStage } from "../../hooks/useAIAnalyze";
 
 interface ToolbarProps {
   fileName: string;
@@ -36,6 +37,7 @@ interface ToolbarProps {
   onAskVault?: () => void;
   isAskVaultOpen?: boolean;
   isAnalyzing: boolean;
+  aiEnhanceStage?: AiEnhanceStage | null;
   isSaving: boolean;
   isPublishing?: boolean;
   isSidebarOpen: boolean;
@@ -59,6 +61,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
     onAskVault,
     isAskVaultOpen = false,
     isAnalyzing,
+    aiEnhanceStage = null,
     isSaving,
     isPublishing = false,
     isSidebarOpen,
@@ -236,6 +239,49 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
               <Lightbulb size={14} aria-hidden />
             </button>
           )}
+          <div className="app-toolbar-ai">
+            <button
+              type="button"
+              className="app-toolbar-icon"
+              title={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
+              aria-label={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
+              aria-busy={isAnalyzing}
+              aria-describedby={
+                isAnalyzing && aiEnhanceStage
+                  ? "ai-enhance-progress"
+                  : undefined
+              }
+              disabled={documentDisabled || isAnalyzing}
+              onClick={onAIAnalyze}
+            >
+              {isAnalyzing ? (
+                <LoaderCircle size={14} className="animate-spin" aria-hidden />
+              ) : (
+                <Sparkles size={14} aria-hidden />
+              )}
+            </button>
+            {isAnalyzing && aiEnhanceStage && (
+              <div
+                id="ai-enhance-progress"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className="app-toolbar-ai-progress"
+              >
+                <strong>{t("ai_buttonLoading")}</strong>
+                <span>
+                  {t(
+                    aiEnhanceStage === "preparing"
+                      ? "ai_progressPreparing"
+                      : aiEnhanceStage === "analyzing"
+                        ? "ai_progressAnalyzing"
+                        : "ai_progressReviewing",
+                  )}
+                </span>
+                <small>{t("ai_progressHint")}</small>
+              </div>
+            )}
+          </div>
           <ViewModeToggle
             viewMode={viewMode}
             onViewModeChange={onViewModeChange}
@@ -279,24 +325,6 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                 aria-label={t("toolbar_more")}
                 className="app-toolbar-menu"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  title={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
-                  aria-label={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
-                  disabled={documentDisabled || isAnalyzing}
-                  onClick={() => runMenuAction(onAIAnalyze)}
-                >
-                  {isAnalyzing ? (
-                    <LoaderCircle
-                      size={14}
-                      className="animate-spin"
-                      aria-hidden
-                    />
-                  ) : (
-                    <Sparkles size={14} aria-hidden />
-                  )}
-                </button>
                 {onExportPdf && (
                   <button
                     type="button"

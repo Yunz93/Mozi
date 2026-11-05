@@ -139,6 +139,20 @@ describe("SplitView scroll handshake", () => {
     expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
   });
 
+  it("does not overwrite a newer user scroll with a delayed mode correction", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    renderSplitView();
+    act(() => editorOnScroll?.(0.3));
+    act(() => useAppStore.setState({ viewMode: ViewMode.PREVIEW }));
+    expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.3, {
+      immediate: true,
+    });
+    act(() => previewOnScroll?.(0.8));
+    mockPreviewSyncScrollTo.mockClear();
+    act(() => vi.advanceTimersByTime(300));
+    expect(mockPreviewSyncScrollTo).not.toHaveBeenCalled();
+  });
+
   it("preserves initial tab restoration but skips its late correction during pending navigation", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     seedSplitViewStore({ viewMode: ViewMode.PREVIEW });

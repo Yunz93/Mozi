@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
+import type { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type {
   AppLanguage,
@@ -132,6 +133,7 @@ export function useImagePaste(
       language: AppLanguage,
       arrayBuffer: ArrayBuffer,
       imageName: string,
+      selection: EditorSelection,
       isCurrent: () => boolean,
       placeholder?: string,
     ): Promise<boolean> => {
@@ -140,7 +142,6 @@ export function useImagePaste(
         return false;
       }
       const sourceDoc = view.state.doc;
-      const selection = view.state.selection.main;
       try {
         const { absoluteDir, markdownRelativePathPrefix } = resolveTarget();
         const imagePath = joinFsPath(absoluteDir, imageName);
@@ -165,17 +166,21 @@ export function useImagePaste(
         if (!placeholder && view.state.doc !== sourceDoc) return false;
         const from = placeholder
           ? view.state.doc.toString().indexOf(placeholder)
-          : selection.from;
+          : selection.main.from;
         if (from < 0) return false;
-        const to = placeholder ? from + placeholder.length : selection.to;
+        const to = placeholder ? from + placeholder.length : selection.main.to;
+        const moveCaret = !placeholder && view.state.selection.eq(selection);
         view.dispatch({
           changes: {
             from,
             to,
             insert: insertText,
           },
-          selection: { anchor: from + insertText.length },
-          scrollIntoView: true,
+          // 异步完成时保留后来的选区；未移动过时才把光标放到图片之后。
+          ...(moveCaret
+            ? { selection: { anchor: from + insertText.length } }
+            : {}),
+          scrollIntoView: moveCaret && view.hasFocus,
         });
 
         const folderLabel = markdownRelativePathPrefix || absoluteDir;
@@ -224,20 +229,23 @@ export function useImagePaste(
       language: AppLanguage,
       arrayBuffer: ArrayBuffer,
       imageName: string,
+      selection: EditorSelection,
       isCurrent: () => boolean,
     ): Promise<boolean> => {
       const altText = imageName.replace(/\.[^.]+$/, "");
       const placeholder = `![Uploading ${imageName}...]()`;
 
-      const selection = view.state.selection.main;
+      const moveCaret = view.state.selection.eq(selection);
       view.dispatch({
         changes: {
-          from: selection.from,
-          to: selection.to,
+          from: selection.main.from,
+          to: selection.main.to,
           insert: placeholder,
         },
-        selection: { anchor: selection.from + placeholder.length },
-        scrollIntoView: true,
+        ...(moveCaret
+          ? { selection: { anchor: selection.main.from + placeholder.length } }
+          : {}),
+        scrollIntoView: moveCaret && view.hasFocus,
       });
 
       try {
@@ -287,6 +295,7 @@ export function useImagePaste(
             language,
             arrayBuffer,
             imageName,
+            view.state.selection,
             isCurrent,
             placeholder,
           );
@@ -315,7 +324,7 @@ export function useImagePaste(
       const originTabId = originState.activeTabId;
       const originRootPath = originState.rootFolderPath;
       const sourceDoc = view.state.doc;
-      const selection = view.state.selection.main;
+      const selection = view.state.selection;
       const isCurrent = () =>
         mountedRef.current &&
         documentSessionRef.current === session &&
@@ -345,9 +354,6 @@ export function useImagePaste(
       const imageName = `${noteBaseName}-${Date.now()}-${pasteId}.${extension}`;
       const arrayBuffer = await file.arrayBuffer();
       if (!isCurrent() || view.state.doc !== sourceDoc) return false;
-      // 文件读取完成后仍使用粘贴发起时的选区。
-      view.dispatch({ selection });
-
       if (isImageHostingEnabled(settings)) {
         return handleUploadMode(
           view,
@@ -355,11 +361,19 @@ export function useImagePaste(
           language,
           arrayBuffer,
           imageName,
+          selection,
           isCurrent,
         );
       }
 
-      return handleLocalMode(view, language, arrayBuffer, imageName, isCurrent);
+      return handleLocalMode(
+        view,
+        language,
+        arrayBuffer,
+        imageName,
+        selection,
+        isCurrent,
+      );
     },
     [
       rootFolderPath,

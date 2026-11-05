@@ -62,6 +62,7 @@ import type { LivePreviewContext } from "../livePreview";
 import { noteEditorUserGesture } from "../../../utils/editorSelectionBridge";
 import { tryOpenLivePreviewLinkOnModClick } from "../livePreview/clickableLinks";
 import { cancelPendingLivePreviewReveals } from "../livePreview/shared";
+import { livePreviewCaretAnchor } from "../livePreview/caretAnchor";
 import type { OrderedListMode, ThemeMode } from "../../../types";
 import { editorAutocompletePanelBaseTheme } from "../editorAutocompleteTheme";
 import type { CodeMirrorContentChangeMeta } from "./useCodeMirror";
@@ -228,6 +229,8 @@ export function createEditorExtensions(
     ...wrapEditorPreferenceExtensions(preferenceCompartments, preferences),
     compartments.markdown.of(createEditorMarkdownLanguage()),
     drawSelection(),
+    // 源码模式也保留滚动守卫，用来消费关闭 Live 前排队的旧补偿；未启用时不测量光标。
+    livePreviewCaretAnchor,
     createRefocusPointerSelectionExtension(),
     frontmatterDecorations,
     fencedCodeDecorations,

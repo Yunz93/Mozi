@@ -168,6 +168,11 @@ export default {
 
   ai_button: "AI Enhance",
   ai_buttonLoading: "Enhancing with AI",
+  ai_progressPreparing: "Preparing your note…",
+  ai_progressAnalyzing: "Analyzing and improving the content. Please wait…",
+  ai_progressReviewing: "Preparing the results…",
+  ai_progressHint:
+    "You can review the result before applying it. Your note stays unchanged.",
   ai_generateWiki: "Generate explainer wiki with AI",
   ai_generatingWiki: "Generating wiki...",
 
@@ -262,9 +267,9 @@ export default {
   askVault_ready: "Ready (semantic retrieval available)",
   askVault_readyKeyword: "Ready (keyword retrieval)",
 
-  index_title: "Vault index",
+  index_title: "XiaoZhi Assistant",
   index_desc:
-    "Link and chunk indexes power backlinks, sidebar search, related notes, and XiaoZhi Assistant. Cached locally and rebuildable anytime without changing your Markdown. XiaoZhi Assistant also needs a model under AI settings.",
+    "XiaoZhi Assistant finds relevant notes in your vault and answers questions using their content. Manage its local index, search scope, and semantic model here. The index also supports backlinks, sidebar search, and related notes. Rebuild it anytime without changing your Markdown files. Answers use the model configured under AI Enhance.",
   index_status: "Status",
   index_statusReady: "Ready",
   index_statusBuilding: "Building ({done}/{total})",
@@ -284,11 +289,11 @@ export default {
   index_vectorsOff: "Disabled",
   index_excludeTitle: "Exclude paths",
   index_excludeDesc:
-    "These vault-relative globs are skipped by XiaoZhi Assistant chunks. One pattern per line; * and ** are supported. Rebuild the index after changing them.",
+    "XiaoZhi Assistant excludes these vault-relative paths from retrieval. One pattern per line; * and ** are supported. Rebuild the index after changing them.",
   index_excludeHint: "Trash and node_modules are excluded by default.",
   index_embeddingTitle: "Semantic search / Embedding",
   index_embeddingDesc:
-    "Uses a built-in on-device model by default (first run downloads tens of MB, then works offline). You can also point at Ollama or another OpenAI-compatible endpoint. Off = keyword only.",
+    "XiaoZhi Assistant uses a built-in on-device model to understand queries and find relevant notes. The first run downloads tens of MB; later searches work offline. You can also use Ollama or another OpenAI-compatible endpoint. When disabled, XiaoZhi Assistant uses keyword retrieval only.",
   index_embeddingProvider: "Embedding provider",
   index_embeddingBuiltin: "Built-in local model (recommended)",
   index_embeddingNone: "Off (keyword only)",
@@ -496,7 +501,7 @@ export default {
   settings_title: "Settings",
   settings_tab_editor: "Editor",
   settings_tab_ai: "AI",
-  settings_tab_index: "Index",
+  settings_tab_index: "XiaoZhi Assistant",
   settings_tab_metadata: "Metadata",
   settings_tab_shortcuts: "Shortcuts",
   settings_tab_interface: "Interface",
@@ -674,7 +679,7 @@ export default {
 
   settings_aiContentEnhance: "AI Content Enhancement",
   settings_aiContentEnhanceDesc:
-    "Choose an AI provider for note enhancement, wiki generation from selection, and XiaoZhi Assistant. XiaoZhi Assistant also needs the Index tab (chunks / embeddings).",
+    "Choose an AI provider for note enhancement, wiki generation from selection, and XiaoZhi Assistant. Configure its retrieval scope and semantic model under XiaoZhi Assistant settings.",
   settings_wereadShowApiKey: "Show WeRead API key",
   settings_wereadHideApiKey: "Hide WeRead API key",
   settings_compatibleKeyLocalOnly: "Stored securely on this device.",
@@ -1294,7 +1299,7 @@ export default {
     "The first use of the built-in semantic model downloads about 120 MB of weights from Hugging Face or a mirror. You can reset this anytime.",
   index_embeddingDownloadConfirmTitle: "Download the built-in semantic model?",
   index_embeddingDownloadConfirmMessage:
-    "This will download about 120 MB of built-in embedding weights from Hugging Face or a mirror to this computer for semantic search. You can change this later in Settings → Index.",
+    "This will download about 120 MB of built-in embedding weights from Hugging Face or a mirror to this computer for semantic search. You can change this later in Settings → XiaoZhi Assistant.",
   index_embeddingDownloadConfirm: "Download",
   index_embeddingDownloadSkip: "Not now",
   notifications_builtinEmbeddingSkipped:

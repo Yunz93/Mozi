@@ -149,6 +149,10 @@ export default {
 
   ai_button: "AI 增强",
   ai_buttonLoading: "AI 增强中",
+  ai_progressPreparing: "正在准备笔记…",
+  ai_progressAnalyzing: "正在分析并优化内容，请稍候…",
+  ai_progressReviewing: "正在整理增强结果…",
+  ai_progressHint: "完成后可预览并确认结果，原文暂不修改。",
   ai_generateWiki: "AI 生成字段解读 Wiki",
   ai_generatingWiki: "正在生成 Wiki…",
 
@@ -238,9 +242,9 @@ export default {
 
   notifications_invalidWikiTarget: "无效的双链目标路径",
 
-  index_title: "知识库索引",
+  index_title: "小知助手",
   index_desc:
-    "链接与切片索引支撑反向链接、侧边栏搜索、相关笔记与小知助手。缓存在本地，可随时重建，不会修改你的 Markdown 文件。小知助手还会用到「AI 增强」里的模型配置。",
+    "小知助手从知识库中检索相关笔记，依据原文回答问题。你可以在这里管理它的本地索引、检索范围与语义模型；索引也用于反向链接、侧边栏搜索和相关笔记，可随时重建，不会修改 Markdown 文件。问答使用「AI 增强」里配置的模型。",
   index_status: "状态",
   index_statusReady: "就绪",
   index_statusBuilding: "构建中 ({done}/{total})",
@@ -260,11 +264,11 @@ export default {
   index_vectorsOff: "未启用",
   index_excludeTitle: "排除路径",
   index_excludeDesc:
-    "这些相对路径不会进入小知助手切片。一行一条，支持 * 与 **。修改后请重建索引。",
+    "小知助手检索时会排除这些相对路径。一行一条，支持 * 与 **。修改后请重建索引。",
   index_excludeHint: "默认排除回收站和 node_modules。",
   index_embeddingTitle: "语义检索 / Embedding",
   index_embeddingDesc:
-    "默认使用软件内置本地模型（首次会下载约几十 MB，之后离线可用）。也可改用 Ollama 等 OpenAI 兼容接口。关闭则仅关键词搜索。",
+    "小知助手默认使用内置本地模型理解查询、检索相关笔记（首次会下载约几十 MB，之后离线可用）。也可改用 Ollama 等 OpenAI 兼容接口。关闭后，小知助手仅使用关键词检索。",
   index_embeddingProvider: "Embedding 提供方",
   index_embeddingBuiltin: "内置本地模型（推荐）",
   index_embeddingNone: "关闭（仅关键词）",
@@ -466,7 +470,7 @@ export default {
   settings_title: "设置",
   settings_tab_editor: "编辑器",
   settings_tab_ai: "AI 增强",
-  settings_tab_index: "索引",
+  settings_tab_index: "小知助手",
   settings_tab_metadata: "元数据",
   settings_tab_shortcuts: "快捷键",
   settings_tab_interface: "界面",
@@ -625,7 +629,7 @@ export default {
 
   settings_aiContentEnhance: "AI 内容增强",
   settings_aiContentEnhanceDesc:
-    "选择 AI 提供商，用于全文增强、选区生成 Wiki，以及工具栏「小知助手」问答。小知助手还依赖「知识库索引」页的切片 / Embedding。",
+    "选择 AI 提供商，用于全文增强、选区生成 Wiki，以及工具栏「小知助手」问答。小知助手的检索范围与语义模型可在「小知助手」页配置。",
   settings_wereadShowApiKey: "显示微信读书密钥",
   settings_wereadHideApiKey: "隐藏微信读书密钥",
   settings_compatibleKeyLocalOnly: "密钥保存在本机安全存储中。",
@@ -1180,7 +1184,7 @@ export default {
     "首次使用内置语义模型会从 Hugging Face 或镜像下载约 120 MB 权重到本机。可随时在此重置。",
   index_embeddingDownloadConfirmTitle: "下载内置语义模型？",
   index_embeddingDownloadConfirmMessage:
-    "将从 Hugging Face 或国内镜像下载约 120 MB 的内置 embedding 模型到本机，用于语义检索。可在设置 → 索引中更改。",
+    "将从 Hugging Face 或国内镜像下载约 120 MB 的内置 embedding 模型到本机，用于语义检索。可在设置 → 小知助手中更改。",
   index_embeddingDownloadConfirm: "下载",
   index_embeddingDownloadSkip: "暂不",
   notifications_builtinEmbeddingSkipped:

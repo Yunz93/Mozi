@@ -294,6 +294,16 @@ export const SplitView: React.FC<SplitViewProps> = ({
         transitionCleanupRef.current = null;
         // 新的标题定位优先，旧视图的延迟恢复不能把正文拉回原位置。
         if (isHeadingNavigationLocked()) return;
+        // 用户在过渡期间滚动后，新的阅读位置优先于旧模式留下的校正任务。
+        if (
+          (isEditorVisibleMode(viewMode) &&
+            Math.abs(editorScrollPercentageRef.current - anchorPercentage) >
+              0.001) ||
+          (isPreviewVisibleMode(viewMode) &&
+            Math.abs(previewScrollPercentageRef.current - anchorPercentage) >
+              0.001)
+        )
+          return;
         if (isEditorVisibleMode(viewMode)) {
           editorPaneRef.current?.syncScrollTo(anchorPercentage, {
             immediate: true,

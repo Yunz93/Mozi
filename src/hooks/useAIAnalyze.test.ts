@@ -395,4 +395,66 @@ describe("useAIAnalyze confirm-before-run", () => {
     expect(ensureAIConfiguration).toHaveBeenCalledTimes(1);
     expect(analyzeMarkdownWithProvider).toHaveBeenCalledTimes(1);
   });
+
+  it("reports preparation and analysis while preventing duplicate requests", async () => {
+    const hydration = deferred<typeof defaultSettings>();
+    const analysis = deferred<{
+      seoTitle: string;
+      summary: string;
+      suggestedTags: string[];
+      optimizedMarkdown: string;
+    }>();
+    hydrateSensitiveSettingsIntoStore.mockReturnValueOnce(hydration.promise);
+    ensureAIConfiguration.mockImplementation(() => undefined);
+    analyzeMarkdownWithProvider.mockReturnValueOnce(analysis.promise);
+    const { result } = renderHook(() => useAIAnalyze());
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.handleAIAnalyze();
+      void result.current.handleAIAnalyze();
+    });
+    expect(result.current.aiEnhanceStage).toBe("preparing");
+    expect(useAppStore.getState().isAnalyzing).toBe(true);
+    await act(async () => {
+      hydration.resolve(defaultSettings);
+      await Promise.resolve();
+    });
+    expect(result.current.aiEnhanceStage).toBe("analyzing");
+    expect(analyzeMarkdownWithProvider).toHaveBeenCalledOnce();
+    await act(async () => {
+      analysis.resolve({
+        seoTitle: "Title",
+        summary: "Summary",
+        suggestedTags: [],
+        optimizedMarkdown: "enhanced body",
+      });
+      await pending;
+    });
+    expect(result.current.aiEnhanceStage).toBeNull();
+    expect(useAppStore.getState().isAnalyzing).toBe(false);
+    expect(useAppStore.getState().pendingAiResult?.newContent).toContain(
+      "enhanced body",
+    );
+    expect(
+      useAppStore.getState().fileContents[useAppStore.getState().activeTabId!],
+    ).toBe("hello world");
+  });
+
+  it("clears progress and reports an error if preparing the request fails", async () => {
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    hydrateSensitiveSettingsIntoStore.mockRejectedValueOnce(
+      new Error("prepare failed"),
+    );
+    const { result } = renderHook(() => useAIAnalyze());
+    await act(async () => {
+      await result.current.handleAIAnalyze();
+    });
+    expect(result.current.aiEnhanceStage).toBeNull();
+    expect(useAppStore.getState().isAnalyzing).toBe(false);
+    expect(useAppStore.getState().notification?.type).toBe("error");
+    expect(analyzeMarkdownWithProvider).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
 });

@@ -4,7 +4,7 @@ Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
-A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.0.1 improves long-document scrolling, switching between editing and reading, and sidebar resizing in windowed mode, with Live editing, vault retrieval, WeChat drafts, and Simple Blog publishing.
+A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.0.2 keeps the caret in place during asynchronous updates and prevents delayed operations from taking focus. AI Enhance now sits in the main toolbar with progress updates, alongside Live editing, vault retrieval, WeChat drafts, and Simple Blog publishing.
 
 > Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 Pin a release (optional):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.1 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.0.2 bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:
@@ -50,7 +50,7 @@ Follow the bundled [feature guide in Chinese](./src-tauri/resources/sample-notes
 
 ### The 2.0.0 workspace and startup screens
 
-Mozi uses the macOS or Windows system sans-serif font by default. Warm light and metallic-gray dark themes extend across the sidebar, document, toolbars, and settings. The top toolbar has icons for theme, XiaoZhi, editing, reading, publishing, and more actions, in that order. Hover for names. The vault entry remains at the bottom left, with Settings beside it on the right.
+Mozi uses the macOS or Windows system sans-serif font by default. Warm light and metallic-gray dark themes extend across the sidebar, document, toolbars, and settings. The top toolbar has icons for theme, XiaoZhi, AI Enhance, editing, reading, publishing, and more actions, in that order. Hover for names. The vault entry remains at the bottom left, with Settings beside it on the right.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/23-theme-dark.png" alt="2.0.0 metallic-gray workspace and icon-only toolbar" width="800">
@@ -104,7 +104,7 @@ Use Wiki links, heading links, display aliases, local images, and note-section e
 
 ### Vault search and local indexing
 
-Switch between keyword, semantic, and hybrid search, then open a result in its source note. Check status, rebuild the index, and exclude paths under **Settings → Indexing**. Local semantic search requires the model download and a completed index; a compatible embedding endpoint is also an option.
+Switch between keyword, semantic, and hybrid search, then open a result in its source note. Check status, rebuild the index, and exclude paths under **Settings → XiaoZhi Assistant**. Local semantic search requires the model download and a completed index; a compatible embedding endpoint is also an option.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/18-search.png" alt="Search results and source snippets" width="800">
@@ -124,7 +124,7 @@ Use Retrieve only to inspect source snippets, or generate an answer with citatio
 
 ### AI enhancement and Wiki generation
 
-Choose Gemini, OpenAI, DeepSeek, GLM, Kimi, or Xiaomi MiMo for note enhancement, Wiki generation, and vault Q&A. Open **More actions → AI Enhance** for the current note, or select text and use the context menu to generate a Wiki. Settings let you choose its save folder and generation prompts. Each provider keeps its own key and model settings, with presets or a custom model ID. Providers with compatible APIs also accept a custom endpoint. Subscription-specific keys require the matching endpoint. Keys are kept in secure local storage.
+Choose Gemini, OpenAI, DeepSeek, GLM, Kimi, or Xiaomi MiMo for note enhancement, Wiki generation, and vault Q&A. Open **AI Enhance**, next to XiaoZhi Assistant in the toolbar, to process the current note with preparation, analysis, and review progress updates, or select text and use the context menu to generate a Wiki. Settings let you choose its save folder and generation prompts. Each provider keeps its own key and model settings, with presets or a custom model ID. Providers with compatible APIs also accept a custom endpoint. Subscription-specific keys require the matching endpoint. Keys are kept in secure local storage.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/12-ai-providers.png" alt="Six AI provider options" width="800">

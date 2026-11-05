@@ -8,6 +8,7 @@ import { livePreviewContextFacet } from "./context";
 import { livePreviewImages } from "./images";
 import {
   bindLivePreviewClickToReveal,
+  bindLivePreviewClickToRevealRange,
   bindLivePreviewImageMeasure,
   bindLivePreviewWidgetCaret,
   bindLivePreviewWidgetCaretAtDom,
@@ -389,6 +390,64 @@ describe("live preview click-to-reveal races", () => {
       true,
     );
   });
+
+  it.each(["focus", "document", "late document"])(
+    "drops a deferred reveal after a newer %s interaction",
+    async (condition) => {
+      const parent = document.createElement("div");
+      document.body.appendChild(parent);
+      const view = new EditorView({
+        state: EditorState.create({ doc: "abcdefghij" }),
+        parent,
+      });
+      views.push(view);
+      const el = document.createElement("div");
+      const input = document.createElement("input");
+      parent.append(el, input);
+      vi.spyOn(view, "posAtDOM").mockReturnValue(2);
+      bindLivePreviewClickToRevealRange(view, el, 2, 5);
+      const click = () =>
+        el.dispatchEvent(
+          new MouseEvent("click", {
+            button: 0,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      // 同一实例先验证正常展开可用，再制造新操作抢在延迟回调之前完成的时序。
+      click();
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      expect(view.state.selection.main.from).toBe(2);
+      expect(view.state.selection.main.to).toBe(5);
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
+      click();
+      if (condition === "late document")
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      if (condition === "focus") {
+        input.focus();
+      } else {
+        view.setState(
+          EditorState.create({
+            doc: "a different note",
+            selection: { anchor: 12 },
+          }),
+        );
+      }
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      if (condition === "focus") expect(document.activeElement).toBe(input);
+      else {
+        expect(view.state.doc.toString()).toBe("a different note");
+        expect(view.state.selection.main.head).toBe(12);
+        expect(view.state.selection.main.empty).toBe(true);
+      }
+    },
+  );
 });
 
 describe("live preview image click selection", () => {

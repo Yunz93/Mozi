@@ -469,6 +469,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       }
 
       const sourceDoc = view.state.doc;
+      const sourceSelection = view.state.selection;
       if (
         sourceDoc.sliceString(menuState.from, menuState.to).trim() !==
         menuState.text.trim()
@@ -514,9 +515,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             to: menuState.to,
             insert: replacement,
           },
-          selection: {
-            anchor: menuState.from + replacement.length,
-          },
+          // 生成期间用户可能只移动了光标，正文未变也不能覆盖新的选区。
+          ...(view.state.selection.eq(sourceSelection)
+            ? { selection: { anchor: menuState.from + replacement.length } }
+            : {}),
         });
         closeSelectionMenu();
       } finally {
@@ -541,6 +543,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       closeImageMenu();
 
       const startedTabId = useAppStore.getState().activeTabId;
+      const sourceDoc = view.state.doc;
+      const sourceSelection = view.state.selection;
       const originalMarkdown = view.state.doc.sliceString(match.from, match.to);
 
       const currentSettings = useAppStore.getState().settings;
@@ -613,7 +617,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
             to: relocated + originalMarkdown.length,
             insert: replacement,
           },
-          selection: { anchor: relocated + replacement.length },
+          ...(view.state.doc === sourceDoc &&
+          view.state.selection.eq(sourceSelection)
+            ? { selection: { anchor: relocated + replacement.length } }
+            : {}),
         });
         showNotification(t("notifications_imageUploaded"), "success");
       } catch (err) {
