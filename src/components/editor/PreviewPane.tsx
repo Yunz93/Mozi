@@ -18,6 +18,7 @@ import React, {
   useEffect,
   useDeferredValue,
 } from "react";
+import { ChevronRight } from "lucide-react";
 import { useAppStore, selectContent } from "../../store/appStore";
 import {
   getPaneLayoutMetrics,
@@ -972,10 +973,19 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
               parsedFrontmatter &&
               settings.showReadingProperties !== false && (
                 <div className="preview-pane-properties-layout editor-pane-width-constrained mx-auto mb-4">
-                  <div className="preview-pane-properties w-full rounded-xl overflow-hidden bg-gray-50/50 dark:bg-white/5 animate-fade-in group/metadata">
-                    <div className="preview-pane-properties-header px-4 py-2 bg-gray-100/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex justify-between items-center">
+                  <details
+                    key={activeTabId}
+                    open
+                    className="preview-pane-properties w-full rounded-xl overflow-hidden bg-gray-50/50 dark:bg-white/5 animate-fade-in group/metadata"
+                  >
+                    <summary className="preview-pane-properties-header px-4 py-2 bg-gray-100/50 dark:bg-white/5 font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                      <ChevronRight
+                        className="preview-pane-properties-chevron shrink-0"
+                        size={13}
+                        aria-hidden
+                      />
                       <span>{t("preview_properties")}</span>
-                    </div>
+                    </summary>
                     <div className="preview-pane-properties-fields p-1.5 table w-full">
                       {frontmatterEntries.map(([key, value]) => (
                         <div
@@ -1021,7 +1031,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 </div>
               )}
 

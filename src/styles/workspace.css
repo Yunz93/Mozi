@@ -286,8 +286,18 @@
 .app-toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
+}
+.app-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.app-toolbar-group + .app-toolbar-group {
+  padding-left: 8px;
+  border-left: 1px solid var(--workspace-border);
 }
 .app-toolbar-icon {
   display: inline-flex;
@@ -302,6 +312,10 @@
 .app-toolbar-icon:hover {
   color: var(--workspace-text);
   background: var(--workspace-hover);
+}
+.app-toolbar-writing-mode[aria-pressed="true"] {
+  color: var(--workspace-accent);
+  background: var(--workspace-active);
 }
 .app-toolbar-assistant {
   display: inline-flex;
@@ -404,11 +418,13 @@
   right: 0;
   top: calc(100% + 8px);
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   width: max-content;
+  min-width: 180px;
   max-width: calc(100vw - 32px);
-  padding: 5px;
+  padding: 6px;
   border: 1px solid var(--workspace-border);
   border-radius: 8px;
   background: var(--workspace-menu);
@@ -417,25 +433,33 @@
 .app-toolbar-menu button {
   display: flex;
   align-items: center;
-  align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 10px;
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  padding: 0;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
   border-radius: 5px;
   font-size: 0.875em;
   text-align: left;
   white-space: nowrap;
 }
+.app-toolbar-menu button svg {
+  flex-shrink: 0;
+}
+.app-toolbar-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--workspace-border);
+}
 .app-toolbar-menu button:hover {
   background: var(--workspace-hover);
 }
-
 .app-toolbar-menu button[aria-checked="true"] {
   color: var(--workspace-accent);
   background: var(--workspace-active);
 }
+
 .app-toolbar button:disabled,
 .workspace-view-modes button:disabled {
   opacity: 0.4;
@@ -504,7 +528,10 @@
     display: none;
   }
   .app-toolbar-actions {
-    gap: 8px;
+    gap: 6px;
+  }
+  .app-toolbar-group + .app-toolbar-group {
+    padding-left: 6px;
   }
   .app-toolbar {
     padding-inline: 14px;
@@ -518,6 +545,12 @@
 @media (max-width: 520px) {
   .app-toolbar-actions {
     gap: 3px;
+  }
+  .app-toolbar-group {
+    gap: 2px;
+  }
+  .app-toolbar-group + .app-toolbar-group {
+    padding-left: 4px;
   }
   .app-toolbar button {
     line-height: 1.4;

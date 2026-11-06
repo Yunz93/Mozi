@@ -54,10 +54,11 @@ describe("Toolbar", () => {
       .map((button) => button.getAttribute("aria-label"));
     expect(names.slice(1)).toEqual([
       "切换到深色模式",
-      "小知助手",
-      "AI 增强",
+      "专注模式",
       "实时预览",
       "阅读",
+      "小知助手",
+      "AI 增强",
       "发布",
       "更多操作",
     ]);
@@ -89,7 +90,7 @@ describe("Toolbar", () => {
       await user.click(screen.getByRole("button", { name: "更多操作" }));
       expect(screen.queryByRole("menuitem", { name: "AI 增强" })).toBeNull();
       const item = screen.getByRole("menuitem", { name });
-      expect(item.textContent).toBe("");
+      expect(item.textContent).toBe(name);
       expect(item.getAttribute("title")).toBe(name);
       await user.click(item);
       expect(callback).toHaveBeenCalledOnce();
@@ -126,23 +127,23 @@ describe("Toolbar", () => {
   });
 
   it("supports menu keyboard navigation, Escape and outside dismissal", async () => {
-    const { user } = setup();
+    const { user } = setup({ viewMode: ViewMode.LIVE });
     const trigger = screen.getByRole("button", { name: "更多操作" });
     await user.click(trigger);
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "导出 PDF" }),
+      screen.getByRole("menuitemcheckbox", { name: "打字机模式" }),
     );
-    await user.keyboard("{ArrowRight}");
-    expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "导出 HTML" }),
-    );
-    await user.keyboard("{ArrowLeft}");
+    await user.keyboard("{ArrowDown}");
     expect(document.activeElement).toBe(
       screen.getByRole("menuitem", { name: "导出 PDF" }),
     );
-    await user.keyboard("{End}{ArrowRight}");
+    await user.keyboard("{ArrowUp}");
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "导出 PDF" }),
+      screen.getByRole("menuitemcheckbox", { name: "打字机模式" }),
+    );
+    await user.keyboard("{End}{ArrowDown}");
+    expect(document.activeElement).toBe(
+      screen.getByRole("menuitemcheckbox", { name: "打字机模式" }),
     );
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
@@ -162,30 +163,64 @@ describe("Toolbar", () => {
     ).toBe(true);
     await user.click(screen.getByRole("button", { name: "更多操作" }));
     expect(
-      screen
-        .getAllByRole("menuitem")
-        .every((item) => (item as HTMLButtonElement).disabled),
+      (
+        screen.getByRole("button", {
+          name: "切换到深色模式",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+    expect(
+      (
+        screen.getByRole("menuitemcheckbox", {
+          name: "打字机模式",
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
+    for (const name of ["导出 PDF", "导出 HTML", "长图分享"]) {
+      expect(
+        (screen.getByRole("menuitem", { name }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+    }
   });
 
   it("blocks document operations for preview-only attachments", async () => {
     const { user } = setup({ isPreviewOnlyFile: true });
-    for (const name of ["小知助手", "AI 增强", "实时预览", "发布"]) {
+    for (const name of [
+      "小知助手",
+      "AI 增强",
+      "实时预览",
+      "专注模式",
+      "发布",
+    ]) {
       expect(
         (screen.getByRole("button", { name }) as HTMLButtonElement).disabled,
       ).toBe(true);
     }
     await user.click(screen.getByRole("button", { name: "更多操作" }));
     expect(
-      screen
-        .getAllByRole("menuitem")
-        .every((item) => (item as HTMLButtonElement).disabled),
+      (
+        screen.getByRole("button", {
+          name: "切换到深色模式",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+    expect(
+      (
+        screen.getByRole("menuitemcheckbox", {
+          name: "打字机模式",
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
+    for (const name of ["导出 PDF", "导出 HTML", "长图分享"]) {
+      expect(
+        (screen.getByRole("menuitem", { name }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+    }
   });
 
   it("prevents duplicate exports and skips disabled actions during keyboard navigation", async () => {
     exportState.inFlight = true;
-    const { user } = setup({ isAnalyzing: true });
+    const { user } = setup({ isAnalyzing: true, viewMode: ViewMode.LIVE });
     await user.click(screen.getByRole("button", { name: "更多操作" }));
     expect(
       (screen.getByRole("button", { name: "AI 增强中" }) as HTMLButtonElement)
@@ -197,8 +232,13 @@ describe("Toolbar", () => {
       ).toBe(true);
     }
     const share = screen.getByRole("menuitem", { name: "长图分享" });
+    const typewriter = screen.getByRole("menuitemcheckbox", {
+      name: "打字机模式",
+    });
+    expect(document.activeElement).toBe(typewriter);
+    await user.keyboard("{ArrowDown}");
     expect(document.activeElement).toBe(share);
-    await user.keyboard("{ArrowDown}{Home}");
-    expect(document.activeElement).toBe(share);
+    await user.keyboard("{Home}");
+    expect(document.activeElement).toBe(typewriter);
   });
 });

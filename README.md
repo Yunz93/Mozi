@@ -4,7 +4,7 @@
 
 [English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
 
-本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.1.0 完善 Live 表格编辑、代码块控件和图片属性，新增专注、打字机与可选智能标点，保留知识检索、微信公众号草稿和 Simple Blog 发布。
+本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.1.1 支持折叠阅读属性并整理顶部工具栏，保留 Live 编辑、专注与打字机模式、知识检索、微信公众号草稿和 Simple Blog 发布。
 
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.1.0 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.1.1 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：

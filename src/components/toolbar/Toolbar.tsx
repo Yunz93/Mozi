@@ -97,8 +97,12 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
       getExportInFlight,
     );
     const documentDisabled = isPreviewOnlyFile || !fileName;
+    const writingDisabled = documentDisabled || viewMode !== ViewMode.LIVE;
     const exportDisabled = documentDisabled || isExporting;
     const displayFileName = fileName.replace(/\.md$/i, "");
+    const themeActionLabel = t(
+      themeMode === "dark" ? "toolbar_switchToLight" : "toolbar_switchToDark",
+    );
 
     useEffect(() => {
       if (!isMenuOpen) return;
@@ -222,16 +226,8 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
             type="button"
             onClick={onToggleTheme}
             className="app-toolbar-icon"
-            title={t(
-              themeMode === "dark"
-                ? "toolbar_switchToLight"
-                : "toolbar_switchToDark",
-            )}
-            aria-label={t(
-              themeMode === "dark"
-                ? "toolbar_switchToLight"
-                : "toolbar_switchToDark",
-            )}
+            title={themeActionLabel}
+            aria-label={themeActionLabel}
           >
             {themeMode === "dark" ? (
               <Sun size={14} aria-hidden />
@@ -239,169 +235,197 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
               <Moon size={14} aria-hidden />
             )}
           </button>
-          {onAskVault && (
+          <div
+            className="app-toolbar-group app-toolbar-writing"
+            role="group"
+            aria-label={t("settings_editorBehavior")}
+          >
             <button
               type="button"
-              onClick={onAskVault}
-              disabled={isPreviewOnlyFile}
-              aria-label={t("askVault_title")}
-              aria-pressed={isAskVaultOpen}
-              title={t("askVault_title")}
-              className={`app-toolbar-assistant ${isAskVaultOpen ? "is-active" : ""}`}
+              className="app-toolbar-icon app-toolbar-writing-mode"
+              title={`${t("settings_focusMode")} · F8`}
+              aria-label={t("settings_focusMode")}
+              aria-pressed={focusMode === true}
+              disabled={writingDisabled}
+              onClick={() => toggleWritingMode("focusMode")}
             >
-              <Lightbulb size={14} aria-hidden />
+              <Focus size={14} aria-hidden />
             </button>
-          )}
-          <div className="app-toolbar-ai">
-            <button
-              type="button"
-              className="app-toolbar-icon"
-              title={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
-              aria-label={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
-              aria-busy={isAnalyzing}
-              aria-describedby={
-                isAnalyzing && aiEnhanceStage
-                  ? "ai-enhance-progress"
-                  : undefined
-              }
-              disabled={documentDisabled || isAnalyzing}
-              onClick={onAIAnalyze}
-            >
-              {isAnalyzing ? (
-                <LoaderCircle size={14} className="animate-spin" aria-hidden />
-              ) : (
-                <Sparkles size={14} aria-hidden />
-              )}
-            </button>
-            {isAnalyzing && aiEnhanceStage && (
-              <div
-                id="ai-enhance-progress"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-                className="app-toolbar-ai-progress"
-              >
-                <strong>{t("ai_buttonLoading")}</strong>
-                <span>
-                  {t(
-                    aiEnhanceStage === "preparing"
-                      ? "ai_progressPreparing"
-                      : aiEnhanceStage === "analyzing"
-                        ? "ai_progressAnalyzing"
-                        : "ai_progressReviewing",
-                  )}
-                </span>
-                <small>{t("ai_progressHint")}</small>
-              </div>
-            )}
+            <ViewModeToggle
+              viewMode={viewMode}
+              onViewModeChange={onViewModeChange}
+              previewOnly={isPreviewOnlyFile}
+            />
           </div>
-          <ViewModeToggle
-            viewMode={viewMode}
-            onViewModeChange={onViewModeChange}
-            previewOnly={isPreviewOnlyFile}
-          />
-          {onPublish && (
-            <button
-              type="button"
-              onClick={onPublish}
-              disabled={isPublishing || documentDisabled}
-              className="app-toolbar-publish"
-              title={t(isPublishing ? "toolbar_publishing" : "toolbar_publish")}
-              aria-label={t(
-                isPublishing ? "toolbar_publishing" : "toolbar_publish",
-              )}
-            >
-              {isPublishing ? (
-                <LoaderCircle size={14} className="animate-spin" aria-hidden />
-              ) : (
-                <Upload size={14} aria-hidden />
-              )}
-            </button>
-          )}
-          <div className="app-toolbar-menu-anchor" ref={menuRef}>
-            <button
-              ref={menuTriggerRef}
-              type="button"
-              onClick={() => setIsMenuOpen((open) => !open)}
-              className="app-toolbar-icon"
-              title={t("toolbar_more")}
-              aria-label={t("toolbar_more")}
-              aria-expanded={isMenuOpen}
-              aria-haspopup="menu"
-            >
-              <MoreHorizontal size={14} aria-hidden />
-            </button>
-            {isMenuOpen && (
-              <div
-                role="menu"
-                aria-orientation="horizontal"
-                aria-label={t("toolbar_more")}
-                className="app-toolbar-menu"
+          <div className="app-toolbar-group app-toolbar-ai-actions">
+            {onAskVault && (
+              <button
+                type="button"
+                onClick={onAskVault}
+                disabled={isPreviewOnlyFile}
+                aria-label={t("askVault_title")}
+                aria-pressed={isAskVaultOpen}
+                title={t("askVault_title")}
+                className={`app-toolbar-assistant ${isAskVaultOpen ? "is-active" : ""}`}
               >
-                <button
-                  type="button"
-                  role="menuitemcheckbox"
-                  aria-checked={focusMode === true}
-                  title={t("settings_focusMode")}
-                  aria-label={t("settings_focusMode")}
-                  disabled={documentDisabled || viewMode !== ViewMode.LIVE}
-                  onClick={() =>
-                    runMenuAction(() => toggleWritingMode("focusMode"))
-                  }
-                >
-                  <Focus size={14} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  role="menuitemcheckbox"
-                  aria-checked={typewriterMode === true}
-                  title={t("settings_typewriterMode")}
-                  aria-label={t("settings_typewriterMode")}
-                  disabled={documentDisabled || viewMode !== ViewMode.LIVE}
-                  onClick={() =>
-                    runMenuAction(() => toggleWritingMode("typewriterMode"))
-                  }
-                >
-                  <TextCursor size={14} aria-hidden />
-                </button>
-                {onExportPdf && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    title={t("toolbar_exportPdf")}
-                    aria-label={t("toolbar_exportPdf")}
-                    disabled={exportDisabled}
-                    onClick={() => runMenuAction(onExportPdf)}
-                  >
-                    <Download size={14} aria-hidden />
-                  </button>
-                )}
-                {onExportHtml && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    title={t("toolbar_exportHtml")}
-                    aria-label={t("toolbar_exportHtml")}
-                    disabled={exportDisabled}
-                    onClick={() => runMenuAction(onExportHtml)}
-                  >
-                    <FileText size={14} aria-hidden />
-                  </button>
-                )}
-                {onShareLongImage && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    title={t("toolbar_shareLongImage")}
-                    aria-label={t("toolbar_shareLongImage")}
-                    disabled={documentDisabled}
-                    onClick={() => runMenuAction(onShareLongImage)}
-                  >
-                    <Image size={14} aria-hidden />
-                  </button>
-                )}
-              </div>
+                <Lightbulb size={14} aria-hidden />
+              </button>
             )}
+            <div className="app-toolbar-ai">
+              <button
+                type="button"
+                className="app-toolbar-icon"
+                title={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
+                aria-label={t(isAnalyzing ? "ai_buttonLoading" : "ai_button")}
+                aria-busy={isAnalyzing}
+                aria-describedby={
+                  isAnalyzing && aiEnhanceStage
+                    ? "ai-enhance-progress"
+                    : undefined
+                }
+                disabled={documentDisabled || isAnalyzing}
+                onClick={onAIAnalyze}
+              >
+                {isAnalyzing ? (
+                  <LoaderCircle
+                    size={14}
+                    className="animate-spin"
+                    aria-hidden
+                  />
+                ) : (
+                  <Sparkles size={14} aria-hidden />
+                )}
+              </button>
+              {isAnalyzing && aiEnhanceStage && (
+                <div
+                  id="ai-enhance-progress"
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className="app-toolbar-ai-progress"
+                >
+                  <strong>{t("ai_buttonLoading")}</strong>
+                  <span>
+                    {t(
+                      aiEnhanceStage === "preparing"
+                        ? "ai_progressPreparing"
+                        : aiEnhanceStage === "analyzing"
+                          ? "ai_progressAnalyzing"
+                          : "ai_progressReviewing",
+                    )}
+                  </span>
+                  <small>{t("ai_progressHint")}</small>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="app-toolbar-group app-toolbar-document-actions">
+            {onPublish && (
+              <button
+                type="button"
+                onClick={onPublish}
+                disabled={isPublishing || documentDisabled}
+                className="app-toolbar-publish"
+                title={t(
+                  isPublishing ? "toolbar_publishing" : "toolbar_publish",
+                )}
+                aria-label={t(
+                  isPublishing ? "toolbar_publishing" : "toolbar_publish",
+                )}
+              >
+                {isPublishing ? (
+                  <LoaderCircle
+                    size={14}
+                    className="animate-spin"
+                    aria-hidden
+                  />
+                ) : (
+                  <Upload size={14} aria-hidden />
+                )}
+              </button>
+            )}
+            <div className="app-toolbar-menu-anchor" ref={menuRef}>
+              <button
+                ref={menuTriggerRef}
+                type="button"
+                onClick={() => setIsMenuOpen((open) => !open)}
+                className="app-toolbar-icon"
+                title={t("toolbar_more")}
+                aria-label={t("toolbar_more")}
+                aria-expanded={isMenuOpen}
+                aria-haspopup="menu"
+              >
+                <MoreHorizontal size={14} aria-hidden />
+              </button>
+              {isMenuOpen && (
+                <div
+                  role="menu"
+                  aria-orientation="vertical"
+                  aria-label={t("toolbar_more")}
+                  className="app-toolbar-menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    title={`${t("settings_typewriterMode")} · F9`}
+                    aria-label={t("settings_typewriterMode")}
+                    aria-checked={typewriterMode === true}
+                    disabled={writingDisabled}
+                    onClick={() =>
+                      runMenuAction(() => toggleWritingMode("typewriterMode"))
+                    }
+                  >
+                    <TextCursor size={14} aria-hidden />
+                    <span>{t("settings_typewriterMode")}</span>
+                  </button>
+                  {(onExportPdf || onExportHtml || onShareLongImage) && (
+                    <div
+                      className="app-toolbar-menu-separator"
+                      role="separator"
+                    />
+                  )}
+                  {onExportPdf && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      title={t("toolbar_exportPdf")}
+                      aria-label={t("toolbar_exportPdf")}
+                      disabled={exportDisabled}
+                      onClick={() => runMenuAction(onExportPdf)}
+                    >
+                      <Download size={14} aria-hidden />
+                      <span>{t("toolbar_exportPdf")}</span>
+                    </button>
+                  )}
+                  {onExportHtml && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      title={t("toolbar_exportHtml")}
+                      aria-label={t("toolbar_exportHtml")}
+                      disabled={exportDisabled}
+                      onClick={() => runMenuAction(onExportHtml)}
+                    >
+                      <FileText size={14} aria-hidden />
+                      <span>{t("toolbar_exportHtml")}</span>
+                    </button>
+                  )}
+                  {onShareLongImage && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      title={t("toolbar_shareLongImage")}
+                      aria-label={t("toolbar_shareLongImage")}
+                      disabled={documentDisabled}
+                      onClick={() => runMenuAction(onShareLongImage)}
+                    >
+                      <Image size={14} aria-hidden />
+                      <span>{t("toolbar_shareLongImage")}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

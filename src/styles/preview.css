@@ -25,6 +25,33 @@
   font-size: 0.85em;
   padding: 0.3rem 0.5rem;
   letter-spacing: 0.14em;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.preview-pane-properties-header::-webkit-details-marker {
+  display: none;
+}
+
+.preview-pane-properties-header:hover,
+.preview-pane-properties-header:active {
+  background: var(--workspace-hover);
+}
+
+.preview-pane-properties-header:focus-visible {
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: -2px;
+}
+
+.preview-pane-properties-header:active > span {
+  transform: translateY(1px);
+}
+
+.preview-pane-properties[open]
+  > .preview-pane-properties-header
+  .preview-pane-properties-chevron {
+  transform: rotate(90deg);
 }
 
 .preview-pane-properties .table-cell {
