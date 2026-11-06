@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSCalendarsUsageDescription</key>
+  <string>墨知需要日历权限，将你选择同步的笔记待办添加到系统日历，并在改期或完成后更新对应事件。</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>墨知需要完整日历权限以选择目标日历，并维护由墨知同步的待办事件。只在你开启日历同步时使用。</string>
+</dict>
+</plist>

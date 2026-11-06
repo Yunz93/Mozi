@@ -22,6 +22,7 @@ import "./src/styles/preview.css";
 import "./src/styles/components.css";
 import "./src/styles/workspace.css";
 import "./src/styles/workspace-settings.css";
+import "./src/styles/tasks.css";
 
 // Ensure process.env exists for some libraries
 if (typeof window !== "undefined" && !window.process) {

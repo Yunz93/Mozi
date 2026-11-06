@@ -48,11 +48,17 @@ export async function completeAppClose(
 ): Promise<void> {
   try {
     if (source === "exit") {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("task_calendar_flush").catch((error: unknown) => {
+        console.warn("退出前日程缓存写入失败：", error);
+      });
       const { exit } = await import("@tauri-apps/plugin-process");
       await exit(0);
       return;
     }
 
+    const { invoke } = await import("@tauri-apps/api/core");
+    if (await invoke<boolean>("task_calendar_keep_background")) return;
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().destroy();
     return;
