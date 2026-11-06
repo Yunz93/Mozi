@@ -25,6 +25,10 @@ export interface TaskCalendarPreferences {
   calendarId: string;
 }
 
+export type TaskCalendarPreferencesPatch = Partial<
+  Omit<TaskCalendarPreferences, "language">
+>;
+
 export interface TaskCalendarVault {
   path: string;
   name: string;

@@ -18,7 +18,10 @@ import {
   getPathDirname,
 } from "../utils/pathHelpers";
 import { openKnowledgeBaseWorkspace } from "../services/filesystem/knowledgeBaseService";
-import { flushActiveDocumentIfDirty } from "../services/filesystem/flushActiveDocument";
+import {
+  flushActiveDocumentIfDirty,
+  flushAllDirtyOpenTabs,
+} from "../services/filesystem/flushActiveDocument";
 import { initializeSampleNotesIfSupported } from "../services/filesystem/sampleNotesService";
 import {
   moveItemToTrash,
@@ -44,6 +47,7 @@ import {
 import { findFileInTree, preserveOpenTabNodes } from "../utils/fileTree";
 
 const TRASH_ROOT_MARKER = "__root__";
+let knowledgeBaseOpenGeneration = 0;
 
 /** 目标等于自身，或仅大小写不同时不视为同名冲突。 */
 export function isSamePathAllowingCaseChange(
@@ -469,9 +473,16 @@ export function useFileSystem() {
         restoreLastOpenedFile?: boolean;
       },
     ): Promise<string | null> => {
+      const generation = ++knowledgeBaseOpenGeneration;
+      const originalRoot = useAppStore.getState().rootFolderPath;
+      const ownsRequest = () =>
+        generation === knowledgeBaseOpenGeneration &&
+        useAppStore.getState().rootFolderPath === originalRoot;
       try {
         const fs = await getFileSystem();
         const result = await openKnowledgeBaseWorkspace({
+          beforeCommit: async () =>
+            ownsRequest() && (await flushAllDirtyOpenTabs()) && ownsRequest(),
           addTab,
           clearAllCache,
           findPreferredFile: findFileInTree,

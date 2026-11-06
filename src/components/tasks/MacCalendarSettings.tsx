@@ -5,6 +5,7 @@ import { getMacCalendarAccess } from "../../services/taskCalendarService";
 import type {
   MacCalendarAccess,
   TaskCalendarPreferences,
+  TaskCalendarPreferencesPatch,
 } from "../../types/taskCalendar";
 import { AppSelect } from "../ui/AppSelect";
 
@@ -19,7 +20,7 @@ export function MacCalendarSettings({
   busy: boolean;
   syncError: string | null;
   syncedAt: number | null;
-  onChange: (preferences: TaskCalendarPreferences) => void;
+  onChange: (preferences: TaskCalendarPreferencesPatch) => void;
 }) {
   const { t } = useI18n();
   const [access, setAccess] = useState<MacCalendarAccess | null>(null);
@@ -93,8 +94,7 @@ export function MacCalendarSettings({
             if (event.target.checked) void enable();
             else {
               setChoosing(false);
-              if (preferences.macCalendar)
-                onChange({ ...preferences, macCalendar: false });
+              if (preferences.macCalendar) onChange({ macCalendar: false });
             }
           }}
         />
@@ -106,9 +106,7 @@ export function MacCalendarSettings({
             <AppSelect
               value={calendarId}
               onChange={(calendarId) =>
-                choosing
-                  ? setSelectedId(calendarId)
-                  : onChange({ ...preferences, calendarId })
+                choosing ? setSelectedId(calendarId) : onChange({ calendarId })
               }
               disabled={busy || pending || !access?.calendars.length}
               className="task-calendar-target-select"
@@ -139,7 +137,7 @@ export function MacCalendarSettings({
               disabled={busy || pending || !calendarId || !!missing}
               onClick={() => {
                 setChoosing(false);
-                onChange({ ...preferences, macCalendar: true, calendarId });
+                onChange({ macCalendar: true, calendarId });
               }}
             >
               {t("tasks_calendarStart")}

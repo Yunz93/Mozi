@@ -4,7 +4,7 @@ Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
-A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.1.1 adds collapsible properties in reading mode and reorganizes the toolbar, alongside Live editing, focus and typewriter modes, vault retrieval, WeChat drafts, and Simple Blog publishing.
+A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.2.0 adds a task calendar, due reminders, and optional macOS Calendar sync, with improvements to focus mode, typewriter mode, and Live link previews.
 
 > Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 Pin a release (optional):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.1.1 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.2.0 bash
 ```
 
 Signed and notarized GitHub Releases should also open normally after you drag **墨知.app** into Applications. If Gatekeeper still blocks the app, run:
@@ -50,7 +50,7 @@ Follow the bundled [feature guide in Chinese](./src-tauri/resources/sample-notes
 
 ### The 2.0.0 workspace and startup screens
 
-Mozi uses the macOS or Windows system sans-serif font by default. Warm light and metallic-gray dark themes extend across the sidebar, document, toolbars, and settings. The top toolbar has icons for theme, XiaoZhi, AI Enhance, editing, reading, publishing, and more actions, in that order. Hover for names. The vault entry remains at the bottom left, with Settings beside it on the right.
+Mozi uses the macOS or Windows system sans-serif font by default. Warm light and metallic-gray dark themes extend across the sidebar, document, toolbars, and settings. The toolbar uses bordered groups ordered by theme, focus and typewriter modes, editing and reading, XiaoZhi and AI Enhance, then publishing and more actions. Hover for names. The vault entry remains at the bottom left, with Settings beside it on the right.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/23-theme-dark.png" alt="2.0.0 metallic-gray workspace and icon-only toolbar" width="800">
@@ -74,7 +74,9 @@ A vault is a folder of ordinary `.md` files. Manage notes, folders, and attachme
 
 Live mode renders Markdown as you write; Reading mode is for reviewing the finished article. Tables, task lists, callouts, footnotes, code highlighting, KaTeX math, and Mermaid diagrams are supported. Use Show plain text in the editor to inspect the Markdown source.
 
-Table input updates the document immediately, with formatting shortcuts, multi-cell copy and paste, row and column moves, and alignment. Code blocks offer language selection and copying; right-click an image to edit its source, description, and dimensions. Enable focus mode, typewriter mode, or smart punctuation in **Settings → Editor**; all are off by default. F8 and F9 toggle focus mode and typewriter mode respectively.
+Table input updates the document immediately, with formatting shortcuts, multi-cell copy and paste, row and column moves, and alignment. Code blocks offer language selection and copying; right-click an image to edit its source, description, and dimensions. Links display their labels until the caret enters and reveals the complete Markdown source; an empty label falls back to the URL.
+
+The toolbar uses bordered groups, with focus and typewriter controls after the theme button. Focus mode makes the editor fullscreen and hides the rest of the workspace; press Esc or F8 to exit. Typewriter mode keeps the active line in the upper middle of the editor; press F9 to toggle it. Both modes can run together and are also available in **Settings → Editor**, off by default.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/20-markdown-reading.png" alt="Code and math in Reading mode" width="800">
@@ -83,6 +85,22 @@ Table input updates the document immediately, with formatting shortcuts, multi-c
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/22-mermaid.png" alt="Mermaid flowchart and sequence diagram" width="800">
 </p>
+
+### Tasks and calendar
+
+Open **Tasks & calendar** below the sidebar search box to see saved Markdown tasks in a calendar or list, search and filter them, or return to their source notes.
+
+Add a date after a task and save the note to update its schedule:
+
+```markdown
+- [ ] Submit proposal @2026-11-10 15:00
+- [ ] Organize materials @2026-11-12
+- [ ] An unscheduled task
+```
+
+Timed tasks remind you when due; date-only tasks appear as all-day entries and default to a 09:00 reminder. Completing or rescheduling a task updates its reminder after saving. Enable system notifications and optional reminders after closing the window in **Tasks & calendar → Reminders**; quitting Mozi stops reminders.
+
+On macOS, you can also enable **Sync to macOS Calendar**, grant calendar access, and select a writable calendar. Saved, incomplete tasks with valid dates sync one way to events created by Mozi. Rescheduling updates those events; completing or removing tasks removes them. Calendar edits do not update notes, and turning sync off keeps existing events. Synced events have no additional alerts.
 
 ### Slash inserts and command palette
 

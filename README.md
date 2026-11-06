@@ -4,7 +4,7 @@
 
 [English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
 
-本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.1.1 支持折叠阅读属性并整理顶部工具栏，保留 Live 编辑、专注与打字机模式、知识检索、微信公众号草稿和 Simple Blog 发布。
+本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.2.0 新增待办日历、到期提醒和可选的 macOS 系统日历同步，改进专注、打字机模式与 Live 链接预览。
 
 > 目标：比 Typora 更顺手、比 Obsidian 更轻量的纯 Markdown 写作体验。
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.1.1 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.2.0 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
@@ -50,7 +50,7 @@ xattr -cr /Applications/墨知.app
 
 ### 2.0.0 工作区与启动页
 
-默认使用 macOS 或 Windows 的系统无衬线字体。浅色采用暖白表面，深色采用金属灰，侧栏、正文、上下栏和设置保持一致。顶部按主题、小知助手、AI 增强、编辑、阅读、发布、更多排列，只显示图标，悬停可查看名称；知识库名称入口仍在左下，设置在右侧。
+默认使用 macOS 或 Windows 的系统无衬线字体。浅色采用暖白表面，深色采用金属灰，侧栏、正文、上下栏和设置保持一致。顶部按主题、专注与打字机、编辑与阅读、小知助手与 AI 增强、发布与更多排列，使用分组框，悬停可查看名称；知识库名称入口仍在左下，设置在右侧。
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/23-theme-dark.png" alt="2.0.0 金属灰工作区与纯图标工具栏" width="800">

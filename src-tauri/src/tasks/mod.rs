@@ -7,7 +7,7 @@ mod tray;
 
 use index::Operation;
 pub use index::TaskManager;
-use model::{Preferences, Snapshot, Vault};
+use model::{PreferencesPatch, Snapshot, Vault};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_plugin_notification::NotificationExt;
@@ -95,22 +95,11 @@ pub async fn task_calendar_refresh(app: AppHandle, path: Option<String>) -> Resu
 #[tauri::command]
 pub async fn task_calendar_set_preferences(
     app: AppHandle,
-    mut preferences: Preferences,
+    preferences: PreferencesPatch,
 ) -> Result<(), String> {
-    if preferences.language != "en" {
-        preferences.language = "zh-CN".into();
-    }
-    if preferences.background {
-        tray::ensure(&app, &preferences.language)?;
-    }
-    let previous = app.state::<TaskManager>().snapshot()?.preferences;
-    if preferences.mac_calendar
-        && (!previous.mac_calendar || previous.calendar_id != preferences.calendar_id)
-    {
-        let calendar_id = preferences.calendar_id.clone();
-        tauri::async_runtime::spawn_blocking(move || calendar::validate(&calendar_id))
-            .await
-            .map_err(|e| e.to_string())??;
+    if preferences.background == Some(true) {
+        let language = app.state::<TaskManager>().snapshot()?.preferences.language;
+        tray::ensure(&app, &language)?;
     }
     request(app, Operation::Preferences(preferences)).await
 }
@@ -173,10 +162,51 @@ pub async fn task_calendar_keep_background(
         log::warn!("退出前日程缓存写入失败，笔记仍由文档保存保护处理：{error}");
     }
     let preferences = app.state::<TaskManager>().snapshot()?.preferences;
-    if !preferences.background || app.webview_windows().len() != 1 {
+    if !preferences.background {
         return Ok(false);
     }
+    let manager = app.state::<TaskManager>();
+    let mut closing = manager.closing_windows.lock().map_err(|e| e.to_string())?;
+    let windows = app.webview_windows().keys().cloned().collect();
     tray::ensure(&app, &preferences.language)?;
-    window.hide().map_err(|e| e.to_string())?;
+    let keep = reserve_background_window(&mut closing, &windows, window.label());
+    let result = if keep {
+        window.hide()
+    } else {
+        window.destroy()
+    };
+    if let Err(error) = result {
+        closing.remove(window.label());
+        return Err(error.to_string());
+    }
     Ok(true)
+}
+
+fn reserve_background_window(
+    closing: &mut std::collections::BTreeSet<String>,
+    windows: &std::collections::BTreeSet<String>,
+    current: &str,
+) -> bool {
+    // 决策与原生操作共用进程锁；尚未销毁的其他关窗请求也按即将关闭计数。
+    closing.retain(|label| windows.contains(label));
+    closing.insert(current.into());
+    let keep = windows.iter().all(|label| closing.contains(label));
+    if keep {
+        closing.remove(current);
+    }
+    keep
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeSet;
+    #[test]
+    fn simultaneous_window_closes_retain_one_background_window() {
+        let windows = BTreeSet::from(["main".into(), "win-1".into()]);
+        let mut closing = BTreeSet::new();
+        assert!(!reserve_background_window(&mut closing, &windows, "main"));
+        assert!(reserve_background_window(&mut closing, &windows, "win-1"));
+        assert!(!closing.contains("win-1"));
+    }
 }

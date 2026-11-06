@@ -5,6 +5,7 @@ import { isMacOSPlatform } from "../../utils/platform";
 import { MacCalendarSettings } from "./MacCalendarSettings";
 import type {
   TaskCalendarPreferences,
+  TaskCalendarPreferencesPatch,
   TaskCalendarVault,
 } from "../../types/taskCalendar";
 
@@ -25,7 +26,7 @@ export function TaskReminderSettings({
   busy: boolean;
   error: string | null;
   onClose: () => void;
-  onChange: (preferences: TaskCalendarPreferences) => void;
+  onChange: (preferences: TaskCalendarPreferencesPatch) => void;
   onTest: () => void;
   onRemove: (path: string) => void;
   calendarError: string | null;
@@ -51,7 +52,7 @@ export function TaskReminderSettings({
             checked={preferences.notifications}
             disabled={busy}
             onChange={(event) =>
-              onChange({ ...preferences, notifications: event.target.checked })
+              onChange({ notifications: event.target.checked })
             }
           />
         </label>
@@ -65,9 +66,7 @@ export function TaskReminderSettings({
             className="task-toggle"
             checked={preferences.background}
             disabled={busy}
-            onChange={(event) =>
-              onChange({ ...preferences, background: event.target.checked })
-            }
+            onChange={(event) => onChange({ background: event.target.checked })}
           />
         </label>
         <div className="task-setting-row">

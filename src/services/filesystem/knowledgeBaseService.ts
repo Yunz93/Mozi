@@ -19,6 +19,7 @@ interface OpenKnowledgeBaseOptions {
 }
 
 interface OpenKnowledgeBaseParams {
+  beforeCommit: () => Promise<boolean>;
   addTab: (tabId: string, content?: string) => void;
   clearAllCache: () => void;
   findPreferredFile: (
@@ -76,6 +77,7 @@ export async function openKnowledgeBaseWorkspace(
 ): Promise<OpenKnowledgeBaseResult | null> {
   const {
     addTab,
+    beforeCommit,
     clearAllCache,
     findPreferredFile,
     fs,
@@ -142,6 +144,8 @@ export async function openKnowledgeBaseWorkspace(
     "Failed to read knowledge base",
   );
 
+  // 读取目录期间用户仍可编辑；替换缓冲前再保存，并拒绝已过期的切换请求。
+  if (!(await beforeCommit())) return null;
   clearAllCache();
   setCurrentFilePath(null);
   setFiles(fileNodes);

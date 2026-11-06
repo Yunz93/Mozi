@@ -77,6 +77,35 @@ export function sortCalendarTasks(tasks: CalendarTask[]): CalendarTask[] {
       a.line - b.line,
   );
 }
+/** 跨库打开任务前先保存旧工作区，再载入来源知识库的完整上下文。 */
+export async function prepareTaskSourceVault(
+  currentRoot: string | null,
+  targetRoot: string,
+  flushTabs: () => Promise<boolean>,
+  openVault: (
+    path: string,
+    options: {
+      silentSuccess: true;
+      skipSampleNotes: true;
+      restoreLastOpenedFile: false;
+    },
+  ) => Promise<string | null>,
+): Promise<boolean> {
+  if (
+    currentRoot &&
+    taskVaultPathKey(currentRoot) === taskVaultPathKey(targetRoot)
+  )
+    return true;
+  if (!(await flushTabs())) return false;
+  return Boolean(
+    await openVault(targetRoot, {
+      silentSuccess: true,
+      skipSampleNotes: true,
+      restoreLastOpenedFile: false,
+    }),
+  );
+}
+
 /** 先匹配当前缓冲区中的完整任务行，避免磁盘偏移覆盖未保存编辑。 */
 export function findTaskRange(
   content: string,
@@ -86,7 +115,8 @@ export function findTaskRange(
   const matches: Array<{ start: number; end: number }> = [];
   for (const line of content.split("\n")) {
     const clean = line.replace(/\r$/, "");
-    if (clean === task.rawLine)
+    const comparable = offset === 0 ? clean.replace(/^\uFEFF/, "") : clean;
+    if (comparable === task.rawLine)
       matches.push({ start: offset, end: offset + clean.length });
     offset += line.length + 1;
   }

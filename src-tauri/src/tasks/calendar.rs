@@ -176,8 +176,18 @@ fn protected_records(
             enrolled.is_some_and(|vault| vault.unavailable)
                 || tasks.iter().any(|task| &task.id == *key && !task.available)
                 || (enrolled.is_some()
-                    && match std::fs::metadata(&record.file_path) {
-                        Ok(_) => super::storage::read_note(Path::new(&record.file_path)).is_err(),
+                    && match std::fs::symlink_metadata(&record.file_path) {
+                        Ok(metadata) => {
+                            let path = Path::new(&record.file_path);
+                            // 特殊文件与符号链接不能读取；来源不可用时保留已有事件。
+                            !metadata.is_file()
+                                || match path.canonicalize() {
+                                    Ok(canonical) if canonical.starts_with(&record.vault_path) => {
+                                        super::storage::read_note(&canonical).is_err()
+                                    }
+                                    _ => true,
+                                }
+                        }
                         Err(error) => error.kind() != std::io::ErrorKind::NotFound,
                     })
         })
@@ -233,5 +243,94 @@ mod tests {
             .filter(|(key, _)| !protected.contains_key(*key))
             .collect();
         assert_eq!(previous[&task.id].event_id, "existing-event");
+    }
+}
+
+#[cfg(all(test, unix))]
+mod source_path_tests {
+    use super::super::model::Vault;
+    use super::*;
+    use std::{fs, os::unix::fs::symlink};
+    #[test]
+    fn replaced_symlink_source_is_protected_without_reading_outside_the_vault() {
+        let root =
+            std::env::temp_dir().join(format!("mozi-calendar-path-{}", uuid::Uuid::new_v4()));
+        let vault = root.join("vault");
+        fs::create_dir_all(&vault).unwrap();
+        let outside = root.join("outside.md");
+        fs::write(&outside, "ordinary text").unwrap();
+        let path = vault.join("note.md");
+        symlink(&outside, &path).unwrap();
+        let mut saved = SavedState::default();
+        saved.vaults.push(Vault {
+            path: vault.to_string_lossy().into(),
+            name: "QA".into(),
+            trash_folder: ".trash".into(),
+            unavailable: false,
+        });
+        saved.calendar_events.insert(
+            "task".into(),
+            CalendarRecord {
+                event_id: "event".into(),
+                calendar_id: "calendar".into(),
+                vault_path: vault.to_string_lossy().into(),
+                file_path: path.to_string_lossy().into(),
+                start_at: 0,
+                end_at: 1,
+                fingerprint: "old".into(),
+            },
+        );
+        let protected = protected_records(&saved, &[], &BTreeMap::new());
+        fs::remove_dir_all(&root).unwrap();
+        assert!(
+            protected.contains_key("task"),
+            "replacement is unavailable, not a verified deletion"
+        );
+    }
+}
+
+#[cfg(all(test, unix))]
+mod special_file_tests {
+    use super::*;
+    use std::{
+        ffi::CString,
+        fs,
+        os::unix::{ffi::OsStrExt, fs::OpenOptionsExt},
+        sync::mpsc,
+        time::Duration,
+    };
+    #[test]
+    fn fifo_source_never_blocks_calendar_or_task_reads() {
+        let root =
+            std::env::temp_dir().join(format!("mozi-calendar-fifo-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("note.md");
+        let name = CString::new(path.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        let (tx, rx) = mpsc::channel();
+        let read_path = path.clone();
+        let thread = std::thread::spawn(move || {
+            let _ = tx.send(super::super::storage::read_note(&read_path));
+        });
+        let result = rx.recv_timeout(Duration::from_millis(500));
+        if result.is_err() {
+            // 旧实现卡住时释放临时 FIFO，保证失败用例也能退出。
+            if let Ok(mut writer) = fs::OpenOptions::new()
+                .write(true)
+                .custom_flags(libc::O_NONBLOCK)
+                .open(&path)
+            {
+                use std::io::Write;
+                let _ = writer.write_all(b"body");
+            }
+            let _ = rx.recv_timeout(Duration::from_secs(1));
+        }
+        thread.join().unwrap();
+        fs::remove_dir_all(root).unwrap();
+        assert!(
+            result.is_ok(),
+            "reading a special file must return immediately"
+        );
+        assert!(result.unwrap().is_err());
     }
 }

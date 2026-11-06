@@ -19,9 +19,13 @@ import { useCloseGuard } from "./app/useCloseGuard";
 import { useTaskCalendar } from "./hooks/useTaskCalendar";
 import { useTaskCalendarStore } from "./store/taskCalendarStore";
 import { TaskWorkspace } from "./components/tasks/TaskWorkspace";
-import { findTaskRange } from "./components/tasks/taskCalendarHelpers";
+import {
+  findTaskRange,
+  prepareTaskSourceVault,
+} from "./components/tasks/taskCalendarHelpers";
 import { refreshTaskCalendar } from "./services/taskCalendarService";
 import type { CalendarTask } from "./types/taskCalendar";
+import { flushAllDirtyOpenTabs } from "./services/filesystem/flushActiveDocument";
 import { UpdateInstallGuard } from "./app/UpdateInstallGuard";
 import { closeTabSafely } from "./hooks/closeTabSafely";
 import { useOutline } from "./hooks/useOutline";
@@ -711,6 +715,17 @@ const App: React.FC = () => {
         path: task.vaultPath,
         recursive: true,
       });
+      if (
+        !(await prepareTaskSourceVault(
+          useAppStore.getState().rootFolderPath,
+          task.vaultPath,
+          flushAllDirtyOpenTabs,
+          openKnowledgeBase,
+        ))
+      ) {
+        showNotification(t("tasks_sourceUnavailable"), "error");
+        return;
+      }
       await fileOps.handleFileSelect({
         id: task.filePath,
         path: task.filePath,
@@ -734,7 +749,14 @@ const App: React.FC = () => {
         });
       });
     },
-    [closeTaskCalendar, fileOps, setViewMode, showNotification, t],
+    [
+      closeTaskCalendar,
+      fileOps,
+      openKnowledgeBase,
+      setViewMode,
+      showNotification,
+      t,
+    ],
   );
 
   const commandPaletteItems = useMemo(

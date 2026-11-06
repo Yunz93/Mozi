@@ -18,7 +18,7 @@ import { isTauriEnvironment } from "../../types/filesystem";
 import { useTaskCalendarLanguage } from "../../hooks/useTaskCalendar";
 import type {
   CalendarTask,
-  TaskCalendarPreferences,
+  TaskCalendarPreferencesPatch,
   TaskFilter,
 } from "../../types/taskCalendar";
 import { AppSelect } from "../ui/AppSelect";
@@ -184,8 +184,8 @@ export function TaskWorkspace({
   function openTask(task: CalendarTask) {
     void run(() => onOpenTask(task));
   }
-  function changePreferences(next: TaskCalendarPreferences) {
-    void run(() => saveTaskCalendarPreferences({ ...next, language }));
+  function changePreferences(next: TaskCalendarPreferencesPatch) {
+    void run(() => saveTaskCalendarPreferences(next));
   }
   return (
     <section className="task-workspace ui-scaled" aria-label={t("tasks_title")}>

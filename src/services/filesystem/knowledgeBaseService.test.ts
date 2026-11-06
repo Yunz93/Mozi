@@ -19,6 +19,7 @@ function createBaseParams(
   return {
     addTab: vi.fn(),
     clearAllCache: vi.fn(),
+    beforeCommit: vi.fn(async () => true),
     findPreferredFile: vi.fn((_nodes: FileNode[], filePath: string) =>
       fileNodes.find((node) => node.path === filePath),
     ),
@@ -49,6 +50,35 @@ function createBaseParams(
 }
 
 describe("openKnowledgeBaseWorkspace", () => {
+  it("checks the latest old workspace after directory reads before clearing it", async () => {
+    let latest = "before read";
+    const saved: string[] = [];
+    const params = createBaseParams({
+      beforeCommit: vi.fn(async () => {
+        saved.push(latest);
+        return true;
+      }),
+    });
+    vi.mocked(params.fs.readDirectory).mockImplementation(async () => {
+      latest = "typed while reading the directory";
+      return [];
+    });
+    vi.mocked(params.clearAllCache).mockImplementation(() => {
+      expect(saved).toEqual([latest]);
+    });
+    await openKnowledgeBaseWorkspace(params);
+    expect(params.beforeCommit).toHaveBeenCalledOnce();
+    expect(params.setRootFolderPath).toHaveBeenCalledWith("/vault");
+  });
+
+  it("preserves the old workspace when saving or ownership validation rejects the commit", async () => {
+    const params = createBaseParams({ beforeCommit: vi.fn(async () => false) });
+    expect(await openKnowledgeBaseWorkspace(params)).toBeNull();
+    expect(params.clearAllCache).not.toHaveBeenCalled();
+    expect(params.setFiles).not.toHaveBeenCalled();
+    expect(params.setRootFolderPath).not.toHaveBeenCalled();
+  });
+
   it("opens an existing knowledge base path after registering fs scope without auto-opening a file", async () => {
     const params = createBaseParams();
 

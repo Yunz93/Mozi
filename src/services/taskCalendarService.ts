@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
-  TaskCalendarPreferences,
+  TaskCalendarPreferencesPatch,
   TaskCalendarSnapshot,
   MacCalendarAccess,
 } from "../types/taskCalendar";
@@ -27,7 +27,7 @@ export function refreshTaskCalendar(path: string | null = null): Promise<void> {
   return invoke("task_calendar_refresh", { path });
 }
 export function saveTaskCalendarPreferences(
-  preferences: TaskCalendarPreferences,
+  preferences: TaskCalendarPreferencesPatch,
 ): Promise<void> {
   return invoke("task_calendar_set_preferences", { preferences });
 }

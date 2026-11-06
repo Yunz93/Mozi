@@ -14,7 +14,7 @@ pub enum Operation {
     Register(Vault),
     Unregister(String),
     Refresh(Option<String>),
-    Preferences(Preferences),
+    Preferences(PreferencesPatch),
     Language(String),
     Flush,
 }
@@ -27,6 +27,7 @@ struct Request {
 pub struct TaskManager {
     sender: mpsc::Sender<Request>,
     snapshot: Arc<RwLock<Snapshot>>,
+    pub(super) closing_windows: std::sync::Mutex<BTreeSet<String>>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -47,6 +48,7 @@ struct Runtime {
     files: BTreeMap<PathBuf, FileIndex>,
     shared: Arc<RwLock<Snapshot>>,
     error: Option<String>,
+    load_error: Option<String>,
     version: u64,
     last_tick: i64,
     local_timezone: (i32, String),
@@ -64,16 +66,14 @@ impl TaskManager {
         std::thread::Builder::new()
             .name("task-calendar".into())
             .spawn(move || {
-                let (saved, error) = match storage::load(&data_path) {
-                    Ok(saved) => (saved, None),
-                    Err(error) => (SavedState::default(), Some(error)),
-                };
+                let (saved, error) = load_state(&data_path);
                 let mut runtime = Runtime {
                     app,
                     data_path,
                     saved,
                     files: BTreeMap::new(),
                     shared,
+                    load_error: error.clone(),
                     error,
                     version: 0,
                     last_tick: Local::now().timestamp_millis(),
@@ -119,7 +119,11 @@ impl TaskManager {
                 }
             })
             .map_err(|e| e.to_string())?;
-        Ok(Self { sender, snapshot })
+        Ok(Self {
+            sender,
+            snapshot,
+            closing_windows: Default::default(),
+        })
     }
 
     pub fn snapshot(&self) -> Result<Snapshot, String> {
@@ -140,6 +144,9 @@ impl TaskManager {
 
 impl Runtime {
     fn apply(&mut self, operation: Operation) -> Result<(), String> {
+        if let Some(error) = &self.load_error {
+            return Err(error.clone());
+        }
         self.error = None;
         if matches!(
             &operation,
@@ -173,7 +180,7 @@ impl Runtime {
                 self.saved.vaults.retain(|v| v.path != path);
                 self.files
                     .retain(|_, index| index.tasks.first().map_or(true, |t| t.vault_path != path));
-                self.reconcile_reminders();
+                self.scan();
                 self.persist()?;
             }
             Operation::Refresh(path) => {
@@ -198,8 +205,15 @@ impl Runtime {
                     self.scan();
                 }
             }
-            Operation::Preferences(preferences) => {
+            Operation::Preferences(patch) => {
                 let previous = self.saved.preferences.clone();
+                let preferences = patch.apply(&previous);
+                // 在串行调度器中校验合并后的开关与目标，避免另一窗口的旧快照覆盖。
+                if preferences.mac_calendar
+                    && (!previous.mac_calendar || previous.calendar_id != preferences.calendar_id)
+                {
+                    calendar::validate(&preferences.calendar_id)?;
+                }
                 self.saved.preferences = preferences;
                 if let Err(error) = self.persist() {
                     self.saved.preferences = previous;
@@ -230,10 +244,13 @@ impl Runtime {
     }
 
     fn persist(&mut self) -> Result<(), String> {
-        storage::save(&self.data_path, &self.saved)
+        persist_state(&self.data_path, &self.saved, self.load_error.as_deref())
     }
 
     fn sync_calendar(&mut self) {
+        if self.load_error.is_some() {
+            return;
+        }
         if !self.saved.preferences.mac_calendar {
             self.calendar_signature.clear();
             self.calendar_error = None;
@@ -363,6 +380,8 @@ impl Runtime {
     }
 
     fn scan_file(&mut self, vault: &Path, path: &Path, force: bool) -> bool {
+        let owner = preferred_vault(&self.saved.vaults, path, vault);
+        let vault = owner.as_path();
         let result = (|| {
             let metadata = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
             if !metadata.is_file() || metadata.file_type().is_symlink() {
@@ -378,7 +397,11 @@ impl Runtime {
             };
             if !force
                 && self.files.get(path).is_some_and(|entry| {
-                    entry.signature == signature && entry.tasks.iter().all(|t| t.available)
+                    entry.signature == signature
+                        && entry
+                            .tasks
+                            .iter()
+                            .all(|t| t.available && Path::new(&t.vault_path) == vault)
                 })
             {
                 return Ok(());
@@ -604,6 +627,32 @@ fn build_reminders<'a>(
     active
 }
 
+fn load_state(path: &Path) -> (SavedState, Option<String>) {
+    match storage::load(path) {
+        Ok(saved) => (saved, None),
+        Err(error) => (SavedState::default(), Some(error)),
+    }
+}
+
+fn persist_state(path: &Path, saved: &SavedState, load_error: Option<&str>) -> Result<(), String> {
+    // 读取失败不代表空数据；保留原文件及事件归属记录，等待恢复后重新启动。
+    if let Some(error) = load_error {
+        return Err(error.into());
+    }
+    storage::save(path, saved)
+}
+
+fn preferred_vault(vaults: &[Vault], path: &Path, fallback: &Path) -> PathBuf {
+    // 重叠知识库只保留一份任务，并稳定归属到最内层的已纳入知识库。
+    vaults
+        .iter()
+        .map(|vault| Path::new(&vault.path))
+        .filter(|root| path.starts_with(root))
+        .max_by_key(|root| root.components().count())
+        .unwrap_or(fallback)
+        .to_path_buf()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -715,4 +764,73 @@ fn collect_notes(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod release_regression_tests {
+    use super::*;
+    #[test]
+    fn failed_state_load_never_overwrites_the_existing_file() {
+        let root = std::env::temp_dir().join(format!("mozi-state-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("state.json");
+        for original in [
+            "{broken".to_string(),
+            "{\"schemaVersion\":2,\"calendarOwner\":\"existing-owner\"}".to_string(),
+        ] {
+            fs::write(&path, &original).unwrap();
+            let (saved, error) = load_state(&path);
+            assert!(error.is_some());
+            let result = persist_state(&path, &saved, error.as_deref());
+            let after = fs::read_to_string(&path).unwrap();
+            assert!(result.is_err(), "load failure must prevent replacement");
+            assert_eq!(after, original);
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn missing_state_can_be_created_normally() {
+        let root = std::env::temp_dir().join(format!("mozi-state-{}", uuid::Uuid::new_v4()));
+        let path = root.join("state.json");
+        let (saved, error) = load_state(&path);
+        assert!(error.is_none());
+        persist_state(&path, &saved, None).unwrap();
+        assert_eq!(
+            storage::load(&path).unwrap().calendar_owner,
+            saved.calendar_owner
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn nested_vault_ownership_is_stable_in_either_registration_order() {
+        let outer = Vault {
+            path: "/outer".into(),
+            name: "outer".into(),
+            trash_folder: ".trash".into(),
+            unavailable: false,
+        };
+        let inner = Vault {
+            path: "/outer/inner".into(),
+            name: "inner".into(),
+            trash_folder: ".trash".into(),
+            unavailable: false,
+        };
+        for vaults in [
+            vec![outer.clone(), inner.clone()],
+            vec![inner.clone(), outer.clone()],
+        ] {
+            assert_eq!(
+                preferred_vault(
+                    &vaults,
+                    Path::new("/outer/inner/note.md"),
+                    Path::new("/outer")
+                ),
+                PathBuf::from("/outer/inner")
+            );
+            assert_eq!(
+                preferred_vault(&vaults, Path::new("/outer/note.md"), Path::new("/outer")),
+                PathBuf::from("/outer")
+            );
+        }
+    }
 }

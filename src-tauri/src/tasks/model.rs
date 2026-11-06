@@ -23,6 +23,29 @@ impl Default for Preferences {
     }
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PreferencesPatch {
+    pub notifications: Option<bool>,
+    pub background: Option<bool>,
+    pub mac_calendar: Option<bool>,
+    pub calendar_id: Option<String>,
+}
+
+impl PreferencesPatch {
+    pub fn apply(self, current: &Preferences) -> Preferences {
+        Preferences {
+            notifications: self.notifications.unwrap_or(current.notifications),
+            background: self.background.unwrap_or(current.background),
+            language: current.language.clone(),
+            mac_calendar: self.mac_calendar.unwrap_or(current.mac_calendar),
+            calendar_id: self
+                .calendar_id
+                .unwrap_or_else(|| current.calendar_id.clone()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Vault {
@@ -141,4 +164,36 @@ pub struct CalendarRecord {
     pub start_at: i64,
     pub end_at: i64,
     pub fingerprint: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn independent_window_patches_preserve_other_settings_and_language() {
+        let initial = Preferences {
+            language: "en".into(),
+            ..Default::default()
+        };
+        let background: PreferencesPatch = serde_json::from_str(r#"{"background":true}"#).unwrap();
+        let notifications: PreferencesPatch =
+            serde_json::from_str(r#"{"notifications":true}"#).unwrap();
+        let current = background.apply(&initial);
+        let current = notifications.apply(&current);
+        assert!(current.background && current.notifications);
+        assert_eq!(current.language, "en");
+        let disabled = PreferencesPatch {
+            mac_calendar: Some(false),
+            ..Default::default()
+        }
+        .apply(&current);
+        let current = PreferencesPatch {
+            notifications: Some(false),
+            ..Default::default()
+        }
+        .apply(&disabled);
+        assert!(!current.mac_calendar);
+        assert!(current.background);
+    }
 }
