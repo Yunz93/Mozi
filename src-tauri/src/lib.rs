@@ -8,6 +8,7 @@ mod publishing;
 mod sample_notes;
 mod secure_settings;
 mod system_fonts;
+mod tasks;
 mod url_encode;
 mod weread;
 mod weread_skill;
@@ -853,10 +854,7 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
-            let _ = app.get_webview_window("main").map(|window| {
-                let _ = window.show();
-                let _ = window.set_focus();
-            });
+            tasks::show_window(app, false);
 
             let paths = opened_file_paths_from_args(&args, &cwd);
             queue_opened_file_paths(app, paths);
@@ -871,6 +869,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
@@ -899,7 +898,17 @@ pub fn run() {
             discard_macos_update,
             write_text_file_atomic,
             force_close_window,
-            force_exit_app
+            force_exit_app,
+            tasks::task_calendar_snapshot,
+            tasks::task_calendar_register_vault,
+            tasks::task_calendar_unregister_vault,
+            tasks::task_calendar_refresh,
+            tasks::task_calendar_set_preferences,
+            tasks::task_calendar_set_language,
+            tasks::task_calendar_test_notification,
+            tasks::task_calendar_macos_access,
+            tasks::task_calendar_flush,
+            tasks::task_calendar_keep_background
         ])
         .on_window_event(|window, event| {
             match event {
@@ -980,6 +989,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            tasks::initialize(app.handle()).map_err(std::io::Error::other)?;
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -1030,6 +1040,10 @@ pub fn run() {
             }
             #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
             {
+                #[cfg(target_os = "macos")]
+                if let tauri::RunEvent::Reopen { .. } = &event {
+                    tasks::show_window(app, false);
+                }
                 if let tauri::RunEvent::Opened { urls } = event {
                     let paths = opened_file_paths_from_urls(&urls);
                     queue_opened_file_paths(app, paths);

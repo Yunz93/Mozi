@@ -16,6 +16,12 @@ import { getScaledEditorFontSize } from "./utils/uiFontSize";
 import { UiZoomHint } from "./components/ui/UiZoomHint";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useCloseGuard } from "./app/useCloseGuard";
+import { useTaskCalendar } from "./hooks/useTaskCalendar";
+import { useTaskCalendarStore } from "./store/taskCalendarStore";
+import { TaskWorkspace } from "./components/tasks/TaskWorkspace";
+import { findTaskRange } from "./components/tasks/taskCalendarHelpers";
+import { refreshTaskCalendar } from "./services/taskCalendarService";
+import type { CalendarTask } from "./types/taskCalendar";
 import { UpdateInstallGuard } from "./app/UpdateInstallGuard";
 import { closeTabSafely } from "./hooks/closeTabSafely";
 import { useOutline } from "./hooks/useOutline";
@@ -49,6 +55,7 @@ import {
 import { ViewMode } from "./types";
 import {
   flushActiveEditorPendingChanges,
+  getActiveEditorView,
   requestEditorRangeFocus,
 } from "./utils/editorSelectionBridge";
 import {
@@ -118,6 +125,19 @@ if (typeof window !== "undefined" && import.meta.env.DEV) {
 
 const App: React.FC = () => {
   const { t } = useI18n();
+  useTaskCalendar();
+  const isTaskCalendarOpen = useTaskCalendarStore((state) => state.isOpen);
+  const openTaskCalendar = useCallback(() => {
+    flushActiveEditorPendingChanges();
+    useTaskCalendarStore.getState().open();
+  }, []);
+  const closeTaskCalendar = useCallback(() => {
+    useTaskCalendarStore.getState().close();
+  }, []);
+  const returnFromTaskCalendar = useCallback(() => {
+    closeTaskCalendar();
+    requestAnimationFrame(() => getActiveEditorView()?.focus());
+  }, [closeTaskCalendar]);
   const {
     files,
     openTabs,
@@ -294,6 +314,7 @@ const App: React.FC = () => {
               continue;
             }
           }
+          closeTaskCalendar();
           await openFilePath(path, {
             silentSuccess: true,
             suppressErrors: false,
@@ -303,7 +324,7 @@ const App: React.FC = () => {
         }
       }
     },
-    [openFilePath, rootFolderPath],
+    [closeTaskCalendar, openFilePath, rootFolderPath],
   );
 
   const externalFileOpen = useExternalFileOpen({
@@ -413,10 +434,16 @@ const App: React.FC = () => {
     isPreviewOnlyActiveFile || isExcalidrawActiveFile;
   const isFocusModeActive = Boolean(
     settings.focusMode &&
+    !isTaskCalendarOpen &&
     activeTabId &&
     !isNonMarkdownWorkspaceFile &&
     viewMode === ViewMode.LIVE,
   );
+  useEffect(() => {
+    // 托盘与启动参数也能打开日程，统一结束专注，避免返回笔记时重新全屏。
+    if (isTaskCalendarOpen && settings.focusMode)
+      updateSettings({ focusMode: false });
+  }, [isTaskCalendarOpen, settings.focusMode, updateSettings]);
   useEffect(() => {
     if (!isFocusModeActive) return;
     setIsSearchBarOpen(false);
@@ -567,10 +594,11 @@ const App: React.FC = () => {
       const fileName = value.trim();
       if (!fileName) return;
 
+      closeTaskCalendar();
       void fileOps.handleCreateFile(undefined, fileName);
       setIsNewNoteDialogOpen(false);
     },
-    [fileOps],
+    [closeTaskCalendar, fileOps],
   );
 
   const handleCreateMissingWikiNote = useCallback(
@@ -676,9 +704,43 @@ const App: React.FC = () => {
     setIsPublishTargetDialogOpen(true);
   }, [isNonMarkdownWorkspaceFile, showNotification, t]);
 
+  const handleOpenTaskSource = useCallback(
+    async (task: CalendarTask) => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("register_allowed_path", {
+        path: task.vaultPath,
+        recursive: true,
+      });
+      await fileOps.handleFileSelect({
+        id: task.filePath,
+        path: task.filePath,
+        type: "file",
+        name: task.filePath.split(/[/\\]/).pop() || task.relativePath,
+      });
+      const state = useAppStore.getState();
+      if (state.activeTabId !== task.filePath) return;
+      const source = state.fileContents[task.filePath];
+      const range = source === undefined ? null : findTaskRange(source, task);
+      if (!range) {
+        await refreshTaskCalendar(task.filePath);
+        showNotification(t("tasks_sourceChanged"), "error");
+        return;
+      }
+      closeTaskCalendar();
+      setViewMode(ViewMode.LIVE, "direct");
+      requestAnimationFrame(() => {
+        requestEditorRangeFocus(task.filePath, range.start, range.start, {
+          alignTopRatio: 0.3,
+        });
+      });
+    },
+    [closeTaskCalendar, fileOps, setViewMode, showNotification, t],
+  );
+
   const commandPaletteItems = useMemo(
     () =>
       buildCommandPaletteItems({
+        openTaskCalendar,
         t,
         shortcuts: settings.shortcuts,
         showNeedEditor: () =>
@@ -745,6 +807,7 @@ const App: React.FC = () => {
       }),
     [
       activeTabId,
+      openTaskCalendar,
       closeActiveTabSafely,
       closeTab,
       currentFilePath,
@@ -1013,7 +1076,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (shouldShowKnowledgeBaseOnboarding) {
+  if (shouldShowKnowledgeBaseOnboarding && !isTaskCalendarOpen) {
     return (
       <KnowledgeBaseOnboarding
         uiScaleStyle={uiScaleStyle}
@@ -1051,15 +1114,22 @@ const App: React.FC = () => {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <Sidebar
+            onOpenTaskCalendar={openTaskCalendar}
+            taskCalendarOpen={isTaskCalendarOpen}
             files={files}
             activeFileId={activeTabId}
-            onFileSelect={fileOps.handleFileSelect}
-            onCreateFile={(folder, fileName) =>
-              fileOps.handleCreateFile(folder, fileName)
-            }
-            onCreateDrawing={(folder, fileName) =>
-              void fileOps.handleCreateDrawing(folder, fileName)
-            }
+            onFileSelect={(file) => {
+              closeTaskCalendar();
+              return fileOps.handleFileSelect(file);
+            }}
+            onCreateFile={(folder, fileName) => {
+              closeTaskCalendar();
+              return fileOps.handleCreateFile(folder, fileName);
+            }}
+            onCreateDrawing={(folder, fileName) => {
+              closeTaskCalendar();
+              void fileOps.handleCreateDrawing(folder, fileName);
+            }}
             onNewFolder={(folder, name) =>
               fileOps.handleNewFolder(folder, name)
             }
@@ -1093,96 +1163,114 @@ const App: React.FC = () => {
             ref={mainContentRef}
             className="workspace-surface flex-1 flex flex-col h-full min-w-0"
           >
-            {!isFocusModeActive && (
-              <Toolbar
-                fileName={activeFile?.name || ""}
-                folderName={activeFile?.path?.split(/[/\\]/).at(-2)}
-                viewMode={viewMode}
-                onViewModeChange={handleToolbarViewModeChange}
-                onAIAnalyze={requestAIAnalyze}
-                onAskVault={() => {
-                  setIsAskVaultOpen((prev) => {
-                    const next = !prev;
-                    if (next) setIsOutlineOpen(false);
-                    return next;
-                  });
-                }}
-                isAskVaultOpen={isAskVaultOpen}
-                isAnalyzing={isAnalyzing}
-                aiEnhanceStage={aiEnhanceStage}
-                isSaving={isSaving}
-                isPublishing={isPublishing}
-                isSidebarOpen={isSidebarOpen}
-                onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
-                onToggleTheme={toggleTheme}
-                themeMode={settings.themeMode}
-                onPublish={handleOpenPublishDialog}
-                onExportPdf={handleExportToPdf}
-                onExportHtml={handleExportToHtml}
-                onShareLongImage={() => {
-                  setIsShareLongImageDialogOpen(true);
-                }}
-                isPreviewOnlyFile={isNonMarkdownWorkspaceFile}
+            {isTaskCalendarOpen ? (
+              <TaskWorkspace
+                rootPath={rootFolderPath}
+                trashFolder={settings.trashFolder}
+                hasUnsavedChanges={
+                  !!activeTabId &&
+                  useAppStore.getState().hasUnsavedChanges(activeTabId)
+                }
+                onOpenTask={handleOpenTaskSource}
+                onClose={returnFromTaskCalendar}
+                onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
               />
-            )}
-
-            <div className="flex-1 min-w-0 flex overflow-hidden relative">
-              <SplitView
-                highlighter={highlighter}
-                onContentChange={handleContentChange}
-                onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
-                isOutlineOpen={isOutlineOpen}
-                canShowOutline={canShowOutlinePanel}
-                canShowOutlineToggle={canShowOutlineToggle}
-                contentDensity={contentDensity}
-                onToggleOutline={() => {
-                  if (isAskVaultOpen) {
-                    setIsAskVaultOpen(false);
-                    setIsOutlineOpen(true);
-                    return;
-                  }
-                  setIsOutlineOpen(!isOutlineOpen);
-                }}
-              />
-              {activeTabId ? (
-                <RightRail
-                  isOpen={
-                    isOutlineVisible && !isAskVaultOpen && !isFocusModeActive
-                  }
-                  headings={outlineHeadings}
-                  activeHeadingId={activeHeadingId}
-                  onHeadingClick={handleHeadingClick}
-                  width={responsiveOutlineWidth}
-                  onWidthChange={handleOutlineWidthChange}
-                  onOpenPath={(path) => {
-                    void fileOps.handleFileSelect({
-                      id: path,
-                      name: path.split(/[/\\]/).pop() || path,
-                      type: "file",
-                      path,
+            ) : null}
+            <div
+              className="flex-1 min-h-0 flex flex-col"
+              style={{ display: isTaskCalendarOpen ? "none" : "flex" }}
+            >
+              {!isFocusModeActive && (
+                <Toolbar
+                  fileName={activeFile?.name || ""}
+                  folderName={activeFile?.path?.split(/[/\\]/).at(-2)}
+                  viewMode={viewMode}
+                  onViewModeChange={handleToolbarViewModeChange}
+                  onAIAnalyze={requestAIAnalyze}
+                  onAskVault={() => {
+                    setIsAskVaultOpen((prev) => {
+                      const next = !prev;
+                      if (next) setIsOutlineOpen(false);
+                      return next;
                     });
                   }}
-                  onCreateMissingNote={handleCreateMissingWikiNote}
+                  isAskVaultOpen={isAskVaultOpen}
+                  isAnalyzing={isAnalyzing}
+                  aiEnhanceStage={aiEnhanceStage}
+                  isSaving={isSaving}
+                  isPublishing={isPublishing}
+                  isSidebarOpen={isSidebarOpen}
+                  onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
+                  onToggleTheme={toggleTheme}
+                  themeMode={settings.themeMode}
+                  onPublish={handleOpenPublishDialog}
+                  onExportPdf={handleExportToPdf}
+                  onExportHtml={handleExportToHtml}
+                  onShareLongImage={() => {
+                    setIsShareLongImageDialogOpen(true);
+                  }}
+                  isPreviewOnlyFile={isNonMarkdownWorkspaceFile}
                 />
-              ) : null}
-              {isAskVaultOpen && !isFocusModeActive ? (
-                <AskVaultPanel
-                  open
-                  onClose={() => setIsAskVaultOpen(false)}
-                  onOpenFile={fileOps.handleFileSelect}
-                  readFile={readFile}
-                />
-              ) : null}
-              {isSearchBarOpen && !isFocusModeActive && (
-                <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
               )}
-              {isCommandPaletteOpen && !isFocusModeActive ? (
-                <CommandPalette
-                  commands={commandPaletteItems}
-                  onClose={() => setIsCommandPaletteOpen(false)}
+
+              <div className="flex-1 min-w-0 flex overflow-hidden relative">
+                <SplitView
+                  highlighter={highlighter}
+                  onContentChange={handleContentChange}
+                  onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
+                  isOutlineOpen={isOutlineOpen}
+                  canShowOutline={canShowOutlinePanel}
+                  canShowOutlineToggle={canShowOutlineToggle}
+                  contentDensity={contentDensity}
+                  onToggleOutline={() => {
+                    if (isAskVaultOpen) {
+                      setIsAskVaultOpen(false);
+                      setIsOutlineOpen(true);
+                      return;
+                    }
+                    setIsOutlineOpen(!isOutlineOpen);
+                  }}
                 />
-              ) : null}
+                {activeTabId ? (
+                  <RightRail
+                    isOpen={
+                      isOutlineVisible && !isAskVaultOpen && !isFocusModeActive
+                    }
+                    headings={outlineHeadings}
+                    activeHeadingId={activeHeadingId}
+                    onHeadingClick={handleHeadingClick}
+                    width={responsiveOutlineWidth}
+                    onWidthChange={handleOutlineWidthChange}
+                    onOpenPath={(path) => {
+                      void fileOps.handleFileSelect({
+                        id: path,
+                        name: path.split(/[/\\]/).pop() || path,
+                        type: "file",
+                        path,
+                      });
+                    }}
+                    onCreateMissingNote={handleCreateMissingWikiNote}
+                  />
+                ) : null}
+                {isAskVaultOpen && !isFocusModeActive ? (
+                  <AskVaultPanel
+                    open
+                    onClose={() => setIsAskVaultOpen(false)}
+                    onOpenFile={fileOps.handleFileSelect}
+                    readFile={readFile}
+                  />
+                ) : null}
+                {isSearchBarOpen && !isFocusModeActive && (
+                  <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
+                )}
+              </div>
             </div>
+            {isCommandPaletteOpen && !isFocusModeActive ? (
+              <CommandPalette
+                commands={commandPaletteItems}
+                onClose={() => setIsCommandPaletteOpen(false)}
+              />
+            ) : null}
           </main>
         </div>
 

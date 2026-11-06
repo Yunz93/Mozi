@@ -8,6 +8,7 @@ import { formatShortcutForDisplay } from "../../utils/shortcuts";
 import type { PaletteCommand } from "../../utils/commandPalette/filterCommands";
 
 interface CommandPaletteActions {
+  openTaskCalendar?: () => void;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   shortcuts: ShortcutConfig;
   showNeedEditor: () => void;
@@ -57,6 +58,16 @@ export function buildCommandPaletteItems(
   const publish = t("commandPalette_groupPublish");
 
   const workspaceItems: PaletteCommand[] = [
+    ...(actions.openTaskCalendar
+      ? [
+          {
+            id: "taskCalendar",
+            title: t("tasks_title"),
+            group: workspace,
+            run: actions.openTaskCalendar,
+          },
+        ]
+      : []),
     {
       id: "save",
       title: t("settings_saveFile"),

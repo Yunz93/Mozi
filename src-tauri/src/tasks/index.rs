@@ -1,0 +1,718 @@
+use super::{calendar, model::*, parser, storage};
+use chrono::Local;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::{Path, PathBuf},
+    sync::{mpsc, Arc, RwLock},
+    time::{Duration, Instant, SystemTime},
+};
+use tauri::{AppHandle, Emitter};
+use tauri_plugin_notification::NotificationExt;
+
+pub enum Operation {
+    Register(Vault),
+    Unregister(String),
+    Refresh(Option<String>),
+    Preferences(Preferences),
+    Language(String),
+    Flush,
+}
+
+struct Request {
+    operation: Operation,
+    reply: mpsc::SyncSender<Result<(), String>>,
+}
+
+pub struct TaskManager {
+    sender: mpsc::Sender<Request>,
+    snapshot: Arc<RwLock<Snapshot>>,
+}
+
+#[derive(Clone, PartialEq)]
+struct Signature {
+    modified: Option<SystemTime>,
+    length: u64,
+}
+
+struct FileIndex {
+    signature: Signature,
+    tasks: Vec<Task>,
+}
+
+struct Runtime {
+    app: AppHandle,
+    data_path: PathBuf,
+    saved: SavedState,
+    files: BTreeMap<PathBuf, FileIndex>,
+    shared: Arc<RwLock<Snapshot>>,
+    error: Option<String>,
+    version: u64,
+    last_tick: i64,
+    local_timezone: (i32, String),
+    calendar_signature: String,
+    calendar_checked_at: Option<Instant>,
+    calendar_synced_at: Option<i64>,
+    calendar_error: Option<String>,
+}
+
+impl TaskManager {
+    pub fn start(app: AppHandle, data_path: PathBuf) -> Result<Self, String> {
+        let (sender, receiver) = mpsc::channel::<Request>();
+        let snapshot = Arc::new(RwLock::new(Snapshot::default()));
+        let shared = snapshot.clone();
+        std::thread::Builder::new()
+            .name("task-calendar".into())
+            .spawn(move || {
+                let (saved, error) = match storage::load(&data_path) {
+                    Ok(saved) => (saved, None),
+                    Err(error) => (SavedState::default(), Some(error)),
+                };
+                let mut runtime = Runtime {
+                    app,
+                    data_path,
+                    saved,
+                    files: BTreeMap::new(),
+                    shared,
+                    error,
+                    version: 0,
+                    last_tick: Local::now().timestamp_millis(),
+                    local_timezone: current_timezone(),
+                    calendar_signature: String::new(),
+                    calendar_checked_at: None,
+                    calendar_synced_at: None,
+                    calendar_error: None,
+                };
+                runtime.publish(true);
+                runtime.scan();
+                runtime.remind(true);
+                runtime.sync_calendar();
+                runtime.publish(false);
+                let mut last_scan = Instant::now();
+                let mut scan_interval = Duration::from_secs(5);
+                loop {
+                    match receiver.recv_timeout(Duration::from_secs(1)) {
+                        Ok(request) => {
+                            let result = runtime.apply(request.operation);
+                            if let Err(error) = &result {
+                                runtime.error = Some(error.clone());
+                            }
+                            runtime.publish(false);
+                            let _ = request.reply.send(result);
+                        }
+                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                        Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    }
+                    if last_scan.elapsed() >= scan_interval {
+                        let start = Instant::now();
+                        runtime.scan();
+                        // 慢磁盘按上次耗时退避，避免连续扫描占满磁盘。
+                        scan_interval =
+                            Duration::from_secs(5).max(start.elapsed().saturating_mul(4));
+                        last_scan = Instant::now();
+                    }
+                    let now = Local::now().timestamp_millis();
+                    runtime.remind(now - runtime.last_tick > 60_000);
+                    runtime.last_tick = now;
+                    runtime.sync_calendar();
+                    runtime.publish(false);
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(Self { sender, snapshot })
+    }
+
+    pub fn snapshot(&self) -> Result<Snapshot, String> {
+        self.snapshot
+            .read()
+            .map(|s| s.clone())
+            .map_err(|_| "Task calendar lock failed".into())
+    }
+
+    pub fn request(&self, operation: Operation) -> Result<(), String> {
+        let (reply, result) = mpsc::sync_channel(1);
+        self.sender
+            .send(Request { operation, reply })
+            .map_err(|e| e.to_string())?;
+        result.recv().map_err(|e| e.to_string())?
+    }
+}
+
+impl Runtime {
+    fn apply(&mut self, operation: Operation) -> Result<(), String> {
+        self.error = None;
+        if matches!(
+            &operation,
+            Operation::Refresh(_) | Operation::Preferences(_)
+        ) {
+            self.calendar_checked_at = None;
+        }
+        match operation {
+            Operation::Register(vault) => {
+                self.saved
+                    .excluded_vaults
+                    .retain(|path| path != &vault.path);
+                if let Some(existing) = self.saved.vaults.iter_mut().find(|v| v.path == vault.path)
+                {
+                    if existing.trash_folder == vault.trash_folder {
+                        return Ok(());
+                    }
+                    *existing = vault;
+                    self.files.clear();
+                } else {
+                    self.saved.vaults.push(vault);
+                }
+                self.persist()?;
+                self.publish(true);
+                self.scan();
+            }
+            Operation::Unregister(path) => {
+                if !self.saved.excluded_vaults.contains(&path) {
+                    self.saved.excluded_vaults.push(path.clone());
+                }
+                self.saved.vaults.retain(|v| v.path != path);
+                self.files
+                    .retain(|_, index| index.tasks.first().map_or(true, |t| t.vault_path != path));
+                self.reconcile_reminders();
+                self.persist()?;
+            }
+            Operation::Refresh(path) => {
+                self.publish(true);
+                if let Some(path) = path {
+                    if let Some(vault) = self
+                        .saved
+                        .vaults
+                        .iter()
+                        .find(|v| Path::new(&path).starts_with(&v.path))
+                        .cloned()
+                    {
+                        self.scan_file(Path::new(&vault.path), Path::new(&path), true);
+                        self.reconcile_reminders();
+                        self.persist()?;
+                    }
+                } else {
+                    // 手动刷新时重新解析已有文件，读取失败仍保留不可用的来源信息。
+                    for entry in self.files.values_mut() {
+                        entry.signature.modified = None;
+                    }
+                    self.scan();
+                }
+            }
+            Operation::Preferences(preferences) => {
+                let previous = self.saved.preferences.clone();
+                self.saved.preferences = preferences;
+                if let Err(error) = self.persist() {
+                    self.saved.preferences = previous;
+                    return Err(error);
+                }
+                if previous.mac_calendar != self.saved.preferences.mac_calendar
+                    || previous.calendar_id != self.saved.preferences.calendar_id
+                {
+                    self.calendar_synced_at = None;
+                }
+            }
+            Operation::Flush => {
+                self.scan();
+                self.persist()?;
+            }
+            Operation::Language(language) => {
+                if self.saved.preferences.language != language {
+                    let previous =
+                        std::mem::replace(&mut self.saved.preferences.language, language);
+                    if let Err(error) = self.persist() {
+                        self.saved.preferences.language = previous;
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn persist(&mut self) -> Result<(), String> {
+        storage::save(&self.data_path, &self.saved)
+    }
+
+    fn sync_calendar(&mut self) {
+        if !self.saved.preferences.mac_calendar {
+            self.calendar_signature.clear();
+            self.calendar_error = None;
+            return;
+        }
+        let tasks: Vec<Task> = self
+            .files
+            .values()
+            .flat_map(|entry| entry.tasks.clone())
+            .collect();
+        let signature = storage::hash(
+            &serde_json::to_string(&(&tasks, &self.saved.preferences, &self.saved.vaults))
+                .unwrap_or_default(),
+        );
+        // 保存变化立即同步；无变化时每分钟核实事件与权限，失败时也按此间隔重试。
+        if signature == self.calendar_signature
+            && self
+                .calendar_checked_at
+                .is_some_and(|last| last.elapsed() < Duration::from_secs(60))
+        {
+            return;
+        }
+        self.calendar_signature = signature;
+        self.calendar_checked_at = Some(Instant::now());
+        match calendar::sync(&mut self.saved, &tasks, &self.data_path) {
+            Ok(()) => {
+                self.calendar_error = None;
+                self.calendar_synced_at = Some(Local::now().timestamp_millis());
+            }
+            Err(error) => self.calendar_error = Some(error),
+        }
+    }
+
+    fn publish(&mut self, scanning: bool) {
+        let mut tasks: Vec<Task> = self
+            .files
+            .values()
+            .flat_map(|entry| entry.tasks.clone())
+            .collect();
+        tasks.sort_by(|a, b| {
+            a.vault_path
+                .cmp(&b.vault_path)
+                .then(a.relative_path.cmp(&b.relative_path))
+                .then(a.start.cmp(&b.start))
+        });
+        let Ok(mut shared) = self.shared.write() else {
+            return;
+        };
+        if shared.tasks == tasks
+            && shared.vaults == self.saved.vaults
+            && shared.excluded_vaults == self.saved.excluded_vaults
+            && shared.preferences == self.saved.preferences
+            && shared.scanning == scanning
+            && shared.error == self.error
+            && shared.calendar_error == self.calendar_error
+            && shared.calendar_synced_at == self.calendar_synced_at
+        {
+            return;
+        }
+        self.version += 1;
+        *shared = Snapshot {
+            version: self.version,
+            tasks,
+            vaults: self.saved.vaults.clone(),
+            excluded_vaults: self.saved.excluded_vaults.clone(),
+            preferences: self.saved.preferences.clone(),
+            scanning,
+            last_synced_at: Some(Local::now().timestamp_millis()),
+            error: self.error.clone(),
+            calendar_error: self.calendar_error.clone(),
+            calendar_synced_at: self.calendar_synced_at,
+        };
+        // 事件只携带版本，窗口按需读取快照，避免向每个编辑窗口广播全部正文索引。
+        let _ = self.app.emit("task-calendar-changed", self.version);
+    }
+
+    fn scan(&mut self) {
+        refresh_timezone(
+            &mut self.files,
+            &mut self.local_timezone,
+            current_timezone(),
+        );
+        let mut seen = BTreeSet::new();
+        for mut vault in self.saved.vaults.clone() {
+            let root = PathBuf::from(&vault.path);
+            let result = collect_vault_notes(&mut vault);
+            if let Some(entry) = self.saved.vaults.iter_mut().find(|v| v.path == vault.path) {
+                entry.unavailable = vault.unavailable;
+            }
+            let paths = match result {
+                Ok(paths) => paths,
+                Err(error) => {
+                    self.error = Some(format!("{}: {error}", vault.name));
+                    self.mark_unavailable(&root, &mut seen);
+                    continue;
+                }
+            };
+            let mut unavailable = false;
+            for path in paths {
+                seen.insert(path.clone());
+                unavailable |= !self.scan_file(&root, &path, false);
+            }
+            if unavailable {
+                if let Some(entry) = self.saved.vaults.iter_mut().find(|v| v.path == vault.path) {
+                    entry.unavailable = true;
+                }
+            }
+        }
+        self.files.retain(|path, _| seen.contains(path));
+        if self.reconcile_reminders() {
+            if let Err(error) = self.persist() {
+                self.error = Some(error);
+            }
+        }
+    }
+
+    fn mark_unavailable(&mut self, root: &Path, seen: &mut BTreeSet<PathBuf>) {
+        for (path, entry) in &mut self.files {
+            if path.starts_with(root) {
+                seen.insert(path.clone());
+                entry
+                    .tasks
+                    .iter_mut()
+                    .for_each(|task| task.available = false);
+            }
+        }
+    }
+
+    fn scan_file(&mut self, vault: &Path, path: &Path, force: bool) -> bool {
+        let result = (|| {
+            let metadata = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+            if !metadata.is_file() || metadata.file_type().is_symlink() {
+                return Err("Note is no longer a regular file".into());
+            }
+            let canonical = fs::canonicalize(path).map_err(|e| e.to_string())?;
+            if !canonical.starts_with(vault) {
+                return Err("Note left its knowledge base".into());
+            }
+            let signature = Signature {
+                modified: metadata.modified().ok(),
+                length: metadata.len(),
+            };
+            if !force
+                && self.files.get(path).is_some_and(|entry| {
+                    entry.signature == signature && entry.tasks.iter().all(|t| t.available)
+                })
+            {
+                return Ok(());
+            }
+            let text = storage::read_note(&canonical)?;
+            self.files.insert(
+                path.into(),
+                FileIndex {
+                    signature,
+                    tasks: parser::parse(&text, vault, path),
+                },
+            );
+            Ok::<(), String>(())
+        })();
+        if let Err(error) = result {
+            if let Some(entry) = self.files.get_mut(path) {
+                entry
+                    .tasks
+                    .iter_mut()
+                    .for_each(|task| task.available = false);
+            }
+            self.error = Some(format!("{}: {error}", path.display()));
+            return false;
+        }
+        true
+    }
+
+    fn reconcile_reminders(&mut self) -> bool {
+        let now = Local::now().timestamp_millis();
+        let preserve_unseen = self.saved.vaults.iter().any(|vault| vault.unavailable)
+            || self
+                .files
+                .values()
+                .any(|entry| entry.tasks.iter().any(|task| !task.available));
+        let active = build_reminders(
+            self.files.values().flat_map(|entry| &entry.tasks),
+            &self.saved.reminders,
+            preserve_unseen,
+            now,
+        );
+        let changed = serde_json::to_string(&active).ok()
+            != serde_json::to_string(&self.saved.reminders).ok();
+        self.saved.reminders = active;
+        changed
+    }
+
+    fn remind(&mut self, catch_up: bool) {
+        let now = Local::now().timestamp_millis();
+        let due: BTreeSet<String> = self
+            .saved
+            .reminders
+            .iter()
+            .filter(|(_, r)| !r.submitted && r.at <= now)
+            .map(|(key, _)| key.clone())
+            .collect();
+        if due.is_empty() {
+            return;
+        }
+        let paths: BTreeSet<(String, String)> = self
+            .files
+            .values()
+            .flat_map(|entry| &entry.tasks)
+            .filter(|task| due.contains(&task.notification_key()))
+            .map(|task| (task.vault_path.clone(), task.file_path.clone()))
+            .collect();
+        // 即使监测有退避，到期前也从磁盘重读，完成或改期后不发送旧提醒。
+        for (vault, path) in paths {
+            self.scan_file(Path::new(&vault), Path::new(&path), true);
+        }
+        self.reconcile_reminders();
+        let candidates: Vec<Task> = self
+            .files
+            .values()
+            .flat_map(|entry| &entry.tasks)
+            .filter(|task| {
+                task.available
+                    && !task.completed
+                    && !task.date_error
+                    && due.contains(&task.notification_key())
+                    && task.reminder_at.is_some_and(|at| at <= now)
+            })
+            .cloned()
+            .collect();
+        if candidates.is_empty() {
+            return;
+        }
+        let english = self.saved.preferences.language == "en";
+        let title = if candidates.len() == 1 && !catch_up {
+            format!(
+                "{}{}",
+                if english {
+                    "Task due: "
+                } else {
+                    "待办到期："
+                },
+                candidates[0].title
+            )
+        } else if english {
+            format!(
+                "{} task reminders{}",
+                candidates.len(),
+                if catch_up { " missed" } else { "" }
+            )
+        } else {
+            format!(
+                "{}{} 项待办",
+                if catch_up { "错过了 " } else { "有 " },
+                candidates.len()
+            )
+        };
+        let first = &candidates[0];
+        let body = if candidates.len() == 1 {
+            format!(
+                "{} {} · {}",
+                first.date.as_deref().unwrap_or_default(),
+                first.time.as_deref().unwrap_or("09:00"),
+                first.relative_path
+            )
+        } else {
+            candidates
+                .iter()
+                .take(3)
+                .map(|task| task.title.as_str())
+                .collect::<Vec<_>>()
+                .join(" · ")
+        };
+        if self.saved.preferences.notifications {
+            if let Err(error) = self
+                .app
+                .notification()
+                .builder()
+                .title(title)
+                .body(body)
+                .show()
+            {
+                self.error = Some(error.to_string());
+                return;
+            }
+        }
+        for task in candidates {
+            if let Some(record) = self.saved.reminders.get_mut(&task.notification_key()) {
+                record.submitted = true;
+            }
+        }
+        if let Err(error) = self.persist() {
+            self.error = Some(error);
+        }
+    }
+}
+
+fn current_timezone() -> (i32, String) {
+    (
+        Local::now().offset().local_minus_utc(),
+        iana_time_zone::get_timezone().unwrap_or_default(),
+    )
+}
+
+fn refresh_timezone(
+    files: &mut BTreeMap<PathBuf, FileIndex>,
+    previous: &mut (i32, String),
+    current: (i32, String),
+) {
+    if current != *previous {
+        *previous = current;
+        for entry in files.values_mut() {
+            entry.signature.modified = None;
+        }
+    }
+}
+
+fn collect_vault_notes(vault: &mut Vault) -> Result<Vec<PathBuf>, String> {
+    let root = Path::new(&vault.path);
+    vault.unavailable =
+        !root.is_dir() || fs::symlink_metadata(root).is_ok_and(|m| m.file_type().is_symlink());
+    if vault.unavailable {
+        return Err("Knowledge base is unavailable".into());
+    }
+    let mut paths = Vec::new();
+    if let Err(error) = collect_notes(root, root, &vault.trash_folder, &mut paths) {
+        vault.unavailable = true;
+        return Err(error);
+    }
+    Ok(paths)
+}
+
+fn build_reminders<'a>(
+    tasks: impl Iterator<Item = &'a Task>,
+    previous: &BTreeMap<String, ReminderRecord>,
+    preserve_unseen: bool,
+    now: i64,
+) -> BTreeMap<String, ReminderRecord> {
+    // 不完整扫描不能证明旧任务已被删除；提醒发送前仍会逐文件核实。
+    let mut active = if preserve_unseen {
+        previous.clone()
+    } else {
+        BTreeMap::new()
+    };
+    for task in tasks {
+        if task.completed || task.date_error {
+            continue;
+        }
+        if let Some(at) = task.reminder_at {
+            let key = task.notification_key();
+            if let Some(record) = previous.get(&key) {
+                active.insert(
+                    key,
+                    ReminderRecord {
+                        at,
+                        submitted: record.submitted,
+                    },
+                );
+            } else if at > now {
+                active.insert(
+                    key,
+                    ReminderRecord {
+                        at,
+                        submitted: false,
+                    },
+                );
+            }
+        }
+    }
+    active
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn offline_start_keeps_due_reminders_until_sources_are_verified() {
+        let task = parser::parse(
+            "- [ ] 待办 @2026-11-10 15:00",
+            Path::new("/vault"),
+            Path::new("/vault/note.md"),
+        )
+        .remove(0);
+        let at = task.reminder_at.unwrap();
+        let known = BTreeMap::from([(
+            task.notification_key(),
+            ReminderRecord {
+                at,
+                submitted: false,
+            },
+        )]);
+        let offline = build_reminders(std::iter::empty(), &known, true, at + 1000);
+        assert_eq!(offline.len(), 1, "离线不代表删除，已安排的提醒不能丢失");
+        let restored = build_reminders(std::iter::once(&task), &offline, false, at + 1000);
+        assert!(!restored[&task.notification_key()].submitted);
+        assert!(build_reminders(std::iter::empty(), &restored, false, at + 1000).is_empty());
+        assert!(
+            build_reminders(std::iter::once(&task), &BTreeMap::new(), false, at + 1000).is_empty()
+        );
+    }
+
+    #[test]
+    fn same_offset_zone_change_invalidates_cached_future_times() {
+        let mut files = BTreeMap::from([(
+            PathBuf::from("/vault/note.md"),
+            FileIndex {
+                signature: Signature {
+                    modified: Some(SystemTime::UNIX_EPOCH),
+                    length: 42,
+                },
+                tasks: vec![],
+            },
+        )]);
+        let mut previous = (0, "Europe/London".into());
+        refresh_timezone(&mut files, &mut previous, (0, "Africa/Abidjan".into()));
+        assert!(
+            files
+                .values()
+                .all(|entry| entry.signature.modified.is_none()),
+            "当前偏移相同不能推断未来夏令时相同"
+        );
+        assert_eq!(previous.1, "Africa/Abidjan");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_directory_scan_marks_whole_vault_unavailable() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("mozi-task-scan-{}", uuid::Uuid::new_v4()));
+        let blocked = root.join("blocked");
+        fs::create_dir_all(&blocked).unwrap();
+        fs::write(root.join("note.md"), "- [ ] 待办 @2026-11-10").unwrap();
+        fs::set_permissions(&blocked, fs::Permissions::from_mode(0)).unwrap();
+        let mut vault = Vault {
+            path: root.to_string_lossy().into(),
+            name: "QA".into(),
+            trash_folder: ".trash".into(),
+            unavailable: false,
+        };
+        let result = collect_vault_notes(&mut vault);
+        fs::set_permissions(&blocked, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        assert!(result.is_err());
+        assert!(vault.unavailable, "枚举失败时必须保护整库已有的日历事件");
+    }
+}
+
+fn collect_notes(
+    root: &Path,
+    directory: &Path,
+    trash: &str,
+    output: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    for entry in fs::read_dir(directory).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let file_type = entry.file_type().map_err(|e| e.to_string())?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let path = entry.path();
+        if file_type.is_dir() {
+            if name.starts_with('.')
+                || matches!(name.as_ref(), "node_modules" | "target")
+                || path == root.join(trash)
+            {
+                continue;
+            }
+            collect_notes(root, &path, trash, output)?;
+        } else if file_type.is_file()
+            && path
+                .extension()
+                .and_then(|s| s.to_str())
+                .is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")
+                })
+        {
+            output.push(path);
+        }
+    }
+    Ok(())
+}
