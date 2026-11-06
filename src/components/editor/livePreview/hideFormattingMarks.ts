@@ -383,9 +383,6 @@ export const livePreviewTheme = EditorView.baseTheme({
     textDecorationSkip: "none",
     cursor: "pointer",
   },
-  ".cm-live-preview-link.has-visible-dest": {
-    marginInlineEnd: "0.35em",
-  },
   ".cm-live-preview-table-wrap": {
     display: "block",
     boxSizing: "border-box",

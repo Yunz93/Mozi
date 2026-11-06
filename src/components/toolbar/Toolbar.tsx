@@ -109,7 +109,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
       const getMenuItems = () =>
         Array.from(
           menuRef.current?.querySelectorAll<HTMLButtonElement>(
-            '[role="menuitem"]:not(:disabled), [role="menuitemcheckbox"]:not(:disabled)',
+            '[role="menuitem"]:not(:disabled)',
           ) ?? [],
         );
       getMenuItems()[0]?.focus();
@@ -251,12 +251,23 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
             >
               <Focus size={14} aria-hidden />
             </button>
-            <ViewModeToggle
-              viewMode={viewMode}
-              onViewModeChange={onViewModeChange}
-              previewOnly={isPreviewOnlyFile}
-            />
+            <button
+              type="button"
+              className="app-toolbar-icon app-toolbar-writing-mode"
+              title={`${t("settings_typewriterMode")} · F9`}
+              aria-label={t("settings_typewriterMode")}
+              aria-pressed={typewriterMode === true}
+              disabled={writingDisabled}
+              onClick={() => toggleWritingMode("typewriterMode")}
+            >
+              <TextCursor size={14} aria-hidden />
+            </button>
           </div>
+          <ViewModeToggle
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+            previewOnly={isPreviewOnlyFile}
+          />
           <div className="app-toolbar-group app-toolbar-ai-actions">
             {onAskVault && (
               <button
@@ -364,26 +375,6 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                   aria-label={t("toolbar_more")}
                   className="app-toolbar-menu"
                 >
-                  <button
-                    type="button"
-                    role="menuitemcheckbox"
-                    title={`${t("settings_typewriterMode")} · F9`}
-                    aria-label={t("settings_typewriterMode")}
-                    aria-checked={typewriterMode === true}
-                    disabled={writingDisabled}
-                    onClick={() =>
-                      runMenuAction(() => toggleWritingMode("typewriterMode"))
-                    }
-                  >
-                    <TextCursor size={14} aria-hidden />
-                    <span>{t("settings_typewriterMode")}</span>
-                  </button>
-                  {(onExportPdf || onExportHtml || onShareLongImage) && (
-                    <div
-                      className="app-toolbar-menu-separator"
-                      role="separator"
-                    />
-                  )}
                   {onExportPdf && (
                     <button
                       type="button"

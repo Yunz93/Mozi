@@ -11,7 +11,10 @@ import { Prec } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { hasSkipAncestor } from "../livePreview/shared";
 import { livePreviewCaretAnchoringEnabled } from "../livePreview/caretAnchor";
-import { isEditorImeComposing } from "../behavior/imeGuard";
+import {
+  IME_CONFIRM_SUPPRESS_MS,
+  isEditorImeComposing,
+} from "../behavior/imeGuard";
 import { useAppStore } from "../../../store/appStore";
 
 export interface WritingPreferences {
@@ -66,13 +69,23 @@ function focusDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true);
 }
 
-const writingView = ViewPlugin.fromClass(
+export const writingView = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
     private generation = 0;
+    private followingCaret = true;
+    private compositionTimer: ReturnType<typeof setTimeout> | null = null;
+    private cancelManualPositioning = () => this.cancelPositioning();
     constructor(view: EditorView) {
       this.decorations = focusDecorations(view);
+      // 滚动条和 gutter 位于 contentDOM 外，也必须取消跟随。
+      for (const type of ["wheel", "touchstart", "mousedown"])
+        view.scrollDOM.addEventListener(type, this.cancelManualPositioning, {
+          passive: true,
+        });
+      this.view = view;
     }
+    private view: EditorView;
     update(update: ViewUpdate): void {
       if (
         update.docChanged ||
@@ -83,31 +96,65 @@ const writingView = ViewPlugin.fromClass(
       ) {
         this.decorations = focusDecorations(update.view);
       }
-      const generation = ++this.generation;
+      const preferences = update.state.facet(writingPreferences);
+      const previousPreferences = update.startState.facet(writingPreferences);
       if (
-        !update.state.facet(writingPreferences).typewriterMode ||
-        !update.view.hasFocus ||
-        isEditorImeComposing(update.view) ||
-        !update.docChanged ||
-        !update.transactions.some(
-          (tr) =>
-            tr.isUserEvent("input.type") ||
-            tr.isUserEvent("input.paste") ||
-            tr.isUserEvent("input") ||
-            tr.isUserEvent("delete"),
-        )
+        update.docChanged ||
+        update.selectionSet ||
+        update.focusChanged ||
+        preferences !== previousPreferences
+      )
+        this.generation++;
+      const userEdit =
+        update.docChanged &&
+        update.transactions.some(
+          (tr) => tr.isUserEvent("input") || tr.isUserEvent("delete"),
+        );
+      const keyboardSelection =
+        update.selectionSet &&
+        update.transactions.some(
+          (tr) => tr.isUserEvent("select") && !tr.isUserEvent("select.pointer"),
+        );
+      const explicitPositioning =
+        !previousPreferences.typewriterMode || userEdit || keyboardSelection;
+      if (update.docChanged && !userEdit) this.cancelPositioning();
+      if (explicitPositioning) this.followingCaret = true;
+      if (this.compositionTimer && (update.docChanged || update.selectionSet)) {
+        if (userEdit || keyboardSelection) this.finishComposition(update.view);
+        else this.cancelPositioning();
+      }
+      if (
+        preferences.typewriterMode &&
+        (explicitPositioning ||
+          (this.followingCaret &&
+            update.geometryChanged &&
+            !update.docChanged &&
+            !update.selectionSet &&
+            !update.viewportChanged))
+      )
+        this.centerCaret(update.view);
+    }
+    centerCaret(view: EditorView): void {
+      if (
+        !view.state.facet(writingPreferences).typewriterMode ||
+        !this.followingCaret ||
+        !view.hasFocus ||
+        !view.state.selection.main.empty ||
+        isEditorImeComposing(view)
       )
         return;
-      const view = update.view;
-      const head = update.state.selection.main.head;
-      const scrollTop = view.scrollDOM.scrollTop;
+      const generation = this.generation;
+      const head = view.state.selection.main.head;
       view.requestMeasure({
         key: this,
         read: () => {
           if (
             generation !== this.generation ||
+            !this.followingCaret ||
             !view.hasFocus ||
-            Math.abs(view.scrollDOM.scrollTop - scrollTop) > 1
+            !view.state.facet(writingPreferences).typewriterMode ||
+            isEditorImeComposing(view) ||
+            view.dom.closest('[aria-hidden="true"]')
           )
             return null;
           const caret = view.coordsAtPos(head);
@@ -115,7 +162,10 @@ const writingView = ViewPlugin.fromClass(
           return caret
             ? Math.max(
                 0,
-                scrollTop + caret.top - viewport.top - viewport.height * 0.45,
+                view.scrollDOM.scrollTop +
+                  caret.top -
+                  viewport.top -
+                  viewport.height * 0.45,
               )
             : null;
         },
@@ -125,8 +175,43 @@ const writingView = ViewPlugin.fromClass(
         },
       });
     }
+    cancelPositioning(): void {
+      this.generation++;
+      this.followingCaret = false;
+      if (this.compositionTimer) {
+        clearTimeout(this.compositionTimer);
+        this.compositionTimer = null;
+      }
+    }
+    finishComposition(view: EditorView): void {
+      if (this.compositionTimer) clearTimeout(this.compositionTimer);
+      this.followingCaret = true;
+      const generation = this.generation;
+      this.compositionTimer = setTimeout(() => {
+        this.compositionTimer = null;
+        if (generation === this.generation) this.centerCaret(view);
+      }, IME_CONFIRM_SUPPRESS_MS + 1);
+    }
+    destroy(): void {
+      this.cancelPositioning();
+      for (const type of ["wheel", "touchstart", "mousedown"])
+        this.view.scrollDOM.removeEventListener(
+          type,
+          this.cancelManualPositioning,
+        );
+    }
   },
-  { decorations: (plugin) => plugin.decorations },
+  {
+    decorations: (plugin) => plugin.decorations,
+    eventObservers: {
+      compositionstart() {
+        this.cancelPositioning();
+      },
+      compositionend(_event, view) {
+        this.finishComposition(view);
+      },
+    },
+  },
 );
 
 function smartPunctuation(

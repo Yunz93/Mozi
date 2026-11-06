@@ -70,6 +70,7 @@ import { useKnowledgeBaseWatch } from "./app/useKnowledgeBaseWatch";
 import { useVaultIndexLifecycle } from "./hooks/useVaultIndexLifecycle";
 import { useAppUpdater } from "./app/useAppUpdater";
 import { useWorkspaceLayout } from "./app/useWorkspaceLayout";
+import { useFocusMode } from "./app/useFocusMode";
 import { useAttachmentCleanup } from "./app/useAttachmentCleanup";
 import { useExternalFileOpen } from "./app/useExternalFileOpen";
 import {
@@ -410,6 +411,17 @@ const App: React.FC = () => {
     : false;
   const isNonMarkdownWorkspaceFile =
     isPreviewOnlyActiveFile || isExcalidrawActiveFile;
+  const isFocusModeActive = Boolean(
+    settings.focusMode &&
+    activeTabId &&
+    !isNonMarkdownWorkspaceFile &&
+    viewMode === ViewMode.LIVE,
+  );
+  useEffect(() => {
+    if (!isFocusModeActive) return;
+    setIsSearchBarOpen(false);
+    setIsCommandPaletteOpen(false);
+  }, [isFocusModeActive]);
 
   // Global keyboard shortcuts
   useUiFontSizeKeyboardShortcuts();
@@ -977,6 +989,20 @@ const App: React.FC = () => {
     bootOpenWithVault: externalFileOpen.bootOpenWithVault,
   });
 
+  useFocusMode(isFocusModeActive, {
+    settings: isSettingsOpen,
+    search: isSearchBarOpen,
+    commands: isCommandPaletteOpen,
+    newNote: isNewNoteDialogOpen,
+    publishTarget: isPublishTargetDialogOpen,
+    simpleBlog: isSimpleBlogDialogOpen,
+    wechatDraft: isWechatDraftDialogOpen,
+    weReadImport: weReadImport.isOpen,
+    shareLongImage: isShareLongImageDialogOpen,
+    aiEnhance: isAiEnhanceConfirmOpen,
+    attachmentCleanup: Boolean(pendingCleanupAttachments?.length),
+  });
+
   if (shouldShowKnowledgeBaseLoading) {
     return (
       <KnowledgeBaseLoadingScreen
@@ -1000,7 +1026,7 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <div
-        className="workspace-root flex h-screen flex-col overflow-hidden text-sm"
+        className={`workspace-root flex h-screen flex-col overflow-hidden text-sm${isFocusModeActive ? " is-focus-mode" : ""}`}
         style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
       >
         {(() => {
@@ -1009,7 +1035,8 @@ const App: React.FC = () => {
             /Mac/.test(navigator.platform ?? "");
           const shouldInsetForMacOverlayTitlebar =
             isMac && isTauriEnvironment();
-          if (!shouldInsetForMacOverlayTitlebar) return null;
+          if (isFocusModeActive || !shouldInsetForMacOverlayTitlebar)
+            return null;
           return (
             <div
               className="workspace-titlebar h-[28px] w-full shrink-0"
@@ -1054,7 +1081,7 @@ const App: React.FC = () => {
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
             onOpenSettings={() => setSettingsOpen(true)}
             disableOpenKnowledgeBase={standaloneDocumentSession}
-            isOpen={isSidebarOpen}
+            isOpen={isSidebarOpen && !isFocusModeActive}
             searchFocusRequestKey={sidebarSearchRequestKey}
             locateCurrentFileRequestKey={sidebarLocateRequestKey}
             width={responsiveSidebarWidth}
@@ -1066,36 +1093,38 @@ const App: React.FC = () => {
             ref={mainContentRef}
             className="workspace-surface flex-1 flex flex-col h-full min-w-0"
           >
-            <Toolbar
-              fileName={activeFile?.name || ""}
-              folderName={activeFile?.path?.split(/[/\\]/).at(-2)}
-              viewMode={viewMode}
-              onViewModeChange={handleToolbarViewModeChange}
-              onAIAnalyze={requestAIAnalyze}
-              onAskVault={() => {
-                setIsAskVaultOpen((prev) => {
-                  const next = !prev;
-                  if (next) setIsOutlineOpen(false);
-                  return next;
-                });
-              }}
-              isAskVaultOpen={isAskVaultOpen}
-              isAnalyzing={isAnalyzing}
-              aiEnhanceStage={aiEnhanceStage}
-              isSaving={isSaving}
-              isPublishing={isPublishing}
-              isSidebarOpen={isSidebarOpen}
-              onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
-              onToggleTheme={toggleTheme}
-              themeMode={settings.themeMode}
-              onPublish={handleOpenPublishDialog}
-              onExportPdf={handleExportToPdf}
-              onExportHtml={handleExportToHtml}
-              onShareLongImage={() => {
-                setIsShareLongImageDialogOpen(true);
-              }}
-              isPreviewOnlyFile={isNonMarkdownWorkspaceFile}
-            />
+            {!isFocusModeActive && (
+              <Toolbar
+                fileName={activeFile?.name || ""}
+                folderName={activeFile?.path?.split(/[/\\]/).at(-2)}
+                viewMode={viewMode}
+                onViewModeChange={handleToolbarViewModeChange}
+                onAIAnalyze={requestAIAnalyze}
+                onAskVault={() => {
+                  setIsAskVaultOpen((prev) => {
+                    const next = !prev;
+                    if (next) setIsOutlineOpen(false);
+                    return next;
+                  });
+                }}
+                isAskVaultOpen={isAskVaultOpen}
+                isAnalyzing={isAnalyzing}
+                aiEnhanceStage={aiEnhanceStage}
+                isSaving={isSaving}
+                isPublishing={isPublishing}
+                isSidebarOpen={isSidebarOpen}
+                onMenuClick={() => setSidebarOpen(!isSidebarOpen)}
+                onToggleTheme={toggleTheme}
+                themeMode={settings.themeMode}
+                onPublish={handleOpenPublishDialog}
+                onExportPdf={handleExportToPdf}
+                onExportHtml={handleExportToHtml}
+                onShareLongImage={() => {
+                  setIsShareLongImageDialogOpen(true);
+                }}
+                isPreviewOnlyFile={isNonMarkdownWorkspaceFile}
+              />
+            )}
 
             <div className="flex-1 min-w-0 flex overflow-hidden relative">
               <SplitView
@@ -1117,7 +1146,9 @@ const App: React.FC = () => {
               />
               {activeTabId ? (
                 <RightRail
-                  isOpen={isOutlineVisible && !isAskVaultOpen}
+                  isOpen={
+                    isOutlineVisible && !isAskVaultOpen && !isFocusModeActive
+                  }
                   headings={outlineHeadings}
                   activeHeadingId={activeHeadingId}
                   onHeadingClick={handleHeadingClick}
@@ -1134,7 +1165,7 @@ const App: React.FC = () => {
                   onCreateMissingNote={handleCreateMissingWikiNote}
                 />
               ) : null}
-              {isAskVaultOpen ? (
+              {isAskVaultOpen && !isFocusModeActive ? (
                 <AskVaultPanel
                   open
                   onClose={() => setIsAskVaultOpen(false)}
@@ -1142,10 +1173,10 @@ const App: React.FC = () => {
                   readFile={readFile}
                 />
               ) : null}
-              {isSearchBarOpen && (
+              {isSearchBarOpen && !isFocusModeActive && (
                 <ContentSearch onClose={() => setIsSearchBarOpen(false)} />
               )}
-              {isCommandPaletteOpen ? (
+              {isCommandPaletteOpen && !isFocusModeActive ? (
                 <CommandPalette
                   commands={commandPaletteItems}
                   onClose={() => setIsCommandPaletteOpen(false)}
@@ -1155,70 +1186,72 @@ const App: React.FC = () => {
           </main>
         </div>
 
-        <AppDialogs
-          isSettingsOpen={isSettingsOpen}
-          isNewNoteDialogOpen={isNewNoteDialogOpen}
-          isPublishTargetDialogOpen={isPublishTargetDialogOpen}
-          isSimpleBlogDialogOpen={isSimpleBlogDialogOpen}
-          isWechatDraftDialogOpen={isWechatDraftDialogOpen}
-          isWeReadImportDialogOpen={weReadImport.isOpen}
-          isWeReadImporting={weReadImport.isImporting}
-          weReadImportInitialQuery={weReadImport.initialQuery}
-          weReadImportPreselectedBookIds={weReadImport.preselectedBookIds}
-          isShareLongImageDialogOpen={isShareLongImageDialogOpen}
-          isPublishing={isPublishing}
-          settings={settings}
-          wechatDraftDefaults={wechatDraftDefaults}
-          simpleBlogPublishDefaults={simpleBlogPublishDefaults}
-          simpleBlogLocalImagesToRepo={
-            !isImageHostingConfigured(settings) &&
-            markdownHasLocalImages(content ?? "")
-          }
-          notification={notification}
-          attachmentContext={{ files, rootFolderPath }}
-          t={t as unknown as (key: string) => string}
-          uiScaleStyle={uiScaleStyle}
-          buildPayload={buildLongImageSharePayload}
-          onCloseSettings={() => setSettingsOpen(false)}
-          onUpdateSettings={updateSettings}
-          onCloseNewNote={() => setIsNewNoteDialogOpen(false)}
-          onSubmitNewNote={handleSubmitNewNote}
-          onClosePublishTarget={() => setIsPublishTargetDialogOpen(false)}
-          onSelectSimpleBlog={handleSelectSimpleBlogPublish}
-          onSelectWechatDraft={handleSelectWechatDraftPublish}
-          onCloseSimpleBlog={() => {
-            if (!isPublishing) setIsSimpleBlogDialogOpen(false);
-          }}
-          onSubmitSimpleBlog={(input) => {
-            void handleSubmitSimpleBlog(input);
-          }}
-          onCloseWechatDraft={() => {
-            if (!isPublishing) setIsWechatDraftDialogOpen(false);
-          }}
-          onPersistWechatDraft={(input) => persistWechatDraftForm(input)}
-          onSubmitWechatDraft={(input) => {
-            void handleSubmitWechatDraft(input).catch((error) => {
-              console.error("Failed to submit WeChat draft:", error);
-            });
-          }}
-          onCloseWeReadImport={weReadImport.closeDialog}
-          onLoadWeReadNotebooks={weReadImport.loadNotebooks}
-          onSearchWeReadStore={weReadImport.searchBooks}
-          onImportWeRead={weReadImport.importSelected}
-          onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
-          isAiEnhanceConfirmOpen={isAiEnhanceConfirmOpen}
-          onConfirmAiEnhance={() => {
-            closeAiEnhanceConfirm();
-            void handleAIAnalyze();
-          }}
-          onCancelAiEnhance={closeAiEnhanceConfirm}
-          cleanupPendingCount={pendingCleanupAttachments?.length ?? 0}
-          onConfirmCleanupAttachments={() => {
-            void confirmCleanupUnusedAttachments();
-          }}
-          onCancelCleanupAttachments={cancelCleanupUnusedAttachments}
-        />
-        <UiZoomHint />
+        {!isFocusModeActive && (
+          <AppDialogs
+            isSettingsOpen={isSettingsOpen}
+            isNewNoteDialogOpen={isNewNoteDialogOpen}
+            isPublishTargetDialogOpen={isPublishTargetDialogOpen}
+            isSimpleBlogDialogOpen={isSimpleBlogDialogOpen}
+            isWechatDraftDialogOpen={isWechatDraftDialogOpen}
+            isWeReadImportDialogOpen={weReadImport.isOpen}
+            isWeReadImporting={weReadImport.isImporting}
+            weReadImportInitialQuery={weReadImport.initialQuery}
+            weReadImportPreselectedBookIds={weReadImport.preselectedBookIds}
+            isShareLongImageDialogOpen={isShareLongImageDialogOpen}
+            isPublishing={isPublishing}
+            settings={settings}
+            wechatDraftDefaults={wechatDraftDefaults}
+            simpleBlogPublishDefaults={simpleBlogPublishDefaults}
+            simpleBlogLocalImagesToRepo={
+              !isImageHostingConfigured(settings) &&
+              markdownHasLocalImages(content ?? "")
+            }
+            notification={notification}
+            attachmentContext={{ files, rootFolderPath }}
+            t={t as unknown as (key: string) => string}
+            uiScaleStyle={uiScaleStyle}
+            buildPayload={buildLongImageSharePayload}
+            onCloseSettings={() => setSettingsOpen(false)}
+            onUpdateSettings={updateSettings}
+            onCloseNewNote={() => setIsNewNoteDialogOpen(false)}
+            onSubmitNewNote={handleSubmitNewNote}
+            onClosePublishTarget={() => setIsPublishTargetDialogOpen(false)}
+            onSelectSimpleBlog={handleSelectSimpleBlogPublish}
+            onSelectWechatDraft={handleSelectWechatDraftPublish}
+            onCloseSimpleBlog={() => {
+              if (!isPublishing) setIsSimpleBlogDialogOpen(false);
+            }}
+            onSubmitSimpleBlog={(input) => {
+              void handleSubmitSimpleBlog(input);
+            }}
+            onCloseWechatDraft={() => {
+              if (!isPublishing) setIsWechatDraftDialogOpen(false);
+            }}
+            onPersistWechatDraft={(input) => persistWechatDraftForm(input)}
+            onSubmitWechatDraft={(input) => {
+              void handleSubmitWechatDraft(input).catch((error) => {
+                console.error("Failed to submit WeChat draft:", error);
+              });
+            }}
+            onCloseWeReadImport={weReadImport.closeDialog}
+            onLoadWeReadNotebooks={weReadImport.loadNotebooks}
+            onSearchWeReadStore={weReadImport.searchBooks}
+            onImportWeRead={weReadImport.importSelected}
+            onCloseShareLongImage={() => setIsShareLongImageDialogOpen(false)}
+            isAiEnhanceConfirmOpen={isAiEnhanceConfirmOpen}
+            onConfirmAiEnhance={() => {
+              closeAiEnhanceConfirm();
+              void handleAIAnalyze();
+            }}
+            onCancelAiEnhance={closeAiEnhanceConfirm}
+            cleanupPendingCount={pendingCleanupAttachments?.length ?? 0}
+            onConfirmCleanupAttachments={() => {
+              void confirmCleanupUnusedAttachments();
+            }}
+            onCancelCleanupAttachments={cancelCleanupUnusedAttachments}
+          />
+        )}
+        {!isFocusModeActive && <UiZoomHint />}
         <UpdateInstallGuard />
       </div>
     </ErrorBoundary>

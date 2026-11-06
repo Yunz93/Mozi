@@ -11,6 +11,7 @@ import {
 } from "./clickableLinks";
 import { livePreviewContextFacet } from "./context";
 import { livePreviewLinks } from "./links";
+import { livePreviewHideFormatting } from "./hideFormattingMarks";
 
 const AWS_LINK_DOC =
   "[AWS 服务价目表说明](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/reading-service-price-list-file-for-services.html)";
@@ -196,6 +197,32 @@ describe("tryOpenLivePreviewLinkAtPos", () => {
     expect(link!.innerHTML).not.toContain("**加粗**");
   });
 
+  it.each(["说明文字", "https://label.example.com"])(
+    "renders one link for label %s and reveals its source when the caret enters on the same line",
+    (label) => {
+      const href = "https://destination.example.com/path?q=1#标题";
+      const doc = `前文 [${label}](${href}) 后文\n\n其他段落`;
+      const outside = doc.indexOf("后文") + 1;
+      const view = mount(
+        doc,
+        [livePreviewHideFormatting, livePreviewLinks],
+        outside,
+      );
+      const links = view.contentDOM.querySelectorAll("a");
+      expect(links.length).toBe(1);
+      expect(links[0].textContent).toBe(label);
+      expect(links[0].getAttribute("href")).toBe(href);
+      expect(view.contentDOM.textContent).not.toContain(href);
+      expect(view.state.doc.toString()).toBe(doc);
+      view.dispatch({ selection: { anchor: doc.indexOf("destination") } });
+      expect(view.contentDOM.querySelector(".cm-live-preview-link")).toBeNull();
+      expect(view.contentDOM.textContent).toContain(`[${label}](${href})`);
+      view.dispatch({ selection: { anchor: outside } });
+      expect(view.contentDOM.querySelectorAll("a").length).toBe(1);
+      expect(view.contentDOM.textContent).not.toContain(href);
+    },
+  );
+
   it("falls back to href when link label is empty", () => {
     const onOpenLink = vi.fn();
     const doc = "go [](https://example.com)\n\naway";
@@ -214,6 +241,11 @@ describe("tryOpenLivePreviewLinkAtPos", () => {
     );
 
     expect(view.contentDOM.textContent).toContain("https://example.com");
-    expect(view.dom.querySelector(".cm-live-preview-link")).toBeNull();
+    const link = view.dom.querySelector(
+      ".cm-live-preview-link",
+    ) as HTMLAnchorElement;
+    expect(link).not.toBeNull();
+    expect(link.textContent).toBe("https://example.com");
+    expect(link.getAttribute("href")).toBe("https://example.com");
   });
 });

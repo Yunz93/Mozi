@@ -44,6 +44,16 @@
   border-radius: 12px;
   background: var(--workspace-canvas);
 }
+
+.workspace-root.is-focus-mode
+  :is(
+    .sidebar-shell,
+    .right-rail,
+    .workspace-document-footer,
+    .editor-pane-chrome
+  ) {
+  display: none !important;
+}
 .workspace-startup-brand {
   color: var(--workspace-accent);
 }
@@ -294,10 +304,10 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-}
-.app-toolbar-group + .app-toolbar-group {
-  padding-left: 8px;
-  border-left: 1px solid var(--workspace-border);
+  padding: 2px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 7px;
+  height: 40px;
 }
 .app-toolbar-icon {
   display: inline-flex;
@@ -370,6 +380,7 @@
   padding: 2px;
   border: 1px solid var(--workspace-border);
   border-radius: 7px;
+  min-height: 40px;
 }
 .workspace-view-modes button {
   display: inline-flex;
@@ -447,17 +458,8 @@
 .app-toolbar-menu button svg {
   flex-shrink: 0;
 }
-.app-toolbar-menu-separator {
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--workspace-border);
-}
 .app-toolbar-menu button:hover {
   background: var(--workspace-hover);
-}
-.app-toolbar-menu button[aria-checked="true"] {
-  color: var(--workspace-accent);
-  background: var(--workspace-active);
 }
 
 .app-toolbar button:disabled,
@@ -530,9 +532,6 @@
   .app-toolbar-actions {
     gap: 6px;
   }
-  .app-toolbar-group + .app-toolbar-group {
-    padding-left: 6px;
-  }
   .app-toolbar {
     padding-inline: 14px;
   }
@@ -548,9 +547,6 @@
   }
   .app-toolbar-group {
     gap: 2px;
-  }
-  .app-toolbar-group + .app-toolbar-group {
-    padding-left: 4px;
   }
   .app-toolbar button {
     line-height: 1.4;

@@ -55,6 +55,7 @@ describe("Toolbar", () => {
     expect(names.slice(1)).toEqual([
       "切换到深色模式",
       "专注模式",
+      "打字机模式",
       "实时预览",
       "阅读",
       "小知助手",
@@ -131,19 +132,19 @@ describe("Toolbar", () => {
     const trigger = screen.getByRole("button", { name: "更多操作" });
     await user.click(trigger);
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitemcheckbox", { name: "打字机模式" }),
+      screen.getByRole("menuitem", { name: "导出 PDF" }),
     );
     await user.keyboard("{ArrowDown}");
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitem", { name: "导出 PDF" }),
+      screen.getByRole("menuitem", { name: "导出 HTML" }),
     );
     await user.keyboard("{ArrowUp}");
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitemcheckbox", { name: "打字机模式" }),
+      screen.getByRole("menuitem", { name: "导出 PDF" }),
     );
     await user.keyboard("{End}{ArrowDown}");
     expect(document.activeElement).toBe(
-      screen.getByRole("menuitemcheckbox", { name: "打字机模式" }),
+      screen.getByRole("menuitem", { name: "导出 PDF" }),
     );
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
@@ -171,7 +172,7 @@ describe("Toolbar", () => {
     ).toBe(false);
     expect(
       (
-        screen.getByRole("menuitemcheckbox", {
+        screen.getByRole("button", {
           name: "打字机模式",
         }) as HTMLButtonElement
       ).disabled,
@@ -206,7 +207,7 @@ describe("Toolbar", () => {
     ).toBe(false);
     expect(
       (
-        screen.getByRole("menuitemcheckbox", {
+        screen.getByRole("button", {
           name: "打字机模式",
         }) as HTMLButtonElement
       ).disabled,
@@ -232,13 +233,8 @@ describe("Toolbar", () => {
       ).toBe(true);
     }
     const share = screen.getByRole("menuitem", { name: "长图分享" });
-    const typewriter = screen.getByRole("menuitemcheckbox", {
-      name: "打字机模式",
-    });
-    expect(document.activeElement).toBe(typewriter);
-    await user.keyboard("{ArrowDown}");
     expect(document.activeElement).toBe(share);
-    await user.keyboard("{Home}");
-    expect(document.activeElement).toBe(typewriter);
+    await user.keyboard("{ArrowDown}{Home}");
+    expect(document.activeElement).toBe(share);
   });
 });

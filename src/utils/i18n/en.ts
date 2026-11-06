@@ -1316,7 +1316,8 @@ export default {
   editor_blockBudget: "Large block. Click to edit its source.",
   settings_focusMode: "Focus mode",
   settings_focusModeDesc:
-    "Highlight the current paragraph and dim the surrounding text.",
+    "Enter fullscreen while editing, hide the interface and highlight the current paragraph. Press Esc to exit.",
+  focusMode_fullscreenFailed: "Could not enter fullscreen. Please try again.",
   settings_typewriterMode: "Typewriter mode",
   settings_typewriterModeDesc:
     "Keep the current line near the middle while typing. Clicking and manual scrolling stay natural.",

@@ -1198,7 +1198,9 @@ export default {
   table_moveColumnRight: "右移列",
   editor_blockBudget: "此块内容较多，点击编辑源码",
   settings_focusMode: "专注模式",
-  settings_focusModeDesc: "突出当前段落，淡化其他正文。",
+  settings_focusModeDesc:
+    "编辑时进入全屏，隐藏其他界面并突出当前段落，按 Esc 退出。",
+  focusMode_fullscreenFailed: "无法进入全屏，请重试。",
   settings_typewriterMode: "打字机模式",
   settings_typewriterModeDesc:
     "输入时将当前行保持在编辑区中部；点选与手动滚动保持自然。",

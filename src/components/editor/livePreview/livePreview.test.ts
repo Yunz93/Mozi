@@ -1094,7 +1094,7 @@ describe("live preview hide formatting", () => {
     expect(href).toBe("docs/完整 PRD.md");
   });
 
-  it("keeps http(s) destinations visible when the cursor is away", () => {
+  it("collapses complete http(s) links when the cursor is away", () => {
     const href = "https://example.com/path?q=1#hash";
     const doc = `go [here](${href})\n\naway`;
     const view = mount(doc, doc.length - 1);
@@ -1106,11 +1106,11 @@ describe("live preview hide formatting", () => {
       const widget = value.spec.widget as { href?: string } | undefined;
       if (widget?.href) widgetHref = widget.href;
     });
-    expect(replaced.join("|")).not.toContain(href);
+    expect(replaced).toEqual([`[here](${href})`]);
     expect(widgetHref).toBe(href);
   });
 
-  it("keeps a Yuque-style URL with a CJK hash visible when the cursor is away", () => {
+  it("preserves a Yuque-style destination with a CJK hash in the collapsed widget", () => {
     const href =
       "https://yueque.antfin.com/g/embodied/wxdppa/nx62cw34yuzlt3lm/collaborator/join?token=1apzsf20gGGjJR1S&source=docx_collaborator/#《RobbyStudio PRD》";
     const doc = `- RobbyantStudio 总体PRD: [《RobbyStudio PRD》](${href})\n\naway`;
@@ -1123,11 +1123,11 @@ describe("live preview hide formatting", () => {
       const widget = value.spec.widget as { href?: string } | undefined;
       if (widget?.href) widgetHref = widget.href;
     });
-    expect(replaced.some((text) => text.includes("https://"))).toBe(false);
+    expect(replaced).toEqual([`[《RobbyStudio PRD》](${href})`]);
     expect(widgetHref).toBe(href);
   });
 
-  it("hides empty []() chrome around an http(s) URL instead of replacing the destination", () => {
+  it("replaces an empty-label http(s) link with one widget", () => {
     const href = "https://example.com/invite";
     const doc = `go [](${href})\n\naway`;
     const view = mount(doc, doc.length - 1);
@@ -1138,22 +1138,21 @@ describe("live preview hide formatting", () => {
       replaced.push(view.state.doc.sliceString(from, to));
       if (value.spec.widget) widgetCount += 1;
     });
-    expect(widgetCount).toBe(0);
-    expect(replaced.join("|")).not.toContain(href);
-    expect(replaced).toEqual(expect.arrayContaining(["[](", ")"]));
+    expect(widgetCount).toBe(1);
+    expect(replaced).toEqual([`[](${href})`]);
   });
 
-  it("renders Yuque http destinations in the live DOM when the caret is away", () => {
+  it("renders only the Yuque link label when the caret is away", () => {
     const href =
       "https://yueque.antfin.com/g/embodied/wxdppa/nx62cw34yuzlt3lm/collaborator/join?token=1apzsf20gGGjJR1S&source=docx_collaborator/#《RobbyStudio PRD》";
     const doc = `- RobbyantStudio 总体PRD: [《RobbyStudio PRD》](${href})\n\naway`;
     const view = mount(doc, doc.length - 1, [livePreviewLinks]);
-    expect(view.contentDOM.textContent).toContain("https://yueque.antfin.com");
+    expect(view.contentDOM.textContent).not.toContain(href);
     const link = view.dom.querySelector(
       ".cm-live-preview-link",
     ) as HTMLAnchorElement | null;
     expect(link).not.toBeNull();
-    expect(link!.classList.contains("has-visible-dest")).toBe(true);
+    expect(link!.getAttribute("href")).toBe(href);
     expect(link!.textContent).toContain("《RobbyStudio PRD》");
     expect(link!.textContent).not.toContain("https://");
   });
