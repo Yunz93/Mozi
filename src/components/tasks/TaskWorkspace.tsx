@@ -1,39 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
-  Bell,
+  X,
+  Settings2,
   CalendarDays,
   CheckCheck,
   FilePenLine,
   List,
   LoaderCircle,
-  PanelLeft,
   RefreshCw,
   Search,
 } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
 import { useTaskCalendarStore } from "../../store/taskCalendarStore";
-import { useAppStore } from "../../store/appStore";
 import { isTauriEnvironment } from "../../types/filesystem";
 import { useTaskCalendarLanguage } from "../../hooks/useTaskCalendar";
-import type {
-  CalendarTask,
-  TaskCalendarPreferencesPatch,
-  TaskFilter,
-} from "../../types/taskCalendar";
+import { isImeComposingEvent } from "../../utils/imeKeyboard";
+import type { CalendarTask, TaskFilter } from "../../types/taskCalendar";
 import { AppSelect } from "../ui/AppSelect";
 import {
   getTaskCalendarSnapshot,
   refreshTaskCalendar,
   registerTaskCalendarVault,
-  saveTaskCalendarPreferences,
-  sendTaskCalendarTestNotification,
-  unregisterTaskCalendarVault,
 } from "../../services/taskCalendarService";
 import { TaskCalendarView } from "./TaskCalendarView";
 import { TaskItem } from "./TaskItem";
 import { TASK_FILTER_LABELS, TaskListView } from "./TaskListView";
-import { TaskReminderSettings } from "./TaskReminderSettings";
 import {
   dateFromKey,
   localDateKey,
@@ -48,14 +39,14 @@ export function TaskWorkspace({
   hasUnsavedChanges,
   onOpenTask,
   onClose,
-  onToggleSidebar,
+  onOpenSettings,
 }: {
   rootPath: string | null;
   trashFolder: string;
   hasUnsavedChanges: boolean;
   onOpenTask: (task: CalendarTask) => Promise<void>;
-  onClose: () => void;
-  onToggleSidebar: () => void;
+  onClose: (restoreFocus?: boolean) => void;
+  onOpenSettings?: () => void;
 }) {
   const { t, language } = useI18n();
   const { snapshot, error, loading, reload } = useTaskCalendarStore();
@@ -67,9 +58,42 @@ export function TaskWorkspace({
   const [scope, setScope] = useState("all");
   const [search, setSearch] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    const handleOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        !panelRef.current?.contains(target) &&
+        !target.closest?.(".app-select-menu, [data-task-calendar-trigger]")
+      )
+        onCloseRef.current(false);
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        isImeComposingEvent(event) ||
+        event.defaultPrevented
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      onCloseRef.current();
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleKey);
+    const frame = requestAnimationFrame(() =>
+      panelRef.current?.focus({ preventScroll: true }),
+    );
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
   const desktop = isTauriEnvironment();
   const run = useCallback(
     async (action: () => Promise<unknown>) => {
@@ -184,23 +208,18 @@ export function TaskWorkspace({
   function openTask(task: CalendarTask) {
     void run(() => onOpenTask(task));
   }
-  function changePreferences(next: TaskCalendarPreferencesPatch) {
-    void run(() => saveTaskCalendarPreferences(next));
-  }
   return (
-    <section className="task-workspace ui-scaled" aria-label={t("tasks_title")}>
+    <section
+      ref={panelRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="false"
+      className="task-workspace task-popover ui-scaled"
+      aria-label={t("tasks_button")}
+    >
       <header className="task-workspace-header">
         <div className="task-workspace-heading">
-          <button
-            type="button"
-            className="task-icon-button"
-            onClick={onToggleSidebar}
-            title={t("tasks_toggleSidebar")}
-            aria-label={t("tasks_toggleSidebar")}
-          >
-            <PanelLeft size={17} aria-hidden />
-          </button>
-          <h1>{t("tasks_title")}</h1>
+          <h1>{t("tasks_button")}</h1>
           <span className="task-sync" role="status">
             {busy || loading || snapshot?.scanning ? (
               <>
@@ -237,14 +256,25 @@ export function TaskWorkspace({
               {t("tasks_list")}
             </button>
           </div>
+          {onOpenSettings ? (
+            <button
+              type="button"
+              className="task-icon-button"
+              onClick={onOpenSettings}
+              title={t("tasks_openSettings")}
+              aria-label={t("tasks_openSettings")}
+            >
+              <Settings2 size={16} aria-hidden />
+            </button>
+          ) : null}
           <button
             type="button"
             className="task-icon-button"
-            onClick={onClose}
-            title={t("tasks_returnNote")}
-            aria-label={t("tasks_returnNote")}
+            onClick={() => onClose()}
+            title={t("tasks_close")}
+            aria-label={t("tasks_close")}
           >
-            <ArrowLeft size={17} aria-hidden />
+            <X size={17} aria-hidden />
           </button>
         </div>
       </header>
@@ -254,6 +284,10 @@ export function TaskWorkspace({
           <h2>{t("tasks_desktopOnly")}</h2>
           <p>{t("tasks_desktopOnlyHint")}</p>
         </div>
+      ) : !snapshot ? (
+        <p className="task-empty" role="status">
+          {issue || t("tasks_syncing")}
+        </p>
       ) : (
         <>
           <div className="task-workspace-content">
@@ -285,15 +319,6 @@ export function TaskWorkspace({
                   aria-label={t("tasks_search")}
                 />
               </label>
-              <button
-                type="button"
-                className="task-small-button"
-                disabled={busy || !snapshot}
-                onClick={() => setSettingsOpen(true)}
-              >
-                <Bell size={14} aria-hidden />
-                {t("tasks_reminderSettings")}
-              </button>
               <button
                 type="button"
                 className="task-icon-button"
@@ -431,32 +456,6 @@ export function TaskWorkspace({
               </div>
             ) : null}
           </div>
-          {settingsOpen && snapshot ? (
-            <TaskReminderSettings
-              preferences={preferences}
-              vaults={snapshot.vaults}
-              busy={busy}
-              error={actionError}
-              calendarError={snapshot.calendarError}
-              calendarSyncedAt={snapshot.calendarSyncedAt}
-              onClose={() => setSettingsOpen(false)}
-              onChange={changePreferences}
-              onTest={() =>
-                void run(async () => {
-                  await sendTaskCalendarTestNotification(language);
-                  useAppStore
-                    .getState()
-                    .showNotification(t("tasks_testSent"), "info");
-                })
-              }
-              onRemove={(path) =>
-                void run(async () => {
-                  await unregisterTaskCalendarVault(path);
-                  setScope("all");
-                })
-              }
-            />
-          ) : null}
         </>
       )}
     </section>

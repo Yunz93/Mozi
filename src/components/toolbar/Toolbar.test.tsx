@@ -21,6 +21,7 @@ function setup(overrides: Partial<React.ComponentProps<typeof Toolbar>> = {}) {
     onViewModeChange: vi.fn(),
     onAIAnalyze: vi.fn(),
     onAskVault: vi.fn(),
+    onOpenTaskCalendar: vi.fn(),
     isAnalyzing: false,
     isSaving: false,
     isSidebarOpen: true,
@@ -55,7 +56,7 @@ describe("Toolbar", () => {
     expect(names.slice(1)).toEqual([
       "切换到深色模式",
       "专注模式",
-      "打字机模式",
+      "待办事项",
       "实时预览",
       "阅读",
       "小知助手",
@@ -71,6 +72,8 @@ describe("Toolbar", () => {
     await user.click(screen.getByRole("button", { name: "小知助手" }));
     await user.click(screen.getByRole("button", { name: "AI 增强" }));
     expect(props.onAIAnalyze).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "待办事项" }));
+    expect(props.onOpenTaskCalendar).toHaveBeenCalledOnce();
     await user.click(screen.getByRole("button", { name: "实时预览" }));
     await user.click(screen.getByRole("button", { name: "发布" }));
     expect(props.onToggleTheme).toHaveBeenCalledOnce();
@@ -173,10 +176,10 @@ describe("Toolbar", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "打字机模式",
+          name: "待办事项",
         }) as HTMLButtonElement
       ).disabled,
-    ).toBe(true);
+    ).toBe(false);
     for (const name of ["导出 PDF", "导出 HTML", "长图分享"]) {
       expect(
         (screen.getByRole("menuitem", { name }) as HTMLButtonElement).disabled,
@@ -208,10 +211,10 @@ describe("Toolbar", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "打字机模式",
+          name: "待办事项",
         }) as HTMLButtonElement
       ).disabled,
-    ).toBe(true);
+    ).toBe(false);
     for (const name of ["导出 PDF", "导出 HTML", "长图分享"]) {
       expect(
         (screen.getByRole("menuitem", { name }) as HTMLButtonElement).disabled,

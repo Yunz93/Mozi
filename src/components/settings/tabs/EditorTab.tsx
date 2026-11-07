@@ -351,14 +351,6 @@ export const EditorTab: React.FC<EditorTabProps> = ({
             }
           />
           <SettingsToggle
-            label={t("settings_typewriterMode")}
-            description={t("settings_typewriterModeDesc")}
-            checked={settings.typewriterMode === true}
-            onToggle={() =>
-              onUpdateSettings({ typewriterMode: !settings.typewriterMode })
-            }
-          />
-          <SettingsToggle
             label={t("settings_smartPunctuation")}
             description={t("settings_smartPunctuationDesc")}
             checked={settings.smartPunctuation === true}

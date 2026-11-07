@@ -1,5 +1,10 @@
 export default {
   tasks_title: "Tasks & calendar",
+  tasks_button: "Tasks",
+  tasks_close: "Close tasks",
+  tasks_openSettings: "Open task settings",
+  tasks_settingsDescription:
+    "Manage task reminders, background behavior, system calendar sync and included knowledge bases.",
   tasks_all: "All",
   tasks_calendar: "Calendar",
   tasks_list: "List",
@@ -1400,9 +1405,6 @@ export default {
   settings_focusModeDesc:
     "Enter fullscreen while editing, hide the interface and highlight the current paragraph. Press Esc to exit.",
   focusMode_fullscreenFailed: "Could not enter fullscreen. Please try again.",
-  settings_typewriterMode: "Typewriter mode",
-  settings_typewriterModeDesc:
-    "Keep the current line near the middle while typing. Clicking and manual scrolling stay natural.",
   settings_smartPunctuation: "Smart punctuation",
   settings_smartPunctuationDesc:
     "Convert curly quotes, ellipses and dashes as you type, preserving code, math and properties.",

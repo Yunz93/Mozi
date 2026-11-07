@@ -4,7 +4,7 @@ Chinese name: **墨知**.
 
 [中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
 
-A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.2.0 adds a task calendar, due reminders, and optional macOS Calendar sync, with improvements to focus mode, typewriter mode, and Live link previews.
+A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.2.0 adds a task calendar, due reminders, and optional macOS Calendar sync, with focus mode and Live link previews.
 
 > Goal: a focused Markdown writing flow, lighter than Obsidian and smoother day to day than Typora for many writers.
 
@@ -50,7 +50,7 @@ Follow the bundled [feature guide in Chinese](./src-tauri/resources/sample-notes
 
 ### The 2.0.0 workspace and startup screens
 
-Mozi uses the macOS or Windows system sans-serif font by default. Warm light and metallic-gray dark themes extend across the sidebar, document, toolbars, and settings. The toolbar uses bordered groups ordered by theme, focus and typewriter modes, editing and reading, XiaoZhi and AI Enhance, then publishing and more actions. Hover for names. The vault entry remains at the bottom left, with Settings beside it on the right.
+Mozi uses the macOS or Windows system sans-serif font by default. Warm light and metallic-gray dark themes extend across the sidebar, document, toolbars, and settings. The toolbar uses bordered groups ordered by theme, focus and tasks, editing and reading, XiaoZhi and AI Enhance, then publishing and more actions. Hover for names. The vault entry remains at the bottom left, with Settings beside it on the right.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/23-theme-dark.png" alt="2.0.0 metallic-gray workspace and icon-only toolbar" width="800">
@@ -76,7 +76,7 @@ Live mode renders Markdown as you write; Reading mode is for reviewing the finis
 
 Table input updates the document immediately, with formatting shortcuts, multi-cell copy and paste, row and column moves, and alignment. Code blocks offer language selection and copying; right-click an image to edit its source, description, and dimensions. Links display their labels until the caret enters and reveals the complete Markdown source; an empty label falls back to the URL.
 
-The toolbar uses bordered groups, with focus and typewriter controls after the theme button. Focus mode makes the editor fullscreen and hides the rest of the workspace; press Esc or F8 to exit. Typewriter mode keeps the active line in the upper middle of the editor; press F9 to toggle it. Both modes can run together and are also available in **Settings → Editor**, off by default.
+The toolbar uses bordered groups, with focus mode and Tasks after the theme button. Focus mode makes the editor fullscreen and hides the rest of the workspace; press Esc or F8 to exit, or manage it in **Settings → Editor**. Tasks opens a vertical popover while keeping the document visible.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/20-markdown-reading.png" alt="Code and math in Reading mode" width="800">
@@ -88,7 +88,7 @@ The toolbar uses bordered groups, with focus and typewriter controls after the t
 
 ### Tasks and calendar
 
-Open **Tasks & calendar** below the sidebar search box to see saved Markdown tasks in a calendar or list, search and filter them, or return to their source notes.
+Use the **Tasks** toolbar button to open a vertical popover with a calendar and task list. Search and filter saved Markdown tasks, or return to their source notes without replacing the editor.
 
 Add a date after a task and save the note to update its schedule:
 
@@ -98,7 +98,7 @@ Add a date after a task and save the note to update its schedule:
 - [ ] An unscheduled task
 ```
 
-Timed tasks remind you when due; date-only tasks appear as all-day entries and default to a 09:00 reminder. Completing or rescheduling a task updates its reminder after saving. Enable system notifications and optional reminders after closing the window in **Tasks & calendar → Reminders**; quitting Mozi stops reminders.
+Timed tasks remind you when due; date-only tasks appear as all-day entries and default to a 09:00 reminder. Completing or rescheduling a task updates its reminder after saving. Enable system notifications and optional reminders after closing the window in **Settings → Tasks & calendar**; quitting Mozi stops reminders.
 
 On macOS, you can also enable **Sync to macOS Calendar**, grant calendar access, and select a writable calendar. Saved, incomplete tasks with valid dates sync one way to events created by Mozi. Rescheduling updates those events; completing or removing tasks removes them. Calendar edits do not update notes, and turning sync off keeps existing events. Synced events have no additional alerts.
 

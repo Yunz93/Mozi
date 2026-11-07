@@ -214,7 +214,6 @@ export interface AppSettings {
   enableFolding: boolean;
   spellcheck: boolean;
   focusMode: boolean;
-  typewriterMode: boolean;
   smartPunctuation: boolean;
   showIndentationGuides: boolean;
   convertHtmlOnPaste: boolean;

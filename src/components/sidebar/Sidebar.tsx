@@ -7,7 +7,7 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { createPortal } from "react-dom";
-import { BookOpen, CalendarDays, Plus } from "lucide-react";
+import { BookOpen, Plus } from "lucide-react";
 import { FileTreeItem } from "./FileTree";
 import { TrashView } from "./TrashView";
 import { useFileSystem } from "../../hooks/useFileSystem";
@@ -40,8 +40,6 @@ import { applyFixedMenuViewportFit } from "../../utils/fitFixedMenuToViewport";
 import { getRenameDialogDefaultValue } from "../../utils/fileTypes";
 
 export interface SidebarProps {
-  onOpenTaskCalendar?: () => void;
-  taskCalendarOpen?: boolean;
   files: FileNode[];
   activeFileId: string | null;
   onFileSelect: (file: FileNode) => void | Promise<void>;
@@ -229,8 +227,6 @@ const RootContextMenu: React.FC<{
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(
   ({
-    onOpenTaskCalendar,
-    taskCalendarOpen = false,
     files,
     activeFileId,
     onFileSelect,
@@ -565,17 +561,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                 </button>
               </div>
             </div>
-            {onOpenTaskCalendar ? (
-              <button
-                type="button"
-                className="workspace-task-entry"
-                aria-pressed={taskCalendarOpen}
-                onClick={onOpenTaskCalendar}
-              >
-                <CalendarDays size={16} aria-hidden />
-                {t("tasks_title")}
-              </button>
-            ) : null}
           </div>
 
           <div

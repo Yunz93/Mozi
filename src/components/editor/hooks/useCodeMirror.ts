@@ -81,7 +81,6 @@ export interface UseCodeMirrorOptions {
   showIndentationGuides?: boolean;
   spellcheck?: boolean;
   focusMode?: boolean;
-  typewriterMode?: boolean;
   smartPunctuation?: boolean;
   convertHtmlOnPaste?: boolean;
   onChange: (content: string, meta?: CodeMirrorContentChangeMeta) => void;
@@ -135,7 +134,6 @@ export function useCodeMirror(
     showIndentationGuides = DEFAULT_PREFERENCES.showIndentationGuides,
     spellcheck = DEFAULT_PREFERENCES.spellcheck,
     focusMode = false,
-    typewriterMode = false,
     smartPunctuation = false,
     convertHtmlOnPaste = true,
     onChange,
@@ -157,7 +155,6 @@ export function useCodeMirror(
       showIndentationGuides,
       spellcheck,
       focusMode,
-      typewriterMode,
       smartPunctuation,
     }),
     [
@@ -170,7 +167,6 @@ export function useCodeMirror(
       showIndentationGuides,
       spellcheck,
       focusMode,
-      typewriterMode,
       smartPunctuation,
     ],
   );

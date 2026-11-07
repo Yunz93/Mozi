@@ -35,19 +35,14 @@ export function useFocusMode(
     const handleKeyDown = (event: KeyboardEvent) => {
       const view = getActiveEditorView();
       if (
-        !["Escape", "F8", "F9"].includes(event.key) ||
+        !["Escape", "F8"].includes(event.key) ||
         event.isComposing ||
         (view && isEditorImeComposing(view))
       )
         return;
       event.preventDefault();
       event.stopPropagation();
-      if (event.key === "F9") {
-        const store = useAppStore.getState();
-        store.updateSettings({
-          typewriterMode: !store.settings.typewriterMode,
-        });
-      } else exit();
+      exit();
     };
     document.addEventListener("keydown", handleKeyDown, true);
     useAppStore.getState().setSettingsOpen(false);

@@ -19,6 +19,7 @@ import { useCloseGuard } from "./app/useCloseGuard";
 import { useTaskCalendar } from "./hooks/useTaskCalendar";
 import { useTaskCalendarStore } from "./store/taskCalendarStore";
 import { TaskWorkspace } from "./components/tasks/TaskWorkspace";
+import { SettingsModal } from "./components/settings/SettingsModal";
 import {
   findTaskRange,
   prepareTaskSourceVault,
@@ -138,10 +139,14 @@ const App: React.FC = () => {
   const closeTaskCalendar = useCallback(() => {
     useTaskCalendarStore.getState().close();
   }, []);
-  const returnFromTaskCalendar = useCallback(() => {
-    closeTaskCalendar();
-    requestAnimationFrame(() => getActiveEditorView()?.focus());
-  }, [closeTaskCalendar]);
+  const returnFromTaskCalendar = useCallback(
+    (restoreFocus = true) => {
+      closeTaskCalendar();
+      if (restoreFocus)
+        requestAnimationFrame(() => getActiveEditorView()?.focus());
+    },
+    [closeTaskCalendar],
+  );
   const {
     files,
     openTabs,
@@ -438,7 +443,6 @@ const App: React.FC = () => {
     isPreviewOnlyActiveFile || isExcalidrawActiveFile;
   const isFocusModeActive = Boolean(
     settings.focusMode &&
-    !isTaskCalendarOpen &&
     activeTabId &&
     !isNonMarkdownWorkspaceFile &&
     viewMode === ViewMode.LIVE,
@@ -1086,7 +1090,44 @@ const App: React.FC = () => {
     shareLongImage: isShareLongImageDialogOpen,
     aiEnhance: isAiEnhanceConfirmOpen,
     attachmentCleanup: Boolean(pendingCleanupAttachments?.length),
+    tasks: isTaskCalendarOpen,
   });
+
+  const taskPopoverBlocked =
+    isSettingsOpen ||
+    isCommandPaletteOpen ||
+    isNewNoteDialogOpen ||
+    isPublishTargetDialogOpen ||
+    isSimpleBlogDialogOpen ||
+    isWechatDraftDialogOpen ||
+    weReadImport.isOpen ||
+    isShareLongImageDialogOpen ||
+    isAiEnhanceConfirmOpen ||
+    Boolean(pendingCleanupAttachments?.length);
+  useEffect(() => {
+    if (taskPopoverBlocked && isTaskCalendarOpen) closeTaskCalendar();
+  }, [taskPopoverBlocked, isTaskCalendarOpen, closeTaskCalendar]);
+  useEffect(() => {
+    // 托盘或启动参数也可能直接打开浮层，首次渲染时同样要退出专注模式。
+    if (isTaskCalendarOpen && useAppStore.getState().settings.focusMode)
+      useAppStore.getState().updateSettings({ focusMode: false });
+  }, [isTaskCalendarOpen]);
+
+  const taskPanel = isTaskCalendarOpen ? (
+    <TaskWorkspace
+      rootPath={rootFolderPath}
+      trashFolder={settings.trashFolder}
+      hasUnsavedChanges={
+        !!activeTabId && useAppStore.getState().hasUnsavedChanges(activeTabId)
+      }
+      onOpenTask={handleOpenTaskSource}
+      onClose={returnFromTaskCalendar}
+      onOpenSettings={() => {
+        closeTaskCalendar();
+        setSettingsOpen(true, "tasks");
+      }}
+    />
+  ) : null;
 
   if (shouldShowKnowledgeBaseLoading) {
     return (
@@ -1098,13 +1139,28 @@ const App: React.FC = () => {
     );
   }
 
-  if (shouldShowKnowledgeBaseOnboarding && !isTaskCalendarOpen) {
+  if (shouldShowKnowledgeBaseOnboarding) {
     return (
-      <KnowledgeBaseOnboarding
-        uiScaleStyle={uiScaleStyle}
-        uiFontFamily={uiFontFamily}
-        onOpen={handleSwitchKnowledgeBase}
-      />
+      <div
+        className="workspace-root"
+        style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
+      >
+        <KnowledgeBaseOnboarding
+          uiScaleStyle={uiScaleStyle}
+          uiFontFamily={uiFontFamily}
+          onOpen={handleSwitchKnowledgeBase}
+        />
+        {taskPanel}
+        {isSettingsOpen ? (
+          <SettingsModal
+            isOpen
+            onClose={() => setSettingsOpen(false)}
+            settings={settings}
+            onUpdateSettings={updateSettings}
+            uiScaleStyle={uiScaleStyle}
+          />
+        ) : null}
+      </div>
     );
   }
 
@@ -1136,8 +1192,6 @@ const App: React.FC = () => {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <Sidebar
-            onOpenTaskCalendar={openTaskCalendar}
-            taskCalendarOpen={isTaskCalendarOpen}
             files={files}
             activeFileId={activeTabId}
             onFileSelect={(file) => {
@@ -1185,25 +1239,15 @@ const App: React.FC = () => {
             ref={mainContentRef}
             className="workspace-surface flex-1 flex flex-col h-full min-w-0"
           >
-            {isTaskCalendarOpen ? (
-              <TaskWorkspace
-                rootPath={rootFolderPath}
-                trashFolder={settings.trashFolder}
-                hasUnsavedChanges={
-                  !!activeTabId &&
-                  useAppStore.getState().hasUnsavedChanges(activeTabId)
-                }
-                onOpenTask={handleOpenTaskSource}
-                onClose={returnFromTaskCalendar}
-                onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
-              />
-            ) : null}
-            <div
-              className="flex-1 min-h-0 flex flex-col"
-              style={{ display: isTaskCalendarOpen ? "none" : "flex" }}
-            >
+            <div className="flex-1 min-h-0 flex flex-col">
               {!isFocusModeActive && (
                 <Toolbar
+                  onOpenTaskCalendar={() =>
+                    isTaskCalendarOpen
+                      ? returnFromTaskCalendar()
+                      : openTaskCalendar()
+                  }
+                  taskCalendarOpen={isTaskCalendarOpen}
                   fileName={activeFile?.name || ""}
                   folderName={activeFile?.path?.split(/[/\\]/).at(-2)}
                   viewMode={viewMode}
@@ -1296,6 +1340,7 @@ const App: React.FC = () => {
           </main>
         </div>
 
+        {taskPanel}
         {!isFocusModeActive && (
           <AppDialogs
             isSettingsOpen={isSettingsOpen}

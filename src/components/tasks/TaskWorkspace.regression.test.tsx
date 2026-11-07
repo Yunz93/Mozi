@@ -83,6 +83,37 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it("中文输入法的 229 Escape 只取消组词，不关闭浮层或抢回编辑焦点", async () => {
+  const onClose = vi.fn();
+  await act(async () => {
+    render(
+      <TaskWorkspace
+        rootPath={null}
+        trashFolder=".trash"
+        hasUnsavedChanges={false}
+        onOpenTask={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+  });
+  const composingEscape = new KeyboardEvent("keydown", {
+    key: "Escape",
+    bubbles: true,
+    isComposing: false,
+  });
+  Object.defineProperty(composingEscape, "keyCode", { value: 229 });
+  act(() => {
+    document.dispatchEvent(composingEscape);
+  });
+  expect(onClose).not.toHaveBeenCalled();
+  act(() => {
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+  });
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
 it("不同语言窗口接收同一份日程快照时不会反复写回语言或覆盖提醒开关", async () => {
   const props = {
     rootPath: null,
@@ -90,7 +121,6 @@ it("不同语言窗口接收同一份日程快照时不会反复写回语言或�
     hasUnsavedChanges: false,
     onOpenTask: vi.fn(),
     onClose: vi.fn(),
-    onToggleSidebar: vi.fn(),
   };
   await act(async () => {
     render(<TaskWorkspace {...props} />);

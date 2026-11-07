@@ -42,13 +42,9 @@ describe("focus fullscreen session", () => {
   });
   afterEach(cleanup);
 
-  it("enters fullscreen and exits on Escape without changing the saved sidebar or typewriter mode", async () => {
+  it("enters fullscreen and exits on Escape without changing the saved sidebar", async () => {
     render(<Harness />);
-    act(() =>
-      useAppStore
-        .getState()
-        .updateSettings({ focusMode: true, typewriterMode: true }),
-    );
+    act(() => useAppStore.getState().updateSettings({ focusMode: true }));
     await waitFor(() =>
       expect(native.setFullscreen).toHaveBeenCalledWith(true),
     );
@@ -62,7 +58,6 @@ describe("focus fullscreen session", () => {
       expect(native.setFullscreen).toHaveBeenLastCalledWith(false),
     );
     expect(useAppStore.getState().settings.focusMode).toBe(false);
-    expect(useAppStore.getState().settings.typewriterMode).toBe(true);
     expect(useAppStore.getState().isSidebarOpen).toBe(true);
   });
 

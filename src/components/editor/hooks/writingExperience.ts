@@ -11,15 +11,11 @@ import { Prec } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { hasSkipAncestor } from "../livePreview/shared";
 import { livePreviewCaretAnchoringEnabled } from "../livePreview/caretAnchor";
-import {
-  IME_CONFIRM_SUPPRESS_MS,
-  isEditorImeComposing,
-} from "../behavior/imeGuard";
+import { isEditorImeComposing } from "../behavior/imeGuard";
 import { useAppStore } from "../../../store/appStore";
 
 export interface WritingPreferences {
   focusMode?: boolean;
-  typewriterMode?: boolean;
   smartPunctuation?: boolean;
 }
 
@@ -72,20 +68,9 @@ function focusDecorations(view: EditorView): DecorationSet {
 export const writingView = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
-    private generation = 0;
-    private followingCaret = true;
-    private compositionTimer: ReturnType<typeof setTimeout> | null = null;
-    private cancelManualPositioning = () => this.cancelPositioning();
     constructor(view: EditorView) {
       this.decorations = focusDecorations(view);
-      // 滚动条和 gutter 位于 contentDOM 外，也必须取消跟随。
-      for (const type of ["wheel", "touchstart", "mousedown"])
-        view.scrollDOM.addEventListener(type, this.cancelManualPositioning, {
-          passive: true,
-        });
-      this.view = view;
     }
-    private view: EditorView;
     update(update: ViewUpdate): void {
       if (
         update.docChanged ||
@@ -96,122 +81,9 @@ export const writingView = ViewPlugin.fromClass(
       ) {
         this.decorations = focusDecorations(update.view);
       }
-      const preferences = update.state.facet(writingPreferences);
-      const previousPreferences = update.startState.facet(writingPreferences);
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.focusChanged ||
-        preferences !== previousPreferences
-      )
-        this.generation++;
-      const userEdit =
-        update.docChanged &&
-        update.transactions.some(
-          (tr) => tr.isUserEvent("input") || tr.isUserEvent("delete"),
-        );
-      const keyboardSelection =
-        update.selectionSet &&
-        update.transactions.some(
-          (tr) => tr.isUserEvent("select") && !tr.isUserEvent("select.pointer"),
-        );
-      const explicitPositioning =
-        !previousPreferences.typewriterMode || userEdit || keyboardSelection;
-      if (update.docChanged && !userEdit) this.cancelPositioning();
-      if (explicitPositioning) this.followingCaret = true;
-      if (this.compositionTimer && (update.docChanged || update.selectionSet)) {
-        if (userEdit || keyboardSelection) this.finishComposition(update.view);
-        else this.cancelPositioning();
-      }
-      if (
-        preferences.typewriterMode &&
-        (explicitPositioning ||
-          (this.followingCaret &&
-            update.geometryChanged &&
-            !update.docChanged &&
-            !update.selectionSet &&
-            !update.viewportChanged))
-      )
-        this.centerCaret(update.view);
-    }
-    centerCaret(view: EditorView): void {
-      if (
-        !view.state.facet(writingPreferences).typewriterMode ||
-        !this.followingCaret ||
-        !view.hasFocus ||
-        !view.state.selection.main.empty ||
-        isEditorImeComposing(view)
-      )
-        return;
-      const generation = this.generation;
-      const head = view.state.selection.main.head;
-      view.requestMeasure({
-        key: this,
-        read: () => {
-          if (
-            generation !== this.generation ||
-            !this.followingCaret ||
-            !view.hasFocus ||
-            !view.state.facet(writingPreferences).typewriterMode ||
-            isEditorImeComposing(view) ||
-            view.dom.closest('[aria-hidden="true"]')
-          )
-            return null;
-          const caret = view.coordsAtPos(head);
-          const viewport = view.scrollDOM.getBoundingClientRect();
-          return caret
-            ? Math.max(
-                0,
-                view.scrollDOM.scrollTop +
-                  caret.top -
-                  viewport.top -
-                  viewport.height * 0.45,
-              )
-            : null;
-        },
-        write: (top) => {
-          if (top !== null && generation === this.generation && view.hasFocus)
-            view.scrollDOM.scrollTop = top;
-        },
-      });
-    }
-    cancelPositioning(): void {
-      this.generation++;
-      this.followingCaret = false;
-      if (this.compositionTimer) {
-        clearTimeout(this.compositionTimer);
-        this.compositionTimer = null;
-      }
-    }
-    finishComposition(view: EditorView): void {
-      if (this.compositionTimer) clearTimeout(this.compositionTimer);
-      this.followingCaret = true;
-      const generation = this.generation;
-      this.compositionTimer = setTimeout(() => {
-        this.compositionTimer = null;
-        if (generation === this.generation) this.centerCaret(view);
-      }, IME_CONFIRM_SUPPRESS_MS + 1);
-    }
-    destroy(): void {
-      this.cancelPositioning();
-      for (const type of ["wheel", "touchstart", "mousedown"])
-        this.view.scrollDOM.removeEventListener(
-          type,
-          this.cancelManualPositioning,
-        );
     }
   },
-  {
-    decorations: (plugin) => plugin.decorations,
-    eventObservers: {
-      compositionstart() {
-        this.cancelPositioning();
-      },
-      compositionend(_event, view) {
-        this.finishComposition(view);
-      },
-    },
-  },
+  { decorations: (plugin) => plugin.decorations },
 );
 
 function smartPunctuation(
@@ -285,10 +157,6 @@ export function createWritingExperience(
       "data-writing-focus": view.state.facet(writingPreferences).focusMode
         ? "true"
         : "false",
-      "data-typewriter-mode": view.state.facet(writingPreferences)
-        .typewriterMode
-        ? "true"
-        : "false",
     })),
     writingView,
     keymap.of([
@@ -297,16 +165,6 @@ export function createWritingExperience(
         run: () => {
           const store = useAppStore.getState();
           store.updateSettings({ focusMode: !store.settings.focusMode });
-          return true;
-        },
-      },
-      {
-        key: "F9",
-        run: () => {
-          const store = useAppStore.getState();
-          store.updateSettings({
-            typewriterMode: !store.settings.typewriterMode,
-          });
           return true;
         },
       },

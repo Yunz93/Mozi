@@ -13,6 +13,7 @@ import { ReadingNotesTab } from "./tabs/ReadingNotesTab";
 import { ImageHostingTab } from "./tabs/ImageHostingTab";
 import { UpdatesTab } from "./tabs/UpdatesTab";
 import { IndexTab } from "./tabs/IndexTab";
+import { TasksTab } from "./tabs/TasksTab";
 import { useSettingsModalLayout } from "./useSettingsModalLayout";
 
 interface SettingsModalProps {
@@ -30,6 +31,7 @@ type SettingsTab =
   | "shortcuts"
   | "ai"
   | "index"
+  | "tasks"
   | "interface"
   | "imageHosting"
   | "readingNotes"
@@ -46,6 +48,7 @@ function getTabs(
   return [
     { id: "interface", label: t("settings_tab_interface") },
     { id: "editor", label: t("settings_tab_editor") },
+    { id: "tasks", label: t("tasks_title") },
     { id: "ai", label: t("settings_tab_ai") },
     { id: "index", label: t("settings_tab_index") },
     { id: "metadata", label: t("settings_tab_metadata") },
@@ -115,6 +118,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       settingsFocusTab === "ai" ||
       settingsFocusTab === "index" ||
       settingsFocusTab === "editor" ||
+      settingsFocusTab === "tasks" ||
       settingsFocusTab === "readingNotes"
     ) {
       setActiveTab(settingsFocusTab);
@@ -185,6 +189,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         return (
           <IndexTab settings={settings} onUpdateSettings={onUpdateSettings} />
         );
+      case "tasks":
+        return <TasksTab settings={settings} />;
       case "metadata":
         return (
           <MetadataTab

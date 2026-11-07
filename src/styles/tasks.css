@@ -9,6 +9,75 @@
   background: var(--workspace-canvas);
   container-type: inline-size;
 }
+/* 工具栏待办采用竖向浮层，正文和工具栏始终保持可见。 */
+.task-popover {
+  position: fixed;
+  top: 76px;
+  right: 20px;
+  z-index: 80;
+  width: min(440px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 96px));
+  max-height: calc(100vh - 96px);
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--workspace-border);
+  border-radius: 12px;
+  background: var(--workspace-menu);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.2);
+}
+.task-popover:focus {
+  outline: none;
+}
+.task-popover .task-workspace-header {
+  padding: 12px 14px;
+  gap: 10px;
+  border-bottom: 1px solid var(--workspace-divider);
+}
+.task-popover .task-workspace-heading {
+  flex: 1;
+  gap: 6px;
+}
+.task-popover .task-workspace-actions {
+  gap: 4px;
+}
+.task-popover .task-view-switch button {
+  gap: 4px;
+  padding: 5px 7px;
+}
+.task-popover .task-workspace-content {
+  padding: 14px 16px 18px;
+  overscroll-behavior: contain;
+}
+.task-popover .task-workspace-tools {
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.task-popover .task-filters {
+  gap: 4px 14px;
+  margin-bottom: 16px;
+}
+.task-popover .task-calendar-layout {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+.task-popover .task-month-header {
+  margin-bottom: 10px;
+}
+.task-popover .task-month-header h2 {
+  font-size: 1em;
+}
+.task-popover .task-calendar-day {
+  min-height: 2.9em;
+}
+.task-popover .task-day-panel {
+  padding-top: 16px;
+}
+.task-popover .task-day-items {
+  display: block;
+}
+.task-settings.task-settings-inline {
+  padding: 0;
+}
 .task-workspace button,
 .task-settings button {
   touch-action: manipulation;
@@ -538,24 +607,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-.workspace-task-entry {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 10px;
-  border-radius: 6px;
-  color: var(--workspace-muted);
-  font-size: 0.875em;
-  text-align: left;
-  width: 100%;
-}
-.workspace-task-entry:hover {
-  background: var(--workspace-hover);
-}
-.workspace-task-entry[aria-pressed="true"] {
-  background: var(--workspace-active);
-  color: var(--workspace-accent);
 }
 @container (max-width: 850px) {
   .task-calendar-layout {

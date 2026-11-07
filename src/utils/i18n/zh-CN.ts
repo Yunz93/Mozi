@@ -1,5 +1,10 @@
 export default {
   tasks_title: "待办与日程",
+  tasks_button: "待办事项",
+  tasks_close: "关闭待办事项",
+  tasks_openSettings: "打开待办设置",
+  tasks_settingsDescription:
+    "统一管理待办的到期提醒、后台运行、系统日历同步和知识库范围。",
   tasks_all: "全部",
   tasks_calendar: "月历",
   tasks_list: "清单",
@@ -1275,9 +1280,6 @@ export default {
   settings_focusModeDesc:
     "编辑时进入全屏，隐藏其他界面并突出当前段落，按 Esc 退出。",
   focusMode_fullscreenFailed: "无法进入全屏，请重试。",
-  settings_typewriterMode: "打字机模式",
-  settings_typewriterModeDesc:
-    "输入时将当前行保持在编辑区中部；点选与手动滚动保持自然。",
   settings_smartPunctuation: "智能标点",
   settings_smartPunctuationDesc:
     "输入时转换弯引号、省略号和破折号，代码、公式和属性区保持原样。",

@@ -201,10 +201,6 @@
   opacity: 1;
 }
 
-.editor-pane-layout .cm-editor[data-typewriter-mode="true"] .cm-content {
-  padding-bottom: max(var(--editor-content-bottom), 55vh) !important;
-}
-
 .cm-live-code-controls select,
 .cm-live-code-controls button {
   color: var(--workspace-muted);

@@ -60,7 +60,7 @@ export interface UIState {
   isSidebarOpen: boolean;
   isSettingsOpen: boolean;
   /** When opening settings, jump to this tab once (then cleared). */
-  settingsFocusTab: "ai" | "index" | "editor" | "readingNotes" | null;
+  settingsFocusTab: "ai" | "index" | "editor" | "readingNotes" | "tasks" | null;
   isSaving: boolean;
   isAnalyzing: boolean;
   isPublishing: boolean;
@@ -171,7 +171,6 @@ export const defaultSettings: AppSettings = {
   enableFolding: false,
   spellcheck: false,
   focusMode: false,
-  typewriterMode: false,
   smartPunctuation: false,
   showIndentationGuides: false,
   convertHtmlOnPaste: true,

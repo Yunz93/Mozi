@@ -436,7 +436,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       showIndentationGuides: settings.showIndentationGuides,
       spellcheck: settings.spellcheck,
       focusMode: settings.focusMode,
-      typewriterMode: settings.typewriterMode,
       smartPunctuation: settings.smartPunctuation,
       convertHtmlOnPaste: settings.convertHtmlOnPaste,
       onChange: updateContent,

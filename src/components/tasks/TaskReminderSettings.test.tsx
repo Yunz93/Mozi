@@ -24,7 +24,6 @@ it("submits only the changed setting so a stale window cannot reset other prefer
       vaults={[]}
       busy={false}
       error={null}
-      onClose={vi.fn()}
       onChange={onChange}
       onTest={vi.fn()}
       onRemove={vi.fn()}

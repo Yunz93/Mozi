@@ -8,7 +8,7 @@ import {
   Download,
   FileText,
   Focus,
-  TextCursor,
+  CalendarDays,
   Image,
   Lightbulb,
   LoaderCircle,
@@ -53,6 +53,8 @@ interface ToolbarProps {
   onExportHtml?: () => void;
   onShareLongImage?: () => void;
   isPreviewOnlyFile?: boolean;
+  onOpenTaskCalendar?: () => void;
+  taskCalendarOpen?: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = React.memo(
@@ -77,14 +79,13 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
     onExportHtml,
     onShareLongImage,
     isPreviewOnlyFile = false,
+    onOpenTaskCalendar,
+    taskCalendarOpen = false,
   }) => {
     const { t } = useI18n();
     const focusMode = useAppStore((state) => state.settings.focusMode);
-    const typewriterMode = useAppStore(
-      (state) => state.settings.typewriterMode,
-    );
     const updateSettings = useAppStore((state) => state.updateSettings);
-    const toggleWritingMode = (mode: "focusMode" | "typewriterMode") => {
+    const toggleWritingMode = (mode: "focusMode") => {
       updateSettings({ [mode]: !useAppStore.getState().settings[mode] });
       getActiveEditorView()?.focus();
     };
@@ -251,17 +252,21 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
             >
               <Focus size={14} aria-hidden />
             </button>
-            <button
-              type="button"
-              className="app-toolbar-icon app-toolbar-writing-mode"
-              title={`${t("settings_typewriterMode")} · F9`}
-              aria-label={t("settings_typewriterMode")}
-              aria-pressed={typewriterMode === true}
-              disabled={writingDisabled}
-              onClick={() => toggleWritingMode("typewriterMode")}
-            >
-              <TextCursor size={14} aria-hidden />
-            </button>
+            {onOpenTaskCalendar ? (
+              <button
+                type="button"
+                className="app-toolbar-icon"
+                title={t("tasks_button")}
+                aria-label={t("tasks_button")}
+                aria-pressed={taskCalendarOpen}
+                aria-expanded={taskCalendarOpen}
+                aria-haspopup="dialog"
+                data-task-calendar-trigger
+                onClick={onOpenTaskCalendar}
+              >
+                <CalendarDays size={14} aria-hidden />
+              </button>
+            ) : null}
           </div>
           <ViewModeToggle
             viewMode={viewMode}
