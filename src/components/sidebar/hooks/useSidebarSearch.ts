@@ -14,6 +14,10 @@ import { createEmbeddingProvider } from "../../../services/vault/embeddingProvid
 import { getActiveVectorStore } from "../../../services/vault/semanticIndexRuntime";
 import { isMarkdownFile } from "../../../utils/fileTypes";
 
+const SEARCH_READ_CONCURRENCY = 8;
+const SEARCH_CACHE_FILES = 2048;
+const SEARCH_CACHE_CHARS = 1_000_000; // UTF-16 contents: at most about 2 MB.
+
 export interface SidebarSearchSnippet {
   line: number;
   start: number;
@@ -122,7 +126,28 @@ export function useSidebarSearch(
   const [searchMode, setSearchMode] = useState<SearchMode>(defaultMode);
   const [searchResults, setSearchResults] = useState<SidebarSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const contentCacheRef = useRef<Map<string, string | undefined>>(new Map());
+  const contentCacheRef = useRef(new Map<string, string>());
+  const cacheCharsRef = useRef(0);
+  const cacheContent = useCallback((id: string, content: string) => {
+    const cache = contentCacheRef.current;
+    const previous = cache.get(id);
+    if (previous !== undefined) {
+      cache.delete(id);
+      cacheCharsRef.current -= previous.length;
+    }
+    if (content.length > SEARCH_CACHE_CHARS) return;
+    while (
+      cache.size &&
+      (cache.size >= SEARCH_CACHE_FILES ||
+        cacheCharsRef.current + content.length > SEARCH_CACHE_CHARS)
+    ) {
+      const oldest = cache.keys().next().value!;
+      cacheCharsRef.current -= cache.get(oldest)!.length;
+      cache.delete(oldest);
+    }
+    cache.set(id, content);
+    cacheCharsRef.current += content.length;
+  }, []);
   const trashFolder = useAppStore((state) => state.settings.trashFolder);
 
   useEffect(() => {
@@ -187,21 +212,9 @@ export function useSidebarSearch(
   }, [searchableFiles]);
 
   useEffect(() => {
-    Object.entries(fileContents).forEach(([fileId, content]) => {
-      if (content !== undefined) {
-        contentCacheRef.current.set(fileId, content);
-      }
-    });
-  }, [fileContents]);
-
-  useEffect(() => {
-    const liveIds = new Set(searchableFiles.map((file) => file.id));
-    for (const fileId of Array.from(contentCacheRef.current.keys())) {
-      if (!liveIds.has(fileId)) {
-        contentCacheRef.current.delete(fileId);
-      }
-    }
-  }, [searchableFiles]);
+    contentCacheRef.current.clear();
+    cacheCharsRef.current = 0;
+  }, [searchableFiles, chunkIndex]);
 
   useEffect(() => {
     if (!normalizedQuery) {
@@ -214,6 +227,8 @@ export function useSidebarSearch(
     const timer = window.setTimeout(() => {
       void (async () => {
         setIsSearching(true);
+        const byPath = new Map<string, SidebarSearchResult>();
+        let usedRetrieval = false;
 
         if (searchMode !== "keyword" && chunkIndex) {
           try {
@@ -226,7 +241,6 @@ export function useSidebarSearch(
             });
             if (cancelled) return;
 
-            const byPath = new Map<string, SidebarSearchResult>();
             for (const hit of hits) {
               const file =
                 filesByPath.get(hit.chunk.path.replace(/\\/g, "/")) ||
@@ -266,58 +280,87 @@ export function useSidebarSearch(
               }
             }
 
-            const nextResults = [...byPath.values()].sort((left, right) => {
-              if (left.filenameMatched !== right.filenameMatched) {
-                return left.filenameMatched ? -1 : 1;
-              }
-              return left.file.name.localeCompare(
-                right.file.name,
-                "zh-Hans-CN",
-              );
-            });
-            setSearchResults(nextResults);
-            setIsSearching(false);
-            return;
+            if (searchMode === "semantic") {
+              const nextResults = [...byPath.values()].sort((left, right) => {
+                if (left.filenameMatched !== right.filenameMatched) {
+                  return left.filenameMatched ? -1 : 1;
+                }
+                return left.file.name.localeCompare(
+                  right.file.name,
+                  "zh-Hans-CN",
+                );
+              });
+              setSearchResults(nextResults);
+              setIsSearching(false);
+              return;
+            }
+            usedRetrieval = true;
           } catch {
             // Fall through to keyword search.
           }
         }
 
-        const nextResults: SidebarSearchResult[] = [];
-        for (const file of searchableFiles) {
-          if (cancelled) return;
+        // Hybrid search must include literal contents too: semantic chunks omit
+        // short notes and may exclude sections of a document. Bound reads and
+        // cached text instead of reading serially or retaining the entire vault.
+        let cursor = 0;
+        const worker = async () => {
+          while (!cancelled && cursor < searchableFiles.length) {
+            const file = searchableFiles[cursor++];
 
-          const filenameMatched =
-            normalizeSearchTarget(file.name).includes(normalizedQuery) ||
-            file.name.toLowerCase().includes(normalizedQuery);
-          let snippets: SidebarSearchSnippet[] = [];
+            const filenameMatched =
+              normalizeSearchTarget(file.name).includes(normalizedQuery) ||
+              file.name.toLowerCase().includes(normalizedQuery);
+            let snippets: SidebarSearchSnippet[] = [];
 
-          if (isMarkdownFile(file.name)) {
-            let content = contentCacheRef.current.get(file.id);
-            if (content === undefined) {
-              try {
-                content = await readFileFn(file);
-                contentCacheRef.current.set(file.id, content);
-              } catch {
-                content = undefined;
+            if (isMarkdownFile(file.name)) {
+              let content =
+                fileContents[file.id] ?? contentCacheRef.current.get(file.id);
+              if (content === undefined) {
+                try {
+                  content = await readFileFn(file);
+                  if (cancelled) return;
+                  cacheContent(file.id, content);
+                } catch {
+                  content = undefined;
+                }
+              }
+
+              if (content !== undefined) {
+                snippets = collectParagraphMatches(content, normalizedQuery);
               }
             }
 
-            if (content !== undefined) {
-              snippets = collectParagraphMatches(content, normalizedQuery);
+            if (filenameMatched || snippets.length > 0) {
+              const existing = byPath.get(file.path);
+              byPath.set(file.path, {
+                file,
+                filenameMatched: filenameMatched || !!existing?.filenameMatched,
+                snippets: snippets.length
+                  ? snippets
+                  : (existing?.snippets ?? []),
+              });
             }
           }
-
-          if (filenameMatched || snippets.length > 0) {
-            nextResults.push({ file, filenameMatched, snippets });
-          }
-        }
+        };
+        await Promise.all(
+          Array.from(
+            {
+              length: Math.min(SEARCH_READ_CONCURRENCY, searchableFiles.length),
+            },
+            worker,
+          ),
+        );
+        const nextResults = [...byPath.values()];
 
         nextResults.sort((left, right) => {
           if (left.filenameMatched !== right.filenameMatched) {
             return left.filenameMatched ? -1 : 1;
           }
-          if (left.snippets.length !== right.snippets.length) {
+          if (
+            !usedRetrieval &&
+            left.snippets.length !== right.snippets.length
+          ) {
             return right.snippets.length - left.snippets.length;
           }
           return left.file.name.localeCompare(right.file.name, "zh-Hans-CN");
@@ -336,6 +379,8 @@ export function useSidebarSearch(
     };
   }, [
     readFileFn,
+    cacheContent,
+    fileContents,
     normalizedQuery,
     searchableFiles,
     searchMode,

@@ -10,7 +10,8 @@ import { createPortal } from "react-dom";
 import { BookOpen, Plus } from "lucide-react";
 import { VirtualFileTree } from "./VirtualFileTree";
 import { TrashView } from "./TrashView";
-import { useFileSystem } from "../../hooks/useFileSystem";
+import { getFileSystem } from "../../types/filesystem";
+import { readBackgroundFile } from "../../services/filesystem/readBackgroundFile";
 import { useAppStore } from "../../store/appStore";
 
 import type { FileNode } from "../../types";
@@ -257,7 +258,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     onClose,
   }) => {
     const { t } = useI18n();
-    const { readFile } = useFileSystem();
+    const readFile = useCallback(
+      async (file: FileNode) =>
+        readBackgroundFile(await getFileSystem(), file.path),
+      [],
+    );
     const fileContents = useAppStore((state) => state.fileContents);
     const trashFolder = useAppStore((state) => state.settings.trashFolder);
     const showNotification = useAppStore((state) => state.showNotification);
