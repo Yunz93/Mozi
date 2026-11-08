@@ -8,6 +8,56 @@ import {
 } from "./wikiLinks";
 import type { FileNode } from "../types";
 
+describe("wiki lookup cache lifetime", () => {
+  const file = (path: string): FileNode => ({
+    id: path,
+    path,
+    name: path.split("/").pop()!,
+    type: "file",
+  });
+
+  it("keeps relative resolution scoped to each root and invalidates on immutable tree changes", () => {
+    const a = file("/vault/a/Note.md");
+    const b = file("/vault/b/Note.md");
+    const files = [a, b];
+    expect(
+      resolveWikiLinkFile(files, "Note", "/vault", "/vault/a/source.md"),
+    ).toBe(a);
+    expect(
+      resolveWikiLinkFile(files, "Note", "/vault", "/vault/b/source.md"),
+    ).toBe(b);
+    expect(resolveWikiLinkFile(files, "Note", "/vault")).toBeNull();
+    expect(resolveWikiLinkFile(files, "Note", "/vault/a")).toBe(a);
+    expect(resolveWikiLinkFile(files, "Note", "/vault/b")).toBe(b);
+    expect(resolveWikiLinkFile([a], "Note", "/vault")).toBe(a);
+    const replacement = file("/vault/Note.md");
+    expect(resolveWikiLinkFile([a, b, replacement], "Note", "/vault")).toBe(
+      replacement,
+    );
+    expect(resolveWikiLinkFile([a, b], "Note", "/vault")).toBeNull();
+  });
+
+  it("resolves Windows separators and Unicode suffixes while preserving ambiguity", () => {
+    const a = file("C:\\Vault\\a\\笔记.md");
+    a.name = "笔记.md";
+    const b = file("C:\\Vault\\b\\笔记.md");
+    b.name = "笔记.md";
+    const files = [a, b];
+    expect(
+      resolveWikiLinkFile(files, "a/%E7%AC%94%E8%AE%B0#Heading", "C:\\Vault"),
+    ).toBe(a);
+    expect(resolveWikiLinkFile(files, "笔记", "C:\\Vault")).toBeNull();
+    expect(
+      resolveWikiLinkFile(
+        files,
+        "笔记",
+        "C:\\Vault",
+        "C:\\Vault\\b\\source.md",
+      ),
+    ).toBe(b);
+  });
+});
+
 describe("parseWikiLinkReference", () => {
   it("parses simple wiki link", () => {
     const result = parseWikiLinkReference("My Note");

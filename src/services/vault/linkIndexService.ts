@@ -22,35 +22,36 @@ export function createEmptyLinkIndex(vaultRoot: string): LinkIndexSnapshot {
   };
 }
 
-
 function rebuildDerivedMaps(
   outbounds: Record<string, WikiOutboundLink[]>,
 ): Pick<LinkIndexSnapshot, "inbounds" | "unresolved"> {
-  const inbounds: Record<string, string[]> = {};
-  const unresolved: Record<string, string[]> = {};
+  const inbounds = new Map<string, Set<string>>();
+  const unresolved = new Map<string, Set<string>>();
 
   for (const [sourcePath, links] of Object.entries(outbounds)) {
     const normalizedSource = normalizePath(sourcePath);
     for (const link of links) {
-      if (link.resolvedPath) {
-        const target = normalizePath(link.resolvedPath);
-        const list = inbounds[target] ?? [];
-        if (!list.includes(normalizedSource)) {
-          list.push(normalizedSource);
-        }
-        inbounds[target] = list;
-      } else {
-        const key = link.targetRaw.trim() || link.raw;
-        const list = unresolved[key] ?? [];
-        if (!list.includes(normalizedSource)) {
-          list.push(normalizedSource);
-        }
-        unresolved[key] = list;
+      const map = link.resolvedPath ? inbounds : unresolved;
+      const key = link.resolvedPath
+        ? normalizePath(link.resolvedPath)
+        : link.targetRaw.trim() || link.raw;
+      let sources = map.get(key);
+      if (!sources) {
+        sources = new Set();
+        map.set(key, sources);
       }
+      sources.add(normalizedSource);
     }
   }
 
-  return { inbounds, unresolved };
+  return {
+    inbounds: Object.fromEntries(
+      [...inbounds].map(([key, sources]) => [key, [...sources]]),
+    ),
+    unresolved: Object.fromEntries(
+      [...unresolved].map(([key, sources]) => [key, [...sources]]),
+    ),
+  };
 }
 
 function listMarkdownPaths(files: FileNode[]): string[] {

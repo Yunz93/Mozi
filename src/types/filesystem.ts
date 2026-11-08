@@ -18,6 +18,8 @@ export interface IFileSystem {
   openFile(): Promise<string | null>;
   openDirectory(): Promise<string | null>;
   readFile(path: string): Promise<string>;
+  /** Background indexing reads must not retain editor format/content state. */
+  readFileUncached?(path: string): Promise<string>;
   readBinaryFile?(path: string): Promise<Uint8Array>;
   registerAllowedPath?(path: string, recursive: boolean): Promise<void>;
   writeFile(path: string, content: string): Promise<void>;

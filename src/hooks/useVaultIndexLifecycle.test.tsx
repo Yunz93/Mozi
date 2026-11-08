@@ -158,6 +158,36 @@ afterEach(() => {
 });
 
 describe("知识库索引任务的顺序与生命周期", () => {
+  it("bounds progress publications while still completing a large index", async () => {
+    cache.clear();
+    const files: FileNode[] = Array.from({ length: 1000 }, (_, i) => ({
+      id: `/vault/n${i}.md`,
+      path: `/vault/n${i}.md`,
+      name: `n${i}.md`,
+      type: "file",
+    }));
+    for (const file of files) disk.set(file.path, "# Note\n\n[[n0]]");
+    useAppStore.setState({ files });
+    const now = vi.spyOn(performance, "now").mockReturnValue(0);
+    const progress = vi.spyOn(useAppStore.getState(), "setLinkIndexProgress");
+    try {
+      await renderReady();
+      expect(
+        Object.keys(useAppStore.getState().linkIndex!.outbounds),
+      ).toHaveLength(1000);
+      expect(
+        progress.mock.calls.filter(([value]) => value.phase === "building")
+          .length,
+      ).toBeLessThanOrEqual(3);
+      expect(progress).toHaveBeenCalledWith(
+        expect.objectContaining({ done: 1000, total: 1000 }),
+      );
+      expect(useAppStore.getState().linkIndexProgress.phase).toBe("idle");
+    } finally {
+      now.mockRestore();
+      progress.mockRestore();
+    }
+  });
   it.each(["/vault/Flow.excalidraw", "/vault/image.png"])(
     "保存 %s 不把附件原始数据写入检索索引",
     async (path) => {

@@ -123,6 +123,63 @@ function getRelativePath(
 
 const flattenCache = new WeakMap<FileNode[], FileNode[]>();
 
+interface WikiFileLookup {
+  paths: Map<string, FileNode>;
+  suffixes: Map<string, FileNode | null>;
+  basenames: Map<string, FileNode | null>;
+}
+
+// File trees are immutable. Keep resolution work proportional to the tree once,
+// rather than traversing every file for every outbound link in every note.
+const lookupCache = new WeakMap<FileNode[], Map<string, WikiFileLookup>>();
+
+function addUnique(
+  map: Map<string, FileNode | null>,
+  key: string,
+  file: FileNode,
+) {
+  map.set(key, map.has(key) ? null : file);
+}
+
+function getWikiFileLookup(
+  files: FileNode[],
+  root?: string | null,
+): WikiFileLookup {
+  const rootKey = root ? normalizeSlashes(root).replace(/\/+$/, "") : "";
+  let roots = lookupCache.get(files);
+  if (!roots) {
+    roots = new Map();
+    lookupCache.set(files, roots);
+  }
+  const cached = roots.get(rootKey);
+  if (cached) return cached;
+  const lookup: WikiFileLookup = {
+    paths: new Map(),
+    suffixes: new Map(),
+    basenames: new Map(),
+  };
+  for (const file of flattenFiles(files)) {
+    const path = stripMarkdownExtension(getRelativePath(file.path, rootKey))
+      .toLowerCase()
+      .normalize("NFC");
+    if (!lookup.paths.has(path)) lookup.paths.set(path, file);
+    for (
+      let slash = path.indexOf("/");
+      slash >= 0;
+      slash = path.indexOf("/", slash + 1)
+    ) {
+      addUnique(lookup.suffixes, path.slice(slash + 1), file);
+    }
+    addUnique(
+      lookup.basenames,
+      stripMarkdownExtension(file.name).toLowerCase().normalize("NFC"),
+      file,
+    );
+  }
+  roots.set(rootKey, lookup);
+  return lookup;
+}
+
 function flattenFiles(nodes: FileNode[]): FileNode[] {
   const cached = flattenCache.get(nodes);
   if (cached) return cached;
@@ -337,7 +394,7 @@ export function resolveWikiLinkFile(
     normalizedTarget.split("/").filter(Boolean).pop() || normalizedTarget
   ).normalize("NFC");
 
-  const allFiles = flattenFiles(files);
+  const lookup = getWikiFileLookup(files, rootFolderPath);
   const currentRelativePath =
     currentFilePath && rootFolderPath
       ? getRelativePath(currentFilePath, rootFolderPath)
@@ -349,42 +406,22 @@ export function resolveWikiLinkFile(
     ? `${currentDir}/${normalizedTarget}`
     : normalizedTarget;
 
-  let exactPathMatch: FileNode | null = null;
-  let relativePathMatch: FileNode | null = null;
-  const suffixMatches: FileNode[] = [];
-  const basenameMatches: FileNode[] = [];
+  const exact = lookup.paths.get(normalizedTarget);
+  const relative = lookup.paths.get(
+    relativeCandidate.toLowerCase().normalize("NFC"),
+  );
+  const suffix = lookup.suffixes.get(normalizedTarget);
+  if (exact || relative || suffix) return exact || relative || suffix || null;
 
-  for (const file of allFiles) {
-    const relativePath = stripMarkdownExtension(
-      getRelativePath(file.path, rootFolderPath),
-    )
-      .toLowerCase()
-      .normalize("NFC");
-    const basename = stripMarkdownExtension(file.name)
-      .toLowerCase()
-      .normalize("NFC");
-
-    if (!exactPathMatch && relativePath === normalizedTarget) {
-      exactPathMatch = file;
-    }
-
-    if (
-      !relativePathMatch &&
-      relativePath === relativeCandidate.toLowerCase().normalize("NFC")
-    ) {
-      relativePathMatch = file;
-    } else if (relativePath.endsWith(`/${normalizedTarget}`)) {
-      suffixMatches.push(file);
-    }
-
-    if (basename === normalizedTarget || basename === targetBasename) {
-      basenameMatches.push(file);
-    }
+  // A FileNode name is normally a basename. Preserve the union/ambiguity rule
+  // even for callers that provide names containing separators.
+  if (
+    normalizedTarget !== targetBasename &&
+    lookup.basenames.has(normalizedTarget)
+  ) {
+    return lookup.basenames.has(targetBasename)
+      ? null
+      : (lookup.basenames.get(normalizedTarget) ?? null);
   }
-
-  const suffixMatch = suffixMatches.length === 1 ? suffixMatches[0] : null;
-  const basenameMatch =
-    basenameMatches.length === 1 ? basenameMatches[0] : null;
-
-  return exactPathMatch || relativePathMatch || suffixMatch || basenameMatch;
+  return lookup.basenames.get(targetBasename) ?? null;
 }

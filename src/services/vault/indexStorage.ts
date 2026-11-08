@@ -1,7 +1,6 @@
 import { toForwardSlashes as normalizePath } from "../../utils/pathHelpers";
 import { isTauriEnvironment } from "../../types/filesystem";
 
-
 export type AppDataNamespace = "vault-index" | "ask-history";
 
 /** Stable short id for a vault root path. */
@@ -143,6 +142,13 @@ export async function writeIndexJson(
       } catch {
         // ignore tmp cleanup failures
       }
+    }
+    // Disk is authoritative after a successful write. Keeping another full JSON
+    // string per index (and per window/vault) needlessly doubles retained data.
+    if (
+      memoryStore.get(memoryKey(vaultRoot, fileName, namespace)) === payload
+    ) {
+      memoryStore.delete(memoryKey(vaultRoot, fileName, namespace));
     }
   } catch (error) {
     console.warn("Failed to persist vault index:", error);
