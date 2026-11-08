@@ -17,12 +17,13 @@
 
 ## Requirements
 
-This project currently supports macOS and Windows. Linux build/file-operation support has been removed for now.
+Release packages support macOS and Windows; CI validates the Linux Debian build and desktop regressions.
+See [desktop acceptance](../testing/desktop-acceptance.md) for the cloud VM matrix, drivers and 25 interaction scenarios.
 
 ### Common
 
-- Node.js 18+
-- Rust 1.77+
+- Node.js 22 (matching CI)
+- Rust stable
 - npm 9+
 
 ### Platform Dependencies

@@ -17,12 +17,13 @@
 
 ## 环境要求
 
-支持 macOS 和 Windows。Linux 构建与文件操作支持已暂时移除。
+发布包支持 macOS 和 Windows；Linux 的 Debian 构建与桌面回归由 CI 验证。
+跨平台驱动、25 项交互用例和云端虚拟机验收见[桌面验收方案](../testing/desktop-acceptance.md)。
 
 ### 通用要求
 
-- Node.js 18+
-- Rust 1.77+
+- Node.js 22（与 CI 一致）
+- Rust stable
 - npm 9+
 
 ### 平台依赖

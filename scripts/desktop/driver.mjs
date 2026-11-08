@@ -44,10 +44,17 @@ export class DesktopDriver {
     this.session = result.sessionId;
     this.capabilities = result.capabilities;
     await this.request("POST", this.path("/timeouts"), {
-      script: 120_000,
+      script: 15_000,
       implicit: 0,
       pageLoad: 120_000,
     });
+    // The embedded HTTP server can be ready before the first WebView navigation.
+    // Native title evaluation survives that transition; script-result globals do not.
+    await until(
+      async () => (await this.request("GET", this.path("/title"))) === "墨知",
+      "Application document did not finish its initial navigation",
+      60_000,
+    );
     return result;
   }
   path(suffix) {
@@ -133,8 +140,25 @@ export class DesktopDriver {
   switch(handle) {
     return this.request("POST", this.path("/window"), { handle });
   }
-  refresh() {
-    return this.request("POST", this.path("/refresh"), {});
+  async refresh() {
+    const marker = `mozi-navigation-${Date.now()}`;
+    await this.execute("document.title=arguments[0];return true", marker);
+    await this.request("POST", this.path("/refresh"), {});
+    // Embedded refresh returns before navigation starts. GET title uses a native
+    // evaluation, so a result callback cannot be destroyed with the old document.
+    await until(
+      async () => (await this.request("GET", this.path("/title"))) !== marker,
+      "Reload did not replace the old document",
+      30_000,
+    );
+    await until(
+      () =>
+        this.execute(
+          "return document.readyState==='complete' && !!window.__TAURI_INTERNALS__",
+        ),
+      "Reload did not initialize the application bridge",
+      60_000,
+    );
   }
   async screenshot(path) {
     const encoded = await this.request("GET", this.path("/screenshot"));

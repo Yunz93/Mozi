@@ -49,7 +49,7 @@ export async function openWindow(
 export async function closeWindow(driver, handle) {
   await driver.switch(handle);
   await driver.execute(
-    "void window.__TAURI_INTERNALS__.invoke('force_close_window');return true",
+    "setTimeout(()=>void window.__TAURI_INTERNALS__.invoke('force_close_window'),300);return true",
   );
   await until(
     async () => !(await driver.handles()).includes(handle),

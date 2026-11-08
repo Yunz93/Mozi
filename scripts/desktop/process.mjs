@@ -2,7 +2,14 @@ import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createServer } from "node:net";
 import { createWriteStream } from "node:fs";
-import { mkdir, readdir, readFile, writeFile, rm } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  writeFile,
+  rm,
+  lstat,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -37,31 +44,8 @@ export async function resetProfile(stock = false) {
       "Stock-profile testing requires an ephemeral GitHub Actions runner",
     );
   const id = stock ? STOCK_ID : TEST_ID;
-  for (const directory of profileDirectories(id)) {
-    if (basename(directory) !== id) throw new Error("Invalid profile boundary");
-    let entries = [];
-    try {
-      entries = await readdir(directory);
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
-    if (entries.length) {
-      let owner;
-      try {
-        owner = JSON.parse(await readFile(join(directory, OWNER), "utf8"));
-      } catch {
-        /* Checked below. */
-      }
-      if (owner?.tool !== "mozi-desktop-acceptance" || owner.identifier !== id)
-        throw new Error(`Refusing to replace an unowned profile: ${directory}`);
-      await rm(directory, { recursive: true, maxRetries: 20, retryDelay: 150 });
-    }
-    await mkdir(directory, { recursive: true });
-    await writeFile(
-      join(directory, OWNER),
-      JSON.stringify({ tool: "mozi-desktop-acceptance", identifier: id }),
-    );
-  }
+  for (const directory of profileDirectories(id))
+    await resetOwnedDirectory(directory, id);
   if (process.platform === "darwin") {
     // CFPreferences caches domains outside the application process.
     try {
@@ -70,6 +54,39 @@ export async function resetProfile(stock = false) {
       if (error.code !== 1) throw error;
     }
   }
+}
+
+export async function resetOwnedDirectory(directory, id) {
+  if (![TEST_ID, STOCK_ID].includes(id) || basename(directory) !== id)
+    throw new Error("Invalid profile boundary");
+  try {
+    if ((await lstat(directory)).isSymbolicLink())
+      throw new Error(`Refusing a symbolic-link profile: ${directory}`);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  let entries = [];
+  try {
+    entries = await readdir(directory);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (entries.length) {
+    let owner;
+    try {
+      owner = JSON.parse(await readFile(join(directory, OWNER), "utf8"));
+    } catch {
+      /* Checked below. */
+    }
+    if (owner?.tool !== "mozi-desktop-acceptance" || owner.identifier !== id)
+      throw new Error(`Refusing to replace an unowned profile: ${directory}`);
+    await rm(directory, { recursive: true, maxRetries: 20, retryDelay: 150 });
+  }
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, OWNER),
+    JSON.stringify({ tool: "mozi-desktop-acceptance", identifier: id }),
+  );
 }
 
 export async function freePort() {

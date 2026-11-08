@@ -14,7 +14,12 @@ import {
 /** Measurements include WebDriver round trips and background work; they are not SLOs. */
 export async function measure(context, count, windows) {
   const { driver: d, vault, child, beforePids, binary, output, mode } = context;
-  await persistedIndex(context);
+  const index = await persistedIndex(context);
+  assert.equal(
+    Object.keys(index.byPath).length,
+    count,
+    "Incomplete persisted index",
+  );
   const firstIndexMs = performance.now() - context.started;
   const handles = [await d.request("GET", d.path("/window"))];
   const note = join(vault, "active.md");
@@ -61,6 +66,7 @@ export async function measure(context, count, windows) {
     restoreMs: context.restoreMs,
     firstIndexMs,
     renderedRows,
+    watchStats: await d.invoke("vault_watch_stats"),
     memory,
     writeToAllEditorsMs,
     medianMs: sorted[1],

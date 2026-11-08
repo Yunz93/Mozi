@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir, mkdtemp } from "node:fs/promises";
-import { tmpdir, arch, release } from "node:os";
+import { tmpdir, arch, release, cpus, totalmem } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { DesktopDriver, until } from "./driver.mjs";
@@ -36,6 +36,8 @@ const report = {
   platform: process.platform,
   arch: arch(),
   osRelease: release(),
+  logicalProcessors: cpus().length,
+  systemMemoryBytes: totalmem(),
   provider,
   binarySha256: createHash("sha256")
     .update(await readFile(binary))
@@ -100,6 +102,7 @@ export async function session(mode = "native", count = 100) {
       150,
     );
     await driver.start(binary, provider);
+    console.log(`READY ${name} ${mode} ${count} notes`);
     await until(
       async () => (await driver.body()).length > 10,
       "Application did not render",
@@ -137,6 +140,9 @@ export async function session(mode = "native", count = 100) {
       close,
     };
   } catch (error) {
+    await driver
+      .screenshot(join(output, `${name}-startup-failed.png`))
+      .catch(() => {});
     await close().catch(() => {});
     throw error;
   }

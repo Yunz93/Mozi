@@ -46,7 +46,7 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_BUILD_JOBS: 3
-      MOZI_DESKTOP_SUITE: bootstrap
+      MOZI_DESKTOP_SUITE: full
       MOZI_DESKTOP_PERFORMANCE: ${{ inputs.performance || 'smoke' }}
       MOZI_DESKTOP_OUTPUT: .perf/desktop
     steps:
@@ -66,6 +66,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb xauth dbus-x11 openbox fonts-noto-cjk
       - run: npm ci
+      - name: Test profile safety and protocol error handling
+        run: node --test scripts/desktop/safety.test.mjs
       - name: Check test/release boundary
         run: node scripts/desktop/check-boundary.mjs
       - name: Build isolated macOS automation app
@@ -74,12 +76,12 @@ jobs:
       - name: Build isolated Linux automation app
         if: runner.os == 'Linux'
         run: npm run tauri -- build --features desktop-e2e --no-bundle --no-sign --config src-tauri/tauri.desktop-e2e.conf.json
-      - name: macOS driver bootstrap
+      - name: macOS desktop acceptance
         if: runner.os == 'macOS'
         env:
           MOZI_DESKTOP_BINARY: src-tauri/target/release/bundle/macos/Mozi Desktop E2E.app/Contents/MacOS/mozi-desktop-e2e
         run: node scripts/desktop/run.mjs
-      - name: Linux driver bootstrap
+      - name: Linux desktop acceptance
         if: runner.os == 'Linux'
         env:
           MOZI_DESKTOP_BINARY: src-tauri/target/release/mozi-desktop-e2e
@@ -93,13 +95,20 @@ jobs:
       - name: Install Tauri driver
         if: runner.os == 'Windows'
         run: cargo install tauri-driver --version 2.1.0 --locked
-      - name: Windows native-driver bootstrap
+      - name: Windows desktop acceptance
         if: runner.os == 'Windows'
         run: node scripts/desktop/run.mjs
+      - name: Build macOS stock release-configuration application
+        if: runner.os == 'macOS'
+        run: npm run tauri -- build --bundles app --no-sign --config src-tauri/tauri.desktop-smoke.conf.json
+      - name: Launch macOS stock application and verify driver exclusion
+        if: runner.os == 'macOS'
+        run: node scripts/desktop/macos-stock.mjs
       - name: Upload desktop evidence (never profiles or credentials)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.runner }}
           path: .perf/desktop
+          include-hidden-files: true
           if-no-files-found: warn
