@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir, mkdtemp } from "node:fs/promises";
+import {
+  readFile,
+  writeFile,
+  mkdir,
+  mkdtemp,
+  realpath,
+} from "node:fs/promises";
 import { tmpdir, arch, release, cpus, totalmem } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -19,7 +25,8 @@ const binary = resolve(
 );
 const provider = process.env.MOZI_DESKTOP_DRIVER ?? "embedded";
 const output = resolve(process.env.MOZI_DESKTOP_OUTPUT ?? ".perf/desktop");
-const root = await mkdtemp(join(tmpdir(), "mozi-desktop-"));
+// Match native canonical identities (notably /var -> /private/var on macOS).
+const root = await realpath(await mkdtemp(join(tmpdir(), "mozi-desktop-")));
 await mkdir(output, { recursive: true });
 const report = {
   schema: 1,
