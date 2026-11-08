@@ -1,8 +1,9 @@
+import { buildVaultIndexes } from "../services/vault/buildVaultIndexes";
+import { toForwardSlashes as normalizePath } from "../utils/pathHelpers";
 import { useCallback, useEffect, useRef } from "react";
 import { useAppStore } from "../store/appStore";
 import { getFileSystem } from "../types/filesystem";
 import {
-  buildFullLinkIndex,
   reconcileTreeWithIndex,
   reindexFileContents,
   removeFilesFromIndex,
@@ -54,10 +55,6 @@ import {
   resolveBuiltinEmbeddingDownloadAction,
 } from "../services/vault/builtinEmbeddingConsent";
 import { t } from "../utils/i18n";
-
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
 
 function isValidLinkSnapshot(
   value: LinkIndexSnapshot | null,
@@ -370,10 +367,11 @@ export function useVaultIndexLifecycle(): {
         const fs = await getFileSystem();
         if (!isCurrent()) return;
         const previousChunks = getActiveChunkIndex()?.byPath;
-        const snapshot = await buildFullLinkIndex({
+        const { linkIndex: snapshot, chunkIndex } = await buildVaultIndexes({
           files: state.files,
           vaultRoot,
           readFile: (path) => fs.readFile(path),
+          excludeGlobs: state.settings.indexExcludeGlobs,
           onProgress: (done, total, currentPath) => {
             if (!isCurrent()) return;
             useAppStore.getState().setLinkIndexProgress({
@@ -392,14 +390,6 @@ export function useVaultIndexLifecycle(): {
         await writeIndexJson(snapshot.vaultRoot, LINK_INDEX_FILE, snapshot);
         if (!isCurrent()) return;
 
-        const chunkIndex = await buildFullChunkIndex({
-          files: state.files,
-          vaultRoot,
-          readFile: (path) => fs.readFile(path),
-          shouldCancel: () => !isCurrent(),
-          excludeGlobs: state.settings.indexExcludeGlobs,
-        });
-        if (!isCurrent()) return;
         await refreshSemanticForChunkIndex(chunkIndex, {
           previousByPath: previousChunks,
           linkGeneration: generation,

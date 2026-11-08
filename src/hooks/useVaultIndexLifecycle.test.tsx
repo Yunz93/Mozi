@@ -380,7 +380,7 @@ describe("知识库索引任务的顺序与生命周期", () => {
     },
   );
 
-  it.each([1, 4])(
+  it.each([1, 3])(
     "切库时停止全量重建第 %i 次延迟读取后的写回",
     async (blockedRead) => {
       const hook = await renderReady();

@@ -1,3 +1,4 @@
+import { toForwardSlashes as normalizePath } from "../../utils/pathHelpers";
 import type { FileNode } from "../../types";
 import type {
   BacklinkGroup,
@@ -21,9 +22,6 @@ export function createEmptyLinkIndex(vaultRoot: string): LinkIndexSnapshot {
   };
 }
 
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
 
 function rebuildDerivedMaps(
   outbounds: Record<string, WikiOutboundLink[]>,

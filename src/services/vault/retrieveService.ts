@@ -1,3 +1,4 @@
+import { toForwardSlashes as normalizePath } from "../../utils/pathHelpers";
 import type {
   ChunkIndexSnapshot,
   RetrieveHit,
@@ -8,9 +9,6 @@ import type { VectorStore } from "./vectorStore";
 import type { EmbeddingProvider } from "./embeddingProvider";
 import { pathMatchesAnyGlob } from "../../utils/pathGlob";
 
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
 
 function normalizeSearchTarget(text: string): string {
   return text
