@@ -230,10 +230,6 @@ Set up the new-note frontmatter template under **Settings → Metadata**, includ
 
 View the installed version and check for GitHub Release updates under **Settings → About**, then follow the prompts to download an installer.
 
-<p>
-  <img src="./src-tauri/resources/sample-notes/resources/13-updates.png" alt="Version and update check" width="800">
-</p>
-
 ## Keyboard shortcuts
 
 Defaults below; the full list lives in **Settings → Shortcuts**.

@@ -232,10 +232,6 @@ macOS 可在同处开启 **同步到 macOS 系统日历**，授权完整日历�
 
 在 **设置 → 关于** 查看版本并检查 GitHub Release 更新，按提示下载安装包。
 
-<p>
-  <img src="./src-tauri/resources/sample-notes/resources/13-updates.png" alt="版本与检查更新" width="800">
-</p>
-
 ## 常用快捷键
 
 默认键位；完整列表见 **Settings → Shortcuts**。
