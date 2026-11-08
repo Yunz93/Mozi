@@ -4,7 +4,7 @@ import { useAppStore, defaultSettings } from "../../store/appStore";
 import { getResolvedUiFontFamily } from "../../utils/fontSettings";
 import { useI18n } from "../../hooks/useI18n";
 import { useImeCompositionGate } from "../../hooks/useImeCompositionGate";
-import { isPlainEnterKey } from "../../utils/imeKeyboard";
+import { isImeComposingEvent, isPlainEnterKey } from "../../utils/imeKeyboard";
 
 interface DialogProps {
   isOpen: boolean;
@@ -48,7 +48,11 @@ export const Dialog: React.FC<DialogProps> = ({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (
+        e.key === "Escape" &&
+        !e.defaultPrevented &&
+        !isImeComposingEvent(e)
+      ) {
         e.preventDefault();
         if (closableRef.current) onCloseRef.current();
       }
@@ -95,7 +99,7 @@ export const Dialog: React.FC<DialogProps> = ({
       onClick={handleBackdropClick}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="pointer-events-none absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
       {/* Dialog */}
       <div
