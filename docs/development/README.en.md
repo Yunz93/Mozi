@@ -83,7 +83,7 @@ Artifacts are generated under `src-tauri/target/release/bundle/`.
 
 ### GitHub Tag Auto Build
 
-The repository is configured with a GitHub Actions release workflow. Push a `v`-prefixed tag to automatically build and upload macOS / Windows installers.
+The repository is configured with a GitHub Actions release workflow. Push a `v`-prefixed tag to automatically build and upload macOS / Windows / Linux x64 installers. Linux uses `tauri.linux.conf.json` to build a `.deb`, validates its metadata, desktop launcher, and Markdown file associations, then uploads it to the same Release. Linux updater artifacts are not generated; upgrades require manually installing the newer `.deb`.
 
 ```bash
 git tag v0.1.1

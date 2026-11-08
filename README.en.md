@@ -44,6 +44,16 @@ See [Development guide: macOS signing and notarization](docs/development/README.
 
 Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run anyway**. After install, **Settings → About** can check for newer GitHub Release builds.
 
+### Linux
+
+A Linux x64 `.deb` package is available for Ubuntu 24.04 and compatible environments, with a desktop launcher and Markdown file associations.
+
+```bash
+sudo apt install ./Mozi_2.3.0_amd64.deb
+```
+
+Linux does not support in-app updates yet. Download and install the newer `.deb` from GitHub Releases to upgrade.
+
 ## Features
 
 Follow the bundled [feature guide in Chinese](./src-tauri/resources/sample-notes/03-功能导览.md) to try each feature. These screenshots come from a separate demo vault and are bundled locally with the samples.

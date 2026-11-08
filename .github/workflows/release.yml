@@ -227,3 +227,62 @@ jobs:
           prerelease: false
           assetNamePattern: Mozi_[version]_[arch][setup][ext]
           args: --bundles nsis
+
+  build-linux:
+    if: github.event_name != 'workflow_dispatch'
+    needs: [build-macos, build-windows]
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_BUILD_JOBS: 2
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          shared-key: linux-package
+
+      - name: Install Linux build and package validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf desktop-file-utils
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Release workflow smoke gate
+        run: npm run smoke:release-workflow
+
+      - name: Sync app version from Git tag
+        run: npm run release:sync-version
+
+      - name: Build the Linux release package
+        run: npm run tauri -- build --bundles deb --no-sign
+
+      - name: Validate Debian metadata and installed launcher targets
+        run: node scripts/check-linux-package.mjs
+
+      - name: Upload validated Linux package to the existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          packages=(src-tauri/target/release/bundle/deb/*.deb)
+          test "${#packages[@]}" -eq 1
+          test -f "${packages[0]}"
+          asset="Mozi_${RELEASE_TAG#v}_amd64.deb"
+          cp "${packages[0]}" "$asset"
+          gh release upload "$RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY"

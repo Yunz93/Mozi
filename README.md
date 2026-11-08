@@ -44,6 +44,16 @@ xattr -cr /Applications/墨知.app
 
 运行 `.exe` 安装。SmartScreen 提示时选「更多信息」→「仍要运行」。安装后可在 **设置 → 关于** 检查 GitHub Release 更新。
 
+### Linux
+
+提供 Linux x64 的 `.deb` 安装包，适用于 Ubuntu 24.04 及兼容环境；支持桌面启动器和 Markdown 文件关联。
+
+```bash
+sudo apt install ./Mozi_2.3.0_amd64.deb
+```
+
+Linux 暂不支持应用内自动更新，升级时请从 GitHub Releases 下载并安装新版 `.deb`。
+
 ## 特色功能
 
 跟着内置 [功能导览](./src-tauri/resources/sample-notes/03-功能导览.md) 逐项体验。以下截图来自独立演示知识库，均随示例保存在本地。
