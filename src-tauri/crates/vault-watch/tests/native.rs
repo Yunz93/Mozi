@@ -34,7 +34,12 @@ fn wait(
         }
         assert!(
             Instant::now() < deadline,
-            "native event did not arrive: {page:?}"
+            "native event did not arrive: seq={}, changes={}, rescan={}, error={:?}, sample={:?}",
+            page.seq,
+            page.changes.len(),
+            page.rescan_required,
+            page.error,
+            page.changes.iter().rev().take(3).collect::<Vec<_>>()
         );
         thread::sleep(Duration::from_millis(20));
     }

@@ -41,6 +41,14 @@ watcher tests exercise shared roots, exact-file isolation, snapshot races, actua
 rename/delete/root loss and symlink boundaries (where supported); deterministic
 journal tests cover coalescing, bounded latency, overflow and replay gaps.
 
+Windows uses the exact `notify 9.0.0-rc.7` backend: notify 8.2 ignores zero-byte
+`ReadDirectoryChangesW` completions and can silently lose changes during a burst.
+The pinned release candidate reports those completions as rescan requests. Other
+platforms retain notify 8.2. CI repeats the Windows burst regression five times.
+This prerelease dependency is another reason to retain the opt-in gate; replace
+the pin with a validated stable release when available. The crate requires Rust
+1.88 or newer.
+
 ## Task calendar consumer
 
 The task worker holds independent broker subscriptions for registered vaults, so
