@@ -10,7 +10,7 @@ impl Temp {
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!("mozi-watch-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&path).unwrap();
-        Self(path)
+        Self(fs::canonicalize(path).unwrap())
     }
 }
 impl Drop for Temp {
