@@ -852,6 +852,11 @@ async fn upload_image_to_hosting(
 pub fn run() {
     let mut builder = tauri::Builder::default();
 
+    #[cfg(feature = "desktop-e2e")]
+    {
+        builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    }
+
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {

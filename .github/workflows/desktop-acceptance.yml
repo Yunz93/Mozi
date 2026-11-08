@@ -1,0 +1,105 @@
+name: Desktop acceptance
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "scripts/desktop/**"
+      - "package*.json"
+      - "index.*"
+      - "vite.config.*"
+      - ".github/workflows/desktop-acceptance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "scripts/desktop/**"
+      - "package*.json"
+      - "index.*"
+      - "vite.config.*"
+      - ".github/workflows/desktop-acceptance.yml"
+  workflow_dispatch:
+    inputs:
+      performance:
+        description: "Performance matrix: smoke or all note/window counts"
+        type: choice
+        default: full
+        options: [smoke, full]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: desktop (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: 3
+      MOZI_DESKTOP_SUITE: bootstrap
+      MOZI_DESKTOP_PERFORMANCE: ${{ inputs.performance || 'smoke' }}
+      MOZI_DESKTOP_OUTPUT: .perf/desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          shared-key: desktop-${{ matrix.runner }}
+      - name: Install Linux desktop libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb xauth dbus-x11 openbox fonts-noto-cjk
+      - run: npm ci
+      - name: Check test/release boundary
+        run: node scripts/desktop/check-boundary.mjs
+      - name: Build isolated macOS automation app
+        if: runner.os == 'macOS'
+        run: npm run tauri -- build --features desktop-e2e --bundles app --no-sign --config src-tauri/tauri.desktop-e2e.conf.json
+      - name: Build isolated Linux automation app
+        if: runner.os == 'Linux'
+        run: npm run tauri -- build --features desktop-e2e --no-bundle --no-sign --config src-tauri/tauri.desktop-e2e.conf.json
+      - name: macOS driver bootstrap
+        if: runner.os == 'macOS'
+        env:
+          MOZI_DESKTOP_BINARY: src-tauri/target/release/bundle/macos/Mozi Desktop E2E.app/Contents/MacOS/mozi-desktop-e2e
+        run: node scripts/desktop/run.mjs
+      - name: Linux driver bootstrap
+        if: runner.os == 'Linux'
+        env:
+          MOZI_DESKTOP_BINARY: src-tauri/target/release/mozi-desktop-e2e
+        run: sh scripts/desktop/run-linux.sh
+      - name: Build Windows release-configuration installer
+        if: runner.os == 'Windows'
+        run: npm run tauri -- build --bundles nsis --no-sign --config src-tauri/tauri.desktop-smoke.conf.json
+      - name: Install Windows application and matching WebView2 driver
+        if: runner.os == 'Windows'
+        run: pwsh -File scripts/desktop/prepare-windows.ps1
+      - name: Install Tauri driver
+        if: runner.os == 'Windows'
+        run: cargo install tauri-driver --version 2.1.0 --locked
+      - name: Windows native-driver bootstrap
+        if: runner.os == 'Windows'
+        run: node scripts/desktop/run.mjs
+      - name: Upload desktop evidence (never profiles or credentials)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.runner }}
+          path: .perf/desktop
+          if-no-files-found: warn
