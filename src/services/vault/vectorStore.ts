@@ -138,8 +138,20 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+interface RuntimeVectorRecord extends Omit<VectorRecord, "values"> {
+  values: Float32Array;
+}
+interface ScoredVector {
+  id: string;
+  score: number;
+  order: number;
+}
+function worse(a: ScoredVector, b: ScoredVector): boolean {
+  return a.score < b.score || (a.score === b.score && a.order > b.order);
+}
+
 export class VectorStore {
-  private records = new Map<string, VectorRecord>();
+  private records = new Map<string, RuntimeVectorRecord>();
   dims = 0;
   model = "";
   vaultRoot = "";
@@ -159,7 +171,10 @@ export class VectorStore {
     this.vaultRoot = snapshot.vaultRoot;
     this.builtAt = snapshot.builtAt;
     for (const record of snapshot.records) {
-      this.records.set(record.id, record);
+      this.records.set(record.id, {
+        ...record,
+        values: Float32Array.from(record.values),
+      });
     }
   }
 
@@ -170,7 +185,10 @@ export class VectorStore {
       model: this.model,
       dims: this.dims,
       builtAt: this.builtAt || Date.now(),
-      records: [...this.records.values()],
+      records: [...this.records.values()].map((record) => ({
+        ...record,
+        values: Array.from(record.values),
+      })),
     };
   }
 
@@ -182,7 +200,7 @@ export class VectorStore {
       this.records.set(entry.id, {
         id: entry.id,
         contentHash: entry.contentHash,
-        values: Array.from(entry.values),
+        values: new Float32Array(entry.values),
       });
     }
     this.builtAt = Date.now();
@@ -210,7 +228,18 @@ export class VectorStore {
   }
 
   get(id: string): VectorRecord | undefined {
-    return this.records.get(id);
+    const record = this.records.get(id);
+    return record
+      ? { ...record, values: Array.from(record.values) }
+      : undefined;
+  }
+
+  getContentHash(id: string): string | undefined {
+    return this.records.get(id)?.contentHash;
+  }
+
+  ids(): IterableIterator<string> {
+    return this.records.keys();
   }
 
   size(): number {
@@ -221,9 +250,51 @@ export class VectorStore {
     query: Float32Array,
     topK: number,
   ): Array<{ id: string; score: number }> {
+    // Match Array.slice's legacy count semantics (including fractional/NaN/Inf).
+    const limit = Math.min(this.records.size, Math.trunc(Math.max(1, topK)));
+    if (!limit) return [];
+    const heap: ScoredVector[] = [];
+    let order = 0;
+    for (const record of this.records.values()) {
+      const position = order++;
+      const score = cosineSimilarity(query, record.values);
+      if (score <= 0) continue;
+      // Malformed legacy snapshots can contain NaNs. Native stable sort has
+      // special behavior for a NaN comparator; keep that rare compatibility path.
+      if (!Number.isFinite(score)) return this.searchLegacy(query, topK);
+      if (heap.length === limit && score <= heap[0].score) continue;
+      const candidate = { id: record.id, score, order: position };
+      if (heap.length < limit) {
+        heap.push(candidate);
+        let child = heap.length - 1;
+        while (child > 0) {
+          const parent = (child - 1) >> 1;
+          if (!worse(heap[child], heap[parent])) break;
+          [heap[child], heap[parent]] = [heap[parent], heap[child]];
+          child = parent;
+        }
+      } else {
+        heap[0] = candidate;
+        let parent = 0;
+        while (parent * 2 + 1 < heap.length) {
+          let child = parent * 2 + 1;
+          if (child + 1 < heap.length && worse(heap[child + 1], heap[child]))
+            child++;
+          if (!worse(heap[child], heap[parent])) break;
+          [heap[child], heap[parent]] = [heap[parent], heap[child]];
+          parent = child;
+        }
+      }
+    }
+    return heap
+      .sort((a, b) => b.score - a.score || a.order - b.order)
+      .map(({ id, score }) => ({ id, score }));
+  }
+
+  private searchLegacy(query: Float32Array, topK: number) {
     const scored: Array<{ id: string; score: number }> = [];
     for (const record of this.records.values()) {
-      const score = cosineSimilarity(query, Float32Array.from(record.values));
+      const score = cosineSimilarity(query, record.values);
       if (score <= 0) continue;
       scored.push({ id: record.id, score });
     }

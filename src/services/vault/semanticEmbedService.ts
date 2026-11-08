@@ -111,8 +111,8 @@ export async function embedChunkIndex(options: {
     removeIds.push(...diff.removeIds);
     // Also embed chunks whose vectors are missing even if hash matches.
     for (const chunk of chunks) {
-      const existing = options.vectorStore.get(chunk.id);
-      if (!existing || existing.contentHash !== chunk.contentHash) {
+      const existingHash = options.vectorStore.getContentHash(chunk.id);
+      if (existingHash === undefined || existingHash !== chunk.contentHash) {
         if (!upsertChunks.some((item) => item.id === chunk.id)) {
           upsertChunks.push(chunk);
         }
@@ -126,10 +126,8 @@ export async function embedChunkIndex(options: {
       .flat()
       .map((chunk) => chunk.id),
   );
-  for (const record of options.vectorStore.toSnapshot().records) {
-    if (!currentIds.has(record.id)) {
-      removeIds.push(record.id);
-    }
+  for (const id of options.vectorStore.ids()) {
+    if (!currentIds.has(id)) removeIds.push(id);
   }
 
   if (removeIds.length > 0) {
