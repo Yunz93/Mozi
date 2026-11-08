@@ -148,7 +148,8 @@ export function VirtualFileTree({
     if (
       locateRequestKey <= 0 ||
       (lastLocateRef.current.key === locateRequestKey &&
-        lastLocateRef.current.id === activeId)
+        lastLocateRef.current.id === activeId &&
+        !pendingLocateRef.current)
     )
       return;
     lastLocateRef.current = { key: locateRequestKey, id: activeId };
