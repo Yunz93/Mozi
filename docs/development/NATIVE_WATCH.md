@@ -40,3 +40,17 @@ CI also runs the Tauri application tests on macOS to check IPC integration. Nati
 watcher tests exercise shared roots, exact-file isolation, snapshot races, actual
 rename/delete/root loss and symlink boundaries (where supported); deterministic
 journal tests cover coalescing, bounded latency, overflow and replay gaps.
+
+## Task calendar consumer
+
+The task worker holds independent broker subscriptions for registered vaults, so
+closing an editor window releases only its own references. It subscribes before
+the initial scan and consumes cursor pages on its existing one-second reminder
+tick. A healthy native consumer does not run the five-second recursive scan.
+
+File hints reparse the current target. Directory creation/moves reconcile that
+subtree; excluded directories, trash, symlinks and non-Markdown files retain the
+snapshot policy. Replay gaps, resume after a long sleep, timezone changes and
+manual refresh trigger a snapshot. Read/backend failures release native references
+and restore the existing scan backoff; native attachment retries after 30 seconds.
+Reminder delivery still rereads due source files before sending notifications.

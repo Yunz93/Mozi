@@ -1,5 +1,6 @@
 use super::{calendar, model::*, parser, storage};
 use chrono::Local;
+use mozi_vault_watch::{Change, Kind, Observer};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -7,7 +8,7 @@ use std::{
     sync::{mpsc, Arc, RwLock},
     time::{Duration, Instant, SystemTime},
 };
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 pub enum Operation {
@@ -56,6 +57,8 @@ struct Runtime {
     calendar_checked_at: Option<Instant>,
     calendar_synced_at: Option<i64>,
     calendar_error: Option<String>,
+    observation: Option<Observer>,
+    observer_retry: Instant,
 }
 
 impl TaskManager {
@@ -82,8 +85,11 @@ impl TaskManager {
                     calendar_checked_at: None,
                     calendar_synced_at: None,
                     calendar_error: None,
+                    observation: None,
+                    observer_retry: Instant::now(),
                 };
                 runtime.publish(true);
+                runtime.configure_observation();
                 runtime.scan();
                 runtime.remind(true);
                 runtime.sync_calendar();
@@ -103,7 +109,34 @@ impl TaskManager {
                         Err(mpsc::RecvTimeoutError::Disconnected) => break,
                         Err(mpsc::RecvTimeoutError::Timeout) => {}
                     }
-                    if last_scan.elapsed() >= scan_interval {
+                    let now = Local::now().timestamp_millis();
+                    let resumed = now - runtime.last_tick > 60_000;
+                    if runtime.observation.is_none()
+                        && crate::vault_watch::available(&runtime.app)
+                        && runtime.observer_retry.elapsed() >= Duration::from_secs(30)
+                    {
+                        runtime.configure_observation();
+                        // Attach first, then reconcile changes during fallback.
+                        if runtime.observation.is_some() {
+                            runtime.scan();
+                        }
+                    }
+                    if let Some(observer) = runtime.observation.as_mut() {
+                        match observer.poll() {
+                            Ok(updates) if updates.rescan_required => runtime.scan(),
+                            Ok(updates) => runtime.apply_watch_changes(updates.changes),
+                            Err(_) => {
+                                runtime.observation = None;
+                                runtime.observer_retry = Instant::now();
+                                runtime.scan();
+                                last_scan = Instant::now();
+                            }
+                        }
+                    }
+                    if resumed
+                        || current_timezone() != runtime.local_timezone
+                        || (runtime.observation.is_none() && last_scan.elapsed() >= scan_interval)
+                    {
                         let start = Instant::now();
                         runtime.scan();
                         // 慢磁盘按上次耗时退避，避免连续扫描占满磁盘。
@@ -111,8 +144,7 @@ impl TaskManager {
                             Duration::from_secs(5).max(start.elapsed().saturating_mul(4));
                         last_scan = Instant::now();
                     }
-                    let now = Local::now().timestamp_millis();
-                    runtime.remind(now - runtime.last_tick > 60_000);
+                    runtime.remind(resumed);
                     runtime.last_tick = now;
                     runtime.sync_calendar();
                     runtime.publish(false);
@@ -143,6 +175,121 @@ impl TaskManager {
 }
 
 impl Runtime {
+    fn configure_observation(&mut self) {
+        if !crate::vault_watch::available(&self.app) {
+            self.observation = None;
+            return;
+        }
+        let broker = self
+            .app
+            .state::<crate::vault_watch::WatchState>()
+            .broker
+            .clone();
+        let mut observer = self
+            .observation
+            .take()
+            .unwrap_or_else(|| Observer::new(broker));
+        if observer
+            .set_roots(self.saved.vaults.iter().map(|v| PathBuf::from(&v.path)))
+            .is_ok()
+        {
+            self.observation = Some(observer);
+        }
+        self.observer_retry = Instant::now();
+    }
+
+    fn apply_watch_changes(&mut self, changes: Vec<Change>) {
+        if changes.is_empty() {
+            return;
+        }
+        let mut paths = BTreeSet::new();
+        for change in changes {
+            // Parent metadata changes accompany file writes on some backends.
+            if change.kind == Kind::Modified && change.is_directory {
+                continue;
+            }
+            paths.insert(change.path);
+            if let Some(old) = change.old_path {
+                paths.insert(old);
+            }
+        }
+        let mut changed = false;
+        let mut failed = false;
+        for path in paths {
+            let Some(vault) = self
+                .saved
+                .vaults
+                .iter()
+                .filter(|v| path.starts_with(&v.path))
+                .max_by_key(|v| Path::new(&v.path).components().count())
+                .cloned()
+            else {
+                continue;
+            };
+            let root = Path::new(&vault.path);
+            // Events are hints, not a history to apply blindly. Inspect the
+            // current target so an atomic replacement cannot delete its index.
+            match fs::symlink_metadata(&path) {
+                Ok(metadata) if !metadata.file_type().is_symlink() && metadata.is_dir() => {
+                    if !included_note_path(root, &path, &vault.trash_folder, true) {
+                        continue;
+                    }
+                    let mut notes = Vec::new();
+                    if let Err(error) = collect_notes(root, &path, &vault.trash_folder, &mut notes)
+                    {
+                        failed = true;
+                        self.error = Some(error);
+                        if let Some(v) = self.saved.vaults.iter_mut().find(|v| v.path == vault.path)
+                        {
+                            v.unavailable = true;
+                        }
+                        let mut seen = BTreeSet::new();
+                        self.mark_unavailable(&path, &mut seen);
+                        continue;
+                    }
+                    let seen: BTreeSet<_> = notes.iter().cloned().collect();
+                    self.files
+                        .retain(|p, _| !p.starts_with(&path) || seen.contains(p));
+                    for note in notes {
+                        failed |= !self.scan_file(root, &note, false);
+                    }
+                    changed = true;
+                }
+                Ok(metadata)
+                    if metadata.is_file()
+                        && !metadata.file_type().is_symlink()
+                        && included_note_path(root, &path, &vault.trash_folder, false) =>
+                {
+                    failed |= !self.scan_file(root, &path, true);
+                    changed = true;
+                }
+                Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                    failed = true;
+                    self.error = Some(error.to_string());
+                    let mut seen = BTreeSet::new();
+                    self.mark_unavailable(&path, &mut seen);
+                }
+                _ => {
+                    let before = self.files.len();
+                    self.files.retain(|p, _| !p.starts_with(&path));
+                    changed |= self.files.len() != before;
+                }
+            }
+        }
+        if failed {
+            // Retry read failures through the existing backoff scanner rather
+            // than waiting indefinitely for another OS event on the same file.
+            self.observation = None;
+            self.observer_retry = Instant::now();
+            self.scan();
+        }
+        if changed && self.reconcile_reminders() {
+            if let Err(error) = self.persist() {
+                self.error = Some(error);
+            }
+        }
+    }
+
     fn apply(&mut self, operation: Operation) -> Result<(), String> {
         if let Some(error) = &self.load_error {
             return Err(error.clone());
@@ -171,6 +318,7 @@ impl Runtime {
                 }
                 self.persist()?;
                 self.publish(true);
+                self.configure_observation();
                 self.scan();
             }
             Operation::Unregister(path) => {
@@ -180,6 +328,7 @@ impl Runtime {
                 self.saved.vaults.retain(|v| v.path != path);
                 self.files
                     .retain(|_, index| index.tasks.first().map_or(true, |t| t.vault_path != path));
+                self.configure_observation();
                 self.scan();
                 self.persist()?;
             }
@@ -729,6 +878,35 @@ mod tests {
     }
 }
 
+/// Same inclusion policy for event hints and the initial recursive snapshot.
+fn included_note_path(root: &Path, path: &Path, trash: &str, directory: bool) -> bool {
+    let Ok(relative) = path.strip_prefix(root) else {
+        return false;
+    };
+    if path.starts_with(root.join(trash)) {
+        return false;
+    }
+    let parts: Vec<_> = relative.components().collect();
+    let directories = if directory {
+        parts.len()
+    } else {
+        parts.len().saturating_sub(1)
+    };
+    if parts[..directories].iter().any(|part| {
+        let name = part.as_os_str().to_string_lossy();
+        name.starts_with('.') || matches!(name.as_ref(), "node_modules" | "target")
+    }) {
+        return false;
+    }
+    directory
+        || path
+            .extension()
+            .and_then(|s| s.to_str())
+            .is_some_and(|ext| {
+                ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")
+            })
+}
+
 fn collect_notes(
     root: &Path,
     directory: &Path,
@@ -741,14 +919,9 @@ fn collect_notes(
         if file_type.is_symlink() {
             continue;
         }
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
         let path = entry.path();
         if file_type.is_dir() {
-            if name.starts_with('.')
-                || matches!(name.as_ref(), "node_modules" | "target")
-                || path == root.join(trash)
-            {
+            if !included_note_path(root, &path, trash, true) {
                 continue;
             }
             collect_notes(root, &path, trash, output)?;
@@ -769,6 +942,41 @@ fn collect_notes(
 #[cfg(test)]
 mod release_regression_tests {
     use super::*;
+    #[test]
+    fn native_hints_and_snapshot_use_the_same_note_scope() {
+        let root = Path::new("/vault");
+        for path in ["note.md", "nested/UPPER.MARKDOWN", ".hidden.md"] {
+            assert!(included_note_path(root, &root.join(path), ".trash", false));
+        }
+        for path in [
+            ".hidden/note.md",
+            "node_modules/a.md",
+            "target/a.md",
+            ".trash/deep/a.md",
+            "a.png",
+        ] {
+            assert!(!included_note_path(root, &root.join(path), ".trash", false));
+        }
+        assert!(!included_note_path(
+            root,
+            Path::new("/vault-other/note.md"),
+            ".trash",
+            false
+        ));
+        assert!(included_note_path(
+            root,
+            &root.join("nested"),
+            ".trash",
+            true
+        ));
+        assert!(!included_note_path(
+            root,
+            &root.join(".hidden"),
+            ".trash",
+            true
+        ));
+    }
+
     #[test]
     fn failed_state_load_never_overwrites_the_existing_file() {
         let root = std::env::temp_dir().join(format!("mozi-state-{}", uuid::Uuid::new_v4()));

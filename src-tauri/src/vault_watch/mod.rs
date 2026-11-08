@@ -13,7 +13,7 @@ struct Owners {
     generations: HashMap<String, u64>,
 }
 pub struct WatchState {
-    pub broker: Broker,
+    pub broker: Arc<Broker>,
     owners: Arc<Mutex<Owners>>,
 }
 #[derive(Clone, Serialize)]
@@ -51,7 +51,10 @@ pub fn initialize(app: &AppHandle) -> Result<(), String> {
             );
         }
     })?;
-    app.manage(WatchState { broker, owners });
+    app.manage(WatchState {
+        broker: Arc::new(broker),
+        owners,
+    });
     Ok(())
 }
 impl WatchState {
@@ -240,7 +243,7 @@ mod tests {
     #[test]
     fn owner_and_generation_isolate_windows() {
         let state = WatchState {
-            broker: Broker::default(),
+            broker: Arc::new(Broker::default()),
             owners: Default::default(),
         };
         let token = Subscription {

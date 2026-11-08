@@ -1,5 +1,6 @@
 mod journal;
 mod model;
+mod observer;
 use journal::Journal;
 use model::Scope;
 pub use model::{Change, Kind, Notice, Page, Stats, Subscription};
@@ -7,6 +8,7 @@ use notify::{
     event::{ModifyKind, RemoveKind, RenameMode},
     Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
+pub use observer::{Observer, Updates};
 use std::{
     collections::HashMap,
     path::{Component, Path, PathBuf},
