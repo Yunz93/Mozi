@@ -69,3 +69,8 @@ note bodies. Ambiguous renames preserve a structural hint; unsafe link replaceme
 requests a filtered snapshot rather than disclosing the target. For measurements,
 rollback instructions and the packaged platform gate, see
 [performance/native-watch.md](../performance/native-watch.md).
+
+Linux release-package desktop automation has a separate
+[acceptance record](../performance/linux-desktop-acceptance.md). It found and
+retested document/index read races and polling handoff recovery. Its Xvfb scope
+does not clear the physical desktop or other-platform release gates.

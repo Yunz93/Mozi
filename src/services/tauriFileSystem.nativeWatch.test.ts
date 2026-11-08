@@ -53,6 +53,7 @@ const modify = (path: string): NativeChange => ({
 });
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.stubGlobal("window", globalThis);
   vi.clearAllMocks();
   seq = 0;
   changes = [];
@@ -71,7 +72,10 @@ beforeEach(() => {
     }
   });
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 async function emit(batch: NativeChange[]) {
   changes = batch;
   seq++;
@@ -119,6 +123,95 @@ it("ignores stale content read before a concurrent save", async () => {
   expect(callback).not.toHaveBeenCalled();
   stop();
 });
+it.each(["native", "poll"])(
+  "%s: an index read cannot acknowledge an external edit for the document watcher",
+  async (mode) => {
+    const original = bridge.invoke.getMockImplementation()!;
+    bridge.invoke.mockImplementation((name, ...args) =>
+      name === "vault_watch_mode"
+        ? Promise.resolve(mode)
+        : original(name, ...args),
+    );
+    const fs = new TauriFileSystem();
+    const callback = vi.fn();
+    bridge.read.mockResolvedValue(new TextEncoder().encode("before"));
+    await fs.readFile("/v/a.md");
+    const stop = await fs.watchFile("/v/a.md", callback);
+    await flush();
+    bridge.read.mockResolvedValue(new TextEncoder().encode("external"));
+    await fs.readFile("/v/a.md"); // An index consumer wins the disk-read race.
+    if (mode === "native") await emit([modify("/v/a.md")]);
+    else await vi.advanceTimersByTimeAsync(1500);
+    expect(callback).toHaveBeenCalledExactlyOnceWith({
+      path: "/v/a.md",
+      type: "modified",
+    });
+    stop();
+  },
+);
+it("keeps delivering a change when another reader finishes during the watch read", async () => {
+  const fs = new TauriFileSystem();
+  const callback = vi.fn();
+  bridge.read.mockResolvedValue(new TextEncoder().encode("before"));
+  await fs.readFile("/v/a.md");
+  const stop = await fs.watchFile("/v/a.md", callback);
+  await flush();
+  let resolve!: (value: Uint8Array) => void;
+  bridge.read.mockImplementationOnce(
+    () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  );
+  changes = [modify("/v/a.md")];
+  seq++;
+  hint({ payload: { subscriptionId: "s" } });
+  await flush();
+  bridge.read.mockResolvedValue(new TextEncoder().encode("external"));
+  await fs.readFile("/v/a.md");
+  resolve(new TextEncoder().encode("external"));
+  await flush();
+  expect(callback).toHaveBeenCalledExactlyOnceWith({
+    path: "/v/a.md",
+    type: "modified",
+  });
+  stop();
+});
+it.each([false, true])(
+  "reconciles the first polling snapshot after backend loss (initial read unavailable: %s)",
+  async (unavailable) => {
+    let failed = false;
+    let failInitialRead = unavailable;
+    const original = bridge.invoke.getMockImplementation()!;
+    bridge.invoke.mockImplementation((name, ...args) => {
+      if (name === "get_vault_changes" && failed)
+        return Promise.reject(new Error("backend lost"));
+      return original(name, ...args);
+    });
+    bridge.readDir.mockImplementation(async () => {
+      if (!failed) return [];
+      if (failInitialRead) {
+        failInitialRead = false;
+        throw new Error("No such file or directory");
+      }
+      return [entry("created-during-failure.md")];
+    });
+    const fs = new TauriFileSystem();
+    const callback = vi.fn();
+    const stop = await fs.watchDirectory("/v", callback);
+    await flush();
+    callback.mockClear();
+    failed = true;
+    await emit([]);
+    if (unavailable) await vi.advanceTimersByTimeAsync(2000);
+    expect(callback).toHaveBeenCalledWith({
+      type: "changed",
+      rescan: true,
+      tree: [expect.objectContaining({ path: "/v/created-during-failure.md" })],
+    });
+    stop();
+  },
+);
 it("refreshes a root listing without rescanning existing subtrees, preserving trash and symlink policy", async () => {
   const fs = new TauriFileSystem();
   const callback = vi.fn();
