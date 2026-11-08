@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore, defaultSettings } from "../store/appStore";
 import { useAutoSave } from "./useAutoSave";
 import { registerActiveEditorFlush } from "../utils/editorSelectionBridge";
-import { closeTabSafely } from "./closeTabSafely";
+import { closeDocumentSession } from "../services/documents/closeDocumentSession";
 
 const { writeFile, readFile } = vi.hoisted(() => ({
   writeFile: vi.fn(async () => {}),
@@ -866,7 +866,7 @@ describe("forceSave 等待最新保存", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     act(() => useAppStore.getState().updateTabContent(NOTE_ID, "first edit"));
     const onBlocked = vi.fn();
-    const closing = closeTabSafely({
+    const closing = closeDocumentSession({
       tabId: NOTE_ID,
       forceSave: getSave().forceSave,
       closeTab: useAppStore.getState().closeTab,
@@ -908,7 +908,7 @@ describe("forceSave 等待最新保存", () => {
       pendingDrawing = null;
     });
     let settled = false;
-    const closing = closeTabSafely({
+    const closing = closeDocumentSession({
       tabId: path,
       forceSave: getSave().forceSave,
       closeTab: useAppStore.getState().closeTab,

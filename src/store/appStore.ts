@@ -2,7 +2,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { ViewMode } from "../types";
 import { createFileSlice, type FileState, type FileActions } from "./fileStore";
-import { createTabSlice, type TabState, type TabActions } from "./tabStore";
+import {
+  createDocumentBufferSlice,
+  type DocumentBufferState,
+  type DocumentBufferActions,
+} from "./documentBufferStore";
 import {
   createEditorSlice,
   type EditorState,
@@ -75,8 +79,8 @@ export function didAppStoreHydrationFail(): boolean {
 export type {
   FileState,
   FileActions,
-  TabState,
-  TabActions,
+  DocumentBufferState,
+  DocumentBufferActions,
   EditorState,
   EditorActions,
   UIState,
@@ -101,12 +105,12 @@ export {
 export interface AppState
   extends
     FileState,
-    TabState,
+    DocumentBufferState,
     EditorState,
     UIState,
     VaultIndexState,
     FileActions,
-    TabActions,
+    DocumentBufferActions,
     EditorActions,
     UIActions,
     VaultIndexActions {}
@@ -133,7 +137,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       // Combine all slice states and actions
       ...createFileSlice(set as any, get as any),
-      ...createTabSlice(set as any, get as any),
+      ...createDocumentBufferSlice(set as any, get as any),
       ...createEditorSlice(set as any, get as any),
       ...createUISlice(set as any, get as any),
       ...createVaultIndexSlice(set as any, get as any),

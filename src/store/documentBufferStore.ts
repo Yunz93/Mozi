@@ -1,11 +1,13 @@
 import { sameDocumentText } from "../utils/documentText";
 
 /**
- * Document buffer state (single open document).
+ * Document buffer storage (one open document).
+ * The map/array names remain compatible storage for attachment/path APIs;
+ * application workflows consume the single DocumentSession contract.
  * `openTabs` is kept as a 0-or-1 array so path remaps and legacy call sites
  * stay simple; multi-document tabs are no longer supported.
  */
-export interface TabState {
+export interface DocumentBufferState {
   openTabs: string[]; // At most one file id
   activeTabId: string | null;
   fileContents: Record<string, string>;
@@ -15,7 +17,7 @@ export interface TabState {
 /**
  * Document buffer actions
  */
-export interface TabActions {
+export interface DocumentBufferActions {
   /** Open (or re-activate) a single document, replacing any previous buffer. */
   addTab: (fileId: string, content?: string) => void;
   closeTab: (fileId: string) => void;
@@ -37,14 +39,14 @@ export interface TabActions {
 /**
  * Initial document buffer state
  */
-export const initialTabState: TabState = {
+export const initialDocumentBufferState: DocumentBufferState = {
   openTabs: [],
   activeTabId: null,
   fileContents: {},
   lastSavedContent: {},
 };
 
-type TabSliceState = TabState & {
+type DocumentBufferSliceState = DocumentBufferState & {
   fileHistories?: Record<string, unknown>;
   currentFilePath?: string | null;
 };
@@ -52,12 +54,14 @@ type TabSliceState = TabState & {
 /**
  * Create document buffer store slice
  */
-export function createTabSlice(
-  set: (fn: (state: TabSliceState) => Partial<TabSliceState>) => void,
-  get: () => TabState & TabActions,
-): TabState & TabActions {
+export function createDocumentBufferSlice(
+  set: (
+    fn: (state: DocumentBufferSliceState) => Partial<DocumentBufferSliceState>,
+  ) => void,
+  get: () => DocumentBufferState & DocumentBufferActions,
+): DocumentBufferState & DocumentBufferActions {
   return {
-    ...initialTabState,
+    ...initialDocumentBufferState,
 
     addTab: (fileId, content) =>
       set((state) => {

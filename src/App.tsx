@@ -1,3 +1,4 @@
+import { selectDocumentSession } from "./services/documents/sessionSnapshot";
 import { useShallow } from "zustand/react/shallow";
 import React, {
   useEffect,
@@ -7,7 +8,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useAppStore, selectContent, defaultSettings } from "./store/appStore";
+import { useAppStore, defaultSettings } from "./store/appStore";
 import { useFileSystem } from "./hooks/useFileSystem";
 import { useViewMode } from "./hooks/useViewMode";
 import { useSettings } from "./hooks/useSettings";
@@ -29,7 +30,7 @@ import { refreshTaskCalendar } from "./services/taskCalendarService";
 import type { CalendarTask } from "./types/taskCalendar";
 import { flushAllDirtyOpenTabs } from "./services/filesystem/flushActiveDocument";
 import { UpdateInstallGuard } from "./app/UpdateInstallGuard";
-import { closeTabSafely } from "./hooks/closeTabSafely";
+import { closeDocumentSession } from "./services/documents/closeDocumentSession";
 import { useOutline } from "./hooks/useOutline";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import { useStoreHydration } from "./hooks/useStoreHydration";
@@ -202,7 +203,8 @@ const App: React.FC = () => {
     })),
   );
 
-  const content = useAppStore(selectContent);
+  const documentSession = useAppStore(selectDocumentSession);
+  const content = documentSession?.content ?? "";
 
   const {
     openDirectory,
@@ -275,7 +277,7 @@ const App: React.FC = () => {
     const tabToClose = useAppStore.getState().activeTabId;
     if (!tabToClose) return;
 
-    void closeTabSafely({
+    void closeDocumentSession({
       tabId: tabToClose,
       forceSave,
       closeTab,
@@ -406,7 +408,6 @@ const App: React.FC = () => {
   }, [showNotification, t]);
   const {
     contentDensity,
-    canShowOutlinePanel,
     canShowOutlineToggle,
     isOutlineOpen,
     isOutlineVisible,

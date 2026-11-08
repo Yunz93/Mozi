@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { closeTabSafely } from "./closeTabSafely";
+import { closeDocumentSession } from "./closeDocumentSession";
 
-describe("closeTabSafely", () => {
+describe("closeDocumentSession", () => {
   it("force-saves a dirty tab before closing", async () => {
     const forceSave = vi.fn(async () => true);
     const closeTab = vi.fn();
     const onBlocked = vi.fn();
 
-    const closed = await closeTabSafely({
+    const closed = await closeDocumentSession({
       tabId: "/vault/note.md",
       forceSave,
       closeTab,
@@ -27,7 +27,7 @@ describe("closeTabSafely", () => {
     const closeTab = vi.fn();
     const onBlocked = vi.fn();
 
-    const closed = await closeTabSafely({
+    const closed = await closeDocumentSession({
       tabId: "/vault/note.md",
       forceSave,
       closeTab,
@@ -45,7 +45,7 @@ describe("closeTabSafely", () => {
     const forceSave = vi.fn(async () => true);
     const closeTab = vi.fn();
 
-    await closeTabSafely({
+    await closeDocumentSession({
       tabId: "/vault/note.md",
       forceSave,
       closeTab,

@@ -58,7 +58,7 @@ vi.mock("../../types/filesystem", async (importOriginal) => ({
 
 import { flushActiveDocumentIfDirty } from "../../services/filesystem/flushActiveDocument";
 import { flushActiveEditorPendingChanges } from "../../utils/editorSelectionBridge";
-import { closeTabSafely } from "../../hooks/closeTabSafely";
+import { closeDocumentSession } from "../../services/documents/closeDocumentSession";
 import { useFileOperations } from "../../hooks/useFileOperations";
 
 const OBSIDIAN_MD = `---
@@ -378,7 +378,7 @@ describe("ExcalidrawPane tab switch flush", () => {
     });
     act(() => drawing.onChange!([{ id: "new-stroke" }], {}, {}));
     await act(async () => {
-      const closed = await closeTabSafely({
+      const closed = await closeDocumentSession({
         tabId,
         forceSave: flushActiveDocumentIfDirty,
         closeTab: (id) => useAppStore.getState().closeTab(id),

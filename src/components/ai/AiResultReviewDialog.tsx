@@ -1,3 +1,4 @@
+import { applyDocumentSessionEdit } from "../../services/documents/documentSession";
 import React, { useMemo } from "react";
 import { Dialog } from "../ui/Dialog";
 import { useAppStore } from "../../store/appStore";
@@ -12,7 +13,6 @@ export const AiResultReviewDialog: React.FC = () => {
   const { t } = useI18n();
   const pendingAiResult = useAppStore((state) => state.pendingAiResult);
   const setPendingAiResult = useAppStore((state) => state.setPendingAiResult);
-  const setContentForFile = useAppStore((state) => state.setContentForFile);
   const showNotification = useAppStore((state) => state.showNotification);
 
   const stats = useMemo(() => {
@@ -26,16 +26,18 @@ export const AiResultReviewDialog: React.FC = () => {
   if (!pendingAiResult) return null;
 
   const handleApply = () => {
-    const current = useAppStore.getState().fileContents[pendingAiResult.fileId];
     if (
-      current !== undefined &&
-      current !== pendingAiResult.previousContent
+      !applyDocumentSessionEdit({
+        fileId: pendingAiResult.fileId,
+        content: pendingAiResult.newContent,
+        previousContent: pendingAiResult.previousContent,
+        source: pendingAiResult.source,
+      })
     ) {
       showNotification(t("notifications_aiApplyStale"), "error");
       setPendingAiResult(null);
       return;
     }
-    setContentForFile(pendingAiResult.fileId, pendingAiResult.newContent);
     setPendingAiResult(null);
     showNotification(t("notifications_aiEnhanced"), "success");
   };
