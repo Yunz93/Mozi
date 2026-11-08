@@ -56,7 +56,6 @@ describe("useGlobalKeyboardShortcuts", () => {
         },
       },
       viewMode: ViewMode.LIVE,
-      lastNonSplitViewMode: ViewMode.LIVE,
     });
 
     function Harness() {

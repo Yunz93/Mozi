@@ -43,7 +43,7 @@ import { useAIAnalyze } from "./hooks/useAIAnalyze";
 import { useFileOperations } from "./hooks/useFileOperations";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { Toolbar } from "./components/toolbar/Toolbar";
-import { SplitView } from "./components/editor/SplitView";
+import { DocumentWorkspace } from "./components/editor/DocumentWorkspace";
 import type { CodeMirrorContentChangeMeta } from "./components/editor/hooks/useCodeMirror";
 import { RightRail } from "./components/rightRail/RightRail";
 import { AskVaultPanel } from "./components/ai/AskVaultPanel";
@@ -1308,12 +1308,11 @@ const App: React.FC = () => {
               )}
 
               <div className="flex-1 min-w-0 flex overflow-hidden relative">
-                <SplitView
+                <DocumentWorkspace
                   highlighter={highlighter}
                   onContentChange={handleContentChange}
                   onGenerateWikiFromSelection={handleGenerateWikiFromSelection}
                   isOutlineOpen={isOutlineOpen}
-                  canShowOutline={canShowOutlinePanel}
                   canShowOutlineToggle={canShowOutlineToggle}
                   contentDensity={contentDensity}
                   onToggleOutline={() => {

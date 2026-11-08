@@ -27,7 +27,6 @@ import {
   normalizeDefaultViewMode,
   normalizeTabSize,
 } from "../utils/editorPreferences";
-import { resolveLastNonSplitViewMode } from "../utils/viewMode";
 import { normalizeUiAccentColor } from "../utils/uiAccentColor";
 import { normalizeMetadataFields } from "../utils/metadataFields";
 import { normalizeTrashFolder } from "../utils/trashFolder";
@@ -269,9 +268,6 @@ export const useAppStore = create<AppState>()(
           semanticVectorCount: currentState.semanticVectorCount,
           // Session starts from the configured default; file switches keep the live mode.
           viewMode: mergedSettings.defaultViewMode,
-          lastNonSplitViewMode: resolveLastNonSplitViewMode(
-            mergedSettings.defaultViewMode,
-          ),
           viewModeBeforePreviewOnly: null,
           pendingCloseDespiteSaveFailure: null,
         };

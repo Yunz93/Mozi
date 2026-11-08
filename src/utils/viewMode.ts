@@ -29,18 +29,6 @@ export function isPreviewVisibleMode(mode: ViewMode): boolean {
   return normalizeSessionViewMode(mode) === ViewMode.PREVIEW;
 }
 
-/** @deprecated Use SessionViewMode; kept for store field typing. */
-export type NonSplitViewMode = SessionViewMode;
-
-export function isNonSplitViewMode(mode: ViewMode): mode is NonSplitViewMode {
-  return mode === ViewMode.LIVE || mode === ViewMode.PREVIEW;
-}
-
-/** Anchor used when leaving a temporary preview-only file. */
-export function resolveLastNonSplitViewMode(mode: ViewMode): NonSplitViewMode {
-  return normalizeSessionViewMode(mode);
-}
-
 /**
  * Toggle cycle: Live → Reading → Live.
  */

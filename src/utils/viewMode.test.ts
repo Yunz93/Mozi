@@ -6,7 +6,6 @@ import {
   isEditorVisibleMode,
   isPreviewVisibleMode,
   normalizeSessionViewMode,
-  resolveLastNonSplitViewMode,
 } from "./viewMode";
 
 describe("viewMode helpers", () => {
@@ -27,12 +26,6 @@ describe("viewMode helpers", () => {
     expect(normalizeSessionViewMode(ViewMode.PREVIEW)).toBe(ViewMode.PREVIEW);
     expect(normalizeSessionViewMode(ViewMode.EDITOR)).toBe(ViewMode.LIVE);
     expect(normalizeSessionViewMode(ViewMode.SPLIT)).toBe(ViewMode.LIVE);
-    expect(resolveLastNonSplitViewMode(ViewMode.LIVE)).toBe(ViewMode.LIVE);
-    expect(resolveLastNonSplitViewMode(ViewMode.EDITOR)).toBe(ViewMode.LIVE);
-    expect(resolveLastNonSplitViewMode(ViewMode.SPLIT)).toBe(ViewMode.LIVE);
-    expect(resolveLastNonSplitViewMode(ViewMode.PREVIEW)).toBe(
-      ViewMode.PREVIEW,
-    );
   });
 
   it("cycles live → reading → live", () => {

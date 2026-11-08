@@ -2,16 +2,14 @@ import React, {
   Suspense,
   lazy,
   useMemo,
-  useState,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
 } from "react";
 import { useAppStore, selectContent } from "../../store/appStore";
 import { ViewMode } from "../../types";
 import {
-  isEditorSoloMode,
+  normalizeSessionViewMode,
   isEditorVisibleMode,
   isPreviewVisibleMode,
 } from "../../utils/viewMode";
@@ -26,23 +24,19 @@ const ExcalidrawPane = lazy(async () => {
   const mod = await import("./ExcalidrawPane");
   return { default: mod.ExcalidrawPane };
 });
-import { throttle } from "../../utils/throttle";
 import type { PaneDensity } from "./paneLayout";
 import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
 import { getMarkdownStyleCssVariables } from "../../utils/markdownStyle";
 import type { CodeMirrorContentChangeMeta } from "./hooks/useCodeMirror";
-import { getUiFontScale } from "../../utils/uiFontSize";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { isHeadingNavigationLocked } from "../../utils/previewNavigationBridge";
 import { findFileInTree } from "../../utils/fileTree";
 import { isExcalidrawWorkspaceFile } from "../../utils/fileTypes";
 
 const PANE_TRANSITION_MS = 200;
-const PANE_TRANSITION = `width ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
-const DIVIDER_TRANSITION = `left ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), opacity 120ms ease, transform ${PANE_TRANSITION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
 
-interface SplitViewProps {
+interface DocumentWorkspaceProps {
   highlighter?: ShikiHighlighter | null;
   onContentChange?: (
     content: string,
@@ -54,26 +48,22 @@ interface SplitViewProps {
     to: number;
   }) => Promise<string | null>;
   isOutlineOpen: boolean;
-  canShowOutline: boolean;
   canShowOutlineToggle: boolean;
   contentDensity: PaneDensity;
   onToggleOutline: () => void;
 }
 
-export const SplitView: React.FC<SplitViewProps> = ({
+export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = ({
   highlighter,
   onContentChange,
   onGenerateWikiFromSelection,
   isOutlineOpen,
-  canShowOutline,
   canShowOutlineToggle,
   contentDensity,
   onToggleOutline,
 }) => {
   const { t } = useI18n();
   const settings = useAppStore((state) => state.settings);
-  const uiFontScale = getUiFontScale(settings.uiFontSize);
-  const MIN_SPLIT_PANE_WIDTH = 360 * uiFontScale;
   const viewMode = useAppStore((state) => state.viewMode);
   const activeTabId = useAppStore((state) => state.activeTabId);
   const files = useAppStore((state) => state.files);
@@ -84,17 +74,12 @@ export const SplitView: React.FC<SplitViewProps> = ({
   const isExcalidrawActive = Boolean(
     activeFile && isExcalidrawWorkspaceFile(activeFile.name, content),
   );
-  const [splitRatio, setSplitRatio] = useState(50);
-  const [isResizing, setIsResizing] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const editorPaneRef = useRef<EditorPaneHandle | null>(null);
   const previewPaneRef = useRef<PreviewPaneHandle | null>(null);
-  const editorWrapperRef = useRef<HTMLDivElement | null>(null);
   const previousViewModeRef = useRef(viewMode);
-  const [visualMode, setVisualMode] = useState<ViewMode>(viewMode);
+  const visualMode = normalizeSessionViewMode(viewMode);
   const editorScrollPercentageRef = useRef(0);
   const previewScrollPercentageRef = useRef(0);
-  const scrollSyncSourceRef = useRef<"editor" | "preview" | null>(null);
   const transitionResyncTimerRef = useRef<number | null>(null);
   const transitionCleanupRef = useRef<(() => void) | null>(null);
   const scrollPositionsRef = useRef<
@@ -108,160 +93,21 @@ export const SplitView: React.FC<SplitViewProps> = ({
     >
   >({});
 
-  const handleMouseDown = useCallback(() => {
-    setIsResizing(true);
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isResizing) return;
-
-      const container = containerRef.current;
-      if (!container) return;
-
-      const rect = container.getBoundingClientRect();
-      const minRatio =
-        rect.width > 0 ? (MIN_SPLIT_PANE_WIDTH / rect.width) * 100 : 20;
-      const maxRatio = 100 - minRatio;
-      const newRatio = ((e.clientX - rect.left) / rect.width) * 100;
-      const clampedRatio = Math.max(
-        Math.min(minRatio, 50),
-        Math.min(
-          Math.max(maxRatio, 50),
-          Math.max(minRatio, Math.min(maxRatio, newRatio)),
-        ),
-      );
-      setSplitRatio(clampedRatio);
-    },
-    [isResizing, MIN_SPLIT_PANE_WIDTH],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // Throttle resize updates to 16ms (60fps) for better performance
-    const throttledSetSplitRatio = throttle((width: number) => {
-      const minRatio = width > 0 ? (MIN_SPLIT_PANE_WIDTH / width) * 100 : 20;
-      const maxRatio = 100 - minRatio;
-      if (viewMode === ViewMode.SPLIT && minRatio < maxRatio) {
-        setSplitRatio((prev) => Math.min(Math.max(prev, minRatio), maxRatio));
-      }
-    }, 16);
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      throttledSetSplitRatio(entry.contentRect.width);
-    });
-
-    resizeObserver.observe(container);
-    return () => resizeObserver.disconnect();
-  }, [viewMode]);
-
-  // Keep `visualMode` in lockstep with `viewMode` before paint so pane widths (and
-  // `previewLayoutActive`) match the store on the same frame as preview layout effects.
-  useLayoutEffect(() => {
-    setVisualMode(viewMode);
-  }, [viewMode]);
-
-  // Handle editor scroll - sync to preview in split mode.
-  // Read view mode from the store inside the handler so it stays correct even when
-  // useScrollSync's onScroll ref has not yet been updated after a view-mode change
-  // (scroll events can fire before child useEffects run).
-  const pendingEditorSyncPctRef = useRef<number | null>(null);
-  const pendingPreviewSyncPctRef = useRef<number | null>(null);
-  const peerSyncRafRef = useRef<number | null>(null);
-
-  const flushPeerScrollSync = useCallback(() => {
-    peerSyncRafRef.current = null;
-    const editorPct = pendingEditorSyncPctRef.current;
-    const previewPct = pendingPreviewSyncPctRef.current;
-    pendingEditorSyncPctRef.current = null;
-    pendingPreviewSyncPctRef.current = null;
-
-    if (editorPct !== null) {
-      previewPaneRef.current?.syncScrollTo(editorPct, { immediate: true });
-    }
-    if (previewPct !== null) {
-      editorPaneRef.current?.syncScrollTo(previewPct, { immediate: true });
-    }
-  }, []);
-
-  const schedulePeerScrollSync = useCallback(() => {
-    if (peerSyncRafRef.current !== null) return;
-    peerSyncRafRef.current = window.requestAnimationFrame(flushPeerScrollSync);
-  }, [flushPeerScrollSync]);
-
-  useEffect(() => {
-    return () => {
-      if (peerSyncRafRef.current !== null) {
-        window.cancelAnimationFrame(peerSyncRafRef.current);
-        peerSyncRafRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleEditorScroll = useCallback(
-    (percentage: number) => {
-      editorScrollPercentageRef.current = percentage;
-      // Outline/wiki heading jumps scroll both panes absolutely; percentage sync
-      // would yank the preview off the target chapter mid-jump.
-      if (isHeadingNavigationLocked()) {
-        return;
-      }
-      const mode = useAppStore.getState().viewMode;
-      if (isEditorVisibleMode(mode)) {
-        previewScrollPercentageRef.current = percentage;
-      }
-      if (mode === ViewMode.SPLIT) {
-        scrollSyncSourceRef.current = "editor";
-        pendingEditorSyncPctRef.current = percentage;
-        schedulePeerScrollSync();
-      }
-    },
-    [schedulePeerScrollSync],
-  );
-
-  const handlePreviewScroll = useCallback(
-    (percentage: number) => {
-      if (scrollSyncSourceRef.current === "editor") {
-        scrollSyncSourceRef.current = null;
-        previewScrollPercentageRef.current = percentage;
-        return;
-      }
-
+  const handleEditorScroll = useCallback((percentage: number) => {
+    editorScrollPercentageRef.current = percentage;
+    if (isHeadingNavigationLocked()) return;
+    if (isEditorVisibleMode(useAppStore.getState().viewMode)) {
       previewScrollPercentageRef.current = percentage;
-      if (isHeadingNavigationLocked()) {
-        return;
-      }
-      const mode = useAppStore.getState().viewMode;
-      if (isPreviewVisibleMode(mode)) {
-        editorScrollPercentageRef.current = percentage;
-      }
-      if (mode === ViewMode.SPLIT) {
-        scrollSyncSourceRef.current = "preview";
-        pendingPreviewSyncPctRef.current = percentage;
-        schedulePeerScrollSync();
-      }
-    },
-    [schedulePeerScrollSync],
-  );
+    }
+  }, []);
+
+  const handlePreviewScroll = useCallback((percentage: number) => {
+    previewScrollPercentageRef.current = percentage;
+    if (isHeadingNavigationLocked()) return;
+    if (isPreviewVisibleMode(useAppStore.getState().viewMode)) {
+      editorScrollPercentageRef.current = percentage;
+    }
+  }, []);
 
   const cleanupTransition = useCallback(() => {
     if (transitionCleanupRef.current) {
@@ -315,22 +161,6 @@ export const SplitView: React.FC<SplitViewProps> = ({
           });
         }
       };
-
-      const wrapper = editorWrapperRef.current;
-      if (wrapper) {
-        const onTransitionEnd = (e: TransitionEvent) => {
-          if (e.propertyName !== "width") return;
-          wrapper.removeEventListener("transitionend", onTransitionEnd);
-          if (transitionResyncTimerRef.current !== null) {
-            window.clearTimeout(transitionResyncTimerRef.current);
-            transitionResyncTimerRef.current = null;
-          }
-          resyncAfterTransition();
-        };
-        wrapper.addEventListener("transitionend", onTransitionEnd);
-        transitionCleanupRef.current = () =>
-          wrapper.removeEventListener("transitionend", onTransitionEnd);
-      }
 
       transitionResyncTimerRef.current = window.setTimeout(() => {
         transitionResyncTimerRef.current = null;
@@ -406,20 +236,8 @@ export const SplitView: React.FC<SplitViewProps> = ({
     syncVisiblePanesToAnchor(anchorPercentage);
   }, [syncVisiblePanesToAnchor, viewMode]);
 
-  const isSplitView = visualMode === ViewMode.SPLIT;
-  const editorWidth = isEditorSoloMode(visualMode)
-    ? 100
-    : visualMode === ViewMode.SPLIT
-      ? splitRatio
-      : 0;
-  const previewWidth =
-    visualMode === ViewMode.PREVIEW
-      ? 100
-      : visualMode === ViewMode.SPLIT
-        ? 100 - splitRatio
-        : 0;
-  const editorActive = editorWidth > 0;
-  const previewActive = previewWidth > 0;
+  const editorActive = visualMode === ViewMode.LIVE;
+  const previewActive = visualMode === ViewMode.PREVIEW;
   const previewRenderActive = isPreviewVisibleMode(viewMode) || previewActive;
   const activePaneKey = activeTabId ?? "no-active-tab";
   const markdownStyleVariables = useMemo(
@@ -431,45 +249,17 @@ export const SplitView: React.FC<SplitViewProps> = ({
     [settings.markdownStylePreset, settings.themeMode],
   );
 
-  // 单栏切换保持两份文档宽度稳定，避免长文在宽度动画的每一帧重新换行和布局。
-  const overlayPanes = visualMode !== ViewMode.SPLIT;
-  const editorPaneStyle: React.CSSProperties = {
-    width: overlayPanes ? "100%" : `${editorWidth}%`,
-    position: overlayPanes ? "absolute" : "relative",
-    inset: overlayPanes ? 0 : undefined,
-    visibility: editorActive ? "visible" : "hidden",
-    opacity: editorActive ? 1 : 0,
-    pointerEvents: editorActive ? "auto" : "none",
-    transition: isResizing
-      ? "none"
-      : overlayPanes
-        ? "opacity 120ms ease"
-        : `${PANE_TRANSITION}, opacity 120ms ease`,
-    willChange: isResizing
-      ? "auto"
-      : overlayPanes
-        ? "opacity"
-        : "width, opacity",
-  };
-
-  const previewPaneStyle: React.CSSProperties = {
-    width: overlayPanes ? "100%" : `${previewWidth}%`,
-    position: overlayPanes ? "absolute" : "relative",
-    inset: overlayPanes ? 0 : undefined,
-    visibility: previewActive ? "visible" : "hidden",
-    opacity: previewActive ? 1 : 0,
-    pointerEvents: previewActive ? "auto" : "none",
-    transition: isResizing
-      ? "none"
-      : overlayPanes
-        ? "opacity 120ms ease"
-        : `${PANE_TRANSITION}, opacity 120ms ease`,
-    willChange: isResizing
-      ? "auto"
-      : overlayPanes
-        ? "opacity"
-        : "width, opacity",
-  };
+  // Keep both surfaces mounted at stable full width to preserve editor state.
+  const paneStyle = (active: boolean): React.CSSProperties => ({
+    width: "100%",
+    position: "absolute",
+    inset: 0,
+    visibility: active ? "visible" : "hidden",
+    opacity: active ? 1 : 0,
+    pointerEvents: active ? "auto" : "none",
+    transition: "opacity 120ms ease",
+    willChange: "opacity",
+  });
 
   if (isExcalidrawActive) {
     return (
@@ -500,16 +290,11 @@ export const SplitView: React.FC<SplitViewProps> = ({
         data-markdown-style={settings.markdownStylePreset}
         style={markdownStyleVariables as React.CSSProperties}
       >
-        <div
-          ref={containerRef}
-          className="flex-1 overflow-hidden relative flex flex-row"
-          style={{ pointerEvents: isResizing ? "none" : "auto" }}
-        >
+        <div className="flex-1 overflow-hidden relative flex flex-row">
           <div
-            ref={editorWrapperRef}
             aria-hidden={!editorActive}
             className="h-full min-w-0 overflow-hidden flex flex-col relative"
-            style={editorPaneStyle}
+            style={paneStyle(editorActive)}
           >
             <EditorPane
               ref={editorPaneRef}
@@ -522,27 +307,9 @@ export const SplitView: React.FC<SplitViewProps> = ({
           </div>
 
           <div
-            className="workspace-split-divider w-3 z-10 absolute h-full flex items-center justify-center"
-            data-resizing={isResizing}
-            style={{
-              left: `${editorWidth}%`,
-              opacity: isSplitView ? 1 : 0,
-              transform: `translateX(-50%) scaleY(${isSplitView ? 1 : 0.9})`,
-              pointerEvents: isSplitView ? "auto" : "none",
-              cursor: isSplitView ? "col-resize" : "default",
-              transition: isResizing ? "none" : DIVIDER_TRANSITION,
-              willChange: isResizing ? "auto" : "left, opacity, transform",
-            }}
-            onMouseDown={isSplitView ? handleMouseDown : undefined}
-          >
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gray-200/70 dark:bg-white/[0.06]" />
-            <div className="relative h-8 w-1 rounded-full bg-gray-300 dark:bg-gray-600 opacity-0 hover:opacity-100 transition-opacity" />
-          </div>
-
-          <div
             aria-hidden={!previewActive}
             className="h-full min-w-0 overflow-hidden"
-            style={previewPaneStyle}
+            style={paneStyle(previewActive)}
           >
             <PreviewPane
               key={`preview-${activePaneKey}`}
