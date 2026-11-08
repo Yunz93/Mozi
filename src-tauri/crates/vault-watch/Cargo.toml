@@ -1,0 +1,12 @@
+[package]
+name = "mozi-vault-watch"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+notify = "8.2"
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }
