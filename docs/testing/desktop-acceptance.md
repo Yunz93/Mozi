@@ -4,14 +4,16 @@
 
 在 GitHub 托管的 Windows、macOS 虚拟机上启动实际桌面程序，复用同一套文件系统、交互和多窗口用例。Linux 使用 Xvfb 桌面作为回归基线。此环境缺少 KVM；不在 Linux 容器中模拟 macOS 或 Windows 的系统 WebView。
 
-| Runner                        | 程序与驱动                                                                                   | 覆盖范围                                            |
-| ----------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `windows-2025`                | 无测试 feature 的 NSIS 安装程序；安装后使用 `tauri-driver` 和匹配 WebView2 版本的 EdgeDriver | 安装、实际 WebView2、Rust 后端、完整交互            |
-| `macos-15` / `macos-15-intel` | 独立标识的优化测试 `.app`，显式启用 `desktop-e2e`                                            | ARM64 / Intel 的实际 WKWebView、Rust 后端、完整交互 |
-| 同上 macOS runner             | 再构建无测试 feature 的普通 `.app`                                                           | 原应用标识、原生窗口启动、测试端口关闭              |
-| `ubuntu-24.04`                | 优化测试程序、WebKitGTK、Xvfb / Openbox / D-Bus                                              | 同协议的 Linux 回归                                 |
+| Runner                        | 程序与驱动                                                                          | 覆盖范围                                            |
+| ----------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `windows-2025`                | 无测试 feature 的 NSIS 安装程序；安装后使用匹配 WebView2 版本的 EdgeDriver 附加连接 | 安装、实际 WebView2、Rust 后端、完整交互            |
+| `macos-15` / `macos-15-intel` | 独立标识的优化测试 `.app`，显式启用 `desktop-e2e`                                   | ARM64 / Intel 的实际 WKWebView、Rust 后端、完整交互 |
+| 同上 macOS runner             | 再构建无测试 feature 的普通 `.app`                                                  | 原应用标识、原生窗口启动、测试端口关闭              |
+| `ubuntu-24.04`                | 优化测试程序、WebKitGTK、Xvfb / Openbox / D-Bus                                     | 同协议的 Linux 回归                                 |
 
 macOS 的嵌入式驱动使用固定版本 `tauri-plugin-wdio-webdriver = 1.5.1`。Node 客户端直接发送 W3C WebDriver 请求；不加载 IPC 模拟层，文件读写、监听、权限和索引都运行真实实现。Windows 的 EdgeDriver 从 Microsoft 官方站点按实际 WebView2 版本下载，并显式选定该运行时，避免浏览器与驱动版本不一致。
+
+Windows 使用 Microsoft 文档中的[附加连接方式](https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/webdriver#step-4b-attaching-microsoft-edge-webdriver-to-a-running-webview2-app)：先启动已安装程序，再通过 `debuggerAddress` 连接，避免依赖 EdgeDriver 自动启动时的 `DevToolsActivePort` 文件发现。调试端口只通过测试子进程环境启用。
 
 实施顺序：先验证驱动连接，再执行 25 项用例和性能采样，最后检查普通发布配置的程序。修复失败后，要求四个平台的任务通过再合并。
 

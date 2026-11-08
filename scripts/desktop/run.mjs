@@ -33,6 +33,12 @@ const report = {
     : execFileSync("git", ["status", "--porcelain"], {
         encoding: "utf8",
       }).trim().length > 0,
+  sourceChanges: process.env.MOZI_DESKTOP_SOURCE_REV
+    ? []
+    : execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
+        .trim()
+        .split("\n")
+        .filter(Boolean),
   platform: process.platform,
   arch: arch(),
   osRelease: release(),
@@ -67,29 +73,57 @@ export async function session(mode = "native", count = 100) {
   await resetProfile(provider === "official");
   const beforePids = new Set((await processSnapshot()).map((p) => p.pid));
   const port = await freePort();
-  let args = [];
-  let command = binary;
   const env = {
     MOZI_WATCH_MODE: mode,
     RUST_BACKTRACE: "1",
     TAURI_WEBDRIVER_PORT: String(port),
   };
+  let debuggerAddress;
   if (provider === "official") {
-    command = process.env.MOZI_TAURI_DRIVER ?? "tauri-driver";
-    args = ["--port", String(port), "--native-port", String(await freePort())];
-    if (process.env.MOZI_EDGE_DRIVER)
-      args.push("--native-driver", process.env.MOZI_EDGE_DRIVER);
+    const debuggingPort = await freePort();
+    debuggerAddress = `127.0.0.1:${debuggingPort}`;
+    env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = [
+      process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
+      `--remote-debugging-port=${debuggingPort}`,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
-  const child = launch(command, args, env, join(output, `${name}-app.log`));
+  const child = launch(binary, [], env, join(output, `${name}-app.log`));
+  let nativeDriver;
   const driver = new DesktopDriver(port);
   const close = async () => {
     try {
       await driver.quit();
     } finally {
+      await stop(nativeDriver);
       await stop(child);
     }
   };
   try {
+    if (provider === "official") {
+      await until(
+        async () => {
+          if (child.launchError) throw child.launchError;
+          if (child.exitCode !== null)
+            throw new Error(`Application exited ${child.exitCode}`);
+          const response = await fetch(
+            `http://${debuggerAddress}/json/version`,
+            { signal: AbortSignal.timeout(2000) },
+          );
+          return (await response.json()).webSocketDebuggerUrl;
+        },
+        "Installed application's WebView2 debugging endpoint did not become ready",
+        45_000,
+        150,
+      );
+      nativeDriver = launch(
+        process.env.MOZI_EDGE_DRIVER,
+        ["--port", String(port)],
+        {},
+        join(output, `${name}-driver.log`),
+      );
+    }
     await until(
       async () => {
         if (child.launchError) throw child.launchError;
@@ -101,7 +135,7 @@ export async function session(mode = "native", count = 100) {
       45_000,
       150,
     );
-    await driver.start(binary, provider);
+    await driver.start(provider, debuggerAddress);
     console.log(`READY ${name} ${mode} ${count} notes`);
     await until(
       async () => (await driver.body()).length > 10,

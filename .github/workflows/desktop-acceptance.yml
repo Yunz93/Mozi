@@ -60,6 +60,7 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
           shared-key: desktop-${{ matrix.runner }}
+          cache-on-failure: true
       - name: Install Linux desktop libraries
         if: runner.os == 'Linux'
         run: |
@@ -92,9 +93,6 @@ jobs:
       - name: Install Windows application and matching WebView2 driver
         if: runner.os == 'Windows'
         run: pwsh -File scripts/desktop/prepare-windows.ps1
-      - name: Install Tauri driver
-        if: runner.os == 'Windows'
-        run: cargo install tauri-driver --version 2.1.0 --locked
       - name: Windows desktop acceptance
         if: runner.os == 'Windows'
         run: node scripts/desktop/run.mjs

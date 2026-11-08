@@ -32,11 +32,7 @@ export async function measure(context, count, windows) {
       return stats.watchers === 1 && stats.subscriptions === windows * 2 + 1;
     }, "Unexpected watcher ownership during measurement");
   await delay(8000);
-  const memory = await sampleMemory(
-    process.env.MOZI_DESKTOP_DRIVER === "official" ? null : child.pid,
-    beforePids,
-    binary,
-  );
+  const memory = await sampleMemory(child.pid, beforePids, binary);
   const renderedRows = [];
   for (const handle of handles) {
     await d.switch(handle);
