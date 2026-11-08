@@ -147,16 +147,16 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     linkIndexProgress.phase === "building" ||
     linkIndexProgress.phase === "updating";
   const keywordOnly = (settings.embeddingProvider ?? "builtin") === "none";
+  const semanticRequired =
+    !keywordOnly && settings.searchModeDefault === "semantic";
   const aiReady = isAiConfigured(settings);
   const blocked =
-    !rootFolderPath || !aiReady || indexBuilding || chunkCount === 0;
-  const canAsk =
-    Boolean(rootFolderPath) &&
-    aiReady &&
-    !indexBuilding &&
-    chunkCount > 0 &&
-    !retrieving &&
-    !generating;
+    !rootFolderPath ||
+    indexBuilding ||
+    chunkCount === 0 ||
+    (semanticRequired && !semanticReady);
+  const canRetrieve = !blocked && !retrieving && !generating;
+  const canAsk = canRetrieve && aiReady;
 
   const followUpQuestion = useMemo(() => {
     const trimmed = question.trim();
@@ -223,7 +223,8 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     }) === "reuseHits";
   const scopeNeedsFile = scope === "folder" || scope === "files";
   const scopeBlocked = scopeNeedsFile && !currentFilePath;
-  const showReadinessDetail = blocked || readinessExpanded || keywordOnly;
+  const showReadinessDetail =
+    blocked || readinessExpanded || keywordOnly || !aiReady;
 
   const answerHtml = useMemo(() => {
     if (!answerMarkdown.trim()) return "";
@@ -349,8 +350,6 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     ): Promise<RetrieveHit[] | null> => {
       const activeSettings = await resolveHydratedSettings();
       if (!isCurrentRequest(generation, requestKey)) return null;
-      if (!(await ensureAskConfig(activeSettings))) return null;
-      if (!isCurrentRequest(generation, requestKey)) return null;
       const hits = await retrieveAskVaultHits(buildRequest(activeSettings));
       if (!isCurrentRequest(generation, requestKey)) return null;
       setPendingHits(hits);
@@ -359,19 +358,13 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
       setPreviewRequestKey(requestKey);
       return hits;
     },
-    [
-      resolveHydratedSettings,
-      ensureAskConfig,
-      buildRequest,
-      isCurrentRequest,
-      requestKey,
-    ],
+    [resolveHydratedSettings, buildRequest, isCurrentRequest, requestKey],
   );
 
   /** Optional: preview snippets without calling the chat model. */
   const handleRetrieve = useCallback(async () => {
     const trimmed = question.trim();
-    if (!trimmed || !rootFolderPath || !canAsk || scopeBlocked) return;
+    if (!trimmed || !rootFolderPath || !canRetrieve || scopeBlocked) return;
 
     const generation = ++requestGenerationRef.current;
     setRetrieving(true);
@@ -392,22 +385,20 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
           ? formatAiServiceError(language, error)
           : error instanceof Error
             ? localizeKnownError(language, error.message)
-            : t("askVault_failed"),
+            : t("askVault_retrieveFailed"),
         "error",
       );
-      setSettingsOpen(true, "ai");
     } finally {
       if (isCurrentRequest(generation, requestKey)) setRetrieving(false);
     }
   }, [
     question,
     rootFolderPath,
-    canAsk,
+    canRetrieve,
     scopeBlocked,
     loadPreviewHits,
     language,
     showNotification,
-    setSettingsOpen,
     t,
     isCurrentRequest,
     requestKey,
@@ -510,7 +501,6 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
             : t("askVault_failed"),
         "error",
       );
-      setSettingsOpen(true, "ai");
       return;
     } finally {
       if (isCurrentRequest(generation, requestKey)) setRetrieving(false);
@@ -529,7 +519,6 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
     loadPreviewHits,
     language,
     showNotification,
-    setSettingsOpen,
     t,
     isCurrentRequest,
     requestKey,
@@ -682,13 +671,6 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
 
   const readinessBody = !rootFolderPath ? (
     <p>{t("askVault_needVault")}</p>
-  ) : !aiReady ? (
-    <p>
-      {t("askVault_needAi")}{" "}
-      <button type="button" onClick={() => setSettingsOpen(true, "ai")}>
-        {t("askVault_openAiSettings")}
-      </button>
-    </p>
   ) : indexBuilding ? (
     <p>
       {t("askVault_indexBuilding", {
@@ -708,6 +690,13 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
         }}
       >
         {t("askVault_rebuildIndex")}
+      </button>
+    </p>
+  ) : semanticRequired && !semanticReady ? (
+    <p>
+      {t("askVault_needSemantic")}{" "}
+      <button type="button" onClick={() => setSettingsOpen(true, "index")}>
+        {t("askVault_openIndexSettings")}
       </button>
     </p>
   ) : keywordOnly ? (
@@ -806,7 +795,22 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
               </span>
             </button>
             {showReadinessDetail ? (
-              <div className="ask-vault-readiness-detail">{readinessBody}</div>
+              <div className="ask-vault-readiness-detail">
+                {readinessBody}
+                <p>
+                  {aiReady
+                    ? t("askVault_generationReady")
+                    : t("askVault_retrieveWithoutAi")}{" "}
+                  {!aiReady ? (
+                    <button
+                      type="button"
+                      onClick={() => setSettingsOpen(true, "ai")}
+                    >
+                      {t("askVault_openAiSettings")}
+                    </button>
+                  ) : null}
+                </p>
+              </div>
             ) : null}
           </div>
 
@@ -974,7 +978,7 @@ export const AskVaultPanel: React.FC<AskVaultPanelProps> = ({
               </button>
               <button
                 type="button"
-                disabled={!canAsk || !question.trim() || scopeBlocked}
+                disabled={!canRetrieve || !question.trim() || scopeBlocked}
                 onClick={() => void handleRetrieve()}
                 title={t("askVault_retrieveHint")}
               >

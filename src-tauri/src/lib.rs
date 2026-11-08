@@ -892,6 +892,7 @@ pub fn run() {
             reveal_in_explorer,
             copy_sample_notes,
             publishing::publish_simple_blog,
+            publishing::check_simple_blog_connection,
             publishing::publish_wechat_draft,
             weread::weread_gateway,
             weread::weread_download_cover,

@@ -44,7 +44,6 @@ interface AskVaultModelResponse {
 export const ASK_VAULT_SYSTEM_PROMPT =
   "You are XiaoZhi (小知助手). Answer questions ONLY using the provided numbered knowledge-base excerpts. Do not invent facts. Cite sources with [n] markers. If the excerpts are insufficient, say you could not find enough information in the vault.";
 
-
 function resolveModelLabel(settings: AppSettings): string {
   if (isCompatibleProvider(settings.aiProvider))
     return resolveCompatibleSettings(settings.aiProvider, settings).model;
@@ -122,7 +121,8 @@ export async function retrieveAskVaultHits(
     query: request.question,
     chunkIndex,
     vectorStore: getActiveVectorStore(),
-    embeddingProvider: createEmbeddingProvider(request.settings),
+    embeddingProvider:
+      mode === "keyword" ? null : createEmbeddingProvider(request.settings),
     retrieve: {
       mode,
       scope: request.scope ?? "vault",

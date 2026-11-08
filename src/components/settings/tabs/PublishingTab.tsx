@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { isTauriEnvironment } from "../../../types/filesystem";
 import {
   isValidOrEmptyBlogRepoUrl,
@@ -9,6 +9,12 @@ import {
 import { useI18n } from "../../../hooks/useI18n";
 import type { SettingsTabProps } from "../types";
 import { useSecureSettings } from "../useSecureSettings";
+import {
+  checkSimpleBlogConnection,
+  type BlogConnectionResult,
+} from "../../../services/publishingConnectionService";
+import { readSecureSetting } from "../../../services/secureSettingsService";
+import type { TranslationKey } from "../../../utils/i18n";
 
 type PublishingTargetTab = "simpleBlog" | "wechat";
 
@@ -17,11 +23,89 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
   onUpdateSettings,
 }) => {
   const { t } = useI18n();
-  const { handleSecureSettingChange, renderSecureSaveState } =
-    useSecureSettings(onUpdateSettings);
+  const {
+    handleSecureSettingChange,
+    renderSecureSaveState,
+    getSecureSaveState,
+  } = useSecureSettings(onUpdateSettings);
   const [activeTab, setActiveTab] = useState<PublishingTargetTab>("simpleBlog");
   const [showGithubToken, setShowGithubToken] = useState(false);
   const [showWechatSecret, setShowWechatSecret] = useState(false);
+  const [blogCheck, setBlogCheck] = useState<BlogConnectionResult | null>(null);
+  const [wechatCheck, setWechatCheck] = useState<TranslationKey | null>(null);
+  const [checking, setChecking] = useState(false);
+  const checkGenerationRef = useRef(0);
+  const desktop = isTauriEnvironment();
+  const checkButtonClass =
+    "inline-flex min-h-10 items-center rounded-xl bg-accent-DEFAULT/10 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-accent-DEFAULT/20 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-DEFAULT dark:text-gray-100 disabled:cursor-not-allowed disabled:opacity-50 transition-colors";
+
+  useEffect(() => {
+    checkGenerationRef.current += 1;
+    setBlogCheck(null);
+    setWechatCheck(null);
+    setChecking(false);
+    return () => {
+      // 配置变化或离开设置后，旧检查不能覆盖新状态。
+      checkGenerationRef.current += 1;
+    };
+  }, [
+    activeTab,
+    settings.blogRepoUrl,
+    settings.blogGithubToken,
+    settings.wechatAppId,
+    settings.wechatAppSecret,
+  ]);
+
+  const handleBlogCheck = async () => {
+    if (checking) return;
+    const generation = ++checkGenerationRef.current;
+    setChecking(true);
+    setBlogCheck(null);
+    const result = await checkSimpleBlogConnection(
+      settings.blogRepoUrl,
+      settings.blogGithubToken ?? "",
+    );
+    if (generation !== checkGenerationRef.current) return;
+    setBlogCheck(result);
+    setChecking(false);
+  };
+
+  const handleWechatCheck = async () => {
+    if (checking) return;
+    const secretState = getSecureSaveState("wechatAppSecret");
+    if (!settings.wechatAppId.trim()) {
+      setWechatCheck("publishCheck_missingAppId");
+      return;
+    }
+    if (!settings.wechatAppSecret?.trim()) {
+      setWechatCheck("publishCheck_missingAppSecret");
+      return;
+    }
+    if (secretState === "saving") {
+      return;
+    }
+    if (secretState === "error") {
+      setWechatCheck("publishCheck_secretNotSaved");
+      return;
+    }
+    const generation = ++checkGenerationRef.current;
+    setChecking(true);
+    setWechatCheck(null);
+    try {
+      const saved = await readSecureSetting("wechatAppSecret");
+      if (generation !== checkGenerationRef.current) return;
+      setWechatCheck(
+        saved.trim() === settings.wechatAppSecret.trim()
+          ? "publishCheck_wechatReady"
+          : "publishCheck_secretNotSaved",
+      );
+    } catch {
+      if (generation !== checkGenerationRef.current) return;
+      setWechatCheck("publishCheck_secretCheckFailed");
+    } finally {
+      if (generation === checkGenerationRef.current) setChecking(false);
+    }
+  };
 
   const renderSimpleBlogPanel = () => (
     <div className="rounded-2xl border border-gray-200/70 bg-white/70 px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
@@ -183,6 +267,51 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
               </p>
             )}
         </div>
+        <div className="space-y-2 border-t border-gray-200/50 pt-4 dark:border-white/10">
+          <button
+            type="button"
+            className={checkButtonClass}
+            disabled={checking || !desktop}
+            onClick={() => void handleBlogCheck()}
+          >
+            {checking
+              ? t("publishCheck_checking")
+              : t("publishCheck_connection")}
+          </button>
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy={checking}
+            className="space-y-1 text-xs leading-5 [overflow-wrap:anywhere]"
+          >
+            {blogCheck?.repository ? (
+              <p className="text-green-700 dark:text-green-400">
+                {t("publishCheck_repository", {
+                  repository: blogCheck.repository,
+                })}
+              </p>
+            ) : null}
+            {blogCheck?.branch ? (
+              <p className="text-green-700 dark:text-green-400">
+                {t("publishCheck_branch", { branch: blogCheck.branch })}
+              </p>
+            ) : null}
+            {blogCheck?.errorKind ? (
+              <p
+                className={
+                  blogCheck.status === "warning"
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-red-600 dark:text-red-400"
+                }
+              >
+                {t(`publishCheck_${blogCheck.errorKind}`)}
+              </p>
+            ) : null}
+          </div>
+          <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
+            {t("publishCheck_readOnlyHint")}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -278,6 +407,44 @@ export const PublishingTab: React.FC<SettingsTabProps> = ({
             {t("settings_wechatAppSecretHint")}
           </p>
           {renderSecureSaveState("wechatAppSecret")}
+        </div>
+
+        <div className="space-y-2 border-t border-gray-200/50 pt-4 dark:border-white/10">
+          <button
+            type="button"
+            className={checkButtonClass}
+            disabled={
+              checking ||
+              !desktop ||
+              getSecureSaveState("wechatAppSecret") === "saving"
+            }
+            onClick={() => void handleWechatCheck()}
+          >
+            {checking
+              ? t("publishCheck_checking")
+              : t("publishCheck_configuration")}
+          </button>
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy={checking}
+            className="text-xs leading-5"
+          >
+            {wechatCheck ? (
+              <p
+                className={
+                  wechatCheck === "publishCheck_wechatReady"
+                    ? "text-green-700 dark:text-green-400"
+                    : "text-amber-700 dark:text-amber-300"
+                }
+              >
+                {t(wechatCheck)}
+              </p>
+            ) : null}
+          </div>
+          <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
+            {t("publishCheck_wechatHint")}
+          </p>
         </div>
 
         <div className="rounded-2xl border border-gray-200/70 bg-gray-50/80 px-4 py-3 text-xs leading-6 text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
