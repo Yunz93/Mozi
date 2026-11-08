@@ -15,6 +15,7 @@ const files = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
   .filter(Boolean);
 const failures = [];
 for (const file of files) {
+  if (file === "scripts/check-public-content.mjs") continue;
   if (
     !existsSync(file) ||
     !statSync(file).isFile() ||
