@@ -48,7 +48,7 @@ it("preserves text following a same-line display-math closer", () => {
   expect(html(renderMarkdown("$x$")).querySelector(".katex")).not.toBeNull();
 });
 it("preserves first-line indentation with the real configured Shiki highlighter", async () => {
-  const highlighter = await createShikiHighlighter();
+  const highlighter = await createShikiHighlighter(["python"]);
   expect(highlighter).not.toBeNull();
   const code = "    return value";
   const out = renderMarkdown("```python\n" + code + "\n```", { highlighter });

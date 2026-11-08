@@ -1,40 +1,6 @@
 const FENCE_LANGUAGE_PATTERN = /^[\t ]*(?:`{3,}|~{3,})\s*([^\s`~{]+)/gm;
 
 // Shiki web bundle 中包含的核心语言集合
-const SHIKI_CORE_LANG_SET = new Set<string>([
-  // JavaScript ecosystem
-  'javascript', 'typescript', 'jsx', 'tsx',
-  // Data/Config formats
-  'json', 'json5', 'jsonc', 'yaml', 'toml', 'ini',
-  // Web/Markup
-  'markdown', 'mdx', 'html', 'xml', 'css', 'scss', 'sass', 'less', 'postcss',
-  // Shell/CLI
-  'bash', 'shellscript', 'powershell', 'cmd',
-  // JVM languages
-  'python', 'java', 'kotlin', 'groovy', 'scala', 'clojure',
-  // Systems languages
-  'go', 'rust', 'c', 'cpp', 'csharp', 'zig',
-  // Other compiled
-  'php', 'ruby', 'swift', 'dart', 'lua', 'perl', 'r',
-  // Functional
-  'elixir', 'erlang', 'haskell', 'ocaml', 'fsharp',
-  // .NET
-  'vb', 'fs',
-  // Mobile
-  'objective-c', 'objc',
-  // Database/Query
-  'sql', 'graphql', 'prisma',
-  // DevOps/Config
-  'docker', 'dockerfile', 'nginx', 'apache',
-  // Tools
-  'diff', 'viml', 'http',
-  // Frameworks
-  'vue', 'vue-html', 'svelte', 'astro', 'angular-html', 'angular-ts',
-  'solidity',
-  // Documentation
-  'latex', 'tex',
-]);
-
 // Shiki web bundle 中包含的核心语言
 // 只列出实际存在于 bundle 中的语言，避免加载时出现警告
 export const SHIKI_CORE_LANGS = [
@@ -273,7 +239,7 @@ export function normalizeShikiLanguage(rawLang: string): string {
   }
 
   const aliased = SHIKI_LANGUAGE_ALIASES[normalized] ?? normalized;
-  if (SHIKI_CORE_LANGS_SET.has(aliased) || SHIKI_CORE_LANG_SET.has(aliased)) {
+  if (SHIKI_CORE_LANGS_SET.has(aliased)) {
     return aliased;
   }
 
