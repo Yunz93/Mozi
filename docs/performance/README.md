@@ -62,3 +62,7 @@ no vault content or local paths. Repeat the same sizes/rounds for comparisons.
 Native filesystem observation has a separate [benchmark and rollout guide](native-watch.md).
 Run `npm run perf:native` for actual OS events without a WebView; this does not
 replace packaged desktop UI validation.
+
+The [vault/window optimization notes](linux-vault-optimization.md) describe the
+index, rendering, background I/O and search bounds, with the core comparison and
+the protocol for comparing fresh Linux desktop processes.
