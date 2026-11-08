@@ -25,7 +25,8 @@
     "prepare": "husky",
     "perf:core": "node scripts/perf/core.mjs",
     "perf:browser": "node scripts/perf/browser.mjs",
-    "check:public": "node scripts/check-public-content.mjs"
+    "check:public": "node scripts/check-public-content.mjs",
+    "perf:native": "node scripts/perf/native.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",

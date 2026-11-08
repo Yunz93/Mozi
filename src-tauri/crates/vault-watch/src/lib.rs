@@ -182,19 +182,24 @@ impl Broker {
         Ok(subscription)
     }
     pub fn changes(&self, id: &str, epoch: &str, after: u64) -> Result<Page, String> {
-        let state = self.shared.state.lock().map_err(|_| "Watch lock failed")?;
-        let key = state.subscriptions.get(id).ok_or("Unknown subscription")?;
-        let root = state.roots.get(key).ok_or("Unknown root")?;
-        let scope = root.scopes.get(id).ok_or("Unknown scope")?;
-        let mut page = root.journal.read(epoch, after);
-        page.changes = page
-            .changes
-            .iter()
-            .filter_map(|c| scope.filter(c))
-            .collect();
+        let (key, mut page) = {
+            let state = self.shared.state.lock().map_err(|_| "Watch lock failed")?;
+            let key = state.subscriptions.get(id).ok_or("Unknown subscription")?;
+            let root = state.roots.get(key).ok_or("Unknown root")?;
+            let scope = root.scopes.get(id).ok_or("Unknown scope")?;
+            let mut page = root.journal.read(epoch, after);
+            page.changes = page
+                .changes
+                .iter()
+                .filter_map(|c| scope.filter(c))
+                .collect();
+            (key.clone(), page)
+        };
         // Some backends stop silently when the watched root itself is deleted.
         // Probe just the root metadata at replay time (never walk the tree).
-        if !key.path.is_dir() {
+        if !std::fs::symlink_metadata(&key.path)
+            .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
+        {
             page.rescan_required = true;
             page.error = Some("Watch root is unavailable".into());
         }
@@ -356,28 +361,35 @@ fn enqueue(shared: &Weak<Shared>, key: &Key, event: notify::Result<Event>) {
     let Some(shared) = shared.upgrade() else {
         return;
     };
-    let Ok(mut state) = shared.state.lock() else {
-        return;
-    };
-    let Some(root) = state.roots.get_mut(key) else {
-        return;
-    };
+    // Filesystem normalization may block on a slow volume. Keep that IO outside
+    // the shared mutex so other roots and consumers can continue replaying.
+    let mut changes = Vec::new();
+    let mut rescan = false;
+    let mut error = None;
     let now = Instant::now();
     match event {
-        Err(error) => root.journal.mark_rescan(now, Some(error.to_string())),
+        Err(reason) => {
+            rescan = true;
+            error = Some(reason.to_string());
+        }
         Ok(event) => {
+            // A link replacement may make the former path unsafe to disclose.
+            // Ask consumers to rebuild their own filtered snapshot instead.
+            if event
+                .paths
+                .iter()
+                .any(|path| path.starts_with(&key.path) && safe_path(path, key).is_none())
+            {
+                rescan = true;
+            }
             if event.need_rescan() {
-                root.journal.mark_rescan(now, None);
+                rescan = true;
             }
             match event.kind {
                 EventKind::Access(_) => return,
-                EventKind::Any | EventKind::Other => root.journal.mark_rescan(now, None),
+                EventKind::Any | EventKind::Other => rescan = true,
                 _ => {
-                    let mut emit = |change: Change| {
-                        if root.scopes.values().any(|s| s.filter(&change).is_some()) {
-                            root.journal.push(change, now);
-                        }
-                    };
+                    let mut emit = |change: Change| changes.push(change);
                     if matches!(
                         event.kind,
                         EventKind::Modify(ModifyKind::Name(RenameMode::Both))
@@ -416,6 +428,15 @@ fn enqueue(shared: &Weak<Shared>, key: &Key, event: notify::Result<Event>) {
                         for path in &event.paths {
                             if let Some(path) = safe_path(path, key) {
                                 let kind = match event.kind {
+                                    EventKind::Modify(ModifyKind::Name(
+                                        RenameMode::Any | RenameMode::Other,
+                                    )) => {
+                                        if path.exists() {
+                                            Kind::Created
+                                        } else {
+                                            Kind::Removed
+                                        }
+                                    }
                                     EventKind::Create(_)
                                     | EventKind::Modify(ModifyKind::Name(RenameMode::To)) => {
                                         Kind::Created
@@ -440,14 +461,75 @@ fn enqueue(shared: &Weak<Shared>, key: &Key, event: notify::Result<Event>) {
                             }
                         }
                     }
-                    if event.paths.iter().any(|p| p == &key.path) && !key.path.exists() {
-                        root.journal
-                            .mark_rescan(now, Some("Watch root is unavailable".into()));
+                    let root_removed = match event.kind {
+                        EventKind::Remove(_)
+                        | EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
+                            event.paths.iter().any(|path| path == &key.path)
+                        }
+                        EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => {
+                            event.paths.first() == Some(&key.path)
+                        }
+                        _ => false,
+                    };
+                    if root_removed
+                        || (event.paths.iter().any(|p| p == &key.path) && !key.path.exists())
+                    {
+                        rescan = true;
+                        error = Some("Watch root is unavailable".into());
                     }
                 }
             }
         }
     }
+    let Ok(mut state) = shared.state.lock() else {
+        return;
+    };
+    let Some(root) = state.roots.get_mut(key) else {
+        return;
+    };
+    if rescan {
+        root.journal.mark_rescan(now, error);
+    }
+    for change in changes {
+        if root
+            .scopes
+            .values()
+            .any(|scope| scope.filter(&change).is_some())
+        {
+            root.journal.push(change, now);
+        }
+    }
     drop(state);
     shared.wake.notify_all();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn root_removal_stays_terminal_even_if_the_path_already_exists_again() {
+        let path = std::env::temp_dir().join(format!("mozi-root-event-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&path).unwrap();
+        let canonical = std::fs::canonicalize(&path).unwrap();
+        let broker = Broker::default();
+        let sub = broker.subscribe(&path, true).unwrap();
+        let key = Key {
+            path: canonical.clone(),
+            recursive: true,
+        };
+        // A delayed backend callback can arrive after another process recreates
+        // the directory. Existence does not restore the old watch registration.
+        enqueue(
+            &Arc::downgrade(&broker.shared),
+            &key,
+            Ok(Event::new(EventKind::Remove(RemoveKind::Folder)).add_path(canonical)),
+        );
+        let page = broker
+            .changes(&sub.subscription_id, &sub.epoch, sub.seq)
+            .unwrap();
+        assert!(page.error.is_some());
+        broker.unsubscribe(&sub.subscription_id);
+        std::fs::remove_dir(path).unwrap();
+    }
 }

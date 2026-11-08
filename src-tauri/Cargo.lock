@@ -2394,8 +2394,10 @@ dependencies = [
 name = "mozi-vault-watch"
 version = "0.1.0"
 dependencies = [
- "notify",
+ "notify 8.2.1",
+ "notify 9.0.0-rc.7",
  "serde",
+ "serde_json",
  "uuid",
 ]
 
@@ -2467,6 +2469,26 @@ dependencies = [
  "objc2-core-services",
  "walkdir",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "notify"
+version = "9.0.0-rc.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dc7e1571ebae4ac2247c2ea8f1e067055dae6495226489c78321a2e14b47966"
+dependencies = [
+ "bitflags 2.13.0",
+ "inotify",
+ "kqueue",
+ "libc",
+ "log",
+ "mio",
+ "notify-types",
+ "objc2-core-foundation",
+ "objc2-core-services",
+ "walkdir",
+ "windows-sys 0.61.2",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -6154,6 +6176,12 @@ dependencies = [
  "libc",
  "rustix",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "550a2b930b62486a393c52d5c3b84bff264b28aa437ed64694d31e93b1757af7"
 
 [[package]]
 name = "yoke"

@@ -2,11 +2,21 @@
 name = "mozi-vault-watch"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.88"
 license = "Apache-2.0"
 publish = false
 
 [dependencies]
-notify = "8.2"
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+notify = "8.2"
+
+# 8.2 silently discards Windows overflow completions. Keep the fixed backend
+# pinned while native mode is experimental; revisit when notify 9 is stable.
+[target.'cfg(target_os = "windows")'.dependencies]
+notify = "=9.0.0-rc.7"
+
+[dev-dependencies]
+serde_json = "1"

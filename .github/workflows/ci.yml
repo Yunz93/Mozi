@@ -80,3 +80,18 @@ jobs:
           workspaces: ./src-tauri -> target
       - name: Test real native file events without a GUI
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml -p mozi-vault-watch
+      - name: Repeat Windows overflow recovery regression
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            cargo test --locked --manifest-path src-tauri/Cargo.toml -p mozi-vault-watch --test native real_burst_is_replayed_or_requests_a_snapshot -- --exact || exit 1
+          done
+      - name: Measure native broker smoke workload
+        shell: bash
+        run: cargo run --locked --release --manifest-path src-tauri/Cargo.toml -p mozi-vault-watch --example observation_perf -- --counts 100 --windows 1 --rounds 3 > native-watch-perf.json
+      - name: Upload native broker measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-watch-perf-${{ matrix.os }}
+          path: native-watch-perf.json

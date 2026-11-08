@@ -46,6 +46,11 @@ export async function reconcileWatchTree(
   readBranch: (parent: string, previous: FileNode[]) => Promise<FileNode[]>,
 ): Promise<{ tree: FileNode[]; modified: string[]; structural: boolean }> {
   const parents = new Set<string>();
+  const replacedDirectories = new Set(
+    changes
+      .filter((change) => change.isDirectory && change.kind !== "modified")
+      .map((change) => watchPath(change.path)),
+  );
   const known = new Set(watchTreeFiles(tree).map(watchPath));
   const touched = new Set<string>();
   const r = watchPath(root);
@@ -79,7 +84,14 @@ export async function reconcileWatchTree(
   for (const parent of [...parents].sort((a, b) => a.length - b.length)) {
     const previous = childrenAt(next, parent, root);
     if (!previous) continue; // Its parent was authoritatively removed above.
-    const branch = await readBranch(parent === r ? root : parent, previous);
+    // A directory can be removed and recreated at the same path within one
+    // batch. Its former children must not survive the authoritative parent read.
+    const reusable = previous.filter(
+      (node) =>
+        node.type !== "folder" ||
+        !replacedDirectories.has(watchPath(node.path)),
+    );
+    const branch = await readBranch(parent === r ? root : parent, reusable);
     next = parent === r ? branch : replaceBranch(next, parent, branch);
   }
   const visible = new Map(
