@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useCallback } from "react";
 import { getFileSystem } from "../types/filesystem";
 import { useAppStore } from "../store/appStore";
@@ -270,7 +271,19 @@ export function useFileSystem() {
     addTab,
     activateTab,
     settings,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      files: state.files,
+      setFiles: state.setFiles,
+      setCurrentFilePath: state.setCurrentFilePath,
+      setRootFolderPath: state.setRootFolderPath,
+      clearAllCache: state.clearAllCache,
+      showNotification: state.showNotification,
+      addTab: state.addTab,
+      activateTab: state.activateTab,
+      settings: state.settings,
+    })),
+  );
 
   const updateKnowledgeBaseMetadata = useCallback((path: string) => {
     const name = getPathBasename(path);

@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import type { AppSettings, MetadataField } from "../types";
@@ -12,7 +13,15 @@ export function useSettings() {
     updateSettings,
     isSettingsOpen,
     setSettingsOpen,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      settings: state.settings,
+      setSettings: state.setSettings,
+      updateSettings: state.updateSettings,
+      isSettingsOpen: state.isSettingsOpen,
+      setSettingsOpen: state.setSettingsOpen,
+    })),
+  );
 
   const openSettings = useCallback(() => {
     setSettingsOpen(true);

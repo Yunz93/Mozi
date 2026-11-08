@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useCallback, useRef } from "react";
 import { useAppStore } from "../store/appStore";
 import { hydrateSensitiveSettingsIntoStore } from "../services/secureSettingsService";
@@ -81,7 +82,16 @@ export function usePublishActions(
     setContentForFile,
     setPublishing,
     showNotification,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      files: state.files,
+      activeTabId: state.activeTabId,
+      settings: state.settings,
+      setContentForFile: state.setContentForFile,
+      setPublishing: state.setPublishing,
+      showNotification: state.showNotification,
+    })),
+  );
   const publishInFlightRef = useRef<Promise<unknown> | null>(null);
 
   const invokePublishWithTimeout = useCallback(

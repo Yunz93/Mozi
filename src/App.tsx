@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import React, {
   useEffect,
   useLayoutEffect,
@@ -172,7 +173,34 @@ const App: React.FC = () => {
     setActiveHeadingId,
     showNotification,
     updateSettings,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      files: state.files,
+      openTabs: state.openTabs,
+      rootFolderPath: state.rootFolderPath,
+      activeTabId: state.activeTabId,
+      currentFilePath: state.currentFilePath,
+      viewMode: state.viewMode,
+      viewModeBeforePreviewOnly: state.viewModeBeforePreviewOnly,
+      isSidebarOpen: state.isSidebarOpen,
+      isSettingsOpen: state.isSettingsOpen,
+      isSaving: state.isSaving,
+      isAnalyzing: state.isAnalyzing,
+      isPublishing: state.isPublishing,
+      settings: state.settings,
+      fileContents: state.fileContents,
+      activeHeadingId: state.activeHeadingId,
+      closeTab: state.closeTab,
+      setContent: state.setContent,
+      setContentForFile: state.setContentForFile,
+      setCurrentFilePath: state.setCurrentFilePath,
+      setSidebarOpen: state.setSidebarOpen,
+      setSettingsOpen: state.setSettingsOpen,
+      setActiveHeadingId: state.setActiveHeadingId,
+      showNotification: state.showNotification,
+      updateSettings: state.updateSettings,
+    })),
+  );
 
   const content = useAppStore(selectContent);
 

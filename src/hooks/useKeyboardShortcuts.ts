@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useEffect, useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import { type ShortcutConfig } from "../types";
@@ -159,7 +160,13 @@ function useShortcutListener(
   options: UseKeyboardShortcutsOptions,
   saveHandler?: (() => void) | null,
 ) {
-  const { settings, viewMode, setViewMode } = useAppStore();
+  const { settings, viewMode, setViewMode } = useAppStore(
+    useShallow((state) => ({
+      settings: state.settings,
+      viewMode: state.viewMode,
+      setViewMode: state.setViewMode,
+    })),
+  );
 
   return useCallback(
     (event: KeyboardEvent) => {

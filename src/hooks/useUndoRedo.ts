@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useCallback, useEffect } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
 import {
@@ -20,7 +21,16 @@ import {
  */
 export function useUndoRedo() {
   const { undo, redo, canUndo, canRedo, activeTabId, fileHistories } =
-    useAppStore();
+    useAppStore(
+      useShallow((state) => ({
+        undo: state.undo,
+        redo: state.redo,
+        canUndo: state.canUndo,
+        canRedo: state.canRedo,
+        activeTabId: state.activeTabId,
+        fileHistories: state.fileHistories,
+      })),
+    );
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback(

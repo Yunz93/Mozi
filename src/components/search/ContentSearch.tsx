@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useAppStore, selectContent } from "../../store/appStore";
 import {
@@ -122,7 +123,12 @@ function expandSearchReplacement(
 export const ContentSearch: React.FC<ContentSearchProps> = ({ onClose }) => {
   const { t } = useI18n();
   const content = useAppStore(selectContent);
-  const { setContent, activeTabId } = useAppStore();
+  const { setContent, activeTabId } = useAppStore(
+    useShallow((state) => ({
+      setContent: state.setContent,
+      activeTabId: state.activeTabId,
+    })),
+  );
   const [searchText, setSearchText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [matches, setMatches] = useState<SearchMatch[]>([]);
