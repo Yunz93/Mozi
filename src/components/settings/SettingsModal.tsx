@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { isImeComposingEvent } from "../../utils/imeKeyboard";
 import type { AppSettings } from "../../types";
 import { useI18n } from "../../hooks/useI18n";
 import type { TranslationKey } from "../../utils/i18n";
@@ -96,6 +97,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   uiScaleStyle,
 }) => {
   const { t } = useI18n();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const settingsFocusTab = useAppStore((s) => s.settingsFocusTab);
   const clearSettingsFocusTab = useAppStore((s) => s.clearSettingsFocusTab);
   const [activeTab, setActiveTab] = useState<SettingsTab>("editor");
@@ -129,16 +133,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]',
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
+    const frame = requestAnimationFrame(() =>
+      (focusable()[0] ?? dialogRef.current)?.focus({ preventScroll: true }),
+    );
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || isImeComposingEvent(event)) return;
+      if (event.key === "Tab") {
+        // Portal menus and nested dialogs manage their own keyboard interaction.
+        const target = event.target as HTMLElement;
+        if (
+          !dialogRef.current?.contains(target) &&
+          target.closest?.('.app-select-menu, [role="dialog"]')
+        )
+          return;
+        const controls = focusable();
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (
+          !first ||
+          !dialogRef.current?.contains(document.activeElement) ||
+          (event.shiftKey
+            ? document.activeElement === first
+            : document.activeElement === last)
+        ) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+        }
+        return;
+      }
       if (event.key !== "Escape") return;
+      const activeDialog = (event.target as HTMLElement).closest?.(
+        '[role="dialog"]',
+      );
+      if (activeDialog && activeDialog !== dialogRef.current) return;
       event.preventDefault();
       event.stopPropagation();
-      onClose();
+      onCloseRef.current();
     };
 
     document.addEventListener("keydown", handleKeyDown, true);
-    return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [isOpen, onClose]);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKeyDown, true);
+      if (previousFocus?.isConnected)
+        previousFocus.focus({ preventScroll: true });
+    };
+  }, [isOpen]);
 
   const handleModalResizeStart = useCallback(
     (event: React.MouseEvent) => {
@@ -250,6 +297,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           maxWidth: "calc(100vw - 2rem)",
           maxHeight: "calc(100vh - 2rem)",
         }}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={t("settings_title")}

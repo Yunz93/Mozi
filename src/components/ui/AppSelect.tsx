@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { isImeComposingEvent } from "../../utils/imeKeyboard";
 
 export interface AppSelectOption {
   value: string;
@@ -85,7 +86,7 @@ export const AppSelect: React.FC<AppSelectProps> = ({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !isImeComposingEvent(event)) {
         event.preventDefault();
         // 下拉优先消费 Esc，避免设置或通用弹窗在同次按键中一起关闭。
         event.stopPropagation();
