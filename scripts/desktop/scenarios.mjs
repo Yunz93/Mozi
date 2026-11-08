@@ -383,22 +383,42 @@ export async function fallback(context, check) {
   await activateTasks(d);
   await check(context, "backend-loss-polling-snapshot", async () => {
     const listener = await d.asyncExecute(
-      "const done=arguments[arguments.length-1];window.__acceptanceHints=[];const handler=window.__TAURI_INTERNALS__.transformCallback(event=>window.__acceptanceHints.push(event.payload.subscriptionId));window.__TAURI_INTERNALS__.invoke('plugin:event|listen',{event:'vault-watch-changed',target:{kind:'Any'},handler}).then(done);",
+      "const done=arguments[arguments.length-1];window.__acceptanceHints=[];const handler=window.__TAURI_INTERNALS__.transformCallback(event=>window.__acceptanceHints.push(event.payload));window.__TAURI_INTERNALS__.invoke('plugin:event|listen',{event:'vault-watch-changed',target:{kind:'WebviewWindow',label:window.__TAURI_INTERNALS__.metadata.currentWindow.label},handler}).then(done);",
     );
     try {
       await writeFile(
         join(vault, "active.md"),
         "# Active\n\nFALLBACK_PROBE\n\n- [ ] FALLBACK_TASK\n",
       );
-      const ids = await until(
-        () =>
-          d.execute(
-            "const ids=[...new Set(window.__acceptanceHints)];return ids.length>=2?ids:null",
-          ),
-        "No native subscription hints",
-      );
+      const ids = await until(async () => {
+        const hints = await d.execute(
+          "return [...new Map(window.__acceptanceHints.map(h=>[h.subscriptionId,h])).values()]",
+        );
+        const owned = [];
+        for (const hint of hints) {
+          try {
+            await d.invoke("get_vault_changes", {
+              subscriptionId: hint.subscriptionId,
+              epoch: hint.epoch,
+              afterSeq: hint.seq,
+            });
+            owned.push(hint.subscriptionId);
+          } catch (error) {
+            // A queued hint can outlive a reload/consumer. Keep the real owner
+            // check enabled; only revoke currently live subscriptions of this window.
+            if (!/does not belong|Unknown subscription/i.test(error.message))
+              throw error;
+          }
+        }
+        return owned.length >= 2 ? owned : false;
+      }, "No two live native subscriptions owned by this window");
       for (const subscriptionId of ids)
         await d.invoke("unsubscribe_vault", { subscriptionId });
+      assert.equal(
+        (await d.invoke("vault_watch_stats")).subscriptions,
+        1,
+        "Fault injection must leave only the background task observer",
+      );
       await writeFile(
         join(vault, "fallback-created.md"),
         "# Fallback\n\n- [ ] FALLBACK_CREATED_TASK\n",
