@@ -6,7 +6,8 @@ export type FileWatchEvent =
   | { path: string; type: "error"; error: unknown };
 
 export type DirectoryWatchEvent =
-  | { type: "changed"; tree: FileNode[] }
+  | { type: "changed"; tree: FileNode[]; rescan?: boolean }
+  | { type: "modified"; paths: string[] }
   | { type: "error"; error: unknown };
 
 /**

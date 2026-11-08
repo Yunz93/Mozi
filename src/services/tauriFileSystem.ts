@@ -1,3 +1,10 @@
+import {
+  nativeWatchEnabled,
+  startNativeWatch,
+  withinWatchPath,
+  watchPath,
+} from "./filesystem/nativeWatchClient";
+import { reconcileWatchTree } from "./filesystem/reconcileWatchTree";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   readFile as readBinaryFile,
@@ -475,6 +482,8 @@ export class TauriFileSystem implements IFileSystem {
     dirPath: string,
     rootPath: string = dirPath,
     inTrash: boolean = false,
+    reuseChildren?: FileNode[],
+    strict: boolean = false,
   ): Promise<FileNode[]> {
     try {
       const entries = await readDir(dirPath);
@@ -489,7 +498,7 @@ export class TauriFileSystem implements IFileSystem {
       );
 
       for (const entry of entries) {
-        if (!entry.name) continue;
+        if (!entry.name || entry.isSymlink) continue;
         const isTrashDirectory =
           entry.isDirectory && isAtRoot && entry.name === trashFolder;
         const nodeInTrash = inTrash || isTrashDirectory;
@@ -505,11 +514,20 @@ export class TauriFileSystem implements IFileSystem {
         const ext = entry.name.toLowerCase();
 
         if (entry.isDirectory) {
-          const children = await this.readDirectory(
-            fullPath,
-            rootPath,
-            nodeInTrash,
+          const existing = reuseChildren?.find(
+            (node) =>
+              node.type === "folder" &&
+              watchPath(node.path) === watchPath(fullPath),
           );
+          const children =
+            existing?.children ??
+            (await this.readDirectory(
+              fullPath,
+              rootPath,
+              nodeInTrash,
+              undefined,
+              strict,
+            ));
           nodes.push({
             id: fullPath,
             name: entry.name,
@@ -546,7 +564,7 @@ export class TauriFileSystem implements IFileSystem {
       console.error(`Failed to read directory ${dirPath}:`, error);
       const normalizedDir = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
       const normalizedRoot = rootPath.replace(/\\/g, "/").replace(/\/+$/, "");
-      if (normalizedDir === normalizedRoot) {
+      if (strict || normalizedDir === normalizedRoot) {
         throw error;
       }
       return [];
@@ -610,6 +628,103 @@ export class TauriFileSystem implements IFileSystem {
    * Listen to file system events
    */
   async watchFile(
+    path: string,
+    callback: (event: FileWatchEvent | null) => void,
+  ): Promise<() => void> {
+    if (!(await nativeWatchEnabled()))
+      return this.watchFilePolling(path, callback);
+    const root = useAppStore.getState().rootFolderPath;
+    const directory = !!root && withinWatchPath(path, root);
+    const check = async ({ active }: { active: () => boolean }) => {
+      const previous = this.fileFormatStates.get(path)?.lastContent;
+      try {
+        const bytes = await readBinaryFile(path);
+        if (!active()) return;
+        const current = this.rememberDecodedText(path, bytes);
+        if (previous !== undefined && current !== previous)
+          callback({ path, type: "modified" });
+      } catch (error) {
+        if (!active()) return;
+        if (isFileNotFoundError(error)) {
+          callback({ path, type: "deleted" });
+          return false;
+        }
+        // Sharing violations and interrupted reads enter the retrying legacy
+        // watcher, so a one-shot native event cannot leave stale content forever.
+        throw error;
+      }
+    };
+    return startNativeWatch({
+      path: directory ? root! : path,
+      directory,
+      snapshot: check,
+      batch: async (changes, context) => {
+        if (
+          changes.some(
+            (change) =>
+              watchPath(change.path) === watchPath(path) ||
+              (change.kind !== "modified" &&
+                withinWatchPath(path, change.path)) ||
+              (change.oldPath && withinWatchPath(path, change.oldPath)),
+          )
+        )
+          return check(context);
+      },
+      fallback: () => this.watchFilePolling(path, callback),
+    });
+  }
+
+  async watchDirectory(
+    dirPath: string,
+    callback: (event: DirectoryWatchEvent) => void,
+  ): Promise<() => void> {
+    if (!(await nativeWatchEnabled()))
+      return this.watchDirectoryPolling(dirPath, callback);
+    let tree: FileNode[] = [];
+    let initialized = false;
+    return startNativeWatch({
+      path: dirPath,
+      directory: true,
+      snapshot: async ({ active }) => {
+        const next = await this.readDirectory(
+          dirPath,
+          dirPath,
+          false,
+          undefined,
+          true,
+        );
+        if (!active()) return;
+        tree = next;
+        callback({ type: "changed", tree, rescan: initialized });
+        initialized = true;
+      },
+      batch: async (changes, { active }) => {
+        const result = await reconcileWatchTree(
+          tree,
+          dirPath,
+          changes,
+          (parent, previous) => {
+            const trash = sanitizeTrashFolder(
+              useAppStore.getState().settings.trashFolder,
+            );
+            const inTrash = withinWatchPath(
+              parent,
+              `${watchPath(dirPath)}/${trash}`,
+            );
+            return this.readDirectory(parent, dirPath, inTrash, previous, true);
+          },
+        );
+        if (!active()) return;
+        tree = result.tree;
+        if (result.structural) callback({ type: "changed", tree });
+        if (result.modified.length)
+          callback({ type: "modified", paths: result.modified });
+      },
+      fallback: () => this.watchDirectoryPolling(dirPath, callback),
+    });
+  }
+
+  private async watchFilePolling(
     path: string,
     callback: (event: FileWatchEvent | null) => void,
   ): Promise<() => void> {
@@ -702,7 +817,7 @@ export class TauriFileSystem implements IFileSystem {
    * of a large tree can never overlap the next one, and the polling interval
    * backs off proportionally to how long the scan actually took.
    */
-  async watchDirectory(
+  private async watchDirectoryPolling(
     dirPath: string,
     callback: (event: DirectoryWatchEvent) => void,
   ): Promise<() => void> {
