@@ -1,3 +1,4 @@
+import { applyDocumentSessionEdit } from "../services/documents/documentSession";
 import React, { useEffect, useRef, useState } from "react";
 import { SettingsModal } from "./settings/SettingsModal";
 import { ConfirmDialog, PromptDialog } from "./ui/Dialog";
@@ -138,7 +139,6 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
   const setPendingCloseDespiteSaveFailure = useAppStore(
     (state) => state.setPendingCloseDespiteSaveFailure,
   );
-  const setContentForFile = useAppStore((state) => state.setContentForFile);
   const [embeddingConsentOpen, setEmbeddingConsentOpen] = useState(false);
   const embeddingConsentResolver = useRef<((granted: boolean) => void) | null>(
     null,
@@ -163,10 +163,14 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
 
   const handleRestoreDraft = () => {
     if (!pendingDraftRestore) return;
-    setContentForFile(
-      pendingDraftRestore.fileId,
-      pendingDraftRestore.draftContent,
-    );
+    if (
+      !applyDocumentSessionEdit({
+        fileId: pendingDraftRestore.fileId,
+        content: pendingDraftRestore.draftContent,
+        source: pendingDraftRestore.source,
+      })
+    )
+      return;
     clearDraftBackup(pendingDraftRestore.fileId);
     setPendingDraftRestore(null);
   };

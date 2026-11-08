@@ -1,8 +1,9 @@
+import { openDocumentSession } from "../services/documents/documentSession";
 import { useShallow } from "zustand/react/shallow";
 import { useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import { useFileSystem } from "./useFileSystem";
-import type { AppLanguage, FileNode } from "../types";
+import type { FileNode } from "../types";
 import { getFileSystem } from "../types/filesystem";
 import { clearAttachmentResolverCache } from "../utils/attachmentResolver";
 import { localizeKnownError, t } from "../utils/i18n";
@@ -16,7 +17,6 @@ import {
 } from "../utils/pathRemap";
 import {
   isExcalidrawFile,
-  isHtmlFile,
   isMarkdownFile,
   isPreviewOnlyFile,
   resolveRenamedFileName,
@@ -26,7 +26,7 @@ import {
   resolveExcalidrawFileName,
 } from "../utils/excalidrawDocument";
 import { normalizeSlashes } from "../utils/pathHelpers";
-import { clearDraftBackup, readDraftBackup } from "../utils/draftBackup";
+import { clearDraftBackup } from "../utils/draftBackup";
 import {
   normalizeNewNoteLocation,
   resolveNewNoteFolderPath,
@@ -55,31 +55,8 @@ import {
   remapEditorDocumentPaths,
 } from "../utils/editorSelectionBridge";
 
-async function notifyIfNonUtf8File(
-  path: string,
-  language: AppLanguage,
-  showNotification: (message: string, type: "success" | "error") => void,
-): Promise<void> {
-  try {
-    const fs = await getFileSystem();
-    const isNonUtf8 = (
-      fs as { isNonUtf8Path?: (filePath: string) => boolean }
-    ).isNonUtf8Path?.(path);
-    if (isNonUtf8) {
-      showNotification(
-        t(language, "notifications_fileEncodingReadOnly"),
-        "error",
-      );
-    }
-  } catch {
-    // 探测编码状态失败时不打断打开流程。
-  }
-}
-
 /** Prevent overlapping create calls for the same destination path. */
 const createDocumentInFlight = new Set<string>();
-// 多个调用方共用请求序号，过期读取不能恢复或覆盖当前文档。
-let fileOpenGeneration = 0;
 
 function isSameOrChildPath(path: string, parentPath: string): boolean {
   const normalizedPath = path.replace(/\\/g, "/");
@@ -148,26 +125,20 @@ export function useFileOperations() {
   const {
     files,
     rootFolderPath,
-    fileContents,
     openTabs,
     settings,
     addTab,
     closeTab,
-    updateTabContent,
-    markAsSaved,
     setCurrentFilePath,
     showNotification,
   } = useAppStore(
     useShallow((state) => ({
       files: state.files,
       rootFolderPath: state.rootFolderPath,
-      fileContents: state.fileContents,
       openTabs: state.openTabs,
       settings: state.settings,
       addTab: state.addTab,
       closeTab: state.closeTab,
-      updateTabContent: state.updateTabContent,
-      markAsSaved: state.markAsSaved,
       setCurrentFilePath: state.setCurrentFilePath,
       showNotification: state.showNotification,
     })),
@@ -187,172 +158,13 @@ export function useFileOperations() {
   } = useFileSystem();
 
   const handleFileSelect = useCallback(
-    async (file: FileNode) => {
-      if (file.type === "folder") return;
-      let generation = fileOpenGeneration;
-      const ownsOpenRequest = () => generation === fileOpenGeneration;
-      const isCurrentDocument = () => {
-        const state = useAppStore.getState();
-        return (
-          ownsOpenRequest() &&
-          state.activeTabId === file.id &&
-          state.currentFilePath === file.path
-        );
-      };
-
-      const previousState = useAppStore.getState();
-      const previousId = previousState.activeTabId;
-      const previousContent = previousId
-        ? previousState.fileContents[previousId]
-        : undefined;
-      const previousSaved = previousId
-        ? previousState.lastSavedContent[previousId]
-        : undefined;
-      const previousPath = previousState.currentFilePath;
-
-      try {
-        if (
-          !isMarkdownFile(file.name) &&
-          !isExcalidrawFile(file.name) &&
-          !isPreviewOnlyFile(file.name)
-        ) {
-          showNotification(
-            t(settings.language, "notifications_previewNotSupported", {
-              name: file.name,
-            }),
-            "error",
-          );
-          return;
-        }
-
-        generation = ++fileOpenGeneration;
-
-        if (previousId && previousId !== file.id) {
-          const flushed = await flushActiveDocumentIfDirty();
-          if (!ownsOpenRequest()) return;
-          if (!flushed) {
-            showNotification(
-              t(settings.language, "tab_closeBlockedUnsaved"),
-              "error",
-            );
-            return;
-          }
-        }
-
-        addTab(file.id);
-        setCurrentFilePath(file.path);
-        const contentAtReadStart = useAppStore.getState().fileContents[file.id];
-        const applyLoadedContent = (text: string): boolean => {
-          if (!isCurrentDocument()) return false;
-          // 编辑器可能尚未把防抖输入同步到 store，先刷新再判断是否有新编辑。
-          flushActiveEditorPendingChanges();
-          if (
-            useAppStore.getState().fileContents[file.id] === contentAtReadStart
-          ) {
-            updateTabContent(file.id, text);
-          }
-          markAsSaved(file.id, text);
-          return true;
-        };
-
-        if (isPreviewOnlyFile(file.name)) {
-          if (isHtmlFile(file.name)) {
-            const text = await readFile(file);
-            if (!applyLoadedContent(text)) return;
-            await notifyIfNonUtf8File(
-              file.path,
-              settings.language,
-              showNotification,
-            );
-          } else {
-            updateTabContent(file.id, "");
-            markAsSaved(file.id);
-          }
-          // View mode stays sticky; App forces PREVIEW only while this file is active.
-          return;
-        }
-
-        if (isExcalidrawFile(file.name)) {
-          const cachedDrawing =
-            previousId === file.id
-              ? useAppStore.getState().fileContents[file.id]
-              : undefined;
-          if (cachedDrawing === undefined) {
-            const text = await readFile(file);
-            if (!applyLoadedContent(text)) return;
-            await notifyIfNonUtf8File(
-              file.path,
-              settings.language,
-              showNotification,
-            );
-          }
-          return;
-        }
-
-        const cachedContent =
-          previousId === file.id
-            ? useAppStore.getState().fileContents[file.id]
-            : undefined;
-
-        if (cachedContent === undefined) {
-          const text = await readFile(file);
-          if (!applyLoadedContent(text)) return;
-          await notifyIfNonUtf8File(
-            file.path,
-            settings.language,
-            showNotification,
-          );
-
-          if (!isCurrentDocument()) return;
-
-          // A draft backup exists when a previous save failed. Offer to
-          // restore it instead of silently keeping the (older) disk content.
-          const draft = readDraftBackup(file.id);
-          if (draft !== null) {
-            if (draft === text) {
-              clearDraftBackup(file.id);
-            } else {
-              useAppStore.getState().setPendingDraftRestore({
-                fileId: file.id,
-                fileName: file.name,
-                draftContent: draft,
-              });
-            }
-          }
-        }
-      } catch (e) {
-        if (!isCurrentDocument()) return;
-        console.error("Failed to read file:", file.path, e);
-        showNotification(
-          t(settings.language, "notifications_failedToReadFile", {
-            name: file.name,
-          }),
-          "error",
-        );
-        closeTab(file.id);
-        if (
-          previousId &&
-          previousId !== file.id &&
-          previousContent !== undefined
-        ) {
-          addTab(previousId, previousContent);
-          if (previousSaved !== undefined) {
-            markAsSaved(previousId, previousSaved);
-          }
-          setCurrentFilePath(previousPath);
-        }
-      }
-    },
-    [
-      readFile,
-      addTab,
-      closeTab,
-      setCurrentFilePath,
-      updateTabContent,
-      markAsSaved,
-      showNotification,
-      settings.language,
-    ],
+    (file: FileNode) =>
+      openDocumentSession(file, {
+        readFile,
+        language: settings.language,
+        showNotification,
+      }),
+    [readFile, settings.language, showNotification],
   );
 
   const handleCreateFile = useCallback(

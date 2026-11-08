@@ -29,3 +29,15 @@ Keep secrets, local environment files, generated reports, traces and personal
 filesystem paths out of tracked files. Use synthetic examples in fixtures.
 Preserve license notices and project attribution. Do not imply external
 certification or review that has not actually occurred.
+
+## Document workflow boundary
+
+`src/services/documents` owns open/read/restore, external reload, staged-edit
+identity checks and close coordination. `sessionSnapshot` exposes one read-only
+`DocumentSession` view, with vault/path identity and an immutable-buffer revision;
+it never stores another copy of the text. `src/store/documentBufferStore.ts`
+retains map-shaped compatibility storage for existing attachment/path-remap APIs.
+Those fields represent one open document, not restored multi-tab support. New
+workflow code should consume the session contract. Save queues and atomic disk
+writes remain in `services/filesystem`; editor history remains in CodeMirror with
+the existing store fallback for external edits.

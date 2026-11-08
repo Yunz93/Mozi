@@ -1,3 +1,4 @@
+import { captureDocumentSession } from "../services/documents/sessionSnapshot";
 import { useShallow } from "zustand/react/shallow";
 import { useCallback, useState } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
@@ -268,6 +269,7 @@ export function useAIAnalyze() {
     if (useAppStore.getState().isAnalyzing) return;
     if (!content || !activeTabId) return;
     // 准备配置期间也占用任务状态，避免重复点击发起多个增强请求。
+    const source = captureDocumentSession(useAppStore.getState());
     setAnalyzing(true);
     setAiEnhanceStage("preparing");
     let taskLanguage = useAppStore.getState().settings.language;
@@ -309,6 +311,7 @@ export function useAIAnalyze() {
       // review it in a dialog before applying.
       useAppStore.getState().setPendingAiResult({
         fileId: activeTabId,
+        source,
         previousContent: content,
         newContent,
       });

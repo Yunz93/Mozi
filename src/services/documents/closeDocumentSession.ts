@@ -1,6 +1,6 @@
-import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
+import { flushActiveEditorPendingChanges } from "../../utils/editorSelectionBridge";
 
-export interface CloseTabSafelyOptions {
+export interface CloseDocumentSessionOptions {
   tabId: string | null | undefined;
   forceSave: (
     content?: string,
@@ -15,8 +15,8 @@ export interface CloseTabSafelyOptions {
 /**
  * 关闭当前文档：有未保存内容时先强制保存，失败则拦截关闭。
  */
-export async function closeTabSafely(
-  options: CloseTabSafelyOptions,
+export async function closeDocumentSession(
+  options: CloseDocumentSessionOptions,
 ): Promise<boolean> {
   const tabId = options.tabId;
   if (!tabId) return false;

@@ -1,3 +1,4 @@
+import type { DocumentSessionToken } from "../services/documents/sessionSnapshot";
 import type { AppSettings, ImageHostingConfig, Notification } from "../types";
 import { ViewMode } from "../types";
 import {
@@ -45,12 +46,14 @@ function normalizeLanguage(language: unknown): AppSettings["language"] {
  * UI store state interface
  */
 export interface PendingDraftRestore {
+  source?: DocumentSessionToken;
   fileId: string;
   fileName: string;
   draftContent: string;
 }
 
 export interface PendingAiResult {
+  source?: DocumentSessionToken;
   fileId: string;
   previousContent: string;
   newContent: string;

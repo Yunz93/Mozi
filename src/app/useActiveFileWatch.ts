@@ -1,3 +1,4 @@
+import { reloadDocumentSession } from "../services/documents/reloadDocumentSession";
 import { useEffect, useRef } from "react";
 import { useAppStore } from "../store/appStore";
 import { findFileInTree } from "./appShellUtils";
@@ -9,7 +10,6 @@ import {
   isMarkdownFile,
   isPreviewOnlyFile,
 } from "../utils/fileTypes";
-import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
 
 interface UseActiveFileWatchOptions {
   activeTabId: string | null;
@@ -35,55 +35,6 @@ function shouldWatchTabContent(node: FileNode | undefined): boolean {
     isExcalidrawFile(node.name) ||
     isPreviewOnlyFile(node.name)
   );
-}
-
-async function reloadTabFromDisk(
-  tabId: string,
-  readFile: (file: FileNode) => Promise<string>,
-  showNotification: (message: string, type: "success" | "error") => void,
-  t: (key: TranslationKey, vars?: Record<string, string | number>) => string,
-  options?: { notifyReload?: boolean },
-): Promise<void> {
-  flushActiveEditorPendingChanges();
-  const state = useAppStore.getState();
-  if (state.hasUnsavedChanges(tabId)) {
-    showNotification(t("notifications_fileChangedOnDisk"), "error");
-    return;
-  }
-
-  const node = findFileInTree(state.files, tabId);
-  if (!node || node.type !== "file") return;
-
-  try {
-    const latestContent = await readFile(node);
-    const stateAfterRead = useAppStore.getState();
-
-    if (stateAfterRead.hasUnsavedChanges(tabId)) {
-      showNotification(t("notifications_fileChangedOnDisk"), "error");
-      return;
-    }
-
-    const currentCached = stateAfterRead.fileContents[tabId];
-    if (currentCached === latestContent) return;
-
-    const stateBeforeUpdate = useAppStore.getState();
-    if (stateBeforeUpdate.hasUnsavedChanges(tabId)) {
-      showNotification(t("notifications_fileChangedOnDisk"), "error");
-      return;
-    }
-
-    // Only reload the open document when content is already cached.
-    if (stateBeforeUpdate.fileContents[tabId] === undefined) return;
-
-    stateBeforeUpdate.setContentForFile(tabId, latestContent, true);
-    stateBeforeUpdate.markAsSaved(tabId);
-    if (options?.notifyReload !== false) {
-      showNotification(t("notifications_fileReloaded"), "success");
-    }
-  } catch (error) {
-    console.error("Failed to reload file from disk:", error);
-    showNotification(t("notifications_reloadFileFailed"), "error");
-  }
 }
 
 export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
@@ -156,9 +107,15 @@ export function useActiveFileWatch(options: UseActiveFileWatchOptions): void {
         }
         if (event?.type !== "modified") return;
 
-        await reloadTabFromDisk(watchedTabId, readFile, showNotification, t, {
-          notifyReload: true,
-        });
+        await reloadDocumentSession(
+          watchedTabId,
+          readFile,
+          showNotification,
+          t,
+          {
+            notifyReload: true,
+          },
+        );
       });
 
       if (disposed) {
