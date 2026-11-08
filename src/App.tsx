@@ -435,13 +435,21 @@ const App: React.FC = () => {
     watchFile,
     t,
   });
+  const { invalidateFile, rebuildLinkIndex } = useVaultIndexLifecycle();
+  const handleExternalFileModified = useCallback(
+    (path: string) => {
+      void invalidateFile(path, undefined, { readFromDisk: true });
+    },
+    [invalidateFile],
+  );
   useKnowledgeBaseWatch({
+    onFileModified: handleExternalFileModified,
+    onRescan: rebuildLinkIndex,
     rootFolderPath,
     watchDirectory,
     showNotification,
     t,
   });
-  useVaultIndexLifecycle();
   const {
     pendingCleanupAttachments,
     confirmCleanupUnusedAttachments,

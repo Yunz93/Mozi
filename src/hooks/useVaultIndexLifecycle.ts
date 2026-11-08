@@ -103,7 +103,11 @@ function isValidChunkSnapshot(
  */
 export function useVaultIndexLifecycle(): {
   rebuildLinkIndex: () => Promise<void>;
-  invalidateFile: (path: string, content?: string) => Promise<void>;
+  invalidateFile: (
+    path: string,
+    content?: string,
+    options?: { readFromDisk?: boolean },
+  ) => Promise<void>;
 } {
   const rootFolderPath = useAppStore((s) => s.rootFolderPath);
   const files = useAppStore((s) => s.files);
@@ -523,7 +527,11 @@ export function useVaultIndexLifecycle(): {
   ]);
 
   const invalidateFile = useCallback(
-    async (path: string, content?: string) => {
+    async (
+      path: string,
+      content?: string,
+      options?: { readFromDisk?: boolean },
+    ) => {
       const vaultRoot = useAppStore.getState().rootFolderPath;
       if (!vaultRoot) return;
       const generation = generationRef.current;
@@ -553,7 +561,10 @@ export function useVaultIndexLifecycle(): {
           const fs = await getFileSystem();
           if (!isCurrent()) return;
           const fileContent = isMarkdown
-            ? (content ?? state.fileContents[path] ?? (await fs.readFile(path)))
+            ? (content ??
+              (options?.readFromDisk
+                ? await fs.readFile(path)
+                : (state.fileContents[path] ?? (await fs.readFile(path)))))
             : "";
           if (!isCurrent()) return;
           const next = await reindexFileContents({

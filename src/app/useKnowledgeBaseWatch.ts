@@ -17,6 +17,8 @@ import { remapEditorDocumentPaths } from "../utils/editorSelectionBridge";
 
 interface UseKnowledgeBaseWatchOptions {
   rootFolderPath: string | null;
+  onRescan?: () => void;
+  onFileModified?: (path: string) => void;
   watchDirectory: (
     dirPath: string,
     callback: (event: DirectoryWatchEvent) => void,
@@ -28,7 +30,14 @@ interface UseKnowledgeBaseWatchOptions {
 export function useKnowledgeBaseWatch(
   options: UseKnowledgeBaseWatchOptions,
 ): void {
-  const { rootFolderPath, watchDirectory, showNotification, t } = options;
+  const {
+    rootFolderPath,
+    watchDirectory,
+    showNotification,
+    t,
+    onFileModified,
+    onRescan,
+  } = options;
 
   useEffect(() => {
     if (!rootFolderPath) return;
@@ -45,6 +54,10 @@ export function useKnowledgeBaseWatch(
           return;
         }
 
+        if (event.type === "modified") {
+          event.paths.forEach((path) => onFileModified?.(path));
+          return;
+        }
         const state = useAppStore.getState();
         const pathRemaps = detectOpenTabPathRemaps(
           state.files,
@@ -106,6 +119,7 @@ export function useKnowledgeBaseWatch(
             previousFiles,
           ),
         );
+        if (event.rescan) onRescan?.();
       });
 
       if (disposed) {
@@ -125,5 +139,12 @@ export function useKnowledgeBaseWatch(
         unwatch = null;
       }
     };
-  }, [rootFolderPath, showNotification, t, watchDirectory]);
+  }, [
+    rootFolderPath,
+    showNotification,
+    t,
+    watchDirectory,
+    onFileModified,
+    onRescan,
+  ]);
 }
