@@ -1,5 +1,5 @@
 import { buildVaultIndexes } from "../services/vault/buildVaultIndexes";
-import { readIndexFile } from "../services/vault/readIndexFile";
+import { readBackgroundFile } from "../services/filesystem/readBackgroundFile";
 import { toForwardSlashes as normalizePath } from "../utils/pathHelpers";
 import { useCallback, useEffect, useRef } from "react";
 import { useAppStore } from "../store/appStore";
@@ -297,7 +297,7 @@ export function useVaultIndexLifecycle(): {
             paths: toAdd,
             files: state.files,
             vaultRoot,
-            readFile: (path) => readIndexFile(fs, path),
+            readFile: (path) => readBackgroundFile(fs, path),
             reresolveAll: true,
           });
         }
@@ -320,7 +320,7 @@ export function useVaultIndexLifecycle(): {
             snapshot: chunkIndex,
             paths: toAdd,
             vaultRoot,
-            readFile: (path) => readIndexFile(fs, path),
+            readFile: (path) => readBackgroundFile(fs, path),
             excludeGlobs: useAppStore.getState().settings.indexExcludeGlobs,
           });
         }
@@ -376,7 +376,7 @@ export function useVaultIndexLifecycle(): {
         const { linkIndex: snapshot, chunkIndex } = await buildVaultIndexes({
           files: state.files,
           vaultRoot,
-          readFile: (path) => readIndexFile(fs, path),
+          readFile: (path) => readBackgroundFile(fs, path),
           excludeGlobs: state.settings.indexExcludeGlobs,
           onProgress: (done, total, currentPath) => {
             if (!isCurrent()) return;
@@ -508,7 +508,7 @@ export function useVaultIndexLifecycle(): {
           const chunkIndex = await buildFullChunkIndex({
             files: state.files,
             vaultRoot,
-            readFile: (path) => readIndexFile(fs, path),
+            readFile: (path) => readBackgroundFile(fs, path),
             excludeGlobs: state.settings.indexExcludeGlobs,
             shouldCancel: () => !isCurrent(),
           });
@@ -568,9 +568,9 @@ export function useVaultIndexLifecycle(): {
           const fileContent = isMarkdown
             ? (content ??
               (options?.readFromDisk
-                ? await readIndexFile(fs, path)
+                ? await readBackgroundFile(fs, path)
                 : (state.fileContents[path] ??
-                  (await readIndexFile(fs, path)))))
+                  (await readBackgroundFile(fs, path)))))
             : "";
           if (!isCurrent()) return;
           const next = await reindexFileContents({
