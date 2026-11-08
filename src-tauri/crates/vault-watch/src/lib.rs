@@ -190,6 +190,12 @@ impl Broker {
             .iter()
             .filter_map(|c| scope.filter(c))
             .collect();
+        // Some backends stop silently when the watched root itself is deleted.
+        // Probe just the root metadata at replay time (never walk the tree).
+        if !key.path.is_dir() {
+            page.rescan_required = true;
+            page.error = Some("Watch root is unavailable".into());
+        }
         Ok(page)
     }
     pub fn unsubscribe(&self, id: &str) {
@@ -414,6 +420,9 @@ fn enqueue(shared: &Weak<Shared>, key: &Key, event: notify::Result<Event>) {
                                     }
                                     EventKind::Remove(_)
                                     | EventKind::Modify(ModifyKind::Name(RenameMode::From)) => {
+                                        Kind::Removed
+                                    }
+                                    _ if matches!(std::fs::symlink_metadata(&path), Err(ref e) if e.kind() == std::io::ErrorKind::NotFound) => {
                                         Kind::Removed
                                     }
                                     _ => Kind::Modified,
