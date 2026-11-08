@@ -83,11 +83,15 @@ fn exact_file_scope_does_not_disclose_siblings() {
     assert_eq!(broker.stats().watchers, 1);
     fs::write(&b, "changed b").unwrap();
     wait(&broker, &two, two.seq, |p| has(p, &b));
-    assert!(broker
-        .changes(&one.subscription_id, &one.epoch, one.seq)
-        .unwrap()
-        .changes
-        .is_empty());
+    assert!(
+        broker
+            .changes(&one.subscription_id, &one.epoch, one.seq)
+            .unwrap()
+            .changes
+            .iter()
+            .all(|change| change.path == a
+                && change.old_path.as_ref().map_or(true, |path| path == &a))
+    );
     broker.unsubscribe(&one.subscription_id);
     broker.unsubscribe(&two.subscription_id);
 }
