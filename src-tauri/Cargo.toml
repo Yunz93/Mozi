@@ -18,7 +18,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 cc = "1"
 
+[workspace]
+members = ["crates/vault-watch"]
+resolver = "2"
+
 [dependencies]
+mozi-vault-watch = { path = "crates/vault-watch" }
 base64 = "0.22"
 chrono = "0.4"
 iana-time-zone = "0.1"

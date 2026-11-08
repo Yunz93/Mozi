@@ -9,6 +9,7 @@ mod sample_notes;
 mod secure_settings;
 mod system_fonts;
 mod tasks;
+mod vault_watch;
 mod url_encode;
 mod weread;
 mod weread_skill;
@@ -874,6 +875,11 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             ping,
+            vault_watch::vault_watch_mode,
+            vault_watch::subscribe_vault,
+            vault_watch::get_vault_changes,
+            vault_watch::unsubscribe_vault,
+            vault_watch::vault_watch_stats,
             take_opened_files,
             open_file_in_new_window,
             open_new_window,
@@ -910,8 +916,16 @@ pub fn run() {
             tasks::task_calendar_flush,
             tasks::task_calendar_keep_background
         ])
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Started {
+                vault_watch::release_window(webview.app_handle(), webview.window().label());
+            }
+        })
         .on_window_event(|window, event| {
             match event {
+                tauri::WindowEvent::Destroyed => {
+                    vault_watch::release_window(window.app_handle(), window.label());
+                }
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     if let Some(webview) = webview_for_window_event(window) {
                         let _ = preserve_logical_size_on_monitor_change(&webview);
@@ -989,6 +1003,9 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            if let Err(error) = vault_watch::initialize(app.handle()) {
+                log::warn!("Native watch service unavailable; keeping polling: {error}");
+            }
             tasks::initialize(app.handle()).map_err(std::io::Error::other)?;
             if cfg!(debug_assertions) {
                 app.handle().plugin(
