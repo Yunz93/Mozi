@@ -74,6 +74,18 @@ jobs:
         run: node --test scripts/desktop/safety.test.mjs
       - name: Check test/release boundary
         run: node scripts/desktop/check-boundary.mjs
+      - name: Restore Windows NSIS tool cache
+        if: runner.os == 'Windows'
+        id: nsis_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/AppData/Local/tauri/NSIS
+          key: nsis-${{ runner.os }}-${{ runner.arch }}-3.11-utils-0.5.3-v1
+      - name: Fetch and verify Windows packaging tools through the Release API
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pwsh -File scripts/desktop/prepare-nsis.ps1
       - name: Build isolated macOS automation app
         if: runner.os == 'macOS'
         run: npm run tauri -- build --features desktop-e2e --bundles app --no-sign --config src-tauri/tauri.desktop-e2e.conf.json
@@ -122,3 +134,9 @@ jobs:
           path: .perf/desktop
           include-hidden-files: true
           if-no-files-found: warn
+      - name: Save verified Windows NSIS tool cache even after test failures
+        if: always() && runner.os == 'Windows' && steps.nsis_cache.outputs.cache-hit != 'true' && steps.nsis_cache.outputs.cache-primary-key != ''
+        uses: actions/cache/save@v4
+        with:
+          path: ~/AppData/Local/tauri/NSIS
+          key: ${{ steps.nsis_cache.outputs.cache-primary-key }}

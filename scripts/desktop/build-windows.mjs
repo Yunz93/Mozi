@@ -9,7 +9,7 @@ for (let attempt = 1; attempt <= 3; attempt++) {
     process.execPath,
     [
       resolve("node_modules/@tauri-apps/cli/tauri.js"),
-      "build",
+      attempt === 1 ? "build" : "bundle",
       "--bundles",
       "nsis",
       "--no-sign",
