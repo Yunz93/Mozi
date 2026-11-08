@@ -174,6 +174,25 @@ export async function session(mode = "native", count = 100) {
       close,
     };
   } catch (error) {
+    if (provider === "official" && child.pid) {
+      try {
+        execFileSync(
+          "powershell.exe",
+          [
+            "-NoProfile",
+            "-File",
+            "scripts/desktop/windows-diagnostics.ps1",
+            "-ApplicationPid",
+            String(child.pid),
+            "-OutputDirectory",
+            output,
+          ],
+          { timeout: 20_000, stdio: "pipe" },
+        );
+      } catch {
+        /* Preserve the original driver/startup error. */
+      }
+    }
     await driver
       .screenshot(join(output, `${name}-startup-failed.png`))
       .catch(() => {});
