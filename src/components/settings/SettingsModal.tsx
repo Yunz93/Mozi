@@ -134,22 +134,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!isOpen) return;
 
     const previousFocus = document.activeElement as HTMLElement | null;
+    const focusRoots = () => {
+      const dialog = dialogRef.current;
+      if (!dialog) return [];
+      // 下拉选项通过 Portal 挂到 body，用控件关联的菜单 ID 确认归属。
+      const menuIds = new Set(
+        Array.from(
+          dialog.querySelectorAll<HTMLElement>(
+            '[aria-haspopup="listbox"][aria-controls]',
+          ),
+        )
+          .filter((trigger) => trigger.closest('[role="dialog"]') === dialog)
+          .map((trigger) => trigger.getAttribute("aria-controls")),
+      );
+      const menus = Array.from(
+        document.querySelectorAll<HTMLElement>(".app-select-menu"),
+      ).filter((menu) => menuIds.has(menu.id));
+      return [dialog, ...menus];
+    };
+    const containsFocus = (element: Node | null) =>
+      focusRoots().some((root) => root.contains(element));
     const focusable = () =>
-      Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]',
-        ) ?? [],
-      ).filter((element) => element.getClientRects().length > 0);
+      focusRoots()
+        .flatMap((root) =>
+          Array.from(
+            root.querySelectorAll<HTMLElement>(
+              'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]',
+            ),
+          ),
+        )
+        .filter((element) => element.getClientRects().length > 0);
     const frame = requestAnimationFrame(() =>
       (focusable()[0] ?? dialogRef.current)?.focus({ preventScroll: true }),
     );
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isImeComposingEvent(event)) return;
       if (event.key === "Tab") {
-        // Portal menus and nested dialogs manage their own keyboard interaction.
+        // 仅处理当前设置窗口及其菜单，其他弹窗保留自己的键盘行为。
         const target = event.target as HTMLElement;
         if (
-          !dialogRef.current?.contains(target) &&
+          !containsFocus(target) &&
           target.closest?.('.app-select-menu, [role="dialog"]')
         )
           return;
@@ -158,7 +182,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const last = controls[controls.length - 1];
         if (
           !first ||
-          !dialogRef.current?.contains(document.activeElement) ||
+          !containsFocus(document.activeElement) ||
           (event.shiftKey
             ? document.activeElement === first
             : document.activeElement === last)
