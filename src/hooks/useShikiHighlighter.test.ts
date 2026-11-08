@@ -60,7 +60,7 @@ afterEach(() => {
 
 describe("createShikiHighlighter", () => {
   it("enables the forgiving JS regex engine for WKWebView/JavaScriptCore compatibility", async () => {
-    await createShikiHighlighter();
+    await createShikiHighlighter(["javascript"]);
 
     expect(mockCreateJavaScriptRegexEngine).toHaveBeenCalledWith({
       forgiving: true,
@@ -68,7 +68,10 @@ describe("createShikiHighlighter", () => {
   });
 
   it("still creates a highlighter when an individual language chunk fails to load", async () => {
-    const highlighter = await createShikiHighlighter();
+    const highlighter = await createShikiHighlighter([
+      "javascript",
+      "typescript",
+    ]);
 
     expect(highlighter).not.toBeNull();
     expect(mockCreateHighlighterCore).toHaveBeenCalledTimes(1);
