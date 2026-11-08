@@ -11,7 +11,7 @@ import {
   lstat,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 const exec = promisify(execFile);
@@ -148,7 +148,7 @@ export async function stop(child) {
 export async function processSnapshot() {
   if (process.platform === "win32") {
     const script =
-      "@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize,ExecutablePath,Name) | ConvertTo-Json -Compress";
+      "@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize,Name) | ConvertTo-Json -Compress";
     const { stdout } = await exec(
       "powershell.exe",
       ["-NoProfile", "-NonInteractive", "-Command", script],
@@ -159,7 +159,6 @@ export async function processSnapshot() {
       parent: p.ParentProcessId,
       bytes: Number(p.WorkingSetSize),
       name: p.Name,
-      executable: p.ExecutablePath,
     }));
   }
   const { stdout } = await exec("ps", ["-axo", "pid=,ppid=,rss=,comm="], {
@@ -174,21 +173,14 @@ export async function processSnapshot() {
             parent: Number(match[2]),
             bytes: Number(match[3]) * 1024,
             name: basename(match[4]),
-            executable: match[4],
           },
         ]
       : [];
   });
 }
 
-export async function sampleMemory(appPid, beforePids, binary) {
+export async function sampleMemory(appPid, beforePids) {
   const processes = await processSnapshot();
-  if (!appPid)
-    appPid = processes.find(
-      (p) =>
-        p.executable &&
-        resolve(p.executable).toLowerCase() === resolve(binary).toLowerCase(),
-    )?.pid;
   if (!appPid) throw new Error("Cannot attribute the application process");
   const owned = new Set([appPid]);
   let changed = true;

@@ -9,8 +9,7 @@ if ($result.ExitCode -notin @(0, 3010)) { throw "Installer failed: $($result.Exi
 $application = @(Get-ChildItem $installation -Filter '*.exe' | Where-Object { $_.Name -notmatch 'uninstall|unins|卸载' })
 if ($application.Count -ne 1) { throw 'Expected exactly one installed application binary' }
 
-# Select an installed runtime and explicitly use that same runtime in the app,
-# so the driver cannot accidentally target Edge browser's unrelated version.
+# Select and record the actual WebView2 runtime for stock and isolated builds.
 $locations = @(
     (Join-Path ${env:ProgramFiles(x86)} 'Microsoft/EdgeWebView/Application'),
     (Join-Path $env:ProgramFiles 'Microsoft/EdgeWebView/Application'),
@@ -25,23 +24,14 @@ $runtimes = @(foreach ($location in $locations) {
 })
 $runtime = $runtimes | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
 if (-not $runtime) { throw 'WebView2 runtime was not installed' }
-$tools = Join-Path $env:RUNNER_TEMP 'mozi-webdriver'
-New-Item $tools -ItemType Directory -Force | Out-Null
-$archive = Join-Path $tools 'edgedriver.zip'
-Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $archive
-Expand-Archive $archive -DestinationPath $tools -Force
-$driver = Join-Path $tools 'msedgedriver.exe'
-& $driver --version
-
 @(
-    "MOZI_DESKTOP_BINARY=$($application[0].FullName)",
-    'MOZI_DESKTOP_DRIVER=official',
-    "MOZI_EDGE_DRIVER=$driver",
+    "MOZI_STOCK_BINARY=$($application[0].FullName)",
     "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER=$($runtime.FullName)"
 ) | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
 
 # Only package/runtime metadata, never profile data, is uploaded.
 New-Item '.perf/desktop' -ItemType Directory -Force | Out-Null
+git diff -- src-tauri/Cargo.toml | Set-Content '.perf/desktop/build-manifest.diff' -Encoding utf8
 @{ installerExitCode = $result.ExitCode; installer = $installer[0].Name;
    application = $application[0].Name; webview2 = $runtime.Name;
    installerSha256 = (Get-FileHash $installer[0].FullName -Algorithm SHA256).Hash;

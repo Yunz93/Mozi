@@ -33,11 +33,10 @@ export class DesktopDriver {
       throw new Error(`${method} ${path}: ${JSON.stringify(data.value)}`);
     return data.value;
   }
-  async start(provider = "embedded", debuggerAddress) {
-    const capabilities =
-      provider === "official"
-        ? { browserName: "webview2", "ms:edgeOptions": { debuggerAddress } }
-        : { "wdio:tauriServiceOptions": { windowLabel: "main" } };
+  async start() {
+    const capabilities = {
+      "wdio:tauriServiceOptions": { windowLabel: "main" },
+    };
     const result = await this.request("POST", "/session", {
       capabilities: { alwaysMatch: capabilities },
     });

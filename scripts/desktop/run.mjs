@@ -23,7 +23,7 @@ const binary = resolve(
   process.env.MOZI_DESKTOP_BINARY ??
     "src-tauri/target/release/mozi-desktop-e2e",
 );
-const provider = process.env.MOZI_DESKTOP_DRIVER ?? "embedded";
+const provider = "embedded";
 const output = resolve(process.env.MOZI_DESKTOP_OUTPUT ?? ".perf/desktop");
 // Match native canonical identities (notably /var -> /private/var on macOS).
 const root = await realpath(await mkdtemp(join(tmpdir(), "mozi-desktop-")));
@@ -56,9 +56,7 @@ const report = {
     .update(await readFile(binary))
     .digest("hex"),
   scope:
-    provider === "embedded"
-      ? "optimized test build, real WebView and Rust filesystem; no backend mocks"
-      : "release configuration executable, native WebView2 driver",
+    "optimized test build, real WebView and Rust filesystem; no backend mocks",
   cases: [],
   performance: [],
   limitations: [
@@ -77,7 +75,7 @@ async function save() {
 export async function session(mode = "native", count = 100) {
   const name = `session-${++sequence}`;
   const vault = await makeVault(join(root, name, "vault"), count);
-  await resetProfile(provider === "official");
+  await resetProfile();
   const beforePids = new Set((await processSnapshot()).map((p) => p.pid));
   const port = await freePort();
   const env = {
@@ -85,52 +83,16 @@ export async function session(mode = "native", count = 100) {
     RUST_BACKTRACE: "1",
     TAURI_WEBDRIVER_PORT: String(port),
   };
-  let debuggerAddress;
-  if (provider === "official") {
-    const debuggingPort = await freePort();
-    debuggerAddress = `127.0.0.1:${debuggingPort}`;
-    env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = [
-      process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS,
-      `--remote-debugging-port=${debuggingPort}`,
-    ]
-      .filter(Boolean)
-      .join(" ");
-  }
   const child = launch(binary, [], env, join(output, `${name}-app.log`));
-  let nativeDriver;
   const driver = new DesktopDriver(port);
   const close = async () => {
     try {
       await driver.quit();
     } finally {
-      await stop(nativeDriver);
       await stop(child);
     }
   };
   try {
-    if (provider === "official") {
-      await until(
-        async () => {
-          if (child.launchError) throw child.launchError;
-          if (child.exitCode !== null)
-            throw new Error(`Application exited ${child.exitCode}`);
-          const response = await fetch(
-            `http://${debuggerAddress}/json/version`,
-            { signal: AbortSignal.timeout(2000) },
-          );
-          return (await response.json()).webSocketDebuggerUrl;
-        },
-        "Installed application's WebView2 debugging endpoint did not become ready",
-        45_000,
-        150,
-      );
-      nativeDriver = launch(
-        process.env.MOZI_EDGE_DRIVER,
-        ["--port", String(port)],
-        {},
-        join(output, `${name}-driver.log`),
-      );
-    }
     await until(
       async () => {
         if (child.launchError) throw child.launchError;
@@ -142,7 +104,7 @@ export async function session(mode = "native", count = 100) {
       45_000,
       150,
     );
-    await driver.start(provider, debuggerAddress);
+    await driver.start();
     console.log(`READY ${name} ${mode} ${count} notes`);
     await until(
       async () => (await driver.body()).length > 10,
@@ -174,14 +136,13 @@ export async function session(mode = "native", count = 100) {
       output,
       mode,
       child,
-      binary,
       beforePids,
       restoreMs,
       started,
       close,
     };
   } catch (error) {
-    if (provider === "official" && child.pid) {
+    if (process.platform === "win32" && child.pid) {
       try {
         execFileSync(
           "powershell.exe",

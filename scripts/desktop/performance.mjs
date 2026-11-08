@@ -13,7 +13,7 @@ import {
 
 /** Measurements include WebDriver round trips and background work; they are not SLOs. */
 export async function measure(context, count, windows) {
-  const { driver: d, vault, child, beforePids, binary, output, mode } = context;
+  const { driver: d, vault, child, beforePids, output, mode } = context;
   const index = await persistedIndex(context);
   assert.equal(
     Object.keys(index.byPath).length,
@@ -32,7 +32,7 @@ export async function measure(context, count, windows) {
       return stats.watchers === 1 && stats.subscriptions === windows * 2 + 1;
     }, "Unexpected watcher ownership during measurement");
   await delay(8000);
-  const memory = await sampleMemory(child.pid, beforePids, binary);
+  const memory = await sampleMemory(child.pid, beforePids);
   const renderedRows = [];
   for (const handle of handles) {
     await d.switch(handle);

@@ -4,16 +4,16 @@
 
 在 GitHub 托管的 Windows、macOS 虚拟机上启动实际桌面程序，复用同一套文件系统、交互和多窗口用例。Linux 使用 Xvfb 桌面作为回归基线。此环境缺少 KVM；不在 Linux 容器中模拟 macOS 或 Windows 的系统 WebView。
 
-| Runner                        | 程序与驱动                                                                          | 覆盖范围                                            |
-| ----------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `windows-2025`                | 无测试 feature 的 NSIS 安装程序；安装后使用匹配 WebView2 版本的 EdgeDriver 附加连接 | 安装、实际 WebView2、Rust 后端、完整交互            |
-| `macos-15` / `macos-15-intel` | 独立标识的优化测试 `.app`，显式启用 `desktop-e2e`                                   | ARM64 / Intel 的实际 WKWebView、Rust 后端、完整交互 |
-| 同上 macOS runner             | 再构建无测试 feature 的普通 `.app`                                                  | 原应用标识、原生窗口启动、测试端口关闭              |
-| `ubuntu-24.04`                | 优化测试程序、WebKitGTK、Xvfb / Openbox / D-Bus                                     | 同协议的 Linux 回归                                 |
+| Runner                        | 程序与驱动                                                           | 覆盖范围                                                                         |
+| ----------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `windows-2025`                | 无测试 feature 的 NSIS 安装程序；另构建独立标识的 `desktop-e2e` 程序 | 普通包安装／响应窗口／测试端口关闭，测试构建的真实 WebView2、Rust 后端和完整交互 |
+| `macos-15` / `macos-15-intel` | 独立标识的优化测试 `.app`，显式启用 `desktop-e2e`                    | ARM64 / Intel 的实际 WKWebView、Rust 后端、完整交互                              |
+| 同上 macOS runner             | 再构建无测试 feature 的普通 `.app`                                   | 原应用标识、原生窗口启动、测试端口关闭                                           |
+| `ubuntu-24.04`                | 优化测试程序、WebKitGTK、Xvfb / Openbox / D-Bus                      | 同协议的 Linux 回归                                                              |
 
-macOS 的嵌入式驱动使用固定版本 `tauri-plugin-wdio-webdriver = 1.5.1`。Node 客户端直接发送 W3C WebDriver 请求；不加载 IPC 模拟层，文件读写、监听、权限和索引都运行真实实现。Windows 的 EdgeDriver 从 Microsoft 官方站点按实际 WebView2 版本下载，并显式选定该运行时，避免浏览器与驱动版本不一致。
+嵌入式驱动使用固定版本 `tauri-plugin-wdio-webdriver = 1.5.1`。Node 客户端直接发送 W3C WebDriver 请求；不加载 IPC 模拟层，文件读写、监听、权限和索引都运行真实实现。Windows 选择并记录实际 WebView2 运行时，两种构建使用同一份前端资源。轮询回退用例观察真实回调中的订阅信息，并通过原有权限接口筛选有效的窗口令牌；不替换命令或响应。
 
-Windows 使用 Microsoft 文档中的[附加连接方式](https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/webdriver#step-4b-attaching-microsoft-edge-webdriver-to-a-running-webview2-app)：先启动已安装程序，再通过 `debuggerAddress` 连接，避免依赖 EdgeDriver 自动启动时的 `DevToolsActivePort` 文件发现。调试端口只通过测试子进程环境启用。
+实测 Windows Server 2025 runner 上的普通程序可以渲染和响应，但原生 EdgeDriver 的自动启动与附加连接均无法建立调试连接。因此 Windows 与 macOS 都以隔离测试构建完成交互验收，普通程序另过安装／原生窗口／测试驱动排除检查。避免通过降级 WebView2 来绕过验收差异。
 
 实施顺序：先验证驱动连接，再执行 25 项用例和性能采样，最后检查普通发布配置的程序。修复失败后，要求四个平台的任务通过再合并。
 
@@ -30,7 +30,7 @@ Windows 使用 Microsoft 文档中的[附加连接方式](https://learn.microsof
 
 ## 运行与证据
 
-工作流：`.github/workflows/desktop-acceptance.yml`。每个平台上传独立的 `desktop-<runner>` artifact，包含 `results.json`、截图和应用日志；Windows 另含安装／运行时元数据，macOS 另含 `macos-stock.json`。
+工作流：`.github/workflows/desktop-acceptance.yml`。每个平台上传独立的 `desktop-<runner>` artifact，包含 `results.json`、截图和应用日志；Windows 另含安装／运行时元数据与 `windows-stock.json`，macOS 另含 `macos-stock.json`。
 
 ```sh
 # 不需要图形桌面的保护测试
@@ -53,13 +53,13 @@ MOZI_DESKTOP_BINARY='src-tauri/target/release/bundle/macos/Mozi Desktop E2E.app/
 
 `MOZI_DESKTOP_PERFORMANCE=full` 扩大性能矩阵。`MOZI_DESKTOP_SUITE=bootstrap` 仅诊断驱动连接，不算完成验收。完整结果必须包含 25 项功能用例与 bootstrap，并以 `status: passed` 结束。
 
-结果中的源码 SHA、工作区是否修改、程序 SHA256、系统架构、UA、驱动能力和测试范围用于追溯。同一工作流可能包含测试构建和普通发布配置构建，不能把 macOS 测试包上的完整交互结果描述为已签名发布包的完整验收。
+结果中的源码 SHA、工作区是否修改、程序 SHA256、系统架构、UA、驱动能力和测试范围用于追溯。同一工作流包含测试构建和普通发布配置构建，不能把测试包上的完整交互结果描述为已签名发布包的完整验收。Windows 另记录构建工具对 Cargo manifest 的改写，保留构建来源差异。
 
 ## 隔离与发布边界
 
-- `desktop-e2e` 是可选 Rust feature，默认依赖图和发布工作流均不启用。检查脚本验证这一点；普通 macOS 程序再验证测试端口关闭。
+- `desktop-e2e` 是可选 Rust feature，默认依赖图和发布工作流均不启用。检查脚本验证这一点；普通 Windows 和 macOS 程序再验证测试端口关闭。
 - 测试程序使用独立应用标识。重置前必须匹配本工具创建的所有权标记；遇到既有未标记目录或符号链接立即拒绝。普通应用标识的重置只允许临时 GitHub Actions runner。
-- Linux 使用临时 XDG 目录；不改写 HOME，不修改代理、证书或账号配置。Windows 安装位置与驱动位于 runner 临时目录。
+- Linux 使用临时 XDG 目录；不改写 HOME，不修改代理、证书或账号配置。Windows 安装位置位于 runner 临时目录。
 - 只使用合成笔记与禁用模型下载的临时配置；不上传用户资料、数据库、凭据或完整进程参数。`.perf/` 是忽略目录，证据通过 CI artifact 提供。
 
 虚拟机结果之外仍需在正式发布流程验证签名、公证、Gatekeeper、更新器，以及在真实设备验证高 DPI、多显示器、输入法、休眠恢复、托盘／通知和 GPU／能耗。Windows Server runner 的结果不能替代 Windows 10／11 真机验收。

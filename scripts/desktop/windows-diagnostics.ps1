@@ -26,14 +26,14 @@ $windows = [System.Collections.Generic.List[object]]::new()
     return $true
 }, [IntPtr]::Zero) | Out-Null
 $application = Get-Process -Id $ApplicationPid -ErrorAction SilentlyContinue
-@{ processAlive = [bool]$application; responding = $application.Responding; windows = @($windows.ToArray()) } |
-    ConvertTo-Json -Depth 5 | Set-Content (Join-Path $OutputDirectory 'windows-startup-diagnostics.json') -Encoding utf8
+@{ processId = $ApplicationPid; processAlive = [bool]$application; responding = $application.Responding; windows = @($windows.ToArray()) } |
+    ConvertTo-Json -Depth 5 | Set-Content (Join-Path $OutputDirectory 'windows-native.json') -Encoding utf8
 $rectangle = $windows | Where-Object { $_.width -gt 100 -and $_.height -gt 100 } | Select-Object -First 1
 if ($rectangle) {
     $bitmap = [System.Drawing.Bitmap]::new($rectangle.width, $rectangle.height)
     $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
     try {
         $graphics.CopyFromScreen($rectangle.left, $rectangle.top, 0, 0, $bitmap.Size)
-        $bitmap.Save((Join-Path $OutputDirectory 'windows-startup-failed.png'))
+        $bitmap.Save((Join-Path $OutputDirectory 'windows-native.png'), [System.Drawing.Imaging.ImageFormat]::Png)
     } finally { $graphics.Dispose(); $bitmap.Dispose() }
 }

@@ -92,11 +92,19 @@ jobs:
       - name: Build Windows release-configuration installer
         if: runner.os == 'Windows'
         run: node scripts/desktop/build-windows.mjs
-      - name: Install Windows application and matching WebView2 driver
+      - name: Install Windows application and select WebView2 runtime
         if: runner.os == 'Windows'
         run: pwsh -File scripts/desktop/prepare-windows.ps1
+      - name: Launch installed Windows stock app and verify driver exclusion
+        if: runner.os == 'Windows'
+        run: node scripts/desktop/windows-stock.mjs
+      - name: Build isolated Windows automation app with the same frontend assets
+        if: runner.os == 'Windows'
+        run: npm run tauri -- build --features desktop-e2e --no-bundle --no-sign --config src-tauri/tauri.desktop-e2e.conf.json --config '{"build":{"beforeBuildCommand":""}}'
       - name: Windows desktop acceptance
         if: runner.os == 'Windows'
+        env:
+          MOZI_DESKTOP_BINARY: src-tauri/target/release/mozi-desktop-e2e.exe
         run: node scripts/desktop/run.mjs
       - name: Build macOS stock release-configuration application
         if: runner.os == 'macOS'

@@ -15,42 +15,40 @@ import { resetOwnedDirectory, TEST_ID } from "./process.mjs";
 import { DesktopDriver } from "./driver.mjs";
 import { instrumentSubscriptions } from "./subscription-probe.mjs";
 
-test("subscription probe preserves real replies and cannot revive a revoked token", async () => {
-  let completeRead;
+test("subscription probe preserves read-only IPC, callback values and retired callbacks", () => {
   const token = { subscriptionId: "owned", epoch: "epoch", seq: 1 };
   const denied = new Error("Denied by the real backend");
-  const bridge = {
-    invoke(command) {
-      assert.equal(this, bridge);
-      if (command === "subscribe_vault") return Promise.resolve(token);
-      if (command === "get_vault_changes")
-        return new Promise((accept) => {
-          completeRead = accept;
-        });
-      if (command === "denied") return Promise.reject(denied);
-      return Promise.resolve(null);
-    },
+  const bridge = { callbacks: new Map() };
+  const invoke = () => Promise.resolve(null);
+  Object.defineProperty(bridge, "invoke", { value: invoke });
+  const event = { payload: token };
+  const receiver = (value) => {
+    assert.equal(value, event);
+    return "real callback return";
   };
-  const original = bridge.invoke;
+  bridge.callbacks.set(1, receiver);
   // Serialize exactly as the desktop client does: no test-module closures.
   const install = Function(`return (${instrumentSubscriptions.toString()})`)();
   install(bridge);
-  assert.equal(await bridge.invoke("subscribe_vault", {}), token);
-  const read = bridge.invoke("get_vault_changes", {
-    subscriptionId: token.subscriptionId,
-    epoch: token.epoch,
-    afterSeq: 1,
-  });
-  await bridge.invoke("unsubscribe_vault", {
-    subscriptionId: token.subscriptionId,
-  });
-  const page = { seq: 2, changes: [] };
-  completeRead(page);
-  assert.equal(await read, page);
-  assert.deepEqual(bridge.__acceptanceSubscriptions.snapshot().tokens, []);
-  await assert.rejects(bridge.invoke("denied"), (error) => error === denied);
+  assert.equal(bridge.callbacks.get(1)(event), "real callback return");
+  const failure = (value) => {
+    assert.equal(value, token);
+    throw denied;
+  };
+  bridge.callbacks.set(2, failure);
+  assert.throws(
+    () => bridge.callbacks.get(2)(token),
+    (error) => error === denied,
+  );
+  assert.deepEqual(bridge.__acceptanceSubscriptions.snapshot().tokens, [
+    { subscriptionId: "owned", epoch: "epoch", afterSeq: 1 },
+  ]);
+  bridge.callbacks.delete(1);
   bridge.__acceptanceSubscriptions.restore();
-  assert.equal(bridge.invoke, original);
+  assert.equal(bridge.invoke, invoke);
+  assert.equal(bridge.callbacks.has(1), false);
+  assert.equal(bridge.callbacks.get(2), failure);
+  assert.equal(Object.hasOwn(bridge.callbacks, "set"), false);
 });
 
 test("profile reset preserves unowned data and refuses linked directories", async () => {
