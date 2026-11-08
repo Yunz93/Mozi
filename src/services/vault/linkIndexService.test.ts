@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { FileNode } from "../../types";
 import {
   buildFullLinkIndex,
@@ -29,6 +29,80 @@ const contents: Record<string, string> = {
 };
 
 describe("linkIndexService", () => {
+  it("bounds concurrent reads, preserves tree order, and isolates failed reads", async () => {
+    const files = Array.from({ length: 20 }, (_, i) =>
+      file(`/vault/n${i}.md`, `n${i}.md`),
+    );
+    const pending = new Map<
+      string,
+      (value: string | Promise<string>) => void
+    >();
+    let active = 0;
+    let maximum = 0;
+    const readFile = vi.fn((path: string) => {
+      maximum = Math.max(maximum, ++active);
+      return new Promise<string>((resolve) =>
+        pending.set(path, resolve),
+      ).finally(() => {
+        active--;
+      });
+    });
+    const building = buildFullLinkIndex({
+      files,
+      vaultRoot: "/vault",
+      readFile,
+    });
+    expect(readFile).toHaveBeenCalledTimes(8);
+    while (pending.size) {
+      const batch = [...pending].reverse();
+      pending.clear();
+      for (const [path, resolve] of batch)
+        resolve(
+          path === "/vault/n3.md"
+            ? Promise.reject(new Error("locked"))
+            : "[[n0]]",
+        );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    const index = await building;
+    expect(maximum).toBe(8);
+    expect(readFile).toHaveBeenCalledTimes(20);
+    expect(Object.keys(index.outbounds)).toEqual(
+      files.map((node) => node.path),
+    );
+    expect(index.outbounds["/vault/n3.md"]).toEqual([]);
+    expect(index.inbounds["/vault/n0.md"]).toEqual(
+      files
+        .filter((node) => node.path !== "/vault/n3.md")
+        .map((node) => node.path),
+    );
+  });
+
+  it("stops admitting reads after cancellation and reports completed work", async () => {
+    const files = Array.from({ length: 20 }, (_, i) =>
+      file(`/vault/n${i}.md`, `n${i}.md`),
+    );
+    const pending: (() => void)[] = [];
+    let cancelled = false;
+    const readFile = vi.fn(
+      () =>
+        new Promise<string>((resolve) => pending.push(() => resolve("[[n0]]"))),
+    );
+    const progress = vi.fn();
+    const building = buildFullLinkIndex({
+      files,
+      vaultRoot: "/vault",
+      readFile,
+      shouldCancel: () => cancelled,
+      onProgress: progress,
+    });
+    cancelled = true;
+    pending.forEach((resolve) => resolve());
+    const index = await building;
+    expect(readFile).toHaveBeenCalledTimes(8);
+    expect(Object.keys(index.outbounds)).toHaveLength(8);
+    expect(progress).toHaveBeenLastCalledWith(8, 20, "");
+  });
   it("deduplicates common targets in source order and handles prototype-like unresolved names", async () => {
     const files = Array.from({ length: 1000 }, (_, i) =>
       file(`/vault/n${i}.md`, `n${i}.md`),

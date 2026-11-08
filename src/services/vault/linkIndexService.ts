@@ -71,26 +71,32 @@ export async function buildFullLinkIndex(options: {
   const paths = listMarkdownPaths(files);
   const outbounds: Record<string, WikiOutboundLink[]> = {};
 
-  for (let index = 0; index < paths.length; index += 1) {
-    if (shouldCancel?.()) {
-      break;
-    }
-    const path = paths[index];
-    onProgress?.(index, paths.length, path);
-    try {
-      const content = await readFile(path);
-      outbounds[path] = extractAndResolveOutboundWikiLinks(
-        path,
-        content,
-        files,
-        vaultRoot,
-      );
-    } catch {
+  let cursor = 0;
+  let done = 0;
+  const worker = async () => {
+    while (cursor < paths.length && !shouldCancel?.()) {
+      const path = paths[cursor++];
+      // Reserve keys in tree order even when disk reads complete out of order.
       outbounds[path] = [];
+      onProgress?.(done, paths.length, path);
+      try {
+        const content = await readFile(path);
+        outbounds[path] = extractAndResolveOutboundWikiLinks(
+          path,
+          content,
+          files,
+          vaultRoot,
+        );
+      } catch {
+        // One unreadable note must not abort the rest of the vault.
+      }
+      done += 1;
     }
-  }
+  };
+  // Bound outstanding IPC/file buffers instead of issuing a Promise per note.
+  await Promise.all(Array.from({ length: Math.min(8, paths.length) }, worker));
 
-  onProgress?.(paths.length, paths.length, "");
+  onProgress?.(done, paths.length, "");
   const derived = rebuildDerivedMaps(outbounds);
   return {
     version: 1,

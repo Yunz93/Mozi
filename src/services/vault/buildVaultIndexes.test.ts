@@ -64,3 +64,33 @@ it("stops reading on cancellation without a vault-wide text cache", async () => 
   expect(Object.keys(result.linkIndex.outbounds)).toEqual(["/vault/a.md"]);
   expect(Object.keys(result.chunkIndex.byPath)).toEqual(["/vault/a.md"]);
 });
+
+it("keeps chunk order stable when concurrent reads finish in reverse order", async () => {
+  const nodes: FileNode[] = ["a", "b", "c"].map((name) => ({
+    id: `/vault/${name}.md`,
+    path: `/vault/${name}.md`,
+    name: `${name}.md`,
+    type: "file",
+  }));
+  const pending: (() => void)[] = [];
+  const building = buildVaultIndexes({
+    files: nodes,
+    vaultRoot: "/vault",
+    excludeGlobs: ["b.md"],
+    readFile: () =>
+      new Promise<string>((resolve) =>
+        pending.push(() =>
+          resolve("# Note\n\nA paragraph with enough context for retrieval."),
+        ),
+      ),
+  });
+  pending.reverse().forEach((resolve) => resolve());
+  const { linkIndex, chunkIndex } = await building;
+  expect(Object.keys(linkIndex.outbounds)).toEqual(
+    nodes.map((node) => node.path),
+  );
+  expect(Object.keys(chunkIndex.byPath)).toEqual([
+    nodes[0].path,
+    nodes[2].path,
+  ]);
+});

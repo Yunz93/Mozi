@@ -423,7 +423,9 @@ describe("知识库索引任务的顺序与生命周期", () => {
       act(() => {
         rebuilding = hook.result.current.rebuildLinkIndex();
       });
-      await waitFor(() => expect(readFile).toHaveBeenCalledTimes(blockedRead));
+      await waitFor(() =>
+        expect(readFile.mock.calls.length).toBeGreaterThanOrEqual(blockedRead),
+      );
       await openVault("/other");
       const writesBefore = writeIndexJson.mock.calls.length;
       await act(async () => {
@@ -444,7 +446,7 @@ describe("知识库索引任务的顺序与生命周期", () => {
     act(() => {
       rebuilding = hook.result.current.rebuildLinkIndex();
     });
-    await waitFor(() => expect(readFile).toHaveBeenCalledOnce());
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith("/vault/a.md"));
     const contentA =
         "# Saved A\nA saved paragraph that remains available in retrieval. [[target]]",
       contentB =
@@ -482,7 +484,7 @@ describe("知识库索引任务的顺序与生命周期", () => {
     act(() => {
       rebuilding = hook.result.current.rebuildLinkIndex();
     });
-    await waitFor(() => expect(readFile).toHaveBeenCalledOnce());
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith("/vault/a.md"));
     disk.set(
       "/vault/new.md",
       "# Added during rebuild\nA new reading paragraph with a link to [[target]] and enough context.",
