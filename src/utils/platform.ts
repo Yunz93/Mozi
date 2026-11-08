@@ -17,6 +17,11 @@ export function isWindowsPlatform(): boolean {
   return getPlatformIdentifier().includes("win");
 }
 
+export function isLinuxPlatform(): boolean {
+  const identifier = getPlatformIdentifier();
+  return identifier.includes("linux") && !identifier.includes("android");
+}
+
 export function isMacOSPlatform(): boolean {
   const identifier = getPlatformIdentifier();
   return (

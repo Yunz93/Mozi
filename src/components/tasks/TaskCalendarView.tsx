@@ -142,7 +142,14 @@ export function TaskCalendarView({
                   );
                 }}
               >
-                <span>{date.getDate()}</span>
+                <span className="task-calendar-day-number">
+                  {date.getDate()}
+                  {dayTasks.length ? (
+                    <span className="task-calendar-count" aria-hidden="true">
+                      {dayTasks.length > 99 ? "99+" : dayTasks.length}
+                    </span>
+                  ) : null}
+                </span>
                 {key === today ? <small>{t("tasks_today")}</small> : null}
               </button>
               <div className="task-calendar-events">
@@ -174,11 +181,6 @@ export function TaskCalendarView({
                   </button>
                 ) : null}
               </div>
-              {dayTasks.length ? (
-                <span className="task-calendar-mobile-count">
-                  {t("tasks_count", { count: dayTasks.length })}
-                </span>
-              ) : null}
             </div>
           );
         })}

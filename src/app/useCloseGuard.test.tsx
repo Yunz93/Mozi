@@ -24,7 +24,7 @@ const {
   destroyMock: vi.fn(async () => {}),
   exitMock: vi.fn(async () => {}),
   flushAllDirtyMock: vi.fn(async () => true),
-  invokeMock: vi.fn(async (_cmd?: string) => {}),
+  invokeMock: vi.fn(async (_cmd?: string): Promise<unknown> => undefined),
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -106,7 +106,10 @@ describe("useCloseGuard", () => {
     exitMock.mockClear();
     exitMock.mockResolvedValue(undefined);
     invokeMock.mockClear();
-    invokeMock.mockResolvedValue(undefined);
+    invokeMock.mockImplementation(async (command?: string) => {
+      if (command === "force_close_window") return destroyMock();
+      return undefined;
+    });
     flushAllDirtyMock.mockClear();
     flushAllDirtyMock.mockResolvedValue(true);
     useAppStore.setState({
@@ -135,7 +138,27 @@ describe("useCloseGuard", () => {
     expect(invokeMock).not.toHaveBeenCalledWith("allow_next_window_close");
     expect(destroyMock).toHaveBeenCalledTimes(1);
     expect(exitMock).not.toHaveBeenCalled();
-    expect(invokeMock).not.toHaveBeenCalledWith("force_close_window");
+    expect(invokeMock).toHaveBeenCalledWith("force_close_window");
+  });
+
+  it("waits for native fullscreen teardown instead of destroying the webview directly", async () => {
+    let finishNativeClose: (() => void) | undefined;
+    invokeMock.mockImplementation(async (command?: string) => {
+      if (command === "force_close_window") {
+        await new Promise<void>((resolve) => {
+          finishNativeClose = resolve;
+        });
+      }
+    });
+    const closing = completeAppClose("window");
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("force_close_window"),
+    );
+    expect(destroyMock).not.toHaveBeenCalled();
+    expect(exitMock).not.toHaveBeenCalled();
+    finishNativeClose!();
+    await closing;
+    expect(destroyMock).not.toHaveBeenCalled();
   });
 
   it("exits the process when the close source is exit", async () => {
@@ -145,16 +168,19 @@ describe("useCloseGuard", () => {
     expect(destroyMock).not.toHaveBeenCalled();
   });
 
-  it("force-closes via rust when javascript destroy is denied", async () => {
-    destroyMock.mockRejectedValueOnce(new Error("destroy not allowed"));
+  it("retries the guarded native close if its first request fails", async () => {
+    destroyMock.mockRejectedValueOnce(new Error("native close failed"));
     await completeAppClose("window");
-    expect(destroyMock).toHaveBeenCalledTimes(1);
-    expect(invokeMock).toHaveBeenCalledWith("force_close_window");
+    expect(destroyMock).toHaveBeenCalledTimes(2);
+    expect(
+      invokeMock.mock.calls.filter(
+        ([command]) => command === "force_close_window",
+      ),
+    ).toHaveLength(2);
     expect(exitMock).not.toHaveBeenCalled();
   });
 
   it("keeps other windows running when rust force-close also fails", async () => {
-    destroyMock.mockRejectedValueOnce(new Error("destroy not allowed"));
     invokeMock.mockImplementation(async (cmd?: string) => {
       if (cmd === "force_close_window") {
         throw new Error("force close failed");
@@ -163,6 +189,18 @@ describe("useCloseGuard", () => {
     await expect(completeAppClose("window")).rejects.toThrow(
       "force close failed",
     );
+    expect(exitMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves background reminders instead of exiting or destroying the retained window", async () => {
+    invokeMock.mockImplementation(async (command?: string) => {
+      if (command === "task_calendar_keep_background") return true;
+      return undefined;
+    });
+    await completeAppClose("window");
+    expect(invokeMock).toHaveBeenCalledWith("task_calendar_keep_background");
+    expect(invokeMock).not.toHaveBeenCalledWith("force_close_window");
+    expect(destroyMock).not.toHaveBeenCalled();
     expect(exitMock).not.toHaveBeenCalled();
   });
 

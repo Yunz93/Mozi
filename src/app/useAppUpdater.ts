@@ -5,7 +5,7 @@ import {
   areUpdaterArtifactsEnabled,
   checkForAppUpdate,
   isInAppUpdaterSupported,
-  isWindowsUpdaterSupported,
+  isMacOSUpdaterSupported,
 } from "../services/updaterService";
 
 interface UseAppUpdaterOptions {
@@ -35,7 +35,7 @@ export function useAppUpdater(options: UseAppUpdaterOptions): void {
       !settingsHydrated ||
       !autoCheckForUpdates ||
       !isInAppUpdaterSupported() ||
-      (isWindowsUpdaterSupported() && !areUpdaterArtifactsEnabled())
+      (!isMacOSUpdaterSupported() && !areUpdaterArtifactsEnabled())
     ) {
       return;
     }

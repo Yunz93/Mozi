@@ -270,8 +270,25 @@ jobs:
       - name: Sync app version from Git tag
         run: npm run release:sync-version
 
+      - name: Prepare updater signing key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_INPUT: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: node scripts/prepare-tauri-signing-key.mjs
+
+      - name: Export updater signing password
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT}" ]; then
+            {
+              echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<EOF"
+              printf '%s\n' "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD_INPUT}"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
       - name: Build the Linux release package
-        run: npm run tauri -- build --bundles deb --no-sign
+        run: npm run tauri -- build --bundles deb
 
       - name: Validate Debian metadata and installed launcher targets
         run: node scripts/check-linux-package.mjs
@@ -285,4 +302,9 @@ jobs:
           test -f "${packages[0]}"
           asset="Mozi_${RELEASE_TAG#v}_amd64.deb"
           cp "${packages[0]}" "$asset"
-          gh release upload "$RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY"
+          cp "${packages[0]}.sig" "$asset.sig"
+          gh release upload "$RELEASE_TAG" "$asset" "$asset.sig" --clobber --repo "$GITHUB_REPOSITORY"
+          manifest_dir="$RUNNER_TEMP/mozi-linux-updater"
+          gh release download "$RELEASE_TAG" --pattern latest.json --dir "$manifest_dir" --repo "$GITHUB_REPOSITORY"
+          node scripts/prepare-linux-updater.mjs "$manifest_dir/latest.json" "$asset"
+          gh release upload "$RELEASE_TAG" "$manifest_dir/latest.json" --clobber --repo "$GITHUB_REPOSITORY"

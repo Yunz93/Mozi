@@ -59,8 +59,8 @@ export async function completeAppClose(
 
     const { invoke } = await import("@tauri-apps/api/core");
     if (await invoke<boolean>("task_calendar_keep_background")) return;
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await getCurrentWindow().destroy();
+    // 统一交给原生端等待全屏退出完成，不能先销毁 WebView 留下黑色全屏空间。
+    await invoke("force_close_window");
     return;
   } catch (error) {
     console.warn("Primary close path failed, forcing shutdown:", error);
