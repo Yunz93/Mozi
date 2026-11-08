@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { useRef, type ComponentProps } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { FileNode } from "../../types";
@@ -135,6 +135,37 @@ it("keeps folder expansion when a row leaves the viewport and locates nested not
     />,
   );
   expect(view.getByTitle("folder/child")).toBeTruthy();
+});
+
+it("waits for ancestor paths supplied after a locate request", () => {
+  const child = file("nested/child");
+  const folder: FileNode = {
+    id: "/vault/nested",
+    path: "/vault/nested",
+    name: "nested",
+    type: "folder",
+    children: [child],
+  };
+  function DelayedPaths({ request }: { request: number }) {
+    const [paths, setPaths] = useState(new Set<string>());
+    useEffect(() => {
+      if (request) setPaths(new Set([folder.id]));
+    }, [request]);
+    return (
+      <Harness
+        nodes={[folder, ...many]}
+        activeId={child.id}
+        locateRequestKey={request}
+        expandedPathIds={paths}
+      />
+    );
+  }
+  const view = render(<DelayedPaths request={0} />);
+  expect(view.queryByTitle("nested/child")).toBeNull();
+  view.rerender(<DelayedPaths request={1} />);
+  expect(view.getByTitle("nested/child").getAttribute("aria-selected")).toBe(
+    "true",
+  );
 });
 
 it("preserves external imports, internal drops, and hover expansion", () => {
