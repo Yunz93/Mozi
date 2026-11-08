@@ -147,5 +147,10 @@ export function useSecureSettings(
     );
   };
 
-  return { handleSecureSettingChange, renderSecureSaveState };
+  return {
+    handleSecureSettingChange,
+    renderSecureSaveState,
+    getSecureSaveState: (key: SensitiveSettingKey) =>
+      secureSaveStates[key]?.type ?? null,
+  };
 }

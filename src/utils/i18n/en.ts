@@ -344,6 +344,13 @@ export default {
     "Some sources are gone; continuing with the remaining snippets.",
   askVault_needVault: "Open a knowledge base first.",
   askVault_needAi: "AI is not configured.",
+  askVault_retrieveWithoutAi:
+    "Retrieve notes now. Configure AI to generate answers.",
+  askVault_generationReady: "Answer generation: model configured.",
+  askVault_needSemantic:
+    "The semantic model or index is not ready. Configure semantic retrieval or use keyword mode.",
+  askVault_retrieveFailed:
+    "Could not retrieve notes. Check the index and embedding model.",
   askVault_openAiSettings: "Configure AI",
   askVault_openIndexSettings: "Configure embeddings",
   askVault_indexBuilding: "Building index… ({done}/{total})",
@@ -779,6 +786,44 @@ export default {
   settings_geminiApiKey: "Gemini API key",
   settings_secureSaving: "Saving securely on this device...",
   settings_secureSaved: "Saved securely on this device.",
+  publishCheck_connection: "Check connection",
+  publishCheck_configuration: "Check configuration",
+  publishCheck_checking: "Checking…",
+  publishCheck_repository: "Repository readable: {repository}",
+  publishCheck_branch: "Default branch readable: {branch}",
+  publishCheck_readOnlyHint:
+    "Reads the repository and branch without submitting content. Publishing still requires Contents write permission and compliance with branch rules.",
+  publishCheck_invalidRepo: "Enter a valid GitHub repository URL.",
+  publishCheck_missingToken: "Enter a GitHub token.",
+  publishCheck_invalidToken:
+    "GitHub rejected this token. Check that it is valid.",
+  publishCheck_forbidden:
+    "GitHub denied access. Check repository permissions, organization authorization, or rate limits.",
+  publishCheck_rateLimited: "GitHub rate limit reached. Try again later.",
+  publishCheck_notFound:
+    "The repository or default branch does not exist, or this token cannot read it.",
+  publishCheck_emptyRepository:
+    "The repository has no readable default branch. Initialize it first.",
+  publishCheck_archived:
+    "The repository is archived and cannot accept publishing changes.",
+  publishCheck_disabled:
+    "The repository is disabled and cannot accept publishing changes.",
+  publishCheck_network:
+    "Could not connect to GitHub. Check your connection and try again.",
+  publishCheck_timeout: "The GitHub request timed out. Try again later.",
+  publishCheck_unexpected: "Could not complete the check. Try again later.",
+  publishCheck_desktopOnly: "Check the connection in the Mozi desktop app.",
+  publishCheck_missingAppId: "Enter your WeChat Official Account AppID.",
+  publishCheck_missingAppSecret:
+    "Enter your WeChat Official Account AppSecret.",
+  publishCheck_secretNotSaved:
+    "AppSecret is not securely saved. Enter it again and wait for confirmation.",
+  publishCheck_secretCheckFailed:
+    "Could not verify secret storage. Try again later.",
+  publishCheck_wechatReady:
+    "Configuration is filled in and the secret is securely saved. API permissions will be verified when publishing.",
+  publishCheck_wechatHint:
+    "Checks local configuration and secret storage only. Does not call WeChat or create a draft.",
   settings_apiKeyPaste: "Paste API key here...",
   settings_localOnlyGoogle:
     "Stored locally only. Get it from Google AI Studio.",

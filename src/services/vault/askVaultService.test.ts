@@ -5,12 +5,50 @@ import {
   estimateLineOffset,
   hitsToPreviewSnippets,
   resolveAskVaultSubmitKind,
+  retrieveAskVaultHits,
 } from "./askVaultService";
+import { defaultSettings } from "../../store/appStore";
+import {
+  getActiveChunkIndex,
+  setActiveChunkIndex,
+} from "./semanticIndexRuntime";
 import { remapPathsInChunkIndex } from "./chunkIndexService";
 import { chunkMarkdownFile } from "./chunkService";
 import { keywordSearchChunks, tokenizeSearchQuery } from "./retrieveService";
 import { VectorStore } from "./vectorStore";
 import type { ChunkIndexSnapshot } from "../../types/vaultIndex";
+
+it("关键词检索不初始化隐私模式禁止的远端语义接口", async () => {
+  const before = getActiveChunkIndex();
+  const chunk = chunkMarkdownFile({
+    path: "/vault/retrieval.md",
+    vaultRoot: "/vault",
+    content:
+      "# 检索\n\n" +
+      "发布流程使用关键词检索，结果应当能够定位回笔记原文。".repeat(8),
+  })[0]!;
+  try {
+    setActiveChunkIndex({
+      version: 1,
+      vaultRoot: "/vault",
+      builtAt: 0,
+      byPath: { [chunk.path]: [chunk] },
+    });
+    const hits = await retrieveAskVaultHits({
+      question: "发布流程",
+      settings: {
+        ...defaultSettings,
+        searchModeDefault: "keyword",
+        embeddingProvider: "openai-compatible",
+        embeddingApiBaseUrl: "https://example.com/v1",
+        privacyMode: true,
+      },
+    });
+    expect(hits.map((hit) => hit.chunk.path)).toContain(chunk.path);
+  } finally {
+    setActiveChunkIndex(before);
+  }
+});
 
 describe("askVault prompts", () => {
   it("includes numbered excerpts and question", () => {

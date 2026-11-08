@@ -100,6 +100,39 @@ pub(crate) struct PublishSimpleBlogRequest {
     assets: Vec<PublishSimpleBlogAsset>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CheckSimpleBlogConnectionRequest {
+    blog_repo_url: String,
+    blog_github_token: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum BlogConnectionError {
+    InvalidRepo,
+    MissingToken,
+    InvalidToken,
+    Forbidden,
+    RateLimited,
+    NotFound,
+    EmptyRepository,
+    Archived,
+    Disabled,
+    Network,
+    Timeout,
+    Unexpected,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BlogConnectionResult {
+    status: &'static str,
+    repository: Option<String>,
+    branch: Option<String>,
+    error_kind: Option<BlogConnectionError>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PublishWechatDraftRequest {
@@ -139,6 +172,10 @@ struct PreparedPublishFile {
 #[derive(Debug, Deserialize)]
 struct GitHubRepoResponse {
     default_branch: String,
+    #[serde(default)]
+    archived: bool,
+    #[serde(default)]
+    disabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -284,6 +321,13 @@ struct WechatDraftUpdatePayload {
     media_id: String,
     index: u8,
     articles: WechatDraftArticleRequest,
+}
+
+#[tauri::command]
+pub(crate) async fn check_simple_blog_connection(
+    request: CheckSimpleBlogConnectionRequest,
+) -> BlogConnectionResult {
+    blog::check_simple_blog_connection(&request).await
 }
 
 #[tauri::command]

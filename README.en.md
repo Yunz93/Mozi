@@ -136,7 +136,7 @@ Switch between keyword, semantic, and hybrid search, then open a result in its s
 
 ### XiaoZhi assistant
 
-Use Retrieve only to inspect source snippets, or generate an answer with citations and follow them back to the notes. The current version requires an AI provider configuration first. Retrieve only does not call a generation model. Semantic retrieval can still send the query to a configured remote embedding endpoint. Generating an answer sends the question and retrieved snippets to the selected model.
+Use Retrieve only to inspect source snippets, or generate an answer with citations and follow them back to the notes. Retrieve only does not require a generation model. Keyword retrieval uses the local text index; semantic retrieval requires its model and index and can send the query to a configured remote embedding endpoint. Generating an answer requires an AI provider configuration and sends the question and retrieved snippets to the selected model.
 
 <p>
   <img src="./src-tauri/resources/sample-notes/resources/02-vault-retrieval.png" alt="Retrieval results and source navigation" width="800">

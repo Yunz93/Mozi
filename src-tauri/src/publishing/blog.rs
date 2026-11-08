@@ -2,6 +2,98 @@ use super::*;
 
 use crate::url_encode::percent_encode_component;
 
+fn connection_failure(
+    error_kind: BlogConnectionError,
+    repository: Option<String>,
+) -> BlogConnectionResult {
+    let status = match error_kind {
+        BlogConnectionError::Archived
+        | BlogConnectionError::Disabled
+        | BlogConnectionError::EmptyRepository => "warning",
+        _ => "failed",
+    };
+    BlogConnectionResult {
+        status,
+        repository,
+        branch: None,
+        error_kind: Some(error_kind),
+    }
+}
+
+fn connection_error_kind(error: &str) -> BlogConnectionError {
+    // 复用发布接口的错误格式，仅返回分类，不把远端响应或凭据带回界面。
+    let message = error.to_ascii_lowercase();
+    if message.contains("rate limit") || message.contains("returned 429") {
+        BlogConnectionError::RateLimited
+    } else if message.contains("returned 401") {
+        BlogConnectionError::InvalidToken
+    } else if message.contains("returned 403") {
+        BlogConnectionError::Forbidden
+    } else if message.contains("returned 404") {
+        BlogConnectionError::NotFound
+    } else if message.contains("returned 409") {
+        BlogConnectionError::EmptyRepository
+    } else if message.contains("timed out") {
+        BlogConnectionError::Timeout
+    } else if message.contains("request failed") {
+        BlogConnectionError::Network
+    } else {
+        BlogConnectionError::Unexpected
+    }
+}
+
+pub(super) async fn check_simple_blog_connection(
+    request: &CheckSimpleBlogConnectionRequest,
+) -> BlogConnectionResult {
+    let repo_slug = normalize_repo_target(&request.blog_repo_url)
+        .ok()
+        .and_then(|remote| github_repo_slug_from_remote(&remote));
+    let Some(repo_slug) = repo_slug else {
+        return connection_failure(BlogConnectionError::InvalidRepo, None);
+    };
+    let Some(token) = normalize_optional_token(request.blog_github_token.as_deref()) else {
+        return connection_failure(BlogConnectionError::MissingToken, None);
+    };
+    let client = match create_github_api_client(&token) {
+        Ok(client) => client,
+        Err(_) => return connection_failure(BlogConnectionError::InvalidToken, None),
+    };
+    // 固定读取 GitHub 仓库及默认分支，不调用创建提交或更新引用的接口。
+    let repo_info: GitHubRepoResponse =
+        match github_api_get(&client, &format!("/repos/{}", repo_slug)).await {
+            Ok(info) => info,
+            Err(error) => return connection_failure(connection_error_kind(&error), None),
+        };
+    if repo_info.disabled {
+        return connection_failure(BlogConnectionError::Disabled, Some(repo_slug));
+    }
+    if repo_info.archived {
+        return connection_failure(BlogConnectionError::Archived, Some(repo_slug));
+    }
+    let branch = repo_info.default_branch.trim();
+    if branch.is_empty() {
+        return connection_failure(BlogConnectionError::EmptyRepository, Some(repo_slug));
+    }
+    let branch_result: Result<GitHubRefResponse, String> = github_api_get(
+        &client,
+        &format!(
+            "/repos/{}/git/ref/heads/{}",
+            repo_slug,
+            percent_encode_component(branch)
+        ),
+    )
+    .await;
+    match branch_result {
+        Ok(_) => BlogConnectionResult {
+            status: "passed",
+            repository: Some(repo_slug),
+            branch: Some(branch.to_string()),
+            error_kind: None,
+        },
+        Err(error) => connection_failure(connection_error_kind(&error), Some(repo_slug)),
+    }
+}
+
 pub(super) async fn publish_remote_simple_blog(
     request: &PublishSimpleBlogRequest,
 ) -> Result<PublishSimpleBlogResult, String> {

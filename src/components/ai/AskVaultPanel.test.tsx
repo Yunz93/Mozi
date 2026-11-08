@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   answer: vi.fn(),
   history: vi.fn(),
   editorFocus: vi.fn(),
+  ensureAi: vi.fn(),
 }));
 vi.mock("../../utils/editorSelectionBridge", async (importOriginal) => ({
   ...(await importOriginal<
@@ -38,7 +39,7 @@ vi.mock("../../services/secureSettingsService", () => ({
     useAppStore.getState().settings,
 }));
 vi.mock("../../services/aiService", () => ({
-  ensureAIConfiguration: () => ({ ok: true }),
+  ensureAIConfiguration: (...args: unknown[]) => mocks.ensureAi(...args),
 }));
 vi.mock("../../utils/markdown", () => ({
   renderMarkdown: (markdown: string) => markdown,
@@ -109,6 +110,7 @@ async function retrieve() {
 }
 
 beforeEach(() => {
+  mocks.ensureAi.mockReset().mockReturnValue({ ok: true });
   mocks.retrieve.mockReset().mockResolvedValue([hit("/vault/a.md")]);
   mocks.answer.mockReset().mockResolvedValue({
     answerMarkdown: "Answer",
@@ -154,6 +156,73 @@ afterEach(() => {
 });
 
 describe("AskVaultPanel 来源定位视图", () => {
+  it.each(["keyword", "semantic"] as const)(
+    "未配置生成模型时仍可进行 %s 检索并定位来源",
+    async (mode) => {
+      mocks.ensureAi.mockImplementation(() => {
+        throw new Error("AI is not configured");
+      });
+      useAppStore.setState((state) => ({
+        settings: {
+          ...state.settings,
+          codexApiKey: "",
+          embeddingProvider: mode === "keyword" ? "none" : "builtin",
+          searchModeDefault: mode,
+        },
+        semanticReady: mode === "semantic",
+      }));
+      const onOpenFile = vi.fn();
+      renderPanel({ onOpenFile });
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "question" },
+      });
+      expect(
+        screen.getByRole<HTMLButtonElement>("button", {
+          name: "askVault_ask",
+        }).disabled,
+      ).toBe(true);
+      const retrieveButton = screen.getByRole<HTMLButtonElement>("button", {
+        name: "askVault_retrieve",
+      });
+      expect(retrieveButton.disabled).toBe(false);
+      fireEvent.click(retrieveButton);
+      await waitFor(() => expect(mocks.retrieve).toHaveBeenCalledOnce());
+      fireEvent.click(
+        await waitFor(() => {
+          const source = document.querySelector<HTMLButtonElement>(
+            ".ask-vault-source-item",
+          );
+          expect(source).not.toBeNull();
+          return source!;
+        }),
+      );
+      await waitFor(() => expect(onOpenFile).toHaveBeenCalledOnce());
+      expect(mocks.answer).not.toHaveBeenCalled();
+    },
+  );
+
+  it("纯语义索引未就绪时提示准备条件，不执行空检索", () => {
+    useAppStore.setState((state) => ({
+      settings: {
+        ...state.settings,
+        embeddingProvider: "builtin",
+        searchModeDefault: "semantic",
+      },
+      semanticReady: false,
+    }));
+    renderPanel();
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "question" },
+    });
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "askVault_retrieve",
+      }).disabled,
+    ).toBe(true);
+    expect(screen.getByText("askVault_needSemantic")).toBeTruthy();
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+  });
+
   it("丢弃切库后延迟完成的来源打开请求", async () => {
     const opening = deferred<void>();
     const target = hit("/vault/source.md");

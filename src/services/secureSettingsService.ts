@@ -117,6 +117,16 @@ export function scrubSensitiveSettingsFromLocalStorage(): void {
   }
 }
 
+/** 显式核验只读取当前后端值，不使用或更新窗口缓存。 */
+export async function readSecureSetting(
+  key: SensitiveSettingKey,
+): Promise<string> {
+  const payload = await invokeSecureSettingsCommand<SecureSettingsPayload>(
+    "get_secure_settings",
+  );
+  return normalizeSecretValue(payload[key]);
+}
+
 export async function loadSecureSettings(): Promise<
   Partial<SensitiveSettings>
 > {
