@@ -1,6 +1,6 @@
 # Mozi Development Guide
 
-[中文](./DEVELOPMENT.md) · [Back to README](../README.en.md)
+[中文](README.md) · [Back to README](../../README.en.md)
 
 ## Tech Stack
 
@@ -123,7 +123,7 @@ The project includes a release smoke-test script:
 npm run smoke:release
 ```
 
-See [RELEASE_SMOKE_TEST.md](./RELEASE_SMOKE_TEST.md) for the manual checklist.
+See [RELEASE_SMOKE_TEST.md](../release/SMOKE_TEST.md) for the manual checklist.
 
 ## Development Notes
 

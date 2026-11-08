@@ -2,7 +2,7 @@
 
 Chinese name: **墨知**.
 
-[中文](./README.md) · [Development guide](./docs/DEVELOPMENT.en.md)
+[中文](./README.md) · [Development guide](docs/development/README.en.md)
 
 A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.2.0 adds a task calendar, due reminders, and optional macOS Calendar sync, with focus mode and Live link previews.
 
@@ -38,7 +38,7 @@ xattr -cr /Applications/墨知.app
 
 If it is still in Downloads, use `~/Downloads/墨知.app` instead.
 
-See [Development guide: macOS signing and notarization](./docs/DEVELOPMENT.en.md#macos-signing--notarization) for the CI secret setup.
+See [Development guide: macOS signing and notarization](docs/development/README.en.md#macos-signing--notarization) for the CI secret setup.
 
 ### Windows
 

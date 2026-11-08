@@ -58,8 +58,6 @@ vi.mock("../../../hooks/useI18n", () => ({
         settings_aboutAuthorValue: "Yunz",
         settings_aboutMessage: "寄语",
         settings_aboutMessageValue: "写给使用者",
-        settings_aboutJointCertification: "联合认证",
-        settings_aboutJointCertificationHint: "hint",
         settings_updatesSectionTitle: "应用更新",
         settings_updatesCurrentVersionLabel: "当前版本",
         settings_updatesLastCheckLabel: "上次检查",

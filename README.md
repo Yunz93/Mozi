@@ -2,7 +2,7 @@
 
 英文名：**Mozi**。
 
-[English](./README.en.md) · [开发文档](./docs/DEVELOPMENT.md)
+[English](./README.en.md) · [开发文档](docs/development/README.md)
 
 本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.2.0 新增待办日历、到期提醒和可选的 macOS 系统日历同步，支持专注模式与 Live 链接预览。
 
@@ -38,7 +38,7 @@ xattr -cr /Applications/墨知.app
 
 若仍在「下载」中，把路径换成 `~/Downloads/墨知.app`。
 
-证书与公证配置见 [开发文档 - macOS 签名公证](./docs/DEVELOPMENT.md#macos-签名与公证)。
+证书与公证配置见 [开发文档 - macOS 签名公证](docs/development/README.md#macos-签名与公证)。
 
 ### Windows
 

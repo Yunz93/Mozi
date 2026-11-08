@@ -6,7 +6,7 @@ import {
   resolvePersistedImageHosting,
   resolvePersistedShortcuts,
 } from "./persistMigrations";
-import { findDefaultShortcutEditorConflicts } from "../utils/shortcutEditorConflict";
+import { findDefaultShortcutEditorConflicts } from "../testUtils/shortcutEditorConflict";
 
 vi.mock("../utils/shortcuts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../utils/shortcuts")>();

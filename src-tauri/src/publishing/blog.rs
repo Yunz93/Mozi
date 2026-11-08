@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn local_path_is_rejected_as_blog_repo_url() {
-        assert!(normalize_repo_target("/Users/yunz/Code/VibeCoding/simple-blog").is_err());
+        assert!(normalize_repo_target("/Users/example/projects/blog").is_err());
     }
 
     #[test]

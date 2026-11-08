@@ -24,7 +24,8 @@
     "test:release-parity": "vitest run src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts src/utils/prepareTauriSigningKey.test.ts",
     "prepare": "husky",
     "perf:core": "node scripts/perf/core.mjs",
-    "perf:browser": "node scripts/perf/browser.mjs"
+    "perf:browser": "node scripts/perf/browser.mjs",
+    "check:public": "node scripts/check-public-content.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",

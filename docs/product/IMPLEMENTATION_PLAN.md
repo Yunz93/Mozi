@@ -1,7 +1,7 @@
 # 墨知 知识层具体实施方案
 
 文档状态：可执行草案  
-关联：[产品演进方案](./PRODUCT_ROADMAP.md) · [PRD](./PRD.md)  
+关联：[产品演进方案](ROADMAP.md) · [PRD](PRD.md)  
 基线：v0.9.12 代码结构  
 更新时间：2026-07-22
 
@@ -502,7 +502,7 @@ assertPrivacyAllowed(settings, endpointUrl);
 
 ### 9.4 验收
 
-断网 + Ollama 可用时：语义搜索与 Ask Vault 链路通；隐私模式开启后抓包/日志无外网请求（开发者自测清单写入 `docs/RELEASE_SMOKE_TEST.md` 增补项）。
+断网 + Ollama 可用时：语义搜索与 Ask Vault 链路通；隐私模式开启后抓包/日志无外网请求（开发者自测清单写入 `docs/release/SMOKE_TEST.md` 增补项）。
 
 ---
 
