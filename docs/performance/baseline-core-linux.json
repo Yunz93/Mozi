@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "git": "a1bfeb04d9b4321b4a73bbc6a7ee533755bd91d8",
+  "timestamp": "2026-11-08T04:11:37.335Z",
+  "runtime": {
+    "platform": "linux",
+    "release": "6.18.57",
+    "arch": "x64",
+    "node": "v24.22.1",
+    "cpu": "AMD EPYC 9V74 80-Core Processor"
+  },
+  "scope": "Node/Vite SSR; excludes disk, WebView, native UI, embedding model",
+  "rows": [
+    {
+      "operation": "full-index",
+      "count": 100,
+      "round": 0,
+      "ms": 16.43013300000007,
+      "reads": 200,
+      "links": 100,
+      "chunks": 200,
+      "heapBytes": 48841496
+    },
+    {
+      "operation": "vector-top10",
+      "count": 1000,
+      "round": 0,
+      "ms": 2.591782999999964,
+      "hits": 10,
+      "heapBytes": 57562032
+    },
+    {
+      "operation": "vector-top10",
+      "count": 10000,
+      "round": 0,
+      "ms": 21.798607000000175,
+      "hits": 10,
+      "heapBytes": 75984520
+    },
+    {
+      "operation": "vector-top10",
+      "count": 50000,
+      "round": 0,
+      "ms": 165.38930900000014,
+      "hits": 10,
+      "heapBytes": 206137576
+    }
+  ]
+}

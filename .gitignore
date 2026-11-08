@@ -34,3 +34,6 @@ AGENTS.md
 .omx/
 secure-settings.json
 secure-settings.key
+
+# Generated performance fixtures and measurements
+.perf/
