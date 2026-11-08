@@ -84,7 +84,7 @@ interface PreviewPaneProps {
   onScroll?: (percentage: number) => void;
   density?: PaneDensity;
   syncedPercentage?: number | null;
-  /** False when SplitView gives the preview column 0 width (e.g. editor-only). Synced to layout, not just store viewMode. */
+  /** False when DocumentWorkspace hides the reading surface. Synced to layout, not just store viewMode. */
   previewLayoutActive?: boolean;
   /** False when the preview pane should keep mounted state but avoid expensive render work. */
   previewRenderActive?: boolean;
@@ -317,7 +317,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       scroll.syncScrollTo(element, syncedPercentage);
     }, [scroll, syncedPercentage]);
 
-    // Per-tab scroll restoration is handled by SplitView via syncedPercentage /
+    // Per-tab scroll restoration is handled by DocumentWorkspace via syncedPercentage /
     // imperative syncScrollTo; avoid resetting preview scroll on every tab switch.
     useLayoutEffect(() => {
       const element = previewRef.current;

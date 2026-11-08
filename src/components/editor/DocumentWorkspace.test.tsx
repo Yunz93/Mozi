@@ -65,13 +65,13 @@ vi.mock("./PreviewPane", () => ({
   }),
 }));
 
-import { SplitView } from "./SplitView";
+import { DocumentWorkspace } from "./DocumentWorkspace";
 import {
   beginHeadingNavigationLock,
   endHeadingNavigationLock,
 } from "../../utils/previewNavigationBridge";
 
-function seedSplitViewStore(
+function seedDocumentWorkspaceStore(
   overrides: Partial<ReturnType<typeof useAppStore.getState>> = {},
 ) {
   useAppStore.setState({
@@ -91,11 +91,10 @@ function seedSplitViewStore(
   } as never);
 }
 
-function renderSplitView() {
+function renderDocumentWorkspace() {
   return render(
-    <SplitView
+    <DocumentWorkspace
       isOutlineOpen={false}
-      canShowOutline={false}
       canShowOutlineToggle={false}
       contentDensity="comfortable"
       onToggleOutline={vi.fn()}
@@ -103,12 +102,12 @@ function renderSplitView() {
   );
 }
 
-describe("SplitView scroll handshake", () => {
+describe("DocumentWorkspace scroll handshake", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     editorOnScroll = undefined;
     previewOnScroll = undefined;
-    seedSplitViewStore();
+    seedDocumentWorkspaceStore();
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
@@ -129,8 +128,8 @@ describe("SplitView scroll handshake", () => {
 
   it("does not let a queued 250ms tab restore overwrite a newer heading jump", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.PREVIEW });
+    renderDocumentWorkspace();
     mockPreviewSyncScrollTo.mockClear();
     beginHeadingNavigationLock();
 
@@ -141,7 +140,7 @@ describe("SplitView scroll handshake", () => {
 
   it("does not overwrite a newer user scroll with a delayed mode correction", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    renderSplitView();
+    renderDocumentWorkspace();
     act(() => editorOnScroll?.(0.3));
     act(() => useAppStore.setState({ viewMode: ViewMode.PREVIEW }));
     expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0.3, {
@@ -155,9 +154,9 @@ describe("SplitView scroll handshake", () => {
 
   it("preserves initial tab restoration but skips its late correction during pending navigation", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.PREVIEW });
     beginHeadingNavigationLock();
-    renderSplitView();
+    renderDocumentWorkspace();
     expect(mockPreviewSyncScrollTo).toHaveBeenCalledWith(0, {
       immediate: true,
     });
@@ -167,7 +166,7 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("does not sync preview scroll in editor-only mode", async () => {
-    renderSplitView();
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       expect(editorOnScroll).toBeTypeOf("function");
@@ -181,8 +180,8 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("does not sync editor scroll from preview in reading mode", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.PREVIEW });
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       expect(previewOnScroll).toBeTypeOf("function");
@@ -196,8 +195,8 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("marks preview layout inactive in editor-only mode", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.LIVE });
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       const preview = document.querySelector(
@@ -208,8 +207,8 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("re-anchors the reading pane when switching from editor to reading", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.LIVE });
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       expect(editorOnScroll).toBeTypeOf("function");
@@ -234,8 +233,8 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("re-anchors the editor when leaving reading mode", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.PREVIEW });
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       expect(previewOnScroll).toBeTypeOf("function");
@@ -260,7 +259,7 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("restores per-tab scroll anchors when switching active tabs", async () => {
-    renderSplitView();
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       expect(editorOnScroll).toBeTypeOf("function");
@@ -299,8 +298,8 @@ describe("SplitView scroll handshake", () => {
 
   it("resyncs the reading pane after the width transition completes", () => {
     vi.useFakeTimers();
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.LIVE });
+    renderDocumentWorkspace();
 
     act(() => {
       editorOnScroll?.(0.33);
@@ -323,8 +322,8 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("restores preview scroll anchor for tabs last viewed in reading mode", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.PREVIEW });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.PREVIEW });
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       expect(previewOnScroll).toBeTypeOf("function");
@@ -356,8 +355,8 @@ describe("SplitView scroll handshake", () => {
   });
 
   it("does not sync across panes while outline heading navigation is locked", async () => {
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
-    renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.LIVE });
+    renderDocumentWorkspace();
 
     await waitFor(() => {
       expect(editorOnScroll).toBeTypeOf("function");
@@ -375,8 +374,8 @@ describe("SplitView scroll handshake", () => {
     expect(mockEditorSyncScrollTo).not.toHaveBeenCalled();
   });
   it("keeps pane widths stable while switching between writing and reading", () => {
-    seedSplitViewStore({ viewMode: ViewMode.LIVE });
-    const pane = renderSplitView();
+    seedDocumentWorkspaceStore({ viewMode: ViewMode.LIVE });
+    const pane = renderDocumentWorkspace();
     const editor = pane.container.querySelector('[data-testid="editor-pane"]')!;
     const preview = pane.container.querySelector(
       '[data-testid="preview-pane"]',

@@ -1,9 +1,5 @@
 import { ViewMode } from "../types";
-import {
-  normalizeSessionViewMode,
-  resolveLastNonSplitViewMode,
-  type NonSplitViewMode,
-} from "../utils/viewMode";
+import { normalizeSessionViewMode } from "../utils/viewMode";
 
 // History state for undo/redo per file
 export interface HistoryState {
@@ -22,7 +18,6 @@ export interface HistoryState {
  */
 export interface EditorState {
   viewMode: ViewMode;
-  lastNonSplitViewMode: NonSplitViewMode;
   lastViewModeChangeSource: "direct" | "toggle";
   /** Mode to restore after leaving a preview-only file (PDF/image/HTML). */
   viewModeBeforePreviewOnly: ViewMode | null;
@@ -60,7 +55,6 @@ export interface EditorActions {
  */
 export const initialEditorState: EditorState = {
   viewMode: ViewMode.LIVE,
-  lastNonSplitViewMode: ViewMode.LIVE,
   lastViewModeChangeSource: "direct",
   viewModeBeforePreviewOnly: null,
   liveSourceMarkdown: false,
@@ -151,7 +145,6 @@ export function createEditorSlice(
         const normalized = normalizeSessionViewMode(mode);
         return {
           viewMode: normalized,
-          lastNonSplitViewMode: resolveLastNonSplitViewMode(normalized),
           lastViewModeChangeSource: source,
         };
       }),

@@ -936,7 +936,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
 
       lastResetTabIdRef.current = activeTabId;
       // Cancel in-flight sync only. Do not zero selection/scroll here — that
-      // fought the per-tab CodeMirror cache and SplitView percentage restore,
+      // fought the per-tab CodeMirror cache and DocumentWorkspace percentage restore,
       // and could look like a click jump when timing overlapped with focus.
       scrollSync.cancelScrollSync();
       closeSelectionMenu();

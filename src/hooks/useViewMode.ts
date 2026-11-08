@@ -37,14 +37,8 @@ export function useViewMode() {
     setViewMode,
     toggleViewMode,
     setLive,
-    /** @deprecated Use setLive — EDITOR mode is normalized to LIVE. */
-    setEditorOnly: setLive,
-    /** @deprecated Split mode removed; maps to Live. */
-    setSplit: setLive,
     setPreviewOnly,
     isLive: normalized === ViewMode.LIVE,
-    isEditorOnly: normalized === ViewMode.LIVE,
-    isSplit: false,
     isPreviewOnly: normalized === ViewMode.PREVIEW,
   };
 }
