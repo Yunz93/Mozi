@@ -55,6 +55,7 @@ interface FileFormatState {
   lineEnding: LineEnding;
   hasBom: boolean;
   lastContent: string;
+  lastWrite?: { content: string };
 }
 
 interface CopySampleNotesResult {
@@ -152,7 +153,11 @@ export class TauriFileSystem implements IFileSystem {
       this.showConfigFiles = options.showConfigFiles;
   }
 
-  private captureFileFormat(path: string, raw: string): string {
+  private captureFileFormat(
+    path: string,
+    raw: string,
+    written = false,
+  ): string {
     const hasBom = raw.startsWith("\uFEFF");
     const content = hasBom ? raw.slice(1) : raw;
     const lineEnding: LineEnding = content.includes("\r\n") ? "\r\n" : "\n";
@@ -161,6 +166,9 @@ export class TauriFileSystem implements IFileSystem {
       lineEnding,
       hasBom,
       lastContent: content,
+      lastWrite: written
+        ? { content }
+        : this.fileFormatStates.get(path)?.lastWrite,
     });
 
     return content;
@@ -285,12 +293,12 @@ export class TauriFileSystem implements IFileSystem {
     const prepared = this.prepareContentForWrite(path, content);
     try {
       await invoke("write_text_file_atomic", { path, content: prepared });
-      this.captureFileFormat(path, prepared);
+      this.captureFileFormat(path, prepared, true);
       this.invalidateObjectUrl(path);
     } catch (error) {
       try {
         await writeTextFile(path, prepared);
-        this.captureFileFormat(path, prepared);
+        this.captureFileFormat(path, prepared, true);
         this.invalidateObjectUrl(path);
       } catch (fallbackError) {
         console.error(`Failed to write file ${path}:`, fallbackError);
@@ -324,7 +332,7 @@ export class TauriFileSystem implements IFileSystem {
         if (savePath) {
           const prepared = this.prepareContentForWrite(savePath, content);
           await writeTextFile(savePath, prepared);
-          this.captureFileFormat(savePath, prepared);
+          this.captureFileFormat(savePath, prepared, true);
           this.invalidateObjectUrl(savePath);
           await this.registerAllowedPath(savePath, false);
           return savePath;
@@ -333,7 +341,7 @@ export class TauriFileSystem implements IFileSystem {
       }
       const prepared = this.prepareContentForWrite(path, content);
       await writeTextFile(path, prepared);
-      this.captureFileFormat(path, prepared);
+      this.captureFileFormat(path, prepared, true);
       this.invalidateObjectUrl(path);
       return path;
     } catch (error) {
@@ -578,7 +586,7 @@ export class TauriFileSystem implements IFileSystem {
     try {
       const prepared = this.prepareContentForWrite(path, content);
       await writeTextFile(path, prepared, { createNew: true });
-      this.captureFileFormat(path, prepared);
+      this.captureFileFormat(path, prepared, true);
       return path;
     } catch (error) {
       console.error("Failed to create file:", error);
@@ -627,6 +635,31 @@ export class TauriFileSystem implements IFileSystem {
   /**
    * Listen to file system events
    */
+  private createWatchContentReader(path: string) {
+    let previous = this.fileFormatStates.get(path)?.lastContent;
+    let knownWrite = this.fileFormatStates.get(path)?.lastWrite;
+    return async (active: () => boolean): Promise<boolean> => {
+      const writeBefore = this.fileFormatStates.get(path)?.lastWrite;
+      const bytes = await readBinaryFile(path);
+      if (!active()) return false;
+      const writeAfter = this.fileFormatStates.get(path)?.lastWrite;
+      if (writeAfter !== writeBefore) {
+        // The read may predate a concurrent save. Its native event/next poll
+        // will reconcile the current disk state without applying stale bytes.
+        previous = writeAfter?.content ?? previous;
+        knownWrite = writeAfter;
+        return false;
+      }
+      if (writeAfter !== knownWrite && writeAfter)
+        previous = writeAfter.content;
+      knownWrite = writeAfter;
+      const current = this.rememberDecodedText(path, bytes);
+      const changed = previous !== undefined && current !== previous;
+      previous = current;
+      return changed;
+    };
+  }
+
   async watchFile(
     path: string,
     callback: (event: FileWatchEvent | null) => void,
@@ -635,16 +668,10 @@ export class TauriFileSystem implements IFileSystem {
       return this.watchFilePolling(path, callback);
     const root = useAppStore.getState().rootFolderPath;
     const directory = !!root && withinWatchPath(path, root);
+    const readContent = this.createWatchContentReader(path);
     const check = async ({ active }: { active: () => boolean }) => {
-      const formatBefore = this.fileFormatStates.get(path);
-      const previous = formatBefore?.lastContent;
       try {
-        const bytes = await readBinaryFile(path);
-        if (!active() || this.fileFormatStates.get(path) !== formatBefore)
-          return;
-        const current = this.rememberDecodedText(path, bytes);
-        if (previous !== undefined && current !== previous)
-          callback({ path, type: "modified" });
+        if (await readContent(active)) callback({ path, type: "modified" });
       } catch (error) {
         if (!active()) return;
         if (isFileNotFoundError(error)) {
@@ -739,7 +766,7 @@ export class TauriFileSystem implements IFileSystem {
         if (result.modified.length)
           callback({ type: "modified", paths: result.modified });
       },
-      fallback: () => this.watchDirectoryPolling(dirPath, callback),
+      fallback: () => this.watchDirectoryPolling(dirPath, callback, true),
     });
   }
 
@@ -748,22 +775,18 @@ export class TauriFileSystem implements IFileSystem {
     callback: (event: FileWatchEvent | null) => void,
   ): Promise<() => void> {
     try {
-      let previous = this.fileFormatStates.get(path)?.lastContent;
-
-      if (previous === undefined) {
-        try {
-          const initialBytes = await readBinaryFile(path);
-          previous = this.rememberDecodedText(path, initialBytes);
-        } catch {
-          previous = "";
-        }
-      }
-
       // Chain polls with setTimeout so a slow read of a large file can never
       // overlap the next poll.
       const POLL_INTERVAL_MS = 1500;
       let disposed = false;
       let timer: number | null = null;
+      const readContent = this.createWatchContentReader(path);
+      try {
+        if (await readContent(() => !disposed))
+          callback({ path, type: "modified" });
+      } catch {
+        // The retry loop below handles missing or temporarily locked files.
+      }
 
       const scheduleNext = () => {
         if (disposed) return;
@@ -773,19 +796,8 @@ export class TauriFileSystem implements IFileSystem {
       const runPoll = async () => {
         if (disposed) return;
         try {
-          const latestKnown = this.fileFormatStates.get(path)?.lastContent;
-          if (latestKnown !== undefined) {
-            previous = latestKnown;
-          }
-
-          const currentBytes = await readBinaryFile(path);
-          const current = this.rememberDecodedText(path, currentBytes);
-          if (disposed) return;
-
-          if (current !== previous) {
-            previous = current;
+          if (await readContent(() => !disposed))
             callback({ path, type: "modified" });
-          }
         } catch (error) {
           if (disposed) return;
           const message =
@@ -839,6 +851,7 @@ export class TauriFileSystem implements IFileSystem {
   private async watchDirectoryPolling(
     dirPath: string,
     callback: (event: DirectoryWatchEvent) => void,
+    reconcileInitial = false,
   ): Promise<() => void> {
     const BASE_INTERVAL_MS = 2000;
     // Never spend more than ~1/4 of wall-clock time scanning large trees.
@@ -846,12 +859,23 @@ export class TauriFileSystem implements IFileSystem {
 
     try {
       let previousSignature = "";
+      let pendingSnapshot = reconcileInitial;
       let disposed = false;
       let timer: number | null = null;
 
       try {
-        const initialTree = await this.readDirectory(dirPath);
+        const initialTree = await this.readDirectory(
+          dirPath,
+          dirPath,
+          false,
+          undefined,
+          reconcileInitial,
+        );
         previousSignature = buildFileTreeSignature(initialTree);
+        if (pendingSnapshot) {
+          pendingSnapshot = false;
+          callback({ type: "changed", tree: initialTree, rescan: true });
+        }
       } catch {
         previousSignature = "";
       }
@@ -865,13 +889,25 @@ export class TauriFileSystem implements IFileSystem {
         if (disposed) return;
         const startedAt = Date.now();
         try {
-          const currentTree = await this.readDirectory(dirPath);
+          const currentTree = await this.readDirectory(
+            dirPath,
+            dirPath,
+            false,
+            undefined,
+            reconcileInitial,
+          );
           if (disposed) return;
 
           const signature = buildFileTreeSignature(currentTree);
-          if (signature !== previousSignature) {
+          if (pendingSnapshot || signature !== previousSignature) {
             previousSignature = signature;
-            callback({ type: "changed", tree: currentTree });
+            const rescan = pendingSnapshot;
+            pendingSnapshot = false;
+            callback({
+              type: "changed",
+              tree: currentTree,
+              ...(rescan ? { rescan: true } : {}),
+            });
           }
         } catch (error) {
           if (!disposed) {

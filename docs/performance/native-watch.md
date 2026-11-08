@@ -55,7 +55,12 @@ attachment after 30 seconds. Startup failure keeps polling available.
 | Atomic replacement, case rename, burst and cleanup tests | CI                                         | CI      | CI                    |
 | Synthetic broker measurement artifact                    | CI                                         | CI      | CI                    |
 | Full Tauri Rust application tests                        | Requires GTK development libraries locally | CI      | Pending dedicated job |
-| Packaged application UI, native mode                     | Pending                                    | Pending | Pending               |
+| Packaged application UI, native mode                     | Debian/Xvfb automation, partial            | Pending | Pending               |
+
+The [Linux desktop acceptance record](linux-desktop-acceptance.md) covers an
+actual release `.deb` running in WebKitGTK on an Xvfb display. This is separate
+from the broker-only measurements above and does not complete the physical
+desktop, sleep/resume, notification or network-share gates.
 
 Before changing the default, exercise the packaged app on each OS using both
 watch modes and 1/2/5 windows. Cover initial opening and restoration, external
