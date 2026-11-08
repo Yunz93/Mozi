@@ -100,7 +100,8 @@ jobs:
         run: node scripts/desktop/run.mjs
       - name: Build macOS stock release-configuration application
         if: runner.os == 'macOS'
-        run: npm run tauri -- build --bundles app --no-sign --config src-tauri/tauri.desktop-smoke.conf.json
+        # Reuse exactly the frontend assets exercised by the isolated app.
+        run: npm run tauri -- build --bundles app --no-sign --config src-tauri/tauri.desktop-smoke.conf.json --config '{"build":{"beforeBuildCommand":""}}'
       - name: Launch macOS stock application and verify driver exclusion
         if: runner.os == 'macOS'
         run: node scripts/desktop/macos-stock.mjs
