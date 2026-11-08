@@ -91,7 +91,7 @@ jobs:
         run: sh scripts/desktop/run-linux.sh
       - name: Build Windows release-configuration installer
         if: runner.os == 'Windows'
-        run: npm run tauri -- build --bundles nsis --no-sign --config src-tauri/tauri.desktop-smoke.conf.json
+        run: node scripts/desktop/build-windows.mjs
       - name: Install Windows application and matching WebView2 driver
         if: runner.os == 'Windows'
         run: pwsh -File scripts/desktop/prepare-windows.ps1

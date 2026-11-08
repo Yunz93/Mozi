@@ -226,6 +226,28 @@ export async function check(context, name, action) {
       ms: performance.now() - started,
       error: error.message,
     });
+    const diagnostics = {};
+    for (const [key, read] of [
+      ["body", () => context.driver.body()],
+      ["tasks", () => context.driver.invoke("task_calendar_snapshot")],
+      [
+        "tree",
+        () =>
+          context.driver.execute(
+            "return [...document.querySelectorAll('.workspace-tree-row')].map(e=>e.title)",
+          ),
+      ],
+    ]) {
+      try {
+        diagnostics[key] = await read();
+      } catch {
+        /* Keep the first failure. */
+      }
+    }
+    await writeFile(
+      join(output, `${name}-diagnostics.json`),
+      JSON.stringify(diagnostics, null, 2),
+    );
     await context.driver
       .screenshot(join(output, `${name}-failed.png`))
       .catch(() => {});
