@@ -2,8 +2,11 @@ mod ai_provider;
 mod image_hosting;
 mod macos_update;
 mod native_new_window;
+mod native_window_close;
 #[cfg(target_os = "macos")]
 mod native_app_exit;
+#[cfg(target_os = "macos")]
+mod native_notification;
 mod publishing;
 mod sample_notes;
 mod secure_settings;
@@ -757,7 +760,8 @@ async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn force_close_window(window: tauri::WebviewWindow) -> Result<(), String> {
+async fn force_close_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    native_window_close::leave_fullscreen(&window).await?;
     window.destroy().map_err(|error| error.to_string())
 }
 
@@ -1009,6 +1013,10 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            if let Err(error) = native_notification::install() {
+                log::warn!("启用通知前台展示失败：{error}");
+            }
             if let Err(error) = vault_watch::initialize(app.handle()) {
                 log::warn!("Native watch service unavailable; keeping polling: {error}");
             }

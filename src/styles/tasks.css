@@ -67,7 +67,11 @@
   font-size: 1em;
 }
 .task-popover .task-calendar-day {
-  min-height: 2.9em;
+  min-height: 2.25em;
+  padding: 4px 2px;
+}
+.task-popover .task-calendar-date {
+  padding: 0;
 }
 .task-popover .task-day-panel {
   padding-top: 16px;
@@ -303,7 +307,8 @@
   font-size: 0.75em;
   font-variant-numeric: tabular-nums;
 }
-.task-calendar-date > span {
+.task-calendar-day-number {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -311,11 +316,29 @@
   height: 24px;
   border-radius: 50%;
 }
+.task-calendar-count {
+  position: absolute;
+  top: -3px;
+  left: calc(100% - 4px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 3px;
+  border-radius: 1em;
+  background: var(--workspace-primary-bg);
+  color: var(--workspace-primary-text);
+  box-shadow: 0 0 0 1px var(--workspace-menu);
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1;
+}
 .task-calendar-date small {
   color: var(--workspace-accent);
   font-size: 0.85em;
 }
-.task-calendar-day.is-today .task-calendar-date > span {
+.task-calendar-day.is-today .task-calendar-day-number {
   color: var(--workspace-primary-text);
   background: var(--workspace-primary-bg);
 }
@@ -362,12 +385,6 @@
   font-size: 0.68em;
   color: var(--workspace-muted);
   padding: 2px 4px;
-}
-.task-calendar-mobile-count {
-  display: none;
-  font-size: 0.7em;
-  color: var(--workspace-accent);
-  padding: 4px;
 }
 .task-day-panel {
   min-width: 0;
@@ -653,9 +670,6 @@
   .task-calendar-events,
   .task-calendar-date small {
     display: none;
-  }
-  .task-calendar-mobile-count {
-    display: block;
   }
   .task-calendar-date {
     justify-content: center;

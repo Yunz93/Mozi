@@ -15,6 +15,7 @@ vi.mock("../types/filesystem", () => ({ isTauriEnvironment: () => true }));
 vi.mock("../utils/platform", () => ({
   isWindowsPlatform: () => mocks.platform === "windows",
   isMacOSPlatform: () => mocks.platform === "macos",
+  isLinuxPlatform: () => mocks.platform === "linux",
 }));
 vi.mock("./updateDocumentGuard", () => ({ beginUpdateInstall: mocks.begin }));
 vi.mock("./filesystem/flushActiveDocument", () => ({

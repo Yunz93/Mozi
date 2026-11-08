@@ -6,6 +6,11 @@ fn main() {
             .flag("-fobjc-arc")
             .flag("-fblocks")
             .compile("mozi_calendar");
+        println!("cargo:rerun-if-changed=src/native_notification_bridge.m");
+        cc::Build::new()
+            .file("src/native_notification_bridge.m")
+            .flag("-fobjc-arc")
+            .compile("mozi_notifications");
         println!("cargo:rustc-link-lib=framework=EventKit");
         println!("cargo:rustc-link-lib=framework=Foundation");
     }

@@ -7,7 +7,11 @@ import {
 } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { isTauriEnvironment } from "../types/filesystem";
-import { isMacOSPlatform, isWindowsPlatform } from "../utils/platform";
+import {
+  isLinuxPlatform,
+  isMacOSPlatform,
+  isWindowsPlatform,
+} from "../utils/platform";
 import { areUpdaterArtifactsEnabled } from "./updaterCapabilities";
 import { flushAllDirtyOpenTabs } from "./filesystem/flushActiveDocument";
 import { useAppStore } from "../store/appStore";
@@ -24,7 +28,10 @@ const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 
 export type UpdateDownloadEvent = DownloadEvent;
 
-export type AvailableUpdateKind = "windows-tauri" | "macos-script";
+export type AvailableUpdateKind =
+  | "windows-tauri"
+  | "linux-tauri"
+  | "macos-script";
 
 export interface AvailableUpdate {
   version: string;
@@ -57,8 +64,16 @@ export function isMacOSUpdaterSupported(): boolean {
   return isDesktopApp() && isMacOSPlatform();
 }
 
+export function isLinuxUpdaterSupported(): boolean {
+  return isDesktopApp() && isLinuxPlatform();
+}
+
 export function isInAppUpdaterSupported(): boolean {
-  return isWindowsUpdaterSupported() || isMacOSUpdaterSupported();
+  return (
+    isWindowsUpdaterSupported() ||
+    isMacOSUpdaterSupported() ||
+    isLinuxUpdaterSupported()
+  );
 }
 
 export async function getInstalledAppVersion(): Promise<string | null> {
@@ -75,7 +90,7 @@ function fromTauriUpdate(update: Update): AvailableUpdate {
     currentVersion: update.currentVersion,
     date: update.date,
     body: update.body,
-    kind: "windows-tauri",
+    kind: isLinuxUpdaterSupported() ? "linux-tauri" : "windows-tauri",
     close: () => update.close(),
     tauriUpdate: update,
   };
@@ -125,11 +140,11 @@ export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
     return checkMacOSUpdate();
   }
 
-  if (!isWindowsUpdaterSupported()) {
+  if (!isWindowsUpdaterSupported() && !isLinuxUpdaterSupported()) {
     return null;
   }
 
-  // When createUpdaterArtifacts is off, skip the network check so polls do not 404 on missing latest.json.
+  // 未生成签名更新包时不发起检查，避免反复请求不存在的更新清单。
   if (!areUpdaterArtifactsEnabled()) {
     return null;
   }
@@ -160,9 +175,13 @@ export async function downloadAndInstallUpdate(
     return;
   }
 
-  if (!isWindowsUpdaterSupported()) {
+  const supported =
+    update.kind === "linux-tauri"
+      ? isLinuxUpdaterSupported()
+      : isWindowsUpdaterSupported();
+  if (!supported) {
     throw new Error(
-      "In-app updates are currently supported on Windows desktop builds only.",
+      "The update installer does not match this desktop platform.",
     );
   }
   if (!areUpdaterArtifactsEnabled()) {
@@ -171,7 +190,7 @@ export async function downloadAndInstallUpdate(
     );
   }
   if (!update.tauriUpdate) {
-    throw new Error("Windows updater handle is missing.");
+    throw new Error("Tauri updater handle is missing.");
   }
 
   await saveDocumentsBeforeUpdate();

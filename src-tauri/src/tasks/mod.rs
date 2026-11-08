@@ -165,6 +165,7 @@ pub async fn task_calendar_keep_background(
     if !preferences.background {
         return Ok(false);
     }
+    crate::native_window_close::leave_fullscreen(&window).await?;
     let manager = app.state::<TaskManager>();
     let mut closing = manager.closing_windows.lock().map_err(|e| e.to_string())?;
     let windows = app.webview_windows().keys().cloned().collect();

@@ -10,6 +10,8 @@ export default {
   tasks_list: "清单",
   tasks_view: "日程视图",
   tasks_today: "今天",
+  tasks_tomorrow: "明天",
+  tasks_chooseDate: "选择到期日期",
   tasks_upcoming: "未来 7 天",
   tasks_overdue: "已逾期",
   tasks_unscheduled: "未安排",
@@ -1001,6 +1003,10 @@ export default {
     "Windows 应用内更新依赖 GitHub Release 中的 `latest.json` 和签名更新包；发布新版本后，已安装用户才能收到更新。",
   settings_updatesGuide2:
     "如果刚发布了新版本但客户端还没检测到，先确认该 release 已包含 updater 产物，再重新检查一次。",
+  settings_updatesLinuxGuide1:
+    "在此检查并下载安装更新，更新包会先校验签名。安装完成后应用会自动重启。",
+  settings_updatesLinuxGuide2:
+    "安装需要系统管理员授权。取消授权或安装失败时，应用会继续运行，可稍后重试或从 GitHub Releases 手动安装。",
   settings_updatesMacGuide1:
     "macOS 应用内更新会下载 GitHub Release 中的 DMG，并用与官网相同的安装脚本清除隔离属性后安装到「应用程序」。",
   settings_updatesMacGuide2:

@@ -10,6 +10,8 @@ export default {
   tasks_list: "List",
   tasks_view: "Calendar view",
   tasks_today: "Today",
+  tasks_tomorrow: "Tomorrow",
+  tasks_chooseDate: "Choose due date",
   tasks_upcoming: "Next 7 days",
   tasks_overdue: "Overdue",
   tasks_unscheduled: "Unscheduled",
@@ -1086,6 +1088,10 @@ export default {
     "Windows in-app updates depend on the `latest.json` metadata file and signed updater artifacts uploaded to the GitHub Release.",
   settings_updatesGuide2:
     "If you just published a release and the client still does not see it, verify the release contains the updater assets first, then check again.",
+  settings_updatesLinuxGuide1:
+    "Check for updates, download, and install them here. Update signatures are verified before installation, and the app restarts when installation finishes.",
+  settings_updatesLinuxGuide2:
+    "Installation requires administrator authorization. If you cancel authorization or installation fails, the app stays open. Try again later or install the package manually from GitHub Releases.",
   settings_updatesMacGuide1:
     "macOS in-app updates download the GitHub Release DMG and install it with the same script used on the website, including clearing quarantine attributes.",
   settings_updatesMacGuide2:

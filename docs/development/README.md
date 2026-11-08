@@ -83,7 +83,7 @@ npm run tauri:build
 
 ### GitHub Tag 自动构建
 
-仓库已配置 GitHub Actions 发布流程，推送 `v` 前缀标签后会自动构建并上传 macOS / Windows / Linux x64 安装包。Linux 复用 `tauri.linux.conf.json` 构建 `.deb`，校验包信息、桌面启动器与 Markdown 文件关联后，上传到同一 Release；不生成 Linux 更新器文件，升级需手动安装新版 `.deb`。
+仓库已配置 GitHub Actions 发布流程，推送 `v` 前缀标签后会自动构建并上传 macOS / Windows / Linux x64 安装包。Linux 复用 `tauri.linux.conf.json` 构建并签名 `.deb`，校验包信息、桌面启动器与 Markdown 文件关联后，上传包及 `.deb.sig` 到同一 Release，再保留 macOS / Windows 条目并向 `latest.json` 合并 `linux-x86_64-deb` 更新条目，按安装包类型匹配。Linux 安装通过 Tauri updater 调用系统包管理器，需要管理员授权。
 
 ```bash
 git tag v0.1.1

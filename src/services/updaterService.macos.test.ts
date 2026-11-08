@@ -17,6 +17,7 @@ vi.mock("../types/filesystem", () => ({
 }));
 
 vi.mock("../utils/platform", () => ({
+  isLinuxPlatform: () => false,
   isWindowsPlatform: () => false,
   isMacOSPlatform: () => true,
 }));

@@ -1,6 +1,6 @@
 # Updater Release Notes
 
-This repository uses the Tauri updater plugin on Windows and the same signed updater artifacts for native macOS updates.
+This repository uses the Tauri updater plugin on Windows and Linux, and the same signed updater artifacts for native macOS updates.
 
 ## Build configuration
 
@@ -56,7 +56,8 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
    - updater signature assets
    - `latest.json`
    - the macOS `.dmg` (and `.app.tar.gz` updater artifact)
-4. Install the new release on at least one Windows machine and one Mac where an older build is already present.
+   - the Linux `.deb` and `.deb.sig`, with a `linux-x86_64-deb` entry in `latest.json` matching the installed package type
+4. Install the new release on Windows, macOS, and a supported Linux desktop where an older build is already present.
 5. Open `Settings -> About` and confirm:
    - the app detects the newer version
    - release notes load
@@ -66,4 +67,5 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
 ## Scope
 
 - Windows: in-app update checks and install flow use the Tauri updater plugin and signed NSIS artifacts.
+- Linux: the signed `.deb` uses the same check, download progress, document-saving guard, install and relaunch flow as Windows. The Tauri updater verifies the signature and uses `dpkg` with administrator authorization. The desktop needs a working authorization mechanism, normally `pkexec` and a polkit authentication agent. Cancellation or installation failure keeps the app running and releases the document lock. The release job runs after macOS and Windows, uploads the validated `.deb` and signature, and merges only the Linux platform entries into the existing same-version manifest. Users of v2.3.0 must manually install the first version with this capability before they can update in-app.
 - macOS: in-app update reads `latest.json`, downloads the architecture-matched signed `.app.tar.gz`, and verifies its signature after download and again before installation. After every window saves successfully, it extracts the bundle, replaces the installed app atomically, and relaunches after the old process exits. Replacement failures restore the old bundle. The README one-line installer remains a separate DMG installation path through `scripts/install-macos.sh`.

@@ -124,9 +124,9 @@ function assertReleaseWorkflowConfig() {
     process.exit(1);
   }
 
-  if (workflow.split("Export updater signing password").length - 1 !== 2) {
+  if (workflow.split("Export updater signing password").length - 1 !== 3) {
     console.error(
-      "release.yml must conditionally export TAURI_SIGNING_PRIVATE_KEY_PASSWORD on both macOS and Windows jobs.",
+      "release.yml must conditionally export TAURI_SIGNING_PRIVATE_KEY_PASSWORD on macOS, Windows and Linux jobs.",
     );
     process.exit(1);
   }

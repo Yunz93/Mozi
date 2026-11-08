@@ -3,7 +3,7 @@ import { useI18n } from "../../../hooks/useI18n";
 import { useAppStore } from "../../../store/appStore";
 import type { AppSettings } from "../../../types";
 import { isTauriEnvironment } from "../../../types/filesystem";
-import { isMacOSPlatform, isWindowsPlatform } from "../../../utils/platform";
+import { isLinuxPlatform, isMacOSPlatform } from "../../../utils/platform";
 import { openExternalUrl } from "../../../utils/externalLinks";
 import type { SettingsTabProps } from "../types";
 import {
@@ -12,6 +12,7 @@ import {
   getInstalledAppVersion,
   RELEASES_PAGE_URL,
   areUpdaterArtifactsEnabled,
+  isInAppUpdaterSupported,
   type AvailableUpdate,
   type UpdateDownloadEvent,
 } from "../../../services/updaterService";
@@ -48,9 +49,9 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
   const { t, language } = useI18n();
   const showNotification = useAppStore((state) => state.showNotification);
   const isDesktop = isTauriEnvironment();
-  const isWindows = useMemo(() => isWindowsPlatform(), []);
+  const isLinux = useMemo(() => isLinuxPlatform(), []);
   const isMac = useMemo(() => isMacOSPlatform(), []);
-  const canUpdateInApp = isWindows || isMac;
+  const canUpdateInApp = isInAppUpdaterSupported();
   const [currentVersion, setCurrentVersion] = useState<string>("");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -115,7 +116,7 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
     setDownloadProgress(INITIAL_UPDATE_DOWNLOAD_PROGRESS);
 
     try {
-      if (isWindows && !areUpdaterArtifactsEnabled()) {
+      if (!isMac && !areUpdaterArtifactsEnabled()) {
         await replaceAvailableUpdate(null);
         setStatusTone("neutral");
         setStatusMessage(t("settings_updatesArtifactsDisabled"));
@@ -408,12 +409,16 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
               <p>
                 {isMac
                   ? t("settings_updatesMacGuide1")
-                  : t("settings_updatesGuide1")}
+                  : isLinux
+                    ? t("settings_updatesLinuxGuide1")
+                    : t("settings_updatesGuide1")}
               </p>
               <p className="mt-2">
                 {isMac
                   ? t("settings_updatesMacGuide2")
-                  : t("settings_updatesGuide2")}
+                  : isLinux
+                    ? t("settings_updatesLinuxGuide2")
+                    : t("settings_updatesGuide2")}
               </p>
               <p className="mt-4">
                 <a

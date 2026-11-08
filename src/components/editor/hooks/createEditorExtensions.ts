@@ -45,6 +45,7 @@ import { tryConvertHtmlPaste } from "../behavior/htmlPaste";
 import { handleStructuredPaste } from "../behavior/input";
 import { markdownFenceLanguageCompletion } from "../behavior/fenceLanguageCompletion";
 import { markdownSlashInsertCompletion } from "../behavior/slashInsertCompletion";
+import { taskDatePickerExtension } from "../behavior/taskDatePicker";
 import { markdownFencedCodeInputHandler } from "../behavior/fencedCodeInput";
 import { createRefocusPointerSelectionExtension } from "../behavior/refocusPointerSelection";
 import {
@@ -205,6 +206,7 @@ export function createEditorExtensions(
     history(),
     compartments.darkTheme.of(EditorView.darkTheme.of(themeMode === "dark")),
     editorAutocompletePanelBaseTheme,
+    taskDatePickerExtension,
     EditorView.inputHandler.of(markdownFencedCodeInputHandler),
     editorImeGuardPlugin,
     keymap.of([
