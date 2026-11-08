@@ -16,7 +16,7 @@ import {
   rename,
   remove,
 } from "@tauri-apps/plugin-fs";
-import { basename, dirname, join } from "@tauri-apps/api/path";
+import { basename, dirname, join, sep } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileNode } from "../types";
 import type {
@@ -274,6 +274,11 @@ export class TauriFileSystem implements IFileSystem {
     }
   }
 
+  async readFileUncached(path: string): Promise<string> {
+    const { text } = decodeTextFileBytes(await readBinaryFile(path));
+    return text.replace(/^\uFEFF/, "");
+  }
+
   async readBinaryFile(path: string): Promise<Uint8Array> {
     try {
       return await readBinaryFile(path);
@@ -495,6 +500,17 @@ export class TauriFileSystem implements IFileSystem {
   ): Promise<FileNode[]> {
     try {
       const entries = await readDir(dirPath);
+      // Normalize once through the native path API; entry names are native leaf
+      // names from readDir, so appending them needs no per-file IPC. In
+      // particular, a backslash in a POSIX filename must remain a literal.
+      const separator = sep();
+      const base = await join(dirPath);
+      const prefix = base.endsWith(separator) ? base : `${base}${separator}`;
+      const reusableFolders = new Map(
+        reuseChildren
+          ?.filter((node) => node.type === "folder")
+          .map((node) => [watchPath(node.path), node]),
+      );
       const nodes: FileNode[] = [];
       const normalizedDirPath = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
       const normalizedRootPath = rootPath
@@ -518,15 +534,11 @@ export class TauriFileSystem implements IFileSystem {
         )
           continue;
 
-        const fullPath = await join(dirPath, entry.name);
+        const fullPath = `${prefix}${entry.name}`;
         const ext = entry.name.toLowerCase();
 
         if (entry.isDirectory) {
-          const existing = reuseChildren?.find(
-            (node) =>
-              node.type === "folder" &&
-              watchPath(node.path) === watchPath(fullPath),
-          );
+          const existing = reusableFolders.get(watchPath(fullPath));
           const children =
             existing?.children ??
             (await this.readDirectory(

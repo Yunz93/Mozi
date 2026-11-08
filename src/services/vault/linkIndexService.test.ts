@@ -29,6 +29,24 @@ const contents: Record<string, string> = {
 };
 
 describe("linkIndexService", () => {
+  it("deduplicates common targets in source order and handles prototype-like unresolved names", async () => {
+    const files = Array.from({ length: 1000 }, (_, i) =>
+      file(`/vault/n${i}.md`, `n${i}.md`),
+    );
+    const index = await buildFullLinkIndex({
+      files,
+      vaultRoot: "/vault",
+      readFile: async () =>
+        "[[n0]] [[n0]] [[__proto__]] [[constructor]] [[__proto__]]",
+    });
+    const paths = files.map((node) => node.path);
+    expect(index.inbounds["/vault/n0.md"]).toEqual(paths);
+    expect(index.unresolved["__proto__"]).toEqual(paths);
+    expect(index.unresolved["constructor"]).toEqual(paths);
+    expect(JSON.parse(JSON.stringify(index)).unresolved["__proto__"]).toEqual(
+      paths,
+    );
+  });
   it("builds a full index with backlinks and unresolved targets", async () => {
     const snapshot = await buildFullLinkIndex({
       files: vaultFiles,

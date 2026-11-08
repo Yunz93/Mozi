@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   remove: vi.fn(),
 }));
 vi.mock("@tauri-apps/api/path", () => ({
+  sep: () => "/",
   basename: async (p: string) => p.split("/").pop(),
   dirname: async (p: string) => p.split("/").slice(0, -1).join("/"),
   join: async (...p: string[]) => p.join("/"),
