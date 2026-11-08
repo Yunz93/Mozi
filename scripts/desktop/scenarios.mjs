@@ -12,6 +12,7 @@ import { join, dirname } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { until } from "./driver.mjs";
 import { diskRename } from "./fixtures.mjs";
+import { instrumentSubscriptions } from "./subscription-probe.mjs";
 import {
   activateTasks,
   appendText,
@@ -382,25 +383,27 @@ export async function fallback(context, check) {
   const { driver: d, vault } = context;
   await activateTasks(d);
   await check(context, "backend-loss-polling-snapshot", async () => {
-    const listener = await d.asyncExecute(
-      "const done=arguments[arguments.length-1];window.__acceptanceHints=[];const handler=window.__TAURI_INTERNALS__.transformCallback(event=>window.__acceptanceHints.push(event.payload));window.__TAURI_INTERNALS__.invoke('plugin:event|listen',{event:'vault-watch-changed',target:{kind:'WebviewWindow',label:window.__TAURI_INTERNALS__.metadata.currentWindow.label},handler}).then(done);",
+    await d.execute(
+      `return (${instrumentSubscriptions.toString()})(window.__TAURI_INTERNALS__)`,
     );
     try {
       await writeFile(
         join(vault, "active.md"),
         "# Active\n\nFALLBACK_PROBE\n\n- [ ] FALLBACK_TASK\n",
       );
+      await loaded(d, "FALLBACK_PROBE");
       const ids = await until(async () => {
-        const hints = await d.execute(
-          "return [...new Map(window.__acceptanceHints.map(h=>[h.subscriptionId,h])).values()]",
+        const probe = await d.execute(
+          "return window.__TAURI_INTERNALS__.__acceptanceSubscriptions.snapshot()",
         );
+        if (!probe.settled) return false;
         const owned = [];
-        for (const hint of hints) {
+        for (const hint of probe.tokens) {
           try {
             await d.invoke("get_vault_changes", {
               subscriptionId: hint.subscriptionId,
               epoch: hint.epoch,
-              afterSeq: hint.seq,
+              afterSeq: hint.afterSeq,
             });
             owned.push(hint.subscriptionId);
           } catch (error) {
@@ -435,10 +438,9 @@ export async function fallback(context, check) {
         newFileAndTaskVisible: true,
       };
     } finally {
-      await d.invoke("plugin:event|unlisten", {
-        event: "vault-watch-changed",
-        eventId: listener,
-      });
+      await d.execute(
+        "window.__TAURI_INTERNALS__.__acceptanceSubscriptions?.restore();return true",
+      );
     }
   });
 }

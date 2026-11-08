@@ -13,6 +13,45 @@ import { join } from "node:path";
 import { createServer } from "node:http";
 import { resetOwnedDirectory, TEST_ID } from "./process.mjs";
 import { DesktopDriver } from "./driver.mjs";
+import { instrumentSubscriptions } from "./subscription-probe.mjs";
+
+test("subscription probe preserves real replies and cannot revive a revoked token", async () => {
+  let completeRead;
+  const token = { subscriptionId: "owned", epoch: "epoch", seq: 1 };
+  const denied = new Error("Denied by the real backend");
+  const bridge = {
+    invoke(command) {
+      assert.equal(this, bridge);
+      if (command === "subscribe_vault") return Promise.resolve(token);
+      if (command === "get_vault_changes")
+        return new Promise((accept) => {
+          completeRead = accept;
+        });
+      if (command === "denied") return Promise.reject(denied);
+      return Promise.resolve(null);
+    },
+  };
+  const original = bridge.invoke;
+  // Serialize exactly as the desktop client does: no test-module closures.
+  const install = Function(`return (${instrumentSubscriptions.toString()})`)();
+  install(bridge);
+  assert.equal(await bridge.invoke("subscribe_vault", {}), token);
+  const read = bridge.invoke("get_vault_changes", {
+    subscriptionId: token.subscriptionId,
+    epoch: token.epoch,
+    afterSeq: 1,
+  });
+  await bridge.invoke("unsubscribe_vault", {
+    subscriptionId: token.subscriptionId,
+  });
+  const page = { seq: 2, changes: [] };
+  completeRead(page);
+  assert.equal(await read, page);
+  assert.deepEqual(bridge.__acceptanceSubscriptions.snapshot().tokens, []);
+  await assert.rejects(bridge.invoke("denied"), (error) => error === denied);
+  bridge.__acceptanceSubscriptions.restore();
+  assert.equal(bridge.invoke, original);
+});
 
 test("profile reset preserves unowned data and refuses linked directories", async () => {
   const root = await mkdtemp(join(tmpdir(), "mozi-profile-guard-"));
