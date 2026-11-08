@@ -148,6 +148,10 @@ try {
     JSON.stringify(
       {
         schema: 1,
+        gitDirty:
+          execFileSync("git", ["status", "--porcelain"], {
+            encoding: "utf8",
+          }).trim().length > 0,
         git: execFileSync("git", ["rev-parse", "HEAD"], {
           encoding: "utf8",
         }).trim(),

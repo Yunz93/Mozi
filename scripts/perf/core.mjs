@@ -87,6 +87,10 @@ if (args[0] === "--fixtures") {
         encoding: "utf8",
       }).trim(),
       timestamp: new Date().toISOString(),
+      gitDirty:
+        execFileSync("git", ["status", "--porcelain"], {
+          encoding: "utf8",
+        }).trim().length > 0,
       runtime: {
         platform: platform(),
         release: release(),
