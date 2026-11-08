@@ -65,6 +65,33 @@ jobs:
       - name: Run cargo tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+  linux-package:
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          shared-key: linux-package
+      - name: Install Linux build and package validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf desktop-file-utils
+      - run: npm ci
+      - name: Build the Linux release package
+        run: npm run tauri -- build --bundles deb --no-sign
+      - name: Validate Debian metadata and installed launcher targets
+        run: node scripts/check-linux-package.mjs
+      - name: Run the application Rust tests on Linux
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml -p app --lib --features tauri/custom-protocol
+
   native-watch:
     name: native-watch (${{ matrix.os }})
     strategy:

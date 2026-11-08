@@ -1,0 +1,15 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Mozi",
+  "mainBinaryName": "mozi",
+  "bundle": {
+    "targets": ["deb"],
+    "createUpdaterArtifacts": false,
+    "category": "Productivity",
+    "linux": {
+      "deb": {
+        "desktopTemplate": "packaging/linux/mozi.desktop.hbs"
+      }
+    }
+  }
+}

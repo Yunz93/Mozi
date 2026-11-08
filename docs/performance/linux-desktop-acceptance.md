@@ -47,6 +47,20 @@ fixed build displayed it.
 
 ## Fixes found by desktop testing
 
+The first `.deb` could be extracted and run, but `dpkg-deb --field` rejected its
+control file: the Chinese product name had become an invalid Debian package
+identifier. A Linux platform overlay now uses `Mozi` / `mozi` for packaging and
+the executable, with a localized Chinese desktop launcher. The launcher forwards
+selected files through `%F`. Linux targets Debian packages; updater artifacts
+are disabled for this target because Tauri's Linux updater requires AppImage.
+The Debian package is installed or updated through normal package-management
+tools. No Linux release publication was added.
+
+CI now builds the release `.deb` on Ubuntu 24.04, asks dpkg to parse its actual
+metadata, validates the desktop entry and executable/file association, and runs
+the application Rust tests on Linux. Merely extracting a package does not prove
+that it is installable.
+
 An index read could update the shared text-format cache before the document
 watcher processed an external edit. The watcher then mistook the updated cache
 for an acknowledged document version and left old text visible. Watchers now
@@ -73,11 +87,13 @@ A Linux build requires the Tauri GTK/WebKit development packages. This session
 used `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`,
 `build-essential`, `pkg-config` and `patchelf`. Desktop automation additionally
 used `webkit2gtk-driver`, `xvfb`, `xauth`, `openbox`, `dbus-x11` and CJK fonts.
+Package validation additionally requires `desktop-file-utils`.
 
 ```sh
 npm ci
 npm run build
 npm run tauri -- build --bundles deb --no-sign --config '{"build":{"beforeBuildCommand":""}}'
+node scripts/check-linux-package.mjs
 cargo install tauri-driver --locked
 # Start the driver in an isolated desktop/session, then create a W3C WebDriver
 # session whose tauri:options.application points to the packaged executable.
