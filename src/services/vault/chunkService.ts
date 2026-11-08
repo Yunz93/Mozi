@@ -1,3 +1,4 @@
+import { toForwardSlashes as normalizePath } from "../../utils/pathHelpers";
 import { parseFrontmatter } from "../../utils/frontmatter";
 import { isMarkdownFile } from "../../utils/markdownLinkUtils";
 import {
@@ -11,9 +12,6 @@ const MIN_CHUNK_CHARS = 40;
 const WINDOW_CHARS = 700;
 const WINDOW_OVERLAP = 80;
 
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
 
 function getRelPath(path: string, vaultRoot: string): string {
   const normalizedPath = normalizePath(path);

@@ -27,11 +27,8 @@ if (args[0] === "--fixtures") {
     appType: "custom",
   });
   try {
-    const links = await server.ssrLoadModule(
-      "/src/services/vault/linkIndexService.ts",
-    );
-    const chunks = await server.ssrLoadModule(
-      "/src/services/vault/chunkIndexService.ts",
+    const { buildVaultIndexes } = await server.ssrLoadModule(
+      "/src/services/vault/buildVaultIndexes.ts",
     );
     const { VectorStore } = await server.ssrLoadModule(
       "/src/services/vault/vectorStore.ts",
@@ -47,8 +44,7 @@ if (args[0] === "--fixtures") {
         };
         const started = performance.now();
         const options = { files: vault.files, vaultRoot: vault.root, readFile };
-        const linkIndex = await links.buildFullLinkIndex(options);
-        const chunkIndex = await chunks.buildFullChunkIndex(options);
+        const { linkIndex, chunkIndex } = await buildVaultIndexes(options);
         rows.push({
           operation: "full-index",
           count,

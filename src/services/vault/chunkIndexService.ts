@@ -1,12 +1,10 @@
+import { toForwardSlashes as normalizePath } from "../../utils/pathHelpers";
 import type { FileNode } from "../../types";
 import type { ChunkIndexSnapshot, TextChunk } from "../../types/vaultIndex";
 import { flattenFiles, isMarkdownFile } from "../../utils/markdownLinkUtils";
 import { chunkMarkdownFile } from "./chunkService";
 import { pathMatchesAnyGlob } from "../../utils/pathGlob";
 
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
 
 export function createEmptyChunkIndex(vaultRoot: string): ChunkIndexSnapshot {
   return {

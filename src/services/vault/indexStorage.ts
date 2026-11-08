@@ -1,8 +1,6 @@
+import { toForwardSlashes as normalizePath } from "../../utils/pathHelpers";
 import { isTauriEnvironment } from "../../types/filesystem";
 
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
 
 export type AppDataNamespace = "vault-index" | "ask-history";
 

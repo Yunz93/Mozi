@@ -1,3 +1,4 @@
+import { toForwardSlashes as normalizePath } from "../../utils/pathHelpers";
 import {
   isCompatibleProvider,
   resolveCompatibleSettings,
@@ -43,9 +44,6 @@ interface AskVaultModelResponse {
 export const ASK_VAULT_SYSTEM_PROMPT =
   "You are XiaoZhi (小知助手). Answer questions ONLY using the provided numbered knowledge-base excerpts. Do not invent facts. Cite sources with [n] markers. If the excerpts are insufficient, say you could not find enough information in the vault.";
 
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/");
-}
 
 function resolveModelLabel(settings: AppSettings): string {
   if (isCompatibleProvider(settings.aiProvider))

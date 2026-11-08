@@ -12,10 +12,15 @@ export function joinFsPath(basePath: string, ...segments: string[]): string {
 }
 
 /**
- * Normalize backslashes to forward slashes and strip trailing slashes.
+ * Convert separators only; preserve roots and trailing slashes in index keys.
  */
+export function toForwardSlashes(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+/** Convert separators and remove trailing slashes for path operations. */
 export function normalizeSlashes(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+  return toForwardSlashes(path).replace(/\/+$/, "");
 }
 
 /**
