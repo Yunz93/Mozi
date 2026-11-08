@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 
 import React from "react";
-import { render, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../store/appStore";
 import type { FileNode } from "../types";
@@ -23,6 +29,8 @@ const otherNote: FileNode = {
 };
 
 afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   useAppStore.setState({
     files: [],
@@ -35,6 +43,67 @@ afterEach(() => {
 });
 
 describe("useKnowledgeBaseWatch", () => {
+  it("yields content indexing to document updates and coalesces bursts without starvation", async () => {
+    vi.useFakeTimers();
+    let emit!: (event: DirectoryWatchEvent) => void;
+    const onFileModified = vi.fn();
+    const watchDirectory = vi.fn(
+      async (_root: string, callback: typeof emit) => {
+        emit = callback;
+        return vi.fn();
+      },
+    );
+    const options = {
+      rootFolderPath: "/vault",
+      watchDirectory,
+      onFileModified,
+      t: () => "",
+      showNotification: vi.fn(),
+    };
+    renderHook(() => useKnowledgeBaseWatch(options));
+    await act(async () => {});
+    act(() => emit({ type: "modified", paths: [note.path, note.path] }));
+    expect(onFileModified).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(60);
+      emit({ type: "modified", paths: [otherNote.path, note.path] });
+    });
+    expect(onFileModified).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(20));
+    expect(onFileModified.mock.calls).toEqual([[note.path], [otherNote.path]]);
+  });
+
+  it("cancels deferred indexing when changing vaults or unmounting", async () => {
+    vi.useFakeTimers();
+    let emit!: (event: DirectoryWatchEvent) => void;
+    const onFileModified = vi.fn();
+    const unwatch = vi.fn();
+    const options = {
+      watchDirectory: vi.fn(async (_root: string, callback: typeof emit) => {
+        emit = callback;
+        return unwatch;
+      }),
+      onFileModified,
+      t: () => "",
+      showNotification: vi.fn(),
+    };
+    const hook = renderHook(
+      ({ root }) => useKnowledgeBaseWatch({ ...options, rootFolderPath: root }),
+      { initialProps: { root: "/vault" } },
+    );
+    await act(async () => {});
+    act(() => emit({ type: "modified", paths: [note.path] }));
+    hook.rerender({ root: "/other" });
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(80));
+    expect(onFileModified).not.toHaveBeenCalled();
+    act(() => emit({ type: "modified", paths: ["/other/note.md"] }));
+    hook.unmount();
+    await act(async () => {});
+    act(() => vi.advanceTimersByTime(80));
+    expect(onFileModified).not.toHaveBeenCalled();
+    expect(unwatch).toHaveBeenCalledTimes(2);
+  });
   it("syncs the file tree and closes the open file when it is removed on disk", async () => {
     const watched = {
       callback: null as ((event: DirectoryWatchEvent) => void) | null,

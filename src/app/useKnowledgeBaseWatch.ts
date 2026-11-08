@@ -44,6 +44,8 @@ export function useKnowledgeBaseWatch(
 
     let disposed = false;
     let unwatch: (() => void) | null = null;
+    const modifiedPaths = new Set<string>();
+    let modifiedTimer: ReturnType<typeof setTimeout> | null = null;
 
     const setupWatcher = async () => {
       const watcher = await watchDirectory(rootFolderPath, (event) => {
@@ -55,7 +57,18 @@ export function useKnowledgeBaseWatch(
         }
 
         if (event.type === "modified") {
-          event.paths.forEach((path) => onFileModified?.(path));
+          if (!onFileModified) return;
+          event.paths.forEach((path) => modifiedPaths.add(path));
+          // Let the document watcher apply the disk edit before rebuilding
+          // backlinks/chunks. Coalesce bursts without postponing indefinitely.
+          if (modifiedTimer === null) {
+            modifiedTimer = setTimeout(() => {
+              modifiedTimer = null;
+              const paths = [...modifiedPaths];
+              modifiedPaths.clear();
+              if (!disposed) paths.forEach((path) => onFileModified(path));
+            }, 80);
+          }
           return;
         }
         const state = useAppStore.getState();
@@ -134,6 +147,8 @@ export function useKnowledgeBaseWatch(
 
     return () => {
       disposed = true;
+      if (modifiedTimer !== null) clearTimeout(modifiedTimer);
+      modifiedPaths.clear();
       if (unwatch) {
         unwatch();
         unwatch = null;
