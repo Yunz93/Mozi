@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { FileTypeIcon } from "../FileTypeIcon";
 import type { FileNode } from "../../types";
 import { isOpenableFile } from "../../utils/fileTypes";
@@ -31,7 +25,7 @@ export function resolveTreeDropFolderPath(node: FileNode): string {
   return normalized.slice(0, idx);
 }
 
-interface FileTreeItemProps {
+export interface FileTreeItemProps {
   node: FileNode;
   level: number;
   activeId: string | null;
@@ -39,9 +33,8 @@ interface FileTreeItemProps {
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
   onImportDroppedFiles?: (destFolderPath: string, files: File[]) => void;
-  forceExpanded?: boolean;
-  expandedPathIds?: Set<string>;
-  locateRequestKey?: number;
+  expanded?: boolean;
+  onExpandedChange?: (id: string, expanded: boolean) => void;
 }
 
 export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
@@ -53,16 +46,19 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     onContextMenu,
     onMoveNode,
     onImportDroppedFiles,
-    forceExpanded = false,
-    expandedPathIds,
-    locateRequestKey = 0,
+    expanded = false,
+    onExpandedChange,
   }) {
     const { t } = useI18n();
-    const [expanded, setExpanded] = useState(false);
+    const setExpanded = useCallback(
+      (value: boolean) => {
+        onExpandedChange?.(node.id, value);
+      },
+      [node.id, onExpandedChange],
+    );
     const [isDragOver, setIsDragOver] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const autoExpandTimerRef = useRef<number | null>(null);
-    const itemRef = useRef<HTMLDivElement>(null);
 
     const isFolder = node.type === "folder";
     const canOpen = isFolder || isOpenableFile(node);
@@ -79,13 +75,13 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
       (e: React.MouseEvent) => {
         e.stopPropagation();
         if (isFolder) {
-          setExpanded((prev) => !prev);
+          setExpanded(!expanded);
           return;
         }
         if (!canOpen) return;
         onSelect(node);
       },
-      [canOpen, isFolder, onSelect, node],
+      [canOpen, isFolder, onSelect, node, expanded, setExpanded],
     );
 
     const handleRightClick = useCallback(
@@ -113,6 +109,8 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
       }
     }, []);
 
+    useEffect(() => clearAutoExpandTimer, [clearAutoExpandTimer]);
+
     const handleDragOver = useCallback(
       (e: React.DragEvent) => {
         if (!isDropTarget) return;
@@ -129,7 +127,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
           }, AUTO_EXPAND_ON_DRAG_MS);
         }
       },
-      [expanded, isDropTarget, isFolder],
+      [expanded, isDropTarget, isFolder, setExpanded],
     );
 
     const handleDragLeave = useCallback(
@@ -183,46 +181,15 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     }, [clearAutoExpandTimer]);
 
     const isActive = node.id === activeId;
-    const isInLocatedPath = Boolean(expandedPathIds?.has(node.id));
     const displayName =
       node.type === "file" ? node.name.replace(/\.md$/i, "") : node.name;
     const itemTitle = !canOpen
       ? `${displayName} · ${t("sidebar_fileTypeNotSupported")}`
       : displayName;
 
-    useEffect(() => {
-      if (locateRequestKey <= 0 || !isFolder || !isInLocatedPath) return;
-      setExpanded(true);
-    }, [isFolder, isInLocatedPath, locateRequestKey]);
-
-    useEffect(() => {
-      if (locateRequestKey <= 0 || !isActive) return;
-
-      itemRef.current?.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
-    }, [isActive, locateRequestKey]);
-
-    const showChildren =
-      isFolder && (expanded || forceExpanded) && node.children;
-
-    // Sorting a large folder on every render is wasteful; only recompute when
-    // the children array actually changes.
-    const sortedChildren = useMemo(
-      () =>
-        (node.children ?? [])
-          .filter((child) => !child.isTrash)
-          .sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-          ),
-      [node.children],
-    );
-
     return (
       <div className="select-none" data-file-tree-item>
         <div
-          ref={itemRef}
           className={`
           workspace-tree-row group relative flex items-center py-2 px-3 mx-2 rounded-lg text-sm border border-transparent
           ${canOpen ? "cursor-pointer" : "cursor-not-allowed"}
@@ -336,26 +303,6 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
             </span>
           )}
         </div>
-
-        {showChildren && (
-          <div className="ml-0 mt-0.5 space-y-0.5">
-            {sortedChildren.map((child) => (
-              <FileTreeItem
-                key={child.id}
-                node={child}
-                onSelect={onSelect}
-                activeId={activeId}
-                level={level + 1}
-                onContextMenu={onContextMenu}
-                onMoveNode={onMoveNode}
-                onImportDroppedFiles={onImportDroppedFiles}
-                forceExpanded={forceExpanded}
-                expandedPathIds={expandedPathIds}
-                locateRequestKey={locateRequestKey}
-              />
-            ))}
-          </div>
-        )}
       </div>
     );
   },

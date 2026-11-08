@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { BookOpen, Plus } from "lucide-react";
-import { FileTreeItem } from "./FileTree";
+import { VirtualFileTree } from "./VirtualFileTree";
 import { TrashView } from "./TrashView";
 import { useFileSystem } from "../../hooks/useFileSystem";
 import { useAppStore } from "../../store/appStore";
@@ -263,6 +263,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     const showNotification = useAppStore((state) => state.showNotification);
 
     const sidebarRef = useRef<HTMLElement>(null);
+    const treeScrollRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [showTrash, setShowTrash] = useState(false);
     const [locatedFileId, setLocatedFileId] = useState<string | null>(null);
@@ -564,6 +565,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
           </div>
 
           <div
+            ref={treeScrollRef}
             className={`flex-1 overflow-y-auto py-2 scrollbar-hide transition-colors ${
               isRootDragOver
                 ? "bg-accent-DEFAULT/10 dark:bg-accent-DEFAULT/10"
@@ -709,23 +711,19 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                 )}
               </div>
             ) : (
-              <div className="space-y-0.5">
-                {filteredFiles.map((node) => (
-                  <FileTreeItem
-                    key={node.id}
-                    node={node}
-                    onSelect={handleTreeSelect}
-                    activeId={activeFileId}
-                    level={0}
-                    onContextMenu={openContextMenu}
-                    onMoveNode={onMoveNode}
-                    onImportDroppedFiles={onImportDroppedFiles}
-                    forceExpanded={hasSearchQuery}
-                    expandedPathIds={locatedPathIds}
-                    locateRequestKey={locateCurrentFileRequestKey}
-                  />
-                ))}
-              </div>
+              <VirtualFileTree
+                key={currentKnowledgeBasePath ?? "standalone"}
+                nodes={filteredFiles}
+                scrollElementRef={treeScrollRef}
+                onSelect={handleTreeSelect}
+                activeId={activeFileId}
+                onContextMenu={openContextMenu}
+                onMoveNode={onMoveNode}
+                onImportDroppedFiles={onImportDroppedFiles}
+                forceExpanded={hasSearchQuery}
+                expandedPathIds={locatedPathIds}
+                locateRequestKey={locateCurrentFileRequestKey}
+              />
             )}
           </div>
 
