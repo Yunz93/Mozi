@@ -636,10 +636,12 @@ export class TauriFileSystem implements IFileSystem {
     const root = useAppStore.getState().rootFolderPath;
     const directory = !!root && withinWatchPath(path, root);
     const check = async ({ active }: { active: () => boolean }) => {
-      const previous = this.fileFormatStates.get(path)?.lastContent;
+      const formatBefore = this.fileFormatStates.get(path);
+      const previous = formatBefore?.lastContent;
       try {
         const bytes = await readBinaryFile(path);
-        if (!active()) return;
+        if (!active() || this.fileFormatStates.get(path) !== formatBefore)
+          return;
         const current = this.rememberDecodedText(path, bytes);
         if (previous !== undefined && current !== previous)
           callback({ path, type: "modified" });
@@ -699,10 +701,27 @@ export class TauriFileSystem implements IFileSystem {
         initialized = true;
       },
       batch: async (changes, { active }) => {
+        const trash = sanitizeTrashFolder(
+          useAppStore.getState().settings.trashFolder,
+        );
+        const visible = (path: string) => {
+          if (this.showHiddenFiles) return true;
+          const parts = watchPath(path)
+            .slice(watchPath(dirPath).length)
+            .split("/")
+            .filter(Boolean);
+          return (
+            parts[0] === trash || !parts.some((part) => part.startsWith("."))
+          );
+        };
         const result = await reconcileWatchTree(
           tree,
           dirPath,
-          changes,
+          changes.filter(
+            (change) =>
+              visible(change.path) ||
+              (change.oldPath && visible(change.oldPath)),
+          ),
           (parent, previous) => {
             const trash = sanitizeTrashFolder(
               useAppStore.getState().settings.trashFolder,

@@ -72,3 +72,13 @@ it("rejects a sibling prefix instead of traversing outside the vault", async () 
     ),
   ).rejects.toThrow();
 });
+it("does not reuse descendants when a directory is recreated at the same path", async () => {
+  const read = vi.fn(async () => tree);
+  await reconcileWatchTree(
+    tree,
+    "/v",
+    [{ path: "/v/a", kind: "created", isDirectory: true }],
+    read,
+  );
+  expect(read).toHaveBeenCalledExactlyOnceWith("/v", [tree[1]]);
+});

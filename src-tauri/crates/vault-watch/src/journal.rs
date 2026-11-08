@@ -46,6 +46,22 @@ impl Journal {
         if self.rescan {
             return;
         }
+        // A single path entry cannot represent every source in a rename chain
+        // or a renamed target removed before flush. Recover from a snapshot
+        // rather than silently forgetting an earlier source directory.
+        let chained_rename = change.kind == Kind::Renamed
+            && change.old_path.as_ref().is_some_and(|old| {
+                self.pending
+                    .get(old)
+                    .is_some_and(|c| c.kind == Kind::Renamed)
+            });
+        let replaced_rename = self.pending.get(&change.path).is_some_and(|previous| {
+            previous.kind == Kind::Renamed && !matches!(change.kind, Kind::Modified | Kind::Created)
+        });
+        if chained_rename || replaced_rename {
+            self.mark_rescan(now, None);
+            return;
+        }
         if change.kind == Kind::Renamed {
             if let Some(old) = &change.old_path {
                 self.pending.remove(old);
@@ -197,5 +213,39 @@ mod tests {
         j.push(change("/v/b"), now);
         j.flush(now + QUIET);
         assert_eq!(j.read(&j.epoch, 0).changes[0].old_path, Some("/v/a".into()));
+    }
+    #[test]
+    fn rename_chains_and_removed_targets_require_snapshot() {
+        for next in [
+            Change {
+                kind: Kind::Renamed,
+                path: "/v/third/c".into(),
+                old_path: Some("/v/second/b".into()),
+                is_directory: false,
+            },
+            Change {
+                kind: Kind::Removed,
+                path: "/v/second/b".into(),
+                old_path: None,
+                is_directory: false,
+            },
+        ] {
+            let mut j = Journal::new();
+            let now = Instant::now();
+            j.push(
+                Change {
+                    kind: Kind::Renamed,
+                    path: "/v/second/b".into(),
+                    old_path: Some("/v/first/a".into()),
+                    is_directory: false,
+                },
+                now,
+            );
+            j.push(next, now);
+            j.flush(now + QUIET);
+            let page = j.read(&j.epoch, 0);
+            assert!(page.rescan_required);
+            assert!(page.changes.is_empty());
+        }
     }
 }

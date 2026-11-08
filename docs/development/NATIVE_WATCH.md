@@ -54,3 +54,10 @@ snapshot policy. Replay gaps, resume after a long sleep, timezone changes and
 manual refresh trigger a snapshot. Read/backend failures release native references
 and restore the existing scan backoff; native attachment retries after 30 seconds.
 Reminder delivery still rereads due source files before sending notifications.
+
+Replay requests probe only the watched root's metadata to detect backends that
+silently stop after root removal. Idle consumers do not walk directories or read
+note bodies. Ambiguous renames preserve a structural hint; unsafe link replacement
+requests a filtered snapshot rather than disclosing the target. For measurements,
+rollback instructions and the packaged platform gate, see
+[performance/native-watch.md](../performance/native-watch.md).

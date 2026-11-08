@@ -134,3 +134,47 @@ fn does_not_follow_symlink_outside_root() {
     assert!(page.changes.iter().all(|c| c.path.starts_with(&temp.0)));
     assert!(!page.changes.iter().any(|c| c.path.ends_with("private.md")));
 }
+
+#[test]
+fn atomic_save_and_case_only_rename_preserve_structural_hints() {
+    let temp = Temp::new();
+    let target = temp.0.join("Case.md");
+    fs::write(&target, "before").unwrap();
+    let broker = Broker::default();
+    let sub = broker.subscribe(&temp.0, true).unwrap();
+    let replacement = temp.0.join("save.tmp");
+    fs::write(&replacement, "after").unwrap();
+    fs::rename(&replacement, &target).unwrap();
+    let page = wait(&broker, &sub, sub.seq, |p| {
+        p.rescan_required || has(p, &target)
+    });
+    assert_eq!(fs::read_to_string(&target).unwrap(), "after");
+    let renamed = temp.0.join("case.md");
+    fs::rename(&target, &renamed).unwrap();
+    wait(&broker, &sub, page.seq, |p| {
+        p.rescan_required
+            || p.changes.iter().any(|c| {
+                c.kind != Kind::Modified
+                    && (c.path == renamed || c.old_path.as_deref() == Some(&target))
+            })
+    });
+    broker.unsubscribe(&sub.subscription_id);
+    assert_eq!(broker.stats().watchers, 0);
+}
+
+#[test]
+fn real_burst_is_replayed_or_requests_a_snapshot() {
+    let temp = Temp::new();
+    let broker = Broker::default();
+    let sub = broker.subscribe(&temp.0, true).unwrap();
+    for i in 0..1500 {
+        fs::write(temp.0.join(format!("note-{i}.md")), "burst").unwrap();
+    }
+    let last = temp.0.join("note-1499.md");
+    let page = wait(&broker, &sub, sub.seq, |p| {
+        p.rescan_required || has(p, &last)
+    });
+    assert!(page.changes.len() <= 1024 * 32);
+    assert!(page.changes.iter().all(|c| c.path.starts_with(&temp.0)));
+    broker.unsubscribe(&sub.subscription_id);
+}

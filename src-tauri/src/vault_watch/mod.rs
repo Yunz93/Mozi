@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 #[derive(Default)]
 struct Owners {
     subscriptions: HashMap<String, String>,
-    generations: HashMap<String, u64>,
+    generations: HashMap<String, String>,
 }
 pub struct WatchState {
     pub broker: Arc<Broker>,
@@ -58,14 +58,13 @@ pub fn initialize(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 impl WatchState {
-    fn generation(&self, label: &str) -> Result<u64, String> {
-        Ok(*self
-            .owners
-            .lock()
-            .map_err(|_| "Owner lock failed")?
+    fn generation(&self, label: &str) -> Result<String, String> {
+        let mut owners = self.owners.lock().map_err(|_| "Owner lock failed")?;
+        Ok(owners
             .generations
-            .get(label)
-            .unwrap_or(&0))
+            .entry(label.into())
+            .or_insert_with(|| uuid::Uuid::new_v4().to_string())
+            .clone())
     }
     fn owns(&self, label: &str, id: &str) -> Result<(), String> {
         if self
@@ -81,9 +80,9 @@ impl WatchState {
             Err("Subscription does not belong to this window".into())
         }
     }
-    fn attach(&self, label: &str, generation: u64, token: &Subscription) -> Result<(), String> {
+    fn attach(&self, label: &str, generation: &str, token: &Subscription) -> Result<(), String> {
         let mut owners = self.owners.lock().map_err(|_| "Owner lock failed")?;
-        if *owners.generations.get(label).unwrap_or(&0) != generation {
+        if owners.generations.get(label).map(String::as_str) != Some(generation) {
             return Err("Window subscription was superseded".into());
         }
         if owners
@@ -108,7 +107,9 @@ pub fn release_window(app: &AppHandle, label: &str) {
         return;
     };
     let ids = if let Ok(mut owners) = state.owners.lock() {
-        *owners.generations.entry(label.into()).or_default() += 1;
+        // Removing a random incarnation token invalidates pending replies without
+        // retaining a generation counter for every window ever opened.
+        owners.generations.remove(label);
         let ids: Vec<_> = owners
             .subscriptions
             .iter()
@@ -178,7 +179,7 @@ pub async fn subscribe_vault(
             state.broker.unsubscribe(&token.subscription_id);
             return Err("Window has closed".into());
         }
-        if let Err(error) = state.attach(&label, generation, &token) {
+        if let Err(error) = state.attach(&label, &generation, &token) {
             state.broker.unsubscribe(&token.subscription_id);
             return Err(error);
         }
@@ -252,15 +253,14 @@ mod tests {
             seq: 0,
             path: "/synthetic".into(),
         };
-        state.attach("main", 0, &token).unwrap();
+        let generation = state.generation("main").unwrap();
+        state.attach("main", &generation, &token).unwrap();
         assert!(state.owns("other", "one").is_err());
         assert!(state.owns("main", "one").is_ok());
-        state
-            .owners
-            .lock()
-            .unwrap()
-            .generations
-            .insert("main".into(), 1);
-        assert!(state.attach("main", 0, &token).is_err());
+        state.owners.lock().unwrap().generations.remove("main");
+        assert!(state.attach("main", &generation, &token).is_err());
+        let next = state.generation("main").unwrap();
+        assert_ne!(generation, next);
+        assert!(state.attach("main", &generation, &token).is_err());
     }
 }

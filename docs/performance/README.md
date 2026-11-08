@@ -58,3 +58,7 @@ The checked-in `baseline-*-linux.json` files are one initial smoke measurement
 against `a1bfeb0`, using 100 notes and the quick browser document. They demonstrate
 reproducibility and work counts, not a statistical performance claim. They contain
 no vault content or local paths. Repeat the same sizes/rounds for comparisons.
+
+Native filesystem observation has a separate [benchmark and rollout guide](native-watch.md).
+Run `npm run perf:native` for actual OS events without a WebView; this does not
+replace packaged desktop UI validation.
