@@ -27,15 +27,13 @@ on:
         type: choice
         default: full
         options: [smoke, full]
+      include_intel:
+        description: "Also validate the optional, currently unshipped Intel macOS build"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: desktop-${{ github.event.pull_request.number || github.ref }}
-  # Finish the active build so cold platform caches survive; only the newest
-  # pending run is retained by GitHub's concurrency group.
-  cancel-in-progress: false
 
 jobs:
   desktop:
@@ -43,7 +41,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04, macos-15, macos-15-intel, windows-2025]
+        runner: ${{ fromJSON(inputs.include_intel && '["ubuntu-24.04","macos-15","macos-15-intel","windows-2025"]' || '["ubuntu-24.04","macos-15","windows-2025"]') }}
+    concurrency:
+      group: desktop-platform-${{ github.event.pull_request.number || github.ref }}-${{ matrix.runner }}
+      cancel-in-progress: false
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
