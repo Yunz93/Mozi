@@ -27,6 +27,9 @@ export async function buildVaultIndexes(options: {
         options.excludeGlobs,
         options.vaultRoot,
       );
+      // Reserve in admission/tree order before asynchronous reads complete, so
+      // embedding batches and tied retrieval results remain deterministic.
+      if (includeChunks) chunkIndex.byPath[path] = [];
       let content: string;
       try {
         content = await options.readFile(rawPath);
