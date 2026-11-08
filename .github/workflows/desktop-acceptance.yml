@@ -33,7 +33,9 @@ permissions:
 
 concurrency:
   group: desktop-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Finish the active build so cold platform caches survive; only the newest
+  # pending run is retained by GitHub's concurrency group.
+  cancel-in-progress: false
 
 jobs:
   desktop:
