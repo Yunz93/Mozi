@@ -357,7 +357,7 @@ export const ImageHostingTab: React.FC<SettingsTabProps> = ({
               type="text"
               value={ih.s3.accessKeyId}
               onChange={(e) => updateS3({ accessKeyId: e.target.value })}
-              placeholder="AKIAIOSFODNN7EXAMPLE"
+              placeholder="YOUR_ACCESS_KEY_ID"
               className={`${inputClass} font-mono`}
             />
           </div>

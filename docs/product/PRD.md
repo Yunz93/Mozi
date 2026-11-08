@@ -108,7 +108,7 @@
 - simple-blog 发布。
 - 微信公众号草稿发布。
 - 可选 AI 辅助：润色、摘要、标签、选区生成词条。
-- **知识层（Beta）**：反向链接 / 出链面板、相关笔记（语义检索）、Ask Vault 库级问答（带来源引用）、内置本地 embedding 与隐私模式。护栏验收标准见 [产品演进方案](./PRODUCT_ROADMAP.md) §6.3。
+- **知识层（Beta）**：反向链接 / 出链面板、相关笔记（语义检索）、Ask Vault 库级问答（带来源引用）、内置本地 embedding 与隐私模式。护栏验收标准见 [产品演进方案](ROADMAP.md) §6.3。
 - 主题、字体、字号、语言、快捷键、metadata、发布、图床、更新等设置。
 - macOS / Windows 桌面安装包与更新检查。
 
@@ -118,9 +118,9 @@
 - 更细粒度的 Markdown 风格预设。
 - 更完整的发布渠道。
 - 大型知识库性能优化。
-- 知识层深化：Ask Vault 评测集与护栏、发送片段预览、索引排除规则 UI、对话历史、本地模型体验打磨等（见 [产品演进方案](./PRODUCT_ROADMAP.md) 与 [具体实施方案](./IMPLEMENTATION_PLAN.md)）。
+- 知识层深化：Ask Vault 评测集与护栏、发送片段预览、索引排除规则 UI、对话历史、本地模型体验打磨等（见 [产品演进方案](ROADMAP.md) 与 [具体实施方案](IMPLEMENTATION_PLAN.md)）。
 
-知识层 Phase 1–3 能力（反向链接、语义检索、Ask Vault、本地 embedding / 隐私模式）已以 **Beta** 形态随 1.0 交付；上述后续项不改变 §5.3 的不做目标。护栏指标以 [产品演进方案](./PRODUCT_ROADMAP.md) §6.3 为准。
+知识层 Phase 1–3 能力（反向链接、语义检索、Ask Vault、本地 embedding / 隐私模式）已以 **Beta** 形态随 1.0 交付；上述后续项不改变 §5.3 的不做目标。护栏指标以 [产品演进方案](ROADMAP.md) §6.3 为准。
 
 ## 8. 核心用户流程
 
@@ -248,7 +248,7 @@
 | FR-106 | 支持列表缩进、反缩进、回车延续等源码编辑行为。                                                                                | P0     |
 | FR-107 | 支持当前文件搜索。                                                                                                            | P1     |
 | FR-108 | 支持字数/写作统计展示。                                                                                                       | P2     |
-| FR-109 | 支持 GFM 表格结构化编辑：单元格导航、增删行列、列对齐、插入表格。详见 [TABLE_EDITING_PROPOSAL](./TABLE_EDITING_PROPOSAL.md)。 | P1     |
+| FR-109 | 支持 GFM 表格结构化编辑：单元格导航、增删行列、列对齐、插入表格。详见 [TABLE_EDITING_PROPOSAL](TABLE_EDITING_PROPOSAL.md)。 | P1     |
 
 ### 9.3 预览与渲染
 

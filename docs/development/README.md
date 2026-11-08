@@ -1,6 +1,6 @@
 # 墨知 开发文档
 
-[English](./DEVELOPMENT.en.md) · [返回主页](../README.md)
+[English](README.en.md) · [返回主页](../../README.md)
 
 ## 技术栈
 
@@ -129,7 +129,7 @@ Release 工作流会在 GitHub Secrets 齐全时自动完成签名与公证；�
 npm run smoke:release
 ```
 
-配套检查清单见 [RELEASE_SMOKE_TEST.md](./RELEASE_SMOKE_TEST.md)。
+配套检查清单见 [RELEASE_SMOKE_TEST.md](../release/SMOKE_TEST.md)。
 
 ## 开发说明
 

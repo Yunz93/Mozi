@@ -851,8 +851,6 @@ export default {
   settings_aboutMessage: "留言",
   settings_aboutMessageValue:
     "这是我理想中 Markdown 编辑器的样子，希望你也会喜欢，欢迎反馈问题和意见。",
-  settings_aboutJointCertification: "Fable5 + GPT 5.6 + Grok 4.5 联合认证",
-  settings_aboutJointCertificationHint: "由多模型协作评审与认证",
   settings_simpleBlogSectionTitle: "Simple Blog",
   settings_simpleBlogSectionDesc: "发布到 simple-blog 仓库并触发网站重新部署。",
   settings_blogRepoUrl: "博客仓库地址",

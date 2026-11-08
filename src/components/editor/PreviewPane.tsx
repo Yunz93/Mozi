@@ -925,26 +925,6 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
       [parsedFrontmatter],
     );
 
-    // Keep hook order stable after the property editor was removed.
-    const [_propertyDrafts] = useState<Record<string, string>>({});
-    const [_editingPropertyKey] = useState<string | null>(null);
-    useEffect(() => {}, [frontmatterEntries, parsedFrontmatter]);
-    useEffect(() => {}, [parsedFrontmatter]);
-    const _commitPropertyDraft = useCallback(
-      (_key: string, _rawDraft?: string) => {},
-      [],
-    );
-    const _handlePropertyChange = useCallback(
-      (_key: string, _value: string) => {},
-      [],
-    );
-    const _handlePropertyFocus = useCallback((_key: string) => {}, []);
-    const _handlePropertyBlur = useCallback((_key: string) => {}, []);
-    const _handlePropertyKeyDown = useCallback(
-      (_event: React.KeyboardEvent<HTMLTextAreaElement>, _key: string) => {},
-      [],
-    );
-
     return (
       <div
         ref={(node) => {

@@ -221,38 +221,6 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
         <p className="mt-4 text-sm leading-9 text-gray-600 dark:text-gray-300">
           {t("settings_aboutMessageValue")}
         </p>
-
-        <div
-          className="mt-8 flex items-start gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3.5 dark:border-emerald-500/25 dark:bg-emerald-500/10"
-          role="note"
-          aria-label={t("settings_aboutJointCertification")}
-        >
-          <span
-            className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-300/80 bg-white text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-300"
-            aria-hidden
-          >
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.25"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 3l2.2 2.2L17 4.5l.3 2.8L20 9l-1.7 2.2.7 2.7-2.7.5L15 17l-2.2-1.5L10.5 17l-1.3-2.6-2.7-.5.7-2.7L5.5 9l2.7-1.7L8.5 4.5l2.8.7L12 3z" />
-              <path d="M9.5 12.2l1.7 1.7 3.5-3.6" />
-            </svg>
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold tracking-wide text-emerald-900 dark:text-emerald-200">
-              {t("settings_aboutJointCertification")}
-            </p>
-            <p className="mt-1 text-xs leading-5 text-emerald-800/75 dark:text-emerald-200/70">
-              {t("settings_aboutJointCertificationHint")}
-            </p>
-          </div>
-        </div>
       </div>
 
       <div>

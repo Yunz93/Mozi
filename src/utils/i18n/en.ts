@@ -921,10 +921,6 @@ export default {
   settings_aboutMessage: "Message",
   settings_aboutMessageValue:
     "This is what the ideal Markdown editor looks like to me. I hope you like it too, and feedback is always welcome.",
-  settings_aboutJointCertification:
-    "Jointly certified by Fable5 + GPT 5.6 + Grok 4.5",
-  settings_aboutJointCertificationHint:
-    "Reviewed and certified through multi-model collaboration",
   settings_simpleBlogSectionTitle: "Simple Blog",
   settings_simpleBlogSectionDesc:
     "Publish to the simple-blog repository and trigger a new deployment.",

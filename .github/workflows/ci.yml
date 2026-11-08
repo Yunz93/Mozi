@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Public content guard
+        run: npm run check:public
+
       - name: Lint
         run: npm run lint
 
