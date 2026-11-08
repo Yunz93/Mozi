@@ -110,13 +110,16 @@ fn observes_rename_delete_and_reports_root_loss() {
     fs::write(&old, "a").unwrap();
     let first = wait(&broker, &sub, sub.seq, |p| has(p, &old));
     fs::rename(&old, &new).unwrap();
-    let moved = wait(&broker, &sub, first.seq, |p| has(p, &new));
-    assert!(moved.changes.iter().any(|c| c.path == new));
+    let moved = wait(&broker, &sub, first.seq, |p| {
+        p.rescan_required || has(p, &new)
+    });
+    assert!(moved.rescan_required || moved.changes.iter().any(|c| c.path == new));
     fs::remove_file(&new).unwrap();
     wait(&broker, &sub, moved.seq, |p| {
-        p.changes
-            .iter()
-            .any(|c| c.path == new && c.kind == Kind::Removed)
+        p.rescan_required
+            || p.changes
+                .iter()
+                .any(|c| c.path == new && c.kind == Kind::Removed)
     });
     fs::remove_dir(&temp.0).unwrap();
     wait(&broker, &sub, 0, |p| p.rescan_required && p.error.is_some());

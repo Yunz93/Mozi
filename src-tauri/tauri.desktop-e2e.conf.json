@@ -1,0 +1,21 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Mozi Desktop E2E",
+  "identifier": "com.bxyz.markdown-press.desktop-e2e",
+  "mainBinaryName": "mozi-desktop-e2e",
+  "bundle": {
+    "createUpdaterArtifacts": false
+  },
+  "app": {
+    "security": {
+      "capabilities": [
+        "default",
+        {
+          "identifier": "desktop-e2e-driver",
+          "windows": ["main", "file-*", "win-*"],
+          "permissions": ["wdio-webdriver:default"]
+        }
+      ]
+    }
+  }
+}

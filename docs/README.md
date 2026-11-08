@@ -2,6 +2,7 @@
 
 - [Development](development/README.en.md) / [开发指南](development/README.md)
 - [Performance measurements and platform checklist](performance/README.md)
+- [Cross-platform desktop acceptance](testing/desktop-acceptance.md)
 - [Product requirements](product/PRD.md), [roadmap](product/ROADMAP.md),
   [implementation notes](product/IMPLEMENTATION_PLAN.md), [table proposal](product/TABLE_EDITING_PROPOSAL.md)
 - [Release smoke checks](release/SMOKE_TEST.md), [updater delivery](release/UPDATER.md)
@@ -22,6 +23,7 @@
 - `src-tauri/src`: native capabilities and backend services, grouped by domain.
 - `scripts/perf`: reproducible performance tooling. Existing release scripts retain
   their stable paths because workflows and public install commands depend on them.
+- `scripts/desktop`: real desktop acceptance clients, synthetic vaults and platform setup.
 - `docs/product`, `docs/development`, `docs/release`, `docs/performance`: public
   documentation; `docs/assets`: reviewed documentation images.
 

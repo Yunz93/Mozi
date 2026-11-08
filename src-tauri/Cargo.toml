@@ -22,6 +22,11 @@ cc = "1"
 members = ["crates/vault-watch"]
 resolver = "2"
 
+[features]
+default = []
+# Automation is opt-in and must never be enabled by a release workflow.
+desktop-e2e = ["dep:tauri-plugin-wdio-webdriver"]
+
 [dependencies]
 mozi-vault-watch = { path = "crates/vault-watch" }
 base64 = "0.22"
@@ -51,6 +56,7 @@ urlencoding = "2.1.3"
 uuid = { version = "1", features = ["v4"] }
 libc = "0.2"
 tauri-plugin-window-state = "2"
+tauri-plugin-wdio-webdriver = { version = "=1.5.1", optional = true }
 minisign-verify = "0.2.5"
 
 [target.'cfg(target_os = "macos")'.dependencies]

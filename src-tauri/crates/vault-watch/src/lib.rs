@@ -385,6 +385,20 @@ fn enqueue(shared: &Weak<Shared>, key: &Key, event: notify::Result<Event>) {
             if event.need_rescan() {
                 rescan = true;
             }
+            // FSEvents can report only one side of a rename. On a case-insensitive
+            // volume both spellings can still exist according to metadata lookup,
+            // so an existence-based delta leaves stale task/tree identities behind.
+            // Rebuild from directory entries when the source is ambiguous; keep
+            // ordinary, fully paired renames incremental.
+            if let EventKind::Modify(ModifyKind::Name(mode)) = event.kind {
+                rescan |= matches!(mode, RenameMode::Any | RenameMode::Other)
+                    || (mode == RenameMode::From && event.paths.iter().any(|path| path.exists()))
+                    || (mode == RenameMode::Both
+                        && (event.paths.len() != 2
+                            || (event.paths[0] != event.paths[1]
+                                && event.paths[0].exists()
+                                && event.paths[1].exists())));
+            }
             match event.kind {
                 EventKind::Access(_) => return,
                 EventKind::Any | EventKind::Other => rescan = true,
@@ -506,6 +520,65 @@ fn enqueue(shared: &Weak<Shared>, key: &Key, event: notify::Result<Event>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ambiguous_renames_and_live_source_aliases_require_a_snapshot() {
+        for (mode, live_source, needs_snapshot) in [
+            (RenameMode::Any, false, true),
+            (RenameMode::From, false, true),
+            (RenameMode::To, false, false),
+            (RenameMode::Both, true, true),
+            (RenameMode::Both, false, false),
+        ] {
+            let path = std::env::temp_dir().join(format!("mozi-rename-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir(&path).unwrap();
+            let path = std::fs::canonicalize(&path).unwrap();
+            let old = path.join("original.md");
+            let target = path.join(if live_source {
+                "recreated.md"
+            } else {
+                "case.md"
+            });
+            std::fs::write(&target, "- [ ] current task").unwrap();
+            if live_source {
+                std::fs::write(&old, "- [ ] recreated source").unwrap();
+            }
+            let broker = Broker::default();
+            let sub = broker.subscribe(&path, true).unwrap();
+            let key = Key {
+                path: path.clone(),
+                recursive: true,
+            };
+            let mut event = Event::new(EventKind::Modify(ModifyKind::Name(mode)));
+            if mode == RenameMode::Both {
+                event = event.add_path(old);
+            }
+            event = event.add_path(target);
+            enqueue(&Arc::downgrade(&broker.shared), &key, Ok(event));
+            broker
+                .shared
+                .state
+                .lock()
+                .unwrap()
+                .roots
+                .get_mut(&key)
+                .unwrap()
+                .journal
+                .flush(Instant::now() + std::time::Duration::from_secs(2));
+            let page = broker
+                .changes(&sub.subscription_id, &sub.epoch, sub.seq)
+                .unwrap();
+            assert_eq!(
+                page.rescan_required, needs_snapshot,
+                "{mode:?}, live source: {live_source}"
+            );
+            if !needs_snapshot && mode == RenameMode::Both {
+                assert!(page.changes.iter().any(|c| c.kind == Kind::Renamed));
+            }
+            broker.unsubscribe(&sub.subscription_id);
+            std::fs::remove_dir_all(path).unwrap();
+        }
+    }
 
     #[test]
     fn root_removal_stays_terminal_even_if_the_path_already_exists_again() {
