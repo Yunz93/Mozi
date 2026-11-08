@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "git": "a1bfeb04d9b4321b4a73bbc6a7ee533755bd91d8",
+  "runtime": {
+    "platform": "linux",
+    "arch": "x64",
+    "release": "6.18.57",
+    "browser": "156.0.8078.79"
+  },
+  "scope": "Development browser with in-memory File System Access fixtures; cold/warm refers to browser context assets/settings, NOT embedding caches or OS disk cache",
+  "rows": [
+    {
+      "operation": "startup-to-folder-choice",
+      "cache": "cold",
+      "ms": 7349.664469999999
+    },
+    {
+      "operation": "open-document",
+      "cache": "cold",
+      "bytes": 100000,
+      "ms": 370.4460249999993
+    },
+    {
+      "operation": "edit-to-reading",
+      "cache": "cold",
+      "bytes": 100000,
+      "ms": 2488.975826,
+      "settingsWrites": 4
+    },
+    {
+      "operation": "startup-to-folder-choice",
+      "cache": "warm",
+      "ms": 1173.496051
+    },
+    {
+      "operation": "open-document",
+      "cache": "warm",
+      "bytes": 100000,
+      "ms": 383.11837500000183
+    },
+    {
+      "operation": "edit-to-reading",
+      "cache": "warm",
+      "bytes": 100000,
+      "ms": 1761.572207000001,
+      "settingsWrites": 4
+    }
+  ]
+}

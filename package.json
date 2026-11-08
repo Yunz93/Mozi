@@ -22,7 +22,9 @@
     "smoke:release": "node scripts/release-smoke-check.mjs --app",
     "smoke:release-workflow": "node scripts/release-smoke-check.mjs --workflow-only",
     "test:release-parity": "vitest run src/utils/tauriWindowConfig.test.ts src/utils/releaseParity.test.ts src/utils/releaseSmokeAuto.test.ts src/utils/installMacosScript.test.ts src/utils/macosReleaseSigning.test.ts src/utils/prepareTauriSigningKey.test.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "perf:core": "node scripts/perf/core.mjs",
+    "perf:browser": "node scripts/perf/browser.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",
@@ -99,6 +101,7 @@
     "happy-dom": "^15.11.7",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "playwright": "^1.65.0",
     "postcss": "^8.5.8",
     "prettier": "^3.8.3",
     "rollup-plugin-visualizer": "^5.14.0",
