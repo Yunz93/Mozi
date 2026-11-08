@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useEffect, useCallback, useRef } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
 import { flushActiveEditorPendingChanges } from "../utils/editorSelectionBridge";
@@ -106,7 +107,18 @@ export function useAutoSave(options: UseAutoSaveOptions = {}) {
     markAsSaved,
     showNotification,
     settings,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      activeTabId: state.activeTabId,
+      currentFilePath: state.currentFilePath,
+      isSaving: state.isSaving,
+      setSaving: state.setSaving,
+      updateTabContent: state.updateTabContent,
+      markAsSaved: state.markAsSaved,
+      showNotification: state.showNotification,
+      settings: state.settings,
+    })),
+  );
 
   // Use configured auto-save interval or override from options
   const effectiveDebounceMs = debounceMs ?? settings?.autoSaveInterval ?? 60000;

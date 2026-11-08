@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 /**
  * Hook for view mode management
  *
@@ -10,7 +11,12 @@ import { ViewMode } from "../types";
 import { getNextViewMode, normalizeSessionViewMode } from "../utils/viewMode";
 
 export function useViewMode() {
-  const { viewMode, setViewMode } = useAppStore();
+  const { viewMode, setViewMode } = useAppStore(
+    useShallow((state) => ({
+      viewMode: state.viewMode,
+      setViewMode: state.setViewMode,
+    })),
+  );
 
   const toggleViewMode = useCallback(() => {
     setViewMode(getNextViewMode(viewMode), "toggle");

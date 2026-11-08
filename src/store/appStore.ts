@@ -112,6 +112,20 @@ export interface AppState
     UIActions,
     VaultIndexActions {}
 
+// Runtime document/index changes must reuse the same sanitized snapshot. The
+// settings object is immutable; only settings changes rebuild this projection.
+let settingsInput: AppState["settings"] | undefined;
+let settingsSnapshot: { settings: AppState["settings"] };
+function partializeSettings(state: AppState) {
+  if (settingsInput !== state.settings) {
+    settingsSnapshot = {
+      settings: sanitizeSettingsForPersistence(state.settings),
+    };
+    settingsInput = state.settings;
+  }
+  return settingsSnapshot;
+}
+
 /**
  * Create the combined store using slice pattern
  */
@@ -131,9 +145,7 @@ export const useAppStore = create<AppState>()(
       storage: createAppStorePersistStorage(),
       migrate: (persistedState, version) =>
         migratePersistedAppState(persistedState, version),
-      partialize: (state) => ({
-        settings: sanitizeSettingsForPersistence((state as any).settings),
-      }),
+      partialize: partializeSettings,
       onRehydrateStorage: () => {
         setAppStorePersistWritesEnabled(false);
         return (state, error) => {

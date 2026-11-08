@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useCallback } from "react";
 import { useAppStore } from "../store/appStore";
 import { useFileSystem } from "./useFileSystem";
@@ -156,7 +157,21 @@ export function useFileOperations() {
     markAsSaved,
     setCurrentFilePath,
     showNotification,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      files: state.files,
+      rootFolderPath: state.rootFolderPath,
+      fileContents: state.fileContents,
+      openTabs: state.openTabs,
+      settings: state.settings,
+      addTab: state.addTab,
+      closeTab: state.closeTab,
+      updateTabContent: state.updateTabContent,
+      markAsSaved: state.markAsSaved,
+      setCurrentFilePath: state.setCurrentFilePath,
+      showNotification: state.showNotification,
+    })),
+  );
 
   const {
     readFile,

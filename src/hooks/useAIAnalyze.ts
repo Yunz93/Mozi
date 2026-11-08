@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useCallback, useState } from "react";
 import { useAppStore, selectContent } from "../store/appStore";
 import { isExcalidrawWorkspaceFile } from "../utils/excalidrawDocument";
@@ -230,7 +231,14 @@ function getDefaultWikiCategory(language: AppLanguage): string {
  */
 export function useAIAnalyze() {
   const { activeTabId, setAnalyzing, showNotification, setSettingsOpen } =
-    useAppStore();
+    useAppStore(
+      useShallow((state) => ({
+        activeTabId: state.activeTabId,
+        setAnalyzing: state.setAnalyzing,
+        showNotification: state.showNotification,
+        setSettingsOpen: state.setSettingsOpen,
+      })),
+    );
   const content = useAppStore(selectContent);
   const [isAiEnhanceConfirmOpen, setAiEnhanceConfirmOpen] = useState(false);
   const [aiEnhanceStage, setAiEnhanceStage] = useState<AiEnhanceStage | null>(

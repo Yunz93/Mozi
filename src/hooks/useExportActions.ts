@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { useCallback, useRef, useState } from "react";
 
 type ExportFlightListener = () => void;
@@ -60,7 +61,12 @@ function isNonMarkdownExportFile(
  * Publish actions live in usePublishActions.
  */
 export function useExportActions(highlighter?: ShikiHighlighter | null) {
-  const { settings, showNotification } = useAppStore();
+  const { settings, showNotification } = useAppStore(
+    useShallow((state) => ({
+      settings: state.settings,
+      showNotification: state.showNotification,
+    })),
+  );
   const exportInFlightRef = useRef(false);
   const [isExporting, setIsExporting] = useState(false);
 
