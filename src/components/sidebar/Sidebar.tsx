@@ -9,7 +9,6 @@ import React, {
 import { createPortal } from "react-dom";
 import { BookOpen, Plus, FolderOpen } from "lucide-react";
 import { useSidebarSorting } from "./hooks/useSidebarSorting";
-import type { FileSortMode } from "../../types";
 import { VirtualFileTree } from "./VirtualFileTree";
 import { TrashView } from "./TrashView";
 import { getFileSystem } from "../../types/filesystem";
@@ -304,6 +303,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
       handleRootDrop,
       isDragging,
       handleDragCapture,
+      handleDragLeaveCapture,
       stopAutoScroll,
     } = useSidebarDragAndDrop(treeScrollRef);
 
@@ -467,13 +467,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
 
         <aside
           ref={sidebarRef}
-          onDragLeaveCapture={(event) => {
-            if (
-              !(event.relatedTarget instanceof Node) ||
-              !event.currentTarget.contains(event.relatedTarget)
-            )
-              stopAutoScroll();
-          }}
+          onDragLeaveCapture={handleDragLeaveCapture}
           onDragOverCapture={(event) => {
             handleDragCapture(event);
             if (
@@ -617,55 +611,28 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
             </div>
           </div>
 
-          <div className="workspace-tree-controls">
-            <div
-              className={`workspace-root-drop-zone${isDragging ? " is-dragging" : ""}${isRootDragOver ? " is-drop-target" : ""}`}
-              data-root-drop-zone
-              title={t("sidebar_rootDropHint")}
-              onDragOver={handleRootDragOver}
-              onDragLeave={handleRootDragLeave}
-              onDrop={(event) =>
-                handleRootDrop(event, onMoveToRoot, (dropped) =>
-                  onImportDroppedFiles?.(
-                    currentKnowledgeBasePath ?? "",
-                    dropped,
-                  ),
-                )
-              }
-            >
-              <FolderOpen size={14} aria-hidden />
-              <span>
-                {isDragging
-                  ? t("sidebar_dropToRoot")
-                  : currentKnowledgeBaseName || t("sidebar_rootFolder")}
-              </span>
+          {isDragging && (
+            <div className="workspace-tree-controls">
+              <div
+                className={`workspace-root-drop-zone is-dragging${isRootDragOver ? " is-drop-target" : ""}`}
+                data-root-drop-zone
+                title={t("sidebar_rootDropHint")}
+                onDragOver={handleRootDragOver}
+                onDragLeave={handleRootDragLeave}
+                onDrop={(event) =>
+                  handleRootDrop(event, onMoveToRoot, (dropped) =>
+                    onImportDroppedFiles?.(
+                      currentKnowledgeBasePath ?? "",
+                      dropped,
+                    ),
+                  )
+                }
+              >
+                <FolderOpen size={14} aria-hidden />
+                <span>{t("sidebar_dropToRoot")}</span>
+              </div>
             </div>
-            <select
-              className="workspace-tree-sort"
-              aria-label={t("sidebar_sortMode")}
-              value={sorting.mode}
-              aria-busy={sorting.loading}
-              onChange={(event) =>
-                updateSettings({
-                  sidebarSortMode: event.target.value as FileSortMode,
-                })
-              }
-            >
-              <option value="name">{t("sidebar_sortName")}</option>
-              <option value="created">{t("sidebar_sortCreated")}</option>
-              <option value="modified">{t("sidebar_sortModified")}</option>
-              <option value="type">{t("sidebar_sortType")}</option>
-            </select>
-          </div>
-          {sorting.loading || sorting.error ? (
-            <p className="workspace-tree-sort-status" role="status">
-              {t(
-                sorting.loading
-                  ? "sidebar_sortLoading"
-                  : "sidebar_sortUnavailable",
-              )}
-            </p>
-          ) : null}
+          )}
 
           <div
             ref={treeScrollRef}
@@ -893,6 +860,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
               disabled={disableOpenKnowledgeBase}
               onSwitch={onSwitchKnowledgeBase}
               onOpenSettings={onOpenSettings}
+              sortMode={sorting.mode}
+              onSortChange={(mode) => updateSettings({ sidebarSortMode: mode })}
+              sortStatus={
+                sorting.loading || sorting.error
+                  ? t(
+                      sorting.loading
+                        ? "sidebar_sortLoading"
+                        : "sidebar_sortUnavailable",
+                    )
+                  : undefined
+              }
             />
           </div>
 

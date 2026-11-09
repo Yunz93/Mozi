@@ -1,4 +1,6 @@
 export default {
+  sidebar_switchKnowledgeBase: "打开或切换知识库",
+  tasks_openApp: "打开墨知",
   tasks_title: "待办与日程",
   tasks_button: "待办事项",
   tasks_close: "关闭待办事项",

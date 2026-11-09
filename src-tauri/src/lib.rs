@@ -440,7 +440,9 @@ fn window_logical_inner_size(window: &tauri::WebviewWindow) -> Option<(f64, f64)
 }
 
 fn window_uses_system_geometry(window: &tauri::WebviewWindow) -> bool {
-    window.is_fullscreen().unwrap_or(false) || window.is_maximized().unwrap_or(false)
+    window.label() == tasks::TRAY_WINDOW_LABEL
+        || window.is_fullscreen().unwrap_or(false)
+        || window.is_maximized().unwrap_or(false)
 }
 
 fn window_work_area(window: &tauri::WebviewWindow) -> Option<tauri::Monitor> {
@@ -495,7 +497,7 @@ fn window_has_usable_logical_size(window: &tauri::WebviewWindow) -> bool {
 }
 
 fn apply_window_geometry(window: &tauri::WebviewWindow, requested: (f64, f64)) {
-    // 全屏和最大化的几何由系统管理，不能在恢复时强制改成普通窗口尺寸。
+    // 托盘使用专门尺寸，全屏和最大化由系统管理，均不能套用普通窗口尺寸。
     if window_uses_system_geometry(window) {
         return;
     }
@@ -763,6 +765,9 @@ async fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn force_close_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() == tasks::TRAY_WINDOW_LABEL {
+        return window.hide().map_err(|error| error.to_string());
+    }
     native_window_close::leave_fullscreen(&window).await?;
     window.destroy().map_err(|error| error.to_string())
 }
@@ -774,7 +779,8 @@ fn force_exit_app(app: tauri::AppHandle) {
 
 fn exit_coordinator_label(labels: &[String]) -> Option<&str> {
     labels.iter().find(|label| label.as_str() == "main")
-        .or_else(|| labels.iter().min()).map(String::as_str)
+        .or_else(|| labels.iter().filter(|label| label.as_str() != tasks::TRAY_WINDOW_LABEL).min())
+        .map(String::as_str)
 }
 
 fn request_app_exit(app: &tauri::AppHandle) -> bool {
@@ -811,7 +817,7 @@ fn persist_window_state(app: &tauri::AppHandle, require_settled: bool) {
     if app
         .webview_windows()
         .values()
-        .any(|window| !window_has_usable_logical_size(window))
+        .any(|window| window.label() != tasks::TRAY_WINDOW_LABEL && !window_has_usable_logical_size(window))
     {
         return;
     }
@@ -883,7 +889,11 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_denylist(&[tasks::TRAY_WINDOW_LABEL])
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             ping,
             vault_watch::vault_watch_mode,
@@ -928,7 +938,8 @@ pub fn run() {
             tasks::task_calendar_test_notification,
             tasks::task_calendar_macos_access,
             tasks::task_calendar_flush,
-            tasks::task_calendar_keep_background
+            tasks::task_calendar_keep_background,
+            tasks::task_calendar_open_app
         ])
         .on_page_load(|webview, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Started {
@@ -936,6 +947,19 @@ pub fn run() {
             }
         })
         .on_window_event(|window, event| {
+            if window.label() == tasks::TRAY_WINDOW_LABEL {
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    tauri::WindowEvent::Focused(false) => {
+                        let _ = window.hide();
+                    }
+                    _ => {}
+                }
+                return;
+            }
             match event {
                 tauri::WindowEvent::Destroyed => {
                     vault_watch::release_window(window.app_handle(), window.label());
@@ -1062,15 +1086,23 @@ pub fn run() {
                 }
                 restore_initial_window_geometry(app);
             }
+            if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::Destroyed, .. } = &event {
+                // 等原生窗口真正移除后再清理，兼容多个文档窗口同时关闭。
+                let windows = app.webview_windows();
+                if windows.len() == 1 {
+                    if let Some(popover) = windows.get(tasks::TRAY_WINDOW_LABEL) {
+                        let _ = popover.destroy();
+                    }
+                }
+            }
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
                 enforce_all_window_sizes(app);
                 persist_window_state(app, false);
                 // 仅拦截系统触发的退出（Cmd+Q / 任务栏关闭）；前端在保存完成后调用 exit(0)
                 // 会带 code，直接放行。最后一个窗口已经 destroy 时也不能再拦，否则进程会变成僵尸。
-                if code.is_none() && !app.webview_windows().is_empty() {
+                // 托盘浮窗不协调文档保存，仅由主窗口或笔记窗口发起退出。
+                if code.is_none() && request_app_exit(app) {
                     api.prevent_exit();
-                    // 只由一个窗口协调全应用保存，避免最快的窗口提前退出整个进程。
-                    request_app_exit(app);
                 }
             }
             #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
@@ -1615,7 +1647,7 @@ mod tests {
         use tauri_plugin_window_state::StateFlags;
         let src = include_str!("lib.rs");
         assert!(
-            src.contains("tauri_plugin_window_state::Builder::default().build()"),
+            src.contains("tauri_plugin_window_state::Builder::default()"),
             "window-state plugin must be registered on the Tauri builder"
         );
         assert!(
@@ -1758,6 +1790,8 @@ mod tests {
     fn app_exit_uses_exactly_one_available_coordinator() {
         assert_eq!(exit_coordinator_label(&["win-b".into(), "main".into(), "file-a".into()]), Some("main"));
         assert_eq!(exit_coordinator_label(&["win-b".into(), "file-a".into()]), Some("file-a"));
+        assert_eq!(exit_coordinator_label(&[tasks::TRAY_WINDOW_LABEL.into(), "win-b".into()]), Some("win-b"));
+        assert_eq!(exit_coordinator_label(&[tasks::TRAY_WINDOW_LABEL.into()]), None);
         assert_eq!(exit_coordinator_label(&[]), None);
     }
 

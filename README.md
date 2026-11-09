@@ -49,7 +49,7 @@ xattr -cr /Applications/墨知.app
 提供 Linux x64 的 `.deb` 安装包，适用于 Ubuntu 24.04 及兼容环境；支持桌面启动器和 Markdown 文件关联。
 
 ```bash
-sudo apt install ./Mozi_2.3.2_amd64.deb
+sudo apt install ./Mozi_2.3.3_amd64.deb
 ```
 
 安装后可在 **设置 → 关于** 检查并下载安装更新，安装时需要系统管理员授权。已安装 v2.3.0 的用户需先手动安装一次包含此功能的新版 `.deb`，之后即可在应用内更新。

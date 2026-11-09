@@ -99,6 +99,7 @@ it("stops edge scrolling when a file row stops dragleave from bubbling outside t
       toJSON() {},
     });
     const row = screen.getByTitle("note");
+    expect(view.container.querySelector("[data-root-drop-zone]")).toBeNull();
     const over = new Event("dragover", { bubbles: true, cancelable: true });
     Object.defineProperties(over, {
       clientX: { value: 100 },
@@ -107,8 +108,10 @@ it("stops edge scrolling when a file row stops dragleave from bubbling outside t
     });
     fireEvent(row, over);
     expect(request).toHaveBeenCalledOnce();
+    expect(view.container.querySelector("[data-root-drop-zone]")).toBeTruthy();
     fireEvent.dragLeave(row, { relatedTarget: document.body });
     expect(cancel).toHaveBeenCalledWith(71);
+    expect(view.container.querySelector("[data-root-drop-zone]")).toBeNull();
   } finally {
     view.unmount();
     request.mockRestore();
