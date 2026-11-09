@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:ci": "node --test scripts/ci/*.test.mjs scripts/desktop/*.test.mjs",
     "test:retrieval-eval": "vitest run src/services/vault/retrievalEval.test.ts",
     "typecheck": "tsc --noEmit",
     "release:sync-version": "node scripts/sync-version-from-tag.mjs",

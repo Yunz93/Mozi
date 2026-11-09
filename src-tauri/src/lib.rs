@@ -10,6 +10,7 @@ mod native_notification;
 mod publishing;
 mod sample_notes;
 mod secure_settings;
+mod updater_signature;
 mod system_fonts;
 mod tasks;
 mod vault_watch;

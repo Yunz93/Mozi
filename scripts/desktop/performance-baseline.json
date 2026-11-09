@@ -1,0 +1,424 @@
+{
+  "schema": 1,
+  "source": "fdd1bd7bd6428d275bec24cba6840c34afb3560b",
+  "run": 42532502117,
+  "policy": {
+    "timeRatio": 2,
+    "timeAllowanceMs": 1000,
+    "memoryRatio": 1.5,
+    "memoryAllowanceBytes": 134217728
+  },
+  "profiles": {
+    "darwin/arm64": {
+      "runner": "macos-15",
+      "osRelease": "24.6.0",
+      "logicalProcessors": 3,
+      "systemMemoryBytes": 7516192768,
+      "sourceDirty": false,
+      "sourceChanges": [],
+      "memoryMetric": "rss",
+      "cases": {
+        "poll/100/1": {
+          "restoreMs": 1087.477,
+          "firstIndexMs": 1287.049,
+          "medianMs": 1465.263,
+          "maxMs": 1489.841,
+          "memoryBytes": 406192128
+        },
+        "poll/100/2": {
+          "restoreMs": 1017.914,
+          "firstIndexMs": 1220.425,
+          "medianMs": 1475.837,
+          "maxMs": 1482.692,
+          "memoryBytes": 641269760
+        },
+        "poll/100/5": {
+          "restoreMs": 1209.879,
+          "firstIndexMs": 1366.637,
+          "medianMs": 1473.449,
+          "maxMs": 1483.219,
+          "memoryBytes": 1290125312
+        },
+        "poll/1000/1": {
+          "restoreMs": 1095.817,
+          "firstIndexMs": 1745.876,
+          "medianMs": 1454.048,
+          "maxMs": 1525.949,
+          "memoryBytes": 537280512
+        },
+        "poll/1000/2": {
+          "restoreMs": 1102.65,
+          "firstIndexMs": 1748.254,
+          "medianMs": 1398.617,
+          "maxMs": 1553.05,
+          "memoryBytes": 833601536
+        },
+        "poll/1000/5": {
+          "restoreMs": 1263.622,
+          "firstIndexMs": 2067.478,
+          "medianMs": 1476.405,
+          "maxMs": 1561.175,
+          "memoryBytes": 1679949824
+        },
+        "poll/10000/1": {
+          "restoreMs": 1957.29,
+          "firstIndexMs": 6484.879,
+          "medianMs": 1463.366,
+          "maxMs": 1474.473,
+          "memoryBytes": 1349419008
+        },
+        "poll/10000/2": {
+          "restoreMs": 1875.133,
+          "firstIndexMs": 6772.708,
+          "medianMs": 1376.296,
+          "maxMs": 1554.254,
+          "memoryBytes": 2151399424
+        },
+        "poll/10000/5": {
+          "restoreMs": 2049.885,
+          "firstIndexMs": 7020.373,
+          "medianMs": 1461.661,
+          "maxMs": 1514.887,
+          "memoryBytes": 2777890816
+        },
+        "native/100/1": {
+          "restoreMs": 1243.99,
+          "firstIndexMs": 1418.691,
+          "medianMs": 332.255,
+          "maxMs": 412.288,
+          "memoryBytes": 387383296
+        },
+        "native/100/2": {
+          "restoreMs": 1253.089,
+          "firstIndexMs": 1451.744,
+          "medianMs": 372.197,
+          "maxMs": 511.662,
+          "memoryBytes": 613466112
+        },
+        "native/100/5": {
+          "restoreMs": 1072.362,
+          "firstIndexMs": 1255.284,
+          "medianMs": 580.676,
+          "maxMs": 876.51,
+          "memoryBytes": 1308442624
+        },
+        "native/1000/1": {
+          "restoreMs": 1189.417,
+          "firstIndexMs": 1834.714,
+          "medianMs": 267.69,
+          "maxMs": 374.748,
+          "memoryBytes": 515506176
+        },
+        "native/1000/2": {
+          "restoreMs": 1102.658,
+          "firstIndexMs": 1776.822,
+          "medianMs": 396.281,
+          "maxMs": 675.643,
+          "memoryBytes": 814186496
+        },
+        "native/1000/5": {
+          "restoreMs": 1209.271,
+          "firstIndexMs": 1869.485,
+          "medianMs": 1067.08,
+          "maxMs": 1689.714,
+          "memoryBytes": 1773322240
+        },
+        "native/10000/1": {
+          "restoreMs": 1834.44,
+          "firstIndexMs": 7134.724,
+          "medianMs": 1567.788,
+          "maxMs": 2183.637,
+          "memoryBytes": 1474510848
+        },
+        "native/10000/2": {
+          "restoreMs": 1695.912,
+          "firstIndexMs": 7272.435,
+          "medianMs": 2168.515,
+          "maxMs": 2589.664,
+          "memoryBytes": 2284142592
+        },
+        "native/10000/5": {
+          "restoreMs": 1883.759,
+          "firstIndexMs": 7317.33,
+          "medianMs": 7981.436,
+          "maxMs": 9050.229,
+          "memoryBytes": 2868674560
+        }
+      }
+    },
+    "win32/x64": {
+      "runner": "windows-2025",
+      "osRelease": "10.0.26100",
+      "logicalProcessors": 4,
+      "systemMemoryBytes": 17174360064,
+      "sourceDirty": true,
+      "sourceChanges": ["M src-tauri/Cargo.toml"],
+      "memoryMetric": "working-set",
+      "cases": {
+        "poll/100/1": {
+          "restoreMs": 578.125,
+          "firstIndexMs": 921.919,
+          "medianMs": 1514.29,
+          "maxMs": 1514.722,
+          "memoryBytes": 495464448
+        },
+        "poll/100/2": {
+          "restoreMs": 630.272,
+          "firstIndexMs": 825.832,
+          "medianMs": 1531.231,
+          "maxMs": 1559.419,
+          "memoryBytes": 671723520
+        },
+        "poll/100/5": {
+          "restoreMs": 635.488,
+          "firstIndexMs": 833.098,
+          "medianMs": 1501.18,
+          "maxMs": 1527.938,
+          "memoryBytes": 1222156288
+        },
+        "poll/1000/1": {
+          "restoreMs": 603.118,
+          "firstIndexMs": 1964.049,
+          "medianMs": 1513.25,
+          "maxMs": 1513.538,
+          "memoryBytes": 517816320
+        },
+        "poll/1000/2": {
+          "restoreMs": 610.939,
+          "firstIndexMs": 1938.713,
+          "medianMs": 1515.038,
+          "maxMs": 1522.379,
+          "memoryBytes": 707899392
+        },
+        "poll/1000/5": {
+          "restoreMs": 601.853,
+          "firstIndexMs": 1970.34,
+          "medianMs": 1498.656,
+          "maxMs": 1610.119,
+          "memoryBytes": 1343709184
+        },
+        "poll/10000/1": {
+          "restoreMs": 788.328,
+          "firstIndexMs": 13070.6,
+          "medianMs": 1512.057,
+          "maxMs": 1514.91,
+          "memoryBytes": 692330496
+        },
+        "poll/10000/2": {
+          "restoreMs": 692.289,
+          "firstIndexMs": 13258.107,
+          "medianMs": 1501.671,
+          "maxMs": 1555.464,
+          "memoryBytes": 1028308992
+        },
+        "poll/10000/5": {
+          "restoreMs": 693.832,
+          "firstIndexMs": 13257.393,
+          "medianMs": 1446.774,
+          "maxMs": 1528.582,
+          "memoryBytes": 1694502912
+        },
+        "native/100/1": {
+          "restoreMs": 624.618,
+          "firstIndexMs": 823.452,
+          "medianMs": 246.599,
+          "maxMs": 257.74,
+          "memoryBytes": 489299968
+        },
+        "native/100/2": {
+          "restoreMs": 653.396,
+          "firstIndexMs": 839.603,
+          "medianMs": 279.726,
+          "maxMs": 294.36,
+          "memoryBytes": 668561408
+        },
+        "native/100/5": {
+          "restoreMs": 558.611,
+          "firstIndexMs": 903.356,
+          "medianMs": 358.025,
+          "maxMs": 360.759,
+          "memoryBytes": 1229524992
+        },
+        "native/1000/1": {
+          "restoreMs": 607.793,
+          "firstIndexMs": 2035.999,
+          "medianMs": 248.538,
+          "maxMs": 277.214,
+          "memoryBytes": 521703424
+        },
+        "native/1000/2": {
+          "restoreMs": 625.663,
+          "firstIndexMs": 2016.421,
+          "medianMs": 300.738,
+          "maxMs": 315.254,
+          "memoryBytes": 705474560
+        },
+        "native/1000/5": {
+          "restoreMs": 594.36,
+          "firstIndexMs": 1907.18,
+          "medianMs": 354.481,
+          "maxMs": 478.831,
+          "memoryBytes": 1321177088
+        },
+        "native/10000/1": {
+          "restoreMs": 762.828,
+          "firstIndexMs": 13081.185,
+          "medianMs": 327.904,
+          "maxMs": 336.384,
+          "memoryBytes": 749326336
+        },
+        "native/10000/2": {
+          "restoreMs": 696.2,
+          "firstIndexMs": 13156.877,
+          "medianMs": 441.781,
+          "maxMs": 533.285,
+          "memoryBytes": 1079328768
+        },
+        "native/10000/5": {
+          "restoreMs": 754.043,
+          "firstIndexMs": 13202.82,
+          "medianMs": 912.175,
+          "maxMs": 921.423,
+          "memoryBytes": 1838555136
+        }
+      }
+    },
+    "linux/x64": {
+      "runner": "ubuntu-24.04",
+      "osRelease": "7.0.0-1017-azure",
+      "logicalProcessors": 4,
+      "systemMemoryBytes": 16760344576,
+      "sourceDirty": false,
+      "sourceChanges": [],
+      "memoryMetric": "rss",
+      "cases": {
+        "poll/100/1": {
+          "restoreMs": 534.369,
+          "firstIndexMs": 728.811,
+          "medianMs": 1463.539,
+          "maxMs": 1561.617,
+          "memoryBytes": 778481664
+        },
+        "poll/100/2": {
+          "restoreMs": 557.144,
+          "firstIndexMs": 729.324,
+          "medianMs": 1460.51,
+          "maxMs": 1486.068,
+          "memoryBytes": 1254195200
+        },
+        "poll/100/5": {
+          "restoreMs": 561.695,
+          "firstIndexMs": 731.422,
+          "medianMs": 1544.414,
+          "maxMs": 1555.087,
+          "memoryBytes": 2651000832
+        },
+        "poll/1000/1": {
+          "restoreMs": 478.925,
+          "firstIndexMs": 961.693,
+          "medianMs": 1477.468,
+          "maxMs": 1542.475,
+          "memoryBytes": 807989248
+        },
+        "poll/1000/2": {
+          "restoreMs": 486.401,
+          "firstIndexMs": 943.994,
+          "medianMs": 1472.491,
+          "maxMs": 1537.525,
+          "memoryBytes": 1302999040
+        },
+        "poll/1000/5": {
+          "restoreMs": 518.773,
+          "firstIndexMs": 1011.546,
+          "medianMs": 1489.583,
+          "maxMs": 1493.463,
+          "memoryBytes": 2768973824
+        },
+        "poll/10000/1": {
+          "restoreMs": 1071.341,
+          "firstIndexMs": 3391.76,
+          "medianMs": 1469.934,
+          "maxMs": 1548.993,
+          "memoryBytes": 1111236608
+        },
+        "poll/10000/2": {
+          "restoreMs": 1110.685,
+          "firstIndexMs": 3431.258,
+          "medianMs": 1442.278,
+          "maxMs": 1565.671,
+          "memoryBytes": 1756553216
+        },
+        "poll/10000/5": {
+          "restoreMs": 1162.541,
+          "firstIndexMs": 3491.935,
+          "medianMs": 1510.495,
+          "maxMs": 1523.017,
+          "memoryBytes": 3728048128
+        },
+        "native/100/1": {
+          "restoreMs": 600.714,
+          "firstIndexMs": 774.17,
+          "medianMs": 178.951,
+          "maxMs": 183.765,
+          "memoryBytes": 781361152
+        },
+        "native/100/2": {
+          "restoreMs": 590.16,
+          "firstIndexMs": 772.707,
+          "medianMs": 199.192,
+          "maxMs": 319.811,
+          "memoryBytes": 1248526336
+        },
+        "native/100/5": {
+          "restoreMs": 586.24,
+          "firstIndexMs": 754.995,
+          "medianMs": 362.379,
+          "maxMs": 477.336,
+          "memoryBytes": 2640601088
+        },
+        "native/1000/1": {
+          "restoreMs": 559.176,
+          "firstIndexMs": 1067.825,
+          "medianMs": 203.732,
+          "maxMs": 211.894,
+          "memoryBytes": 810287104
+        },
+        "native/1000/2": {
+          "restoreMs": 520.817,
+          "firstIndexMs": 1036.013,
+          "medianMs": 220.753,
+          "maxMs": 350.281,
+          "memoryBytes": 1338073088
+        },
+        "native/1000/5": {
+          "restoreMs": 529.095,
+          "firstIndexMs": 1060.328,
+          "medianMs": 482.674,
+          "maxMs": 675.76,
+          "memoryBytes": 2814988288
+        },
+        "native/10000/1": {
+          "restoreMs": 1155.724,
+          "firstIndexMs": 3929.372,
+          "medianMs": 970.879,
+          "maxMs": 1007.138,
+          "memoryBytes": 1041723392
+        },
+        "native/10000/2": {
+          "restoreMs": 1099.407,
+          "firstIndexMs": 3842.575,
+          "medianMs": 1251.757,
+          "maxMs": 1307.457,
+          "memoryBytes": 1842769920
+        },
+        "native/10000/5": {
+          "restoreMs": 1124.309,
+          "firstIndexMs": 3743.536,
+          "medianMs": 3094.124,
+          "maxMs": 3167.703,
+          "memoryBytes": 3931709440
+        }
+      }
+    }
+  }
+}

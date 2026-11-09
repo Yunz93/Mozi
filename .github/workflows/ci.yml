@@ -33,14 +33,22 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
+      - name: Test CI helpers and desktop harness guards
+        run: npm run test:ci
 
       - name: Release workflow smoke gate
         run: npm run smoke:release-workflow
 
       - name: Coverage gate
         run: npm run test:coverage
+
+      - name: Upload full-source coverage summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: coverage/coverage-summary.json
+          if-no-files-found: error
 
       - name: Retrieval eval gate
         run: npm run test:retrieval-eval
@@ -49,7 +57,12 @@ jobs:
         run: npm run build
 
   rust-tests:
-    runs-on: macos-latest
+    name: rust-tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -63,7 +76,7 @@ jobs:
           workspaces: ./src-tauri -> target
 
       - name: Run cargo tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
   linux-package:
     runs-on: ubuntu-24.04
@@ -122,3 +135,18 @@ jobs:
         with:
           name: native-watch-perf-${{ matrix.os }}
           path: native-watch-perf.json
+
+  ci-gate:
+    name: CI gates
+    if: always()
+    needs: [frontend-checks, rust-tests, linux-package, native-watch]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Require all CI results
+        env:
+          NEEDS_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci/workflow-gate.mjs ci

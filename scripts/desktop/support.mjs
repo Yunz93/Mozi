@@ -48,9 +48,8 @@ export async function openWindow(
 }
 export async function closeWindow(driver, handle) {
   await driver.switch(handle);
-  await driver.execute(
-    "setTimeout(()=>void window.__TAURI_INTERNALS__.invoke('force_close_window'),300);return true",
-  );
+  // W3C 正常关窗会经过 CloseRequested、前端保存保护和原生全屏退出。
+  await driver.request("DELETE", driver.path("/window"));
   await until(
     async () => !(await driver.handles()).includes(handle),
     "Window did not close",
