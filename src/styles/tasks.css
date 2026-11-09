@@ -610,6 +610,13 @@
 .task-mac-calendar {
   margin-top: 20px;
 }
+.task-calendar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
 .task-calendar-target-select {
   width: 60%;
   min-width: 0;
@@ -697,9 +704,14 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+.task-reminder-times-row > span:first-child {
+  flex: 1 1 320px;
+}
 .task-reminder-times {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 8px;
 }
 .task-reminder-time-list,
@@ -708,6 +720,9 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+.task-reminder-time-add {
+  flex-shrink: 0;
 }
 .task-reminder-time {
   display: inline-flex;

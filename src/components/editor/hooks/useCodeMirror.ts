@@ -52,6 +52,7 @@ import {
   scheduleLivePreviewMeasure,
 } from "../livePreview/shared";
 import { isEditorImeComposing } from "../behavior/imeGuard";
+import { closeTaskDatePicker } from "../behavior/taskDatePicker";
 import { flushLiveTableInput } from "../livePreview/tables";
 import { subscribeEditorDocumentPathRemap } from "../../../utils/editorSelectionBridge";
 
@@ -253,6 +254,7 @@ export function useCodeMirror(
   // 缓存重挂载与切换文档共用当前配置，不能恢复旧标签页保存的外观或 Live 模式。
   const createCurrentConfigurationEffects = useCallback(
     () => [
+      closeTaskDatePicker.of(),
       compartments.darkTheme.reconfigure(
         EditorView.darkTheme.of(themeModeRef.current === "dark"),
       ),

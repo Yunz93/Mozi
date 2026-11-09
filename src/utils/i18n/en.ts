@@ -59,6 +59,7 @@ export default {
   tasks_calendarSynced: "Synced to Calendar",
   tasks_calendarPending: "Waiting to sync to Calendar",
   tasks_calendarRefresh: "Refresh calendars",
+  tasks_calendarActions: "Calendar sync actions",
   tasks_calendarSyncError: "Calendar sync failed:",
   tasks_calendarBoundary:
     "Syncs incomplete tasks with valid dates. Completing or deleting a task removes the event created by Mozi. Date-only tasks become all-day events; timed tasks occupy 30 minutes. Calendar changes do not update notes. Turning sync off keeps existing events. Events have no extra alerts to avoid duplicate notifications.",
@@ -75,6 +76,8 @@ export default {
   tasks_addReminderTime: "Add reminder time",
   tasks_removeReminderTime: "Remove {time} reminder",
   tasks_optionalTime: "Time (optional)",
+  tasks_hour: "Hour",
+  tasks_minute: "Minute",
   tasks_notificationBoundary:
     "Reminders stop when you quit Mozi. Missed reminders are summarized after sleep. System settings and Focus mode control banners and sounds.",
   tasks_testNotification: "Send test notification",

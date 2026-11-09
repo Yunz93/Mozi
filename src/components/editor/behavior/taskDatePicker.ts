@@ -28,7 +28,7 @@ interface TaskDateRange {
   time: string;
 }
 
-const closeTaskDatePicker = StateEffect.define<void>();
+export const closeTaskDatePicker = StateEffect.define<void>();
 
 function taskDateRange(state: EditorState): TaskDateRange | null {
   if (
@@ -97,15 +97,43 @@ function createDatePicker(view: EditorView, range: TaskDateRange): TooltipView {
   grid.className = "cm-task-date-grid";
   const footer = document.createElement("div");
   footer.className = "cm-task-date-footer";
-  const timeLabel = document.createElement("label");
+  const timeLabel = document.createElement("div");
   timeLabel.className = "cm-task-time-field";
+  timeLabel.setAttribute("role", "group");
+  timeLabel.setAttribute("aria-label", t(language, "tasks_optionalTime"));
   timeLabel.textContent = t(language, "tasks_optionalTime");
-  const timeInput = document.createElement("input");
-  timeInput.type = "time";
-  timeInput.step = "60";
-  timeInput.value = range.time;
-  timeInput.setAttribute("aria-label", t(language, "tasks_optionalTime"));
-  timeLabel.append(timeInput);
+  const timeControls = document.createElement("span");
+  timeControls.className = "cm-task-time-controls";
+  const timeSelect = (label: string, count: number) => {
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", label);
+    for (let value = 0; value < count; value++) {
+      const text = String(value).padStart(2, "0");
+      const option = document.createElement("option");
+      option.textContent = text;
+      option.value = text;
+      select.append(option);
+    }
+    return select;
+  };
+  const hour = timeSelect(t(language, "tasks_hour"), 24);
+  const allDay = document.createElement("option");
+  allDay.textContent = t(language, "tasks_allDay");
+  allDay.value = "";
+  hour.prepend(allDay);
+  const minute = timeSelect(t(language, "tasks_minute"), 60);
+  const existingTime = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(range.time);
+  hour.value = existingTime?.[1] ?? "";
+  minute.value = existingTime?.[2] ?? "00";
+  minute.disabled = !hour.value;
+  hour.addEventListener("change", () => {
+    minute.disabled = !hour.value;
+  });
+  const separator = document.createElement("span");
+  separator.textContent = ":";
+  separator.setAttribute("aria-hidden", "true");
+  timeControls.append(hour, separator, minute);
+  timeLabel.append(timeControls);
   let month = new Date(range.date.getFullYear(), range.date.getMonth(), 1);
 
   const close = (restoreFocus = false) => {
@@ -115,7 +143,8 @@ function createDatePicker(view: EditorView, range: TaskDateRange): TooltipView {
   const choose = (date: Date) => {
     if (isEditorImeComposing(view)) return;
     // 日期标记与任务正文之间需要空格，保证保存后可被日程索引识别。
-    const insert = `${range.separator}@${localDateKey(date)}${timeInput.value ? ` ${timeInput.value}` : ""}`;
+    const time = hour.value ? ` ${hour.value}:${minute.value}` : "";
+    const insert = `${range.separator}@${localDateKey(date)}${time}`;
     view.dispatch({
       changes: { from: range.from, to: range.to, insert },
       selection: { anchor: range.from + insert.length },
@@ -225,7 +254,11 @@ function createDatePicker(view: EditorView, range: TaskDateRange): TooltipView {
   dom.append(title, header, grid, timeLabel, footer);
   // 鼠标选日期时保留正文的焦点与光标，键盘仍可进入日期按钮。
   dom.addEventListener("mousedown", (event) => {
-    if (!(event.target instanceof HTMLInputElement)) event.preventDefault();
+    if (
+      !(event.target instanceof Element) ||
+      !event.target.closest("input, select, textarea")
+    )
+      event.preventDefault();
   });
   dom.addEventListener("keydown", (event) => {
     if (
@@ -246,29 +279,18 @@ function createDatePicker(view: EditorView, range: TaskDateRange): TooltipView {
     )
       close();
   };
-  const blur = () => {
-    // 等浏览器完成焦点转移，避免从正文 Tab 到日期按钮时提前关窗。
-    queueMicrotask(() => {
-      if (
-        dom.isConnected &&
-        !dom.contains(document.activeElement) &&
-        !view.hasFocus
-      )
-        close();
-    });
-  };
   paint();
   return {
     dom,
     mount() {
       document.addEventListener("mousedown", outside, true);
-      view.dom.addEventListener("focusout", blur);
-      dom.addEventListener("focusout", blur);
+      // 原生下拉获得焦点前，WKWebView 会暂时把活动元素设为 BODY。
+      // 只在新焦点明确进入面板及正文外的控件时关闭，不能按临时失焦判断。
+      document.addEventListener("focusin", outside);
     },
     destroy() {
       document.removeEventListener("mousedown", outside, true);
-      view.dom.removeEventListener("focusout", blur);
-      dom.removeEventListener("focusout", blur);
+      document.removeEventListener("focusin", outside);
     },
   };
 }
@@ -277,7 +299,7 @@ const taskDateTooltip = StateField.define<Tooltip | null>({
   create: () => null,
   update(value, transaction) {
     if (
-      transaction.reconfigured ||
+      transaction.state.readOnly ||
       transaction.effects.some((effect) => effect.is(closeTaskDatePicker))
     )
       return null;
@@ -372,13 +394,29 @@ const datePickerTheme = EditorView.baseTheme({
     gap: "8px",
     color: "var(--workspace-muted)",
   },
-  ".cm-task-time-field input": {
+  ".cm-task-time-controls": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+  },
+  ".cm-task-time-field select": {
     font: "inherit",
     color: "var(--workspace-text)",
     background: "var(--workspace-menu)",
     border: "1px solid var(--workspace-border)",
     borderRadius: "6px",
     padding: "4px 6px",
+    minHeight: "32px",
+    minWidth: "54px",
+    cursor: "pointer",
+  },
+  ".cm-task-time-field select:focus-visible": {
+    outline: "2px solid var(--workspace-accent)",
+    outlineOffset: "1px",
+  },
+  ".cm-task-time-field select:disabled": {
+    opacity: ".5",
+    cursor: "default",
   },
 });
 
