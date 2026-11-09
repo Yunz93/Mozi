@@ -127,6 +127,61 @@ describe("openKnowledgeBaseWorkspace", () => {
     expect(result?.initialFile?.path).toBe("/vault/note.md");
   });
 
+  it.each([
+    ["C:\\vault\\note.md", "\\\\?\\C:\\vault\\note.md"],
+    ["\\\\?\\C:\\vault\\note.md", "C:\\vault\\note.md"],
+    ["\\\\server\\share\\note.md", "\\\\?\\UNC\\server\\share\\note.md"],
+  ])(
+    "restores the same Windows file across native path spellings (%s)",
+    async (treePath, savedPath) => {
+      const file = createFileNode(treePath, "note.md");
+      const params = createBaseParams({
+        lastOpenedFilePath: savedPath,
+        options: {
+          path: "C:\\vault",
+          skipSampleNotes: true,
+          restoreLastOpenedFile: true,
+        },
+        findPreferredFile: vi.fn((_nodes, path) =>
+          path === treePath ? file : undefined,
+        ),
+      });
+      vi.mocked(params.fs.readDirectory).mockResolvedValue([file]);
+      const result = await openKnowledgeBaseWorkspace(params);
+      expect(result?.initialFile).toEqual(file);
+      expect(params.addTab).toHaveBeenCalledWith(treePath, "# note");
+      expect(params.fs.readFile).toHaveBeenCalledWith(treePath);
+    },
+  );
+
+  it.each([
+    ["/vault/note.md", "/vault/Note.md"],
+    ["/vault/a/b.md", "/vault/a\\b.md"],
+    ["C:\\vault\\note.md", "C:\\other\\note.md"],
+    ["C:\\vault\\note.md", "C:\\vault\\Note.md"],
+  ])(
+    "does not restore a different file through path normalization (%s)",
+    async (treePath, savedPath) => {
+      const params = createBaseParams({
+        lastOpenedFilePath: savedPath,
+        options: {
+          path: "/vault",
+          skipSampleNotes: true,
+          restoreLastOpenedFile: true,
+        },
+        findPreferredFile: vi.fn((_nodes, path) =>
+          path === treePath ? createFileNode(treePath, "note.md") : undefined,
+        ),
+      });
+      vi.mocked(params.fs.readDirectory).mockResolvedValue([
+        createFileNode(treePath, "note.md"),
+      ]);
+      const result = await openKnowledgeBaseWorkspace(params);
+      expect(result?.initialFile).toBeNull();
+      expect(params.addTab).not.toHaveBeenCalled();
+    },
+  );
+
   it("does not fall back to the first file when opening a folder with 未命名.md", async () => {
     const untitled = createFileNode("/vault/未命名.md", "未命名.md");
     const params = createBaseParams({

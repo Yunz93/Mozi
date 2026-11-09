@@ -5,6 +5,7 @@
 //! **绝不**退回无校验的 DMG / `install-macos.sh` 路径。
 #![allow(dead_code)]
 
+#[cfg(test)]
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -157,29 +158,7 @@ pub fn updater_pubkey_from_tauri_conf() -> Result<String, String> {
         .ok_or_else(|| "tauri.conf.json 缺少 plugins.updater.pubkey".to_string())
 }
 
-fn decode_tauri_updater_b64(value: &str) -> Result<String, String> {
-    let bytes = BASE64_STANDARD
-        .decode(value.trim())
-        .map_err(|error| format!("更新签名解码失败: {error}"))?;
-    String::from_utf8(bytes).map_err(|error| format!("更新签名不是合法 UTF-8: {error}"))
-}
-
-/// 与 `tauri-plugin-updater` 相同：pubkey / signature 均为 minisign 文本的 Base64。
-pub fn verify_update_signature(data: &[u8], signature: &str, pubkey: &str) -> Result<(), String> {
-    if signature.trim().is_empty() {
-        return Err("latest.json 缺少 signature，已终止安装。".to_string());
-    }
-    let pubkey_plain = decode_tauri_updater_b64(pubkey)?;
-    let signature_plain = decode_tauri_updater_b64(signature)?;
-    let public_key = minisign_verify::PublicKey::decode(&pubkey_plain)
-        .map_err(|error| format!("更新公钥无效: {error}"))?;
-    let decoded_signature = minisign_verify::Signature::decode(&signature_plain)
-        .map_err(|error| format!("更新签名格式非法: {error}"))?;
-    public_key
-        .verify(data, &decoded_signature, true)
-        .map_err(|_| "更新包签名校验失败，已终止安装。".to_string())?;
-    Ok(())
-}
+pub use crate::updater_signature::verify_update_signature;
 
 pub fn require_signed_platform_artifact(
     latest: &LatestJson,
@@ -768,6 +747,14 @@ mod tests {
         let error = verify_update_signature(b"tampered-tar-bytes", &signature, &pubkey)
             .expect_err("tampered");
         assert!(error.contains("签名校验失败"));
+    }
+
+    #[test]
+    fn verify_update_signature_rejects_a_different_valid_public_key() {
+        let (pubkey, signature) = minisign_test_vector();
+        verify_update_signature(b"test", &signature, &pubkey).expect("valid vector");
+        assert_ne!(pubkey, UPDATER_PUBKEY);
+        assert!(verify_update_signature(b"test", &signature, UPDATER_PUBKEY).is_err());
     }
 
     #[test]

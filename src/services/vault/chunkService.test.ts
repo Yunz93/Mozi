@@ -1,7 +1,64 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { chunkMarkdownFile, diffChunks, hashText } from "./chunkService";
 
 describe("chunkService", () => {
+  it("keeps multiline window line numbers and text unchanged for LF and CRLF", () => {
+    for (const newline of ["\n", "\r\n"]) {
+      const content = `line with enough plain content${newline}`
+        .repeat(90)
+        .trim();
+      const chunks = chunkMarkdownFile({
+        path: "/vault/plain.md",
+        vaultRoot: "/vault",
+        content,
+      });
+      const expected = [];
+      for (let offset = 0; offset < content.length; offset += 620) {
+        const end = Math.min(content.length, offset + 700);
+        const text = content.slice(offset, end).trim();
+        if (text.length >= 40) {
+          const startLine = content.slice(0, offset).split(/\r?\n/).length;
+          expected.push({
+            text,
+            startLine,
+            endLine: startLine + text.split(/\r?\n/).length - 1,
+          });
+        }
+        if (end === content.length) break;
+      }
+      expect(
+        chunks.map(({ text, startLine, endLine }) => ({
+          text,
+          startLine,
+          endLine,
+        })),
+      ).toEqual(expected);
+    }
+  });
+
+  it("does not repeatedly split growing prefixes while indexing a large multiline note", () => {
+    const content = "plain multiline paragraph\n".repeat(4000);
+    const original = String.prototype.split;
+    let scanned = 0;
+    const split = vi
+      .spyOn(String.prototype, "split")
+      .mockImplementation(function (this: string, ...args: unknown[]) {
+        scanned += String(this).length;
+        return Reflect.apply(original, this, args) as string[];
+      });
+    let chunks;
+    try {
+      chunks = chunkMarkdownFile({
+        path: "/vault/large.md",
+        vaultRoot: "/vault",
+        content,
+      });
+    } finally {
+      split.mockRestore();
+    }
+    expect(chunks.length).toBeGreaterThan(100);
+    expect(scanned).toBeLessThan(content.length * 12);
+  });
   it("chunks by headings and keeps anchors", () => {
     const content = `---
 title: Demo

@@ -1,7 +1,7 @@
 {
   "name": "markdown-press",
   "private": true,
-  "version": "2.3.1",
+  "version": "2.3.2",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:ci": "node --test scripts/ci/*.test.mjs scripts/desktop/*.test.mjs",
     "test:retrieval-eval": "vitest run src/services/vault/retrievalEval.test.ts",
     "typecheck": "tsc --noEmit",
     "release:sync-version": "node scripts/sync-version-from-tag.mjs",

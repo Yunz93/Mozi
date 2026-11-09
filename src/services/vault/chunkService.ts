@@ -12,7 +12,6 @@ const MIN_CHUNK_CHARS = 40;
 const WINDOW_CHARS = 700;
 const WINDOW_OVERLAP = 80;
 
-
 function getRelPath(path: string, vaultRoot: string): string {
   const normalizedPath = normalizePath(path);
   const root = normalizePath(vaultRoot).replace(/\/+$/, "");
@@ -67,12 +66,18 @@ function buildWindowChunks(options: {
   const chunks: TextChunk[] = [];
   let offset = 0;
   let ordinal = 0;
+  let scannedOffset = 0;
+  let precedingLines = 0;
   while (offset < trimmed.length) {
     const end = Math.min(trimmed.length, offset + WINDOW_CHARS);
     const slice = trimmed.slice(offset, end).trim();
     if (slice.length >= MIN_CHUNK_CHARS) {
-      const prefix = trimmed.slice(0, offset);
-      const startLine = bodyStartLine + splitLines(prefix).length - 1;
+      // 窗口只向前推进，每个字符最多扫描一次，避免大笔记产生平方级前缀拆分。
+      while (scannedOffset < offset) {
+        if (trimmed.charCodeAt(scannedOffset) === 10) precedingLines++;
+        scannedOffset++;
+      }
+      const startLine = bodyStartLine + precedingLines;
       const endLine = startLine + Math.max(splitLines(slice).length - 1, 0);
       chunks.push({
         id: `${relPath}#${ordinal}`,

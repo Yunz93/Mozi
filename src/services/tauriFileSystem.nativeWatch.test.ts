@@ -264,3 +264,42 @@ it("emits deletion once and releases the registration", async () => {
   });
   stop();
 });
+
+it.each([false, true])(
+  "ignores temporary import updates and publishes the final rename (showHidden: %s)",
+  async (showHidden) => {
+    const temporary = "mozi-import-01234567-89ab-4cde-8fab-0123456789ab.tmp";
+    const fs = new TauriFileSystem();
+    fs.setDisplayOptions({ showHidden });
+    const callback = vi.fn();
+    let published = false;
+    bridge.readDir.mockImplementation(async () =>
+      published ? [entry("large.md")] : [entry(temporary)],
+    );
+    const stop = await fs.watchDirectory("/v", callback);
+    await flush();
+    expect(callback.mock.calls[0][0].tree).toEqual([]);
+    callback.mockClear();
+    bridge.readDir.mockClear();
+    for (let index = 0; index < 10; index += 1) {
+      await emit([modify(`/v/${temporary}`)]);
+    }
+    expect(bridge.readDir).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+    published = true;
+    await emit([
+      {
+        path: "/v/large.md",
+        oldPath: `/v/${temporary}`,
+        kind: "renamed",
+        isDirectory: false,
+      },
+    ]);
+    expect(bridge.readDir).toHaveBeenCalledExactlyOnceWith("/v");
+    expect(callback).toHaveBeenCalledWith({
+      type: "changed",
+      tree: [expect.objectContaining({ path: "/v/large.md" })],
+    });
+    stop();
+  },
+);

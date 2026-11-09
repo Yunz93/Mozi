@@ -11,6 +11,8 @@ import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { DesktopDriver, until } from "./driver.mjs";
 import { makeVault } from "./fixtures.mjs";
+import { seedSettingsOnUnload } from "./fixture-settings.mjs";
+import { assertCaseCoverage } from "./case-coverage.mjs";
 import {
   freePort,
   launch,
@@ -87,7 +89,7 @@ export async function session(mode = "native", count = 100) {
   const driver = new DesktopDriver(port);
   const close = async () => {
     try {
-      await driver.quit();
+      if (child.exitCode === null && !child.signalCode) await driver.quit();
     } finally {
       await stop(child);
     }
@@ -115,9 +117,23 @@ export async function session(mode = "native", count = 100) {
     report.userAgent = userAgent;
     report.capabilities = driver.capabilities;
     await driver.execute(
-      "localStorage.clear();localStorage.setItem('markdown-press-settings',JSON.stringify({state:{settings:{language:'zh-CN',lastKnowledgeBasePath:arguments[0],lastOpenedFilePath:arguments[1],knowledgeBases:[{path:arguments[0],name:'Acceptance vault',lastOpenedAt:new Date().toISOString()}],embeddingProvider:'none',builtinEmbeddingDownloadConsent:'denied',autoSaveInterval:600000}},version:0}));",
-      vault,
-      join(vault, "active.md"),
+      `return (${seedSettingsOnUnload.toString()})(arguments[0])`,
+      {
+        language: "zh-CN",
+        lastKnowledgeBasePath: vault,
+        lastOpenedFilePath: join(vault, "active.md"),
+        knowledgeBases: [
+          {
+            path: vault,
+            name: "Acceptance vault",
+            lastOpenedAt: new Date().toISOString(),
+          },
+        ],
+        embeddingProvider: "none",
+        builtinEmbeddingDownloadConsent: "denied",
+        autoSaveInterval: 600000,
+        autoCheckForUpdates: false,
+      },
     );
     const started = performance.now();
     await driver.refresh();
@@ -192,6 +208,13 @@ export async function check(context, name, action) {
       ["body", () => context.driver.body()],
       ["tasks", () => context.driver.invoke("task_calendar_snapshot")],
       [
+        "restoredPaths",
+        () =>
+          context.driver.execute(
+            "const s=JSON.parse(localStorage.getItem('markdown-press-settings')||'null')?.state?.settings;return {vault:s?.lastKnowledgeBasePath,file:s?.lastOpenedFilePath}",
+          ),
+      ],
+      [
         "tree",
         () =>
           context.driver.execute(
@@ -235,10 +258,15 @@ try {
   if (process.env.MOZI_DESKTOP_SUITE !== "bootstrap") {
     // Scenario modules share only the public WebDriver/IPC interface.
     const { functional, fallback, largeTree } = await import("./scenarios.mjs");
+    const { editorFlows, closingFlows, exitFlow } =
+      await import("./user-flows.mjs");
     for (const [action, count] of [
       [functional, 100],
       [fallback, 100],
       [largeTree, 10000],
+      [editorFlows, 100],
+      [closingFlows, 100],
+      [exitFlow, 100],
     ]) {
       const context = await session("native", count);
       try {
@@ -247,8 +275,7 @@ try {
         await context.close();
       }
     }
-    if (report.cases.filter((c) => c.name !== "driver-bootstrap").length !== 25)
-      throw new Error("Incomplete desktop acceptance coverage");
+    assertCaseCoverage(report.cases);
     const { measure } = await import("./performance.mjs");
     const full = process.env.MOZI_DESKTOP_PERFORMANCE === "full";
     for (const mode of ["poll", "native"])

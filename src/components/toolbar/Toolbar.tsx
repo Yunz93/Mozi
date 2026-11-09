@@ -14,6 +14,7 @@ import {
   LoaderCircle,
   Moon,
   MoreHorizontal,
+  Trash2,
   PanelLeft,
   Sparkles,
   Sun,
@@ -55,6 +56,7 @@ interface ToolbarProps {
   isPreviewOnlyFile?: boolean;
   onOpenTaskCalendar?: () => void;
   taskCalendarOpen?: boolean;
+  onOpenTrash?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = React.memo(
@@ -81,6 +83,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
     isPreviewOnlyFile = false,
     onOpenTaskCalendar,
     taskCalendarOpen = false,
+    onOpenTrash,
   }) => {
     const { t } = useI18n();
     const focusMode = useAppStore((state) => state.settings.focusMode);
@@ -417,6 +420,18 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
                     >
                       <Image size={14} aria-hidden />
                       <span>{t("toolbar_shareLongImage")}</span>
+                    </button>
+                  )}
+                  {onOpenTrash && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      title={t("toolbar_trash")}
+                      aria-label={t("toolbar_trash")}
+                      onClick={() => runMenuAction(onOpenTrash)}
+                    >
+                      <Trash2 size={14} aria-hidden />
+                      <span>{t("toolbar_trash")}</span>
                     </button>
                   )}
                 </div>

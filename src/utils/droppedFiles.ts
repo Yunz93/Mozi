@@ -3,6 +3,10 @@ import { getPathBasename } from "./pathHelpers";
 
 const SKIPPED_DROP_NAMES = new Set([".ds_store", "thumbs.db", "desktop.ini"]);
 
+// 控制最坏情况下的 IPC 序列化占用，大文件导入不自动触发编辑器或预览渲染。
+export const FILE_IMPORT_CHUNK_BYTES = 256 * 1024;
+export const MAX_AUTO_OPEN_IMPORT_BYTES = 5 * 1024 * 1024;
+
 export function dataTransferTypes(event: React.DragEvent): string[] {
   const types = event.dataTransfer.types;
   if (!types) return [];
@@ -28,7 +32,9 @@ export type SidebarDropIntent = "import-files" | "move-node" | null;
 export function resolveSidebarDropIntent(
   event: React.DragEvent,
   hasInternalPayload: boolean,
+  nativeInternalDrag = false,
 ): SidebarDropIntent {
+  if (nativeInternalDrag && hasInternalPayload) return "move-node";
   if (hasExternalFilePayload(event)) return "import-files";
   if (hasInternalPayload) return "move-node";
   return null;

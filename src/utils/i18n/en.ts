@@ -67,6 +67,12 @@ export default {
   tasks_backgroundHint:
     "Mozi stays in the background and can be reopened from the tray",
   tasks_allDayReminder: "All-day reminder",
+  tasks_reminderTimesHint:
+    "Date-only tasks remind at these times on the due date. An explicit HH:mm takes priority.",
+  tasks_reminderTime: "Reminder time",
+  tasks_addReminderTime: "Add reminder time",
+  tasks_removeReminderTime: "Remove {time} reminder",
+  tasks_optionalTime: "Time (optional)",
   tasks_notificationBoundary:
     "Reminders stop when you quit Mozi. Missed reminders are summarized after sleep. System settings and Focus mode control banners and sounds.",
   tasks_testNotification: "Send test notification",
@@ -139,6 +145,19 @@ export default {
 
   app_brandName: "Mozi",
   toolbar_more: "More actions",
+  toolbar_trash: "Trash",
+  sidebar_nativeDragFailed:
+    "Could not drag the file. Try again or reveal it in your file manager.",
+  sidebar_rootFolder: "Knowledge base root",
+  sidebar_rootDropHint: "Drop here to move to the knowledge base root",
+  sidebar_dropToRoot: "Drop at root",
+  sidebar_sortMode: "Sort files",
+  sidebar_sortName: "Name",
+  sidebar_sortCreated: "Created",
+  sidebar_sortModified: "Updated",
+  sidebar_sortType: "File type",
+  sidebar_sortLoading: "Reading file times…",
+  sidebar_sortUnavailable: "File times unavailable. Showing files by name.",
   view_edit: "Edit",
   toolbar_hideSidebar: "Hide sidebar",
   toolbar_showSidebar: "Show sidebar",

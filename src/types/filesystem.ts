@@ -10,11 +10,17 @@ export type DirectoryWatchEvent =
   | { type: "modified"; paths: string[] }
   | { type: "error"; error: unknown };
 
+export interface FileEntryMetadata {
+  createdAt: number | null;
+  modifiedAt: number | null;
+}
+
 /**
  * Unified file system interface
  * Implementations: TauriFileSystem (for Tauri app), BrowserFileSystem (for web)
  */
 export interface IFileSystem {
+  fileMetadata?(paths: string[]): Promise<Record<string, FileEntryMetadata>>;
   openFile(): Promise<string | null>;
   openDirectory(): Promise<string | null>;
   readFile(path: string): Promise<string>;
@@ -24,6 +30,8 @@ export interface IFileSystem {
   registerAllowedPath?(path: string, recursive: boolean): Promise<void>;
   writeFile(path: string, content: string): Promise<void>;
   writeBinaryFile?(path: string, content: Uint8Array): Promise<void>;
+  /** 直接导入 Blob，避免把整个大文件加载进 WebView。 */
+  writeBlobFile?(path: string, content: Blob): Promise<void>;
   getFileObjectUrl?(path: string): Promise<string>;
   /** Drop a cached object URL and read the file again (dead blob recovery). */
   refreshFileObjectUrl?(path: string): Promise<string>;

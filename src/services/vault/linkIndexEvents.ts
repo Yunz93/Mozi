@@ -1,5 +1,6 @@
 import { scheduleIdleWork } from "../../utils/performance";
 import { notifyTaskCalendarFileSaved } from "../taskCalendarService";
+import { invalidateFileMetadata } from "../filesystem/fileMetadataEvents";
 
 type FileSavedHandler = (path: string, content: string) => void;
 type RebuildHandler = () => Promise<void>;
@@ -46,6 +47,7 @@ export function setVaultFileSavedHandler(
  * do not block the UI on link-index rebuild + semantic embed.
  */
 export function notifyVaultFileSaved(path: string, content: string): void {
+  invalidateFileMetadata([path]);
   notifyTaskCalendarFileSaved(path);
   pendingSavedFiles.set(path, content);
   if (cancelScheduledFlush) {

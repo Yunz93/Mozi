@@ -308,3 +308,51 @@ jobs:
           gh release download "$RELEASE_TAG" --pattern latest.json --dir "$manifest_dir" --repo "$GITHUB_REPOSITORY"
           node scripts/prepare-linux-updater.mjs "$manifest_dir/latest.json" "$asset"
           gh release upload "$RELEASE_TAG" "$manifest_dir/latest.json" --clobber --repo "$GITHUB_REPOSITORY"
+
+  verify-published-assets:
+    if: github.event_name != 'workflow_dispatch'
+    needs: [build-macos, build-windows, build-linux]
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_BUILD_JOBS: 2
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          shared-key: linux-package
+      - name: Install verifier build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - run: npm ci
+      - run: npm run build
+      - name: Download published assets and verify metadata and SHA-256
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          verification_dir=$(mktemp -d "$RUNNER_TEMP/mozi-release-verification.XXXXXX")
+          echo "RELEASE_VERIFICATION_DIR=$verification_dir" >> "$GITHUB_ENV"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$verification_dir/release.json"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$verification_dir"
+          node scripts/ci/verify-release-assets.mjs "$verification_dir"
+      - name: Verify updater signatures with the embedded application public key
+        run: |
+          for package in "$RELEASE_VERIFICATION_DIR"/*.app.tar.gz "$RELEASE_VERIFICATION_DIR"/*.exe "$RELEASE_VERIFICATION_DIR"/*.deb; do
+            cargo run --locked --release --manifest-path src-tauri/Cargo.toml --example verify-updater -- "$package" "$package.sig"
+          done
+      - name: Upload asset verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-asset-verification
+          path: ${{ env.RELEASE_VERIFICATION_DIR }}/verification-summary.json
+          if-no-files-found: error

@@ -3,18 +3,21 @@ import {
   droppedFileRelativePath,
   nextAvailableFileName,
   sanitizeDroppedRelativePath,
+  FILE_IMPORT_CHUNK_BYTES,
 } from "../../utils/droppedFiles";
 
 export interface ImportDroppedFilesFileSystem {
   fileExists(path: string): Promise<boolean>;
   createDirectory(path: string): Promise<void>;
   writeBinaryFile?(path: string, content: Uint8Array): Promise<void>;
+  writeBlobFile?(path: string, content: Blob): Promise<void>;
   writeFile(path: string, content: string): Promise<void>;
 }
 
 export interface ImportedDroppedFile {
   path: string;
   name: string;
+  size: number;
 }
 
 export interface ImportDroppedFilesResult {
@@ -96,9 +99,18 @@ export async function importDroppedFiles(options: {
       );
       taken.add(takenKey(uniqueName));
       const destPath = joinFsPath(folderPath, uniqueName);
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      await writeDroppedBytes(options.fs, destPath, bytes);
-      imported.push({ path: destPath, name: uniqueName });
+      if (options.fs.writeBlobFile) {
+        await options.fs.writeBlobFile(destPath, file);
+      } else {
+        if (file.size > FILE_IMPORT_CHUNK_BYTES) {
+          throw new Error(
+            "This file system does not support bounded large-file imports.",
+          );
+        }
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await writeDroppedBytes(options.fs, destPath, bytes);
+      }
+      imported.push({ path: destPath, name: uniqueName, size: file.size });
     } catch (error) {
       failed.push({
         name: fileName,

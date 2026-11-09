@@ -14,6 +14,7 @@ import {
 import type { DirectoryWatchEvent } from "../types/filesystem";
 import type { TranslationKey } from "../utils/i18n";
 import { remapEditorDocumentPaths } from "../utils/editorSelectionBridge";
+import { invalidateFileMetadata } from "../services/filesystem/fileMetadataEvents";
 
 interface UseKnowledgeBaseWatchOptions {
   rootFolderPath: string | null;
@@ -57,6 +58,7 @@ export function useKnowledgeBaseWatch(
         }
 
         if (event.type === "modified") {
+          invalidateFileMetadata(event.paths);
           if (!onFileModified) return;
           event.paths.forEach((path) => modifiedPaths.add(path));
           // Let the document watcher apply the disk edit before rebuilding

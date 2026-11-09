@@ -19,8 +19,9 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      reporter: ["text", "text-summary"],
-      // Floor against the current ~65% baseline; tighten as hotspots shrink.
+      include: ["src/**/*.{ts,tsx}"],
+      reporter: ["text", "text-summary", "json-summary"],
+      // 全源码统计包含未被测试加载的文件，继续保留原有覆盖率门槛。
       thresholds: {
         lines: 60,
         statements: 60,

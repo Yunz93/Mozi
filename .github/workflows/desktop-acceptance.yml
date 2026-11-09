@@ -2,24 +2,11 @@ name: Desktop acceptance
 
 on:
   pull_request:
-    paths:
-      - "src/**"
-      - "src-tauri/**"
-      - "scripts/desktop/**"
-      - "package*.json"
-      - "index.*"
-      - "vite.config.*"
-      - ".github/workflows/desktop-acceptance.yml"
   push:
     branches: [main]
-    paths:
-      - "src/**"
-      - "src-tauri/**"
-      - "scripts/desktop/**"
-      - "package*.json"
-      - "index.*"
-      - "vite.config.*"
-      - ".github/workflows/desktop-acceptance.yml"
+  schedule:
+    # 上海时间每天 02:30，执行完整性能矩阵。
+    - cron: "30 18 * * *"
   workflow_dispatch:
     inputs:
       performance:
@@ -36,7 +23,27 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_desktop: ${{ steps.scope.outputs.run_desktop }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Select desktop coverage
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node scripts/ci/desktop-scope.mjs
+
   desktop:
+    needs: changes
+    if: needs.changes.outputs.run_desktop == 'true'
     name: desktop (${{ matrix.runner }})
     strategy:
       fail-fast: false
@@ -46,11 +53,11 @@ jobs:
       group: desktop-platform-${{ github.event.pull_request.number || github.ref }}-${{ matrix.runner }}
       cancel-in-progress: false
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: 3
       MOZI_DESKTOP_SUITE: full
-      MOZI_DESKTOP_PERFORMANCE: ${{ inputs.performance || 'smoke' }}
+      MOZI_DESKTOP_PERFORMANCE: ${{ github.event_name == 'schedule' && 'full' || inputs.performance || 'smoke' }}
       MOZI_DESKTOP_OUTPUT: .perf/desktop
     steps:
       - uses: actions/checkout@v5
@@ -102,6 +109,9 @@ jobs:
         env:
           MOZI_DESKTOP_BINARY: src-tauri/target/release/mozi-desktop-e2e
         run: sh scripts/desktop/run-linux.sh
+      - name: Compare measured performance with the committed platform baseline
+        if: runner.os == 'Linux' && matrix.runner != 'macos-15-intel'
+        run: node scripts/desktop/performance-gate.mjs
       - name: Build Windows release-configuration installer
         if: runner.os == 'Windows'
         run: node scripts/desktop/build-windows.mjs
@@ -119,6 +129,9 @@ jobs:
         env:
           MOZI_DESKTOP_BINARY: src-tauri/target/release/mozi-desktop-e2e.exe
         run: node scripts/desktop/run.mjs
+      - name: Compare macOS and Windows performance with the committed platform baseline
+        if: runner.os != 'Linux' && matrix.runner != 'macos-15-intel'
+        run: node scripts/desktop/performance-gate.mjs
       - name: Build macOS stock release-configuration application
         if: runner.os == 'macOS'
         # Reuse exactly the frontend assets exercised by the isolated app.
@@ -140,3 +153,57 @@ jobs:
         with:
           path: ~/AppData/Local/tauri/NSIS
           key: ${{ steps.nsis_cache.outputs.cache-primary-key }}
+
+  linux-upgrade:
+    needs: changes
+    if: needs.changes.outputs.run_desktop == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          shared-key: desktop-linux-upgrade
+          cache-on-failure: true
+      - name: Install Linux desktop libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb xauth dbus-x11 openbox fonts-noto-cjk
+      - run: npm ci
+      - name: Check test and privilege boundaries
+        run: |
+          node scripts/desktop/check-boundary.mjs
+          node --test scripts/desktop/linux-upgrade-support.test.mjs
+      - name: Verify installed Linux update, cancellation and invalid signature
+        run: sh scripts/desktop/run-linux.sh scripts/desktop/linux-upgrade.mjs
+      - name: Upload upgrade evidence without packages, profiles or private keys
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installed-upgrade
+          path: .perf/linux-upgrade
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  desktop-gate:
+    name: Desktop gates
+    if: always()
+    needs: [changes, desktop, linux-upgrade]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Require desktop matrix or explicit documentation skip
+        env:
+          NEEDS_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci/workflow-gate.mjs desktop

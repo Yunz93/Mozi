@@ -50,6 +50,7 @@ import {
   flushDocumentIfDirty,
 } from "../services/filesystem/flushActiveDocument";
 import { importDroppedFiles } from "../services/filesystem/importDroppedFiles";
+import { MAX_AUTO_OPEN_IMPORT_BYTES } from "../utils/droppedFiles";
 import {
   flushActiveEditorPendingChanges,
   remapEditorDocumentPaths,
@@ -808,9 +809,10 @@ export function useFileOperations() {
 
         const openable = result.imported.filter(
           (file) =>
-            isMarkdownFile(file.name) ||
-            isExcalidrawFile(file.name) ||
-            isPreviewOnlyFile(file.name),
+            file.size <= MAX_AUTO_OPEN_IMPORT_BYTES &&
+            (isMarkdownFile(file.name) ||
+              isExcalidrawFile(file.name) ||
+              isPreviewOnlyFile(file.name)),
         );
         if (openable.length !== 1) return;
 

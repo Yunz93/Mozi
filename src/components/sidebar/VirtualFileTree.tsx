@@ -7,27 +7,15 @@ import {
   useState,
 } from "react";
 import type { RefObject } from "react";
-import type { FileNode } from "../../types";
+import type { FileNode, FileSortMode } from "../../types";
+import type { FileEntryMetadata } from "../../types/filesystem";
+import { sortFileNodes } from "./fileSorting";
 import { FileTreeItem, type FileTreeItemProps } from "./FileTree";
 
 const OVERSCAN = 6;
 const ROW_GAP = 2;
-const sortedChildren = new WeakMap<FileNode[], FileNode[]>();
 const EMPTY_NODES: FileNode[] = [];
-
-function childrenOf(node: FileNode): FileNode[] {
-  const children = node.children ?? EMPTY_NODES;
-  let sorted = sortedChildren.get(children);
-  if (!sorted) {
-    sorted = children
-      .filter((child) => !child.isTrash)
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-      );
-    sortedChildren.set(children, sorted);
-  }
-  return sorted;
-}
+const EMPTY_METADATA = new Map<string, FileEntryMetadata>();
 
 interface Props extends Omit<
   FileTreeItemProps,
@@ -38,6 +26,8 @@ interface Props extends Omit<
   locateRequestKey?: number;
   nodes: FileNode[];
   scrollElementRef: RefObject<HTMLDivElement | null>;
+  sortMode?: FileSortMode;
+  metadata?: ReadonlyMap<string, FileEntryMetadata>;
 }
 
 /** Keep expansion state outside rows, which unmount as they leave the viewport. */
@@ -48,6 +38,8 @@ export function VirtualFileTree({
   expandedPathIds,
   locateRequestKey = 0,
   forceExpanded = false,
+  sortMode = "name",
+  metadata = EMPTY_METADATA,
   ...itemProps
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -56,6 +48,22 @@ export function VirtualFileTree({
   const hostRef = useRef<HTMLDivElement>(null);
   const pendingLocateRef = useRef(false);
   const lastLocateRef = useRef({ key: 0, id: activeId });
+  const childrenOf = useMemo(() => {
+    const cache = new WeakMap<FileNode[], FileNode[]>();
+    return (node: FileNode) => {
+      const children = node.children ?? EMPTY_NODES;
+      let sorted = cache.get(children);
+      if (!sorted) {
+        sorted = sortFileNodes(
+          children.filter((child) => !child.isTrash),
+          sortMode,
+          metadata,
+        );
+        cache.set(children, sorted);
+      }
+      return sorted;
+    };
+  }, [sortMode, metadata]);
 
   const onExpandedChange = useCallback((id: string, value: boolean) => {
     setExpanded((previous) => {
@@ -82,9 +90,9 @@ export function VirtualFileTree({
       }
     };
     // The sidebar already sorts root entries (folders first).
-    visit(nodes, 0);
+    visit(sortFileNodes(nodes, sortMode, metadata), 0);
     return result;
-  }, [nodes, expanded, forceExpanded]);
+  }, [nodes, expanded, forceExpanded, sortMode, metadata, childrenOf]);
 
   const virtual = rows.length > 200;
   const visibleCount = Math.ceil(viewport.height / rowHeight);

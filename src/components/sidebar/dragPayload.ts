@@ -1,4 +1,5 @@
 import type React from "react";
+import { nativeDraggedNodeId } from "./nativeFileDrag";
 
 /**
  * Shared drag-and-drop payload helpers for the sidebar file tree.
@@ -30,6 +31,7 @@ export function setDragPayload(
  * only `types` is readable.
  */
 export function hasDragPayload(event: React.DragEvent): boolean {
+  if (nativeDraggedNodeId()) return true;
   const types = event.dataTransfer.types;
   if (!types) return false;
   return (
@@ -41,6 +43,8 @@ export function hasDragPayload(event: React.DragEvent): boolean {
 
 /** Extract the dragged node id on drop. Tries every payload flavor we write. */
 export function extractDraggedNodeId(event: React.DragEvent): string | null {
+  const nativeId = nativeDraggedNodeId();
+  if (nativeId) return nativeId;
   try {
     const direct = event.dataTransfer.getData(DRAG_DATA_TYPE);
     if (direct) return direct;

@@ -64,7 +64,13 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
    - download and install complete successfully
    - macOS downloads the signed `.app.tar.gz` for the current architecture, verifies it before installation, and atomically replaces the app after all windows have saved
 
-## Scope
+## Automated verification
+
+Tagged releases finish with `verify-published-assets`: download the eight published assets, verify GitHub SHA-256 digests, exact version/platform inventory, repository-bound URLs and matching signature sidecars. The `verify-updater` Rust example then verifies all three updater packages using the public key embedded in that tag's source. It shares the signature implementation with the macOS installer and never reads a key from the feed or environment. This job has read-only repository access and no signing secrets. The older macOS-only repair dispatch is outside the complete eight-asset contract.
+
+Desktop acceptance also performs a real installed Linux `.deb` upgrade with a separate package identity, ephemeral signing key and localhost feed. It checks signature corruption, authorization cancellation, saving two dirty windows, `dpkg` replacement and relaunch. Its child-only authorization proxy exercises success and failure without requiring interactive credentials. Real OS prompts and installed-release upgrades remain on the [physical-device checklist](../testing/physical-release-checklist.md).
+
+## Platform behavior
 
 - Windows: in-app update checks and install flow use the Tauri updater plugin and signed NSIS artifacts.
 - Linux: the signed `.deb` uses the same check, download progress, document-saving guard, install and relaunch flow as Windows. The Tauri updater verifies the signature and uses `dpkg` with administrator authorization. The desktop needs a working authorization mechanism, normally `pkexec` and a polkit authentication agent. Cancellation or installation failure keeps the app running and releases the document lock. The release job runs after macOS and Windows, uploads the validated `.deb` and signature, and merges only the Linux platform entries into the existing same-version manifest. Users of v2.3.0 must manually install the first version with this capability before they can update in-app.

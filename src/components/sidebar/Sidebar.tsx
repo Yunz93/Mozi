@@ -7,7 +7,9 @@ import React, {
   useLayoutEffect,
 } from "react";
 import { createPortal } from "react-dom";
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, Plus, FolderOpen } from "lucide-react";
+import { useSidebarSorting } from "./hooks/useSidebarSorting";
+import type { FileSortMode } from "../../types";
 import { VirtualFileTree } from "./VirtualFileTree";
 import { TrashView } from "./TrashView";
 import { getFileSystem } from "../../types/filesystem";
@@ -39,6 +41,7 @@ import { useI18n } from "../../hooks/useI18n";
 import { isSavableDocumentFile } from "../../utils/fileTypes";
 import { applyFixedMenuViewportFit } from "../../utils/fitFixedMenuToViewport";
 import { getRenameDialogDefaultValue } from "../../utils/fileTypes";
+import { hasExternalFilePayload } from "../../utils/droppedFiles";
 
 export interface SidebarProps {
   files: FileNode[];
@@ -58,6 +61,7 @@ export interface SidebarProps {
   onMoveNode: (sourceId: string, targetId: string) => void;
   onMoveToRoot: (sourceId: string) => void;
   onImportDroppedFiles?: (destFolderPath: string, files: File[]) => void;
+  trashOpenRequestKey?: number;
   currentKnowledgeBaseName?: string;
   currentKnowledgeBasePath?: string;
   onSwitchKnowledgeBase: () => void;
@@ -245,6 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     onMoveNode,
     onMoveToRoot,
     onImportDroppedFiles,
+    trashOpenRequestKey = 0,
     currentKnowledgeBaseName,
     currentKnowledgeBasePath,
     onSwitchKnowledgeBase,
@@ -266,11 +271,16 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     const fileContents = useAppStore((state) => state.fileContents);
     const trashFolder = useAppStore((state) => state.settings.trashFolder);
     const showNotification = useAppStore((state) => state.showNotification);
+    const updateSettings = useAppStore((state) => state.updateSettings);
+    const sorting = useSidebarSorting(files);
 
     const sidebarRef = useRef<HTMLElement>(null);
     const treeScrollRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [showTrash, setShowTrash] = useState(false);
+    useEffect(() => {
+      if (trashOpenRequestKey > 0) setShowTrash(true);
+    }, [trashOpenRequestKey]);
     const [locatedFileId, setLocatedFileId] = useState<string | null>(null);
     const [rootContextMenu, setRootContextMenu] = useState<{
       x: number;
@@ -292,7 +302,10 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
       handleRootDragOver,
       handleRootDragLeave,
       handleRootDrop,
-    } = useSidebarDragAndDrop();
+      isDragging,
+      handleDragCapture,
+      stopAutoScroll,
+    } = useSidebarDragAndDrop(treeScrollRef);
 
     const searchDeps = useMemo(
       () => ({
@@ -454,6 +467,41 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
 
         <aside
           ref={sidebarRef}
+          onDragLeaveCapture={(event) => {
+            if (
+              !(event.relatedTarget instanceof Node) ||
+              !event.currentTarget.contains(event.relatedTarget)
+            )
+              stopAutoScroll();
+          }}
+          onDragOverCapture={(event) => {
+            handleDragCapture(event);
+            if (
+              event.target instanceof Element &&
+              event.target.closest("[data-file-tree-item]")
+            )
+              setIsRootDragOver(false);
+          }}
+          onDragOver={(event) => {
+            if (!event.defaultPrevented && hasExternalFilePayload(event))
+              handleRootDragOver(event);
+          }}
+          onDragLeave={(event) => {
+            handleRootDragLeave(event);
+            if (
+              !(event.relatedTarget instanceof Node) ||
+              !event.currentTarget.contains(event.relatedTarget)
+            )
+              stopAutoScroll();
+          }}
+          onDrop={(event) => {
+            if (event.defaultPrevented || !hasExternalFilePayload(event))
+              return;
+            // 标题和底栏也必须接管系统文件拖放，不能让 WebView 默认导航到文件。
+            handleRootDrop(event, onMoveToRoot, (files) =>
+              onImportDroppedFiles?.(currentKnowledgeBasePath ?? "", files),
+            );
+          }}
           style={sidebarSurfaceStyle}
           className={`
           sidebar-shell ui-scaled
@@ -568,6 +616,56 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
               </div>
             </div>
           </div>
+
+          <div className="workspace-tree-controls">
+            <div
+              className={`workspace-root-drop-zone${isDragging ? " is-dragging" : ""}${isRootDragOver ? " is-drop-target" : ""}`}
+              data-root-drop-zone
+              title={t("sidebar_rootDropHint")}
+              onDragOver={handleRootDragOver}
+              onDragLeave={handleRootDragLeave}
+              onDrop={(event) =>
+                handleRootDrop(event, onMoveToRoot, (dropped) =>
+                  onImportDroppedFiles?.(
+                    currentKnowledgeBasePath ?? "",
+                    dropped,
+                  ),
+                )
+              }
+            >
+              <FolderOpen size={14} aria-hidden />
+              <span>
+                {isDragging
+                  ? t("sidebar_dropToRoot")
+                  : currentKnowledgeBaseName || t("sidebar_rootFolder")}
+              </span>
+            </div>
+            <select
+              className="workspace-tree-sort"
+              aria-label={t("sidebar_sortMode")}
+              value={sorting.mode}
+              aria-busy={sorting.loading}
+              onChange={(event) =>
+                updateSettings({
+                  sidebarSortMode: event.target.value as FileSortMode,
+                })
+              }
+            >
+              <option value="name">{t("sidebar_sortName")}</option>
+              <option value="created">{t("sidebar_sortCreated")}</option>
+              <option value="modified">{t("sidebar_sortModified")}</option>
+              <option value="type">{t("sidebar_sortType")}</option>
+            </select>
+          </div>
+          {sorting.loading || sorting.error ? (
+            <p className="workspace-tree-sort-status" role="status">
+              {t(
+                sorting.loading
+                  ? "sidebar_sortLoading"
+                  : "sidebar_sortUnavailable",
+              )}
+            </p>
+          ) : null}
 
           <div
             ref={treeScrollRef}
@@ -717,6 +815,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
               </div>
             ) : (
               <VirtualFileTree
+                sortMode={sorting.mode}
+                metadata={sorting.metadata}
                 key={currentKnowledgeBasePath ?? "standalone"}
                 nodes={filteredFiles}
                 scrollElementRef={treeScrollRef}
@@ -733,29 +833,29 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
           </div>
 
           <div className="workspace-sidebar-footer p-3 space-y-2">
-            <div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setShowTrash(!showTrash)}
-                  className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-black/[0.04] dark:text-gray-400 dark:hover:bg-white/[0.06]"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <svg
-                      className="h-4 w-4 shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                    <span className="truncate">
-                      {t("sidebar_trash", { count: trashItems.length })}
-                    </span>
-                  </div>
-                  {showTrash ? (
+            {showTrash && (
+              <div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowTrash(false)}
+                    className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-black/[0.04] dark:text-gray-400 dark:hover:bg-white/[0.06]"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <svg
+                        className="h-4 w-4 shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      <span className="truncate">
+                        {t("sidebar_trash", { count: trashItems.length })}
+                      </span>
+                    </div>
                     <svg
                       className="h-3.5 w-3.5 shrink-0"
                       viewBox="0 0 24 24"
@@ -765,39 +865,27 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                     >
                       <polyline points="6 9 12 15 18 9" />
                     </svg>
-                  ) : (
-                    <svg
-                      className="h-3.5 w-3.5 shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  )}
-                </button>
-                {showTrash && trashItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => openEmptyTrashDialog()}
-                    className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-red-600/80 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400/80 dark:hover:bg-red-950/40 dark:hover:text-red-300"
-                    title={t("context_emptyTrash")}
-                  >
-                    {t("context_emptyTrash")}
                   </button>
-                )}
-              </div>
+                  {trashItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openEmptyTrashDialog()}
+                      className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-red-600/80 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400/80 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+                      title={t("context_emptyTrash")}
+                    >
+                      {t("context_emptyTrash")}
+                    </button>
+                  )}
+                </div>
 
-              {showTrash && (
                 <TrashView
                   trashItems={trashItems}
                   onRestore={onRestoreFromTrash}
                   onDeleteForever={(node) => openDeleteDialog(node)}
                   onContextMenu={openContextMenu}
                 />
-              )}
-            </div>
+              </div>
+            )}
 
             <KnowledgeBaseHeader
               name={currentKnowledgeBaseName}

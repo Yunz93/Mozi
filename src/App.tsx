@@ -301,6 +301,7 @@ const App: React.FC = () => {
   >([]);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
+  const [sidebarTrashRequestKey, setSidebarTrashRequestKey] = useState(0);
 
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
@@ -1259,6 +1260,7 @@ const App: React.FC = () => {
             onMoveNode={fileOps.handleMoveNode}
             onMoveToRoot={fileOps.handleMoveToRoot}
             onImportDroppedFiles={fileOps.handleImportDroppedFiles}
+            trashOpenRequestKey={sidebarTrashRequestKey}
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
@@ -1279,6 +1281,15 @@ const App: React.FC = () => {
             <div className="flex-1 min-h-0 flex flex-col">
               {!isFocusModeActive && (
                 <Toolbar
+                  onOpenTrash={
+                    rootFolderPath
+                      ? () => {
+                          closeTaskCalendar();
+                          setSidebarOpen(true);
+                          setSidebarTrashRequestKey((key) => key + 1);
+                        }
+                      : undefined
+                  }
                   onOpenTaskCalendar={() =>
                     isTaskCalendarOpen
                       ? returnFromTaskCalendar()

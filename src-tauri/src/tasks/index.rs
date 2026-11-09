@@ -1,5 +1,5 @@
-use super::{calendar, model::*, parser, storage};
-use chrono::Local;
+use super::{calendar, model::*, parser, reminders, storage};
+use chrono::{Local, TimeZone};
 use mozi_vault_watch::{Change, Kind, Observer};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -356,16 +356,21 @@ impl Runtime {
             }
             Operation::Preferences(patch) => {
                 let previous = self.saved.preferences.clone();
-                let preferences = patch.apply(&previous);
+                let mut preferences = patch.apply(&previous);
+                preferences.reminder_times =
+                    reminders::normalize_times(preferences.reminder_times)?;
                 // 在串行调度器中校验合并后的开关与目标，避免另一窗口的旧快照覆盖。
                 if preferences.mac_calendar
                     && (!previous.mac_calendar || previous.calendar_id != preferences.calendar_id)
                 {
                     calendar::validate(&preferences.calendar_id)?;
                 }
+                let previous_reminders = self.saved.reminders.clone();
                 self.saved.preferences = preferences;
+                self.reconcile_reminders();
                 if let Err(error) = self.persist() {
                     self.saved.preferences = previous;
+                    self.saved.reminders = previous_reminders;
                     return Err(error);
                 }
                 if previous.mac_calendar != self.saved.preferences.mac_calendar
@@ -590,6 +595,7 @@ impl Runtime {
             &self.saved.reminders,
             preserve_unseen,
             now,
+            &self.saved.preferences,
         );
         let changed = serde_json::to_string(&active).ok()
             != serde_json::to_string(&self.saved.reminders).ok();
@@ -613,7 +619,11 @@ impl Runtime {
             .files
             .values()
             .flat_map(|entry| &entry.tasks)
-            .filter(|task| due.contains(&task.notification_key()))
+            .filter(|task| {
+                reminders::points(task, &self.saved.preferences)
+                    .iter()
+                    .any(|(key, _)| due.contains(key))
+            })
             .map(|task| (task.vault_path.clone(), task.file_path.clone()))
             .collect();
         // 即使监测有退避，到期前也从磁盘重读，完成或改期后不发送旧提醒。
@@ -629,8 +639,17 @@ impl Runtime {
                 task.available
                     && !task.completed
                     && !task.date_error
-                    && due.contains(&task.notification_key())
-                    && task.reminder_at.is_some_and(|at| at <= now)
+                    && reminders::points(task, &self.saved.preferences)
+                        .iter()
+                        .any(|(key, at)| {
+                            due.contains(key)
+                                && *at <= now
+                                && self
+                                    .saved
+                                    .reminders
+                                    .get(key)
+                                    .is_some_and(|record| !record.submitted)
+                        })
             })
             .cloned()
             .collect();
@@ -666,7 +685,12 @@ impl Runtime {
             format!(
                 "{} {} · {}",
                 first.date.as_deref().unwrap_or_default(),
-                first.time.as_deref().unwrap_or("09:00"),
+                reminders::points(first, &self.saved.preferences)
+                    .iter()
+                    .find(|(key, at)| due.contains(key) && *at <= now)
+                    .and_then(|(_, at)| Local.timestamp_millis_opt(*at).single())
+                    .map(|time| time.format("%H:%M").to_string())
+                    .unwrap_or_default(),
                 first.relative_path
             )
         } else {
@@ -691,8 +715,12 @@ impl Runtime {
             }
         }
         for task in candidates {
-            if let Some(record) = self.saved.reminders.get_mut(&task.notification_key()) {
-                record.submitted = true;
+            for (key, at) in reminders::points(&task, &self.saved.preferences) {
+                if at <= now && due.contains(&key) {
+                    if let Some(record) = self.saved.reminders.get_mut(&key) {
+                        record.submitted = true;
+                    }
+                }
             }
         }
         if let Err(error) = self.persist() {
@@ -741,6 +769,7 @@ fn build_reminders<'a>(
     previous: &BTreeMap<String, ReminderRecord>,
     preserve_unseen: bool,
     now: i64,
+    preferences: &Preferences,
 ) -> BTreeMap<String, ReminderRecord> {
     // 不完整扫描不能证明旧任务已被删除；提醒发送前仍会逐文件核实。
     let mut active = if preserve_unseen {
@@ -752,8 +781,7 @@ fn build_reminders<'a>(
         if task.completed || task.date_error {
             continue;
         }
-        if let Some(at) = task.reminder_at {
-            let key = task.notification_key();
+        for (key, at) in reminders::points(task, preferences) {
             if let Some(record) = previous.get(&key) {
                 active.insert(
                     key,
@@ -822,14 +850,38 @@ mod tests {
                 submitted: false,
             },
         )]);
-        let offline = build_reminders(std::iter::empty(), &known, true, at + 1000);
-        assert_eq!(offline.len(), 1, "离线不代表删除，已安排的提醒不能丢失");
-        let restored = build_reminders(std::iter::once(&task), &offline, false, at + 1000);
-        assert!(!restored[&task.notification_key()].submitted);
-        assert!(build_reminders(std::iter::empty(), &restored, false, at + 1000).is_empty());
-        assert!(
-            build_reminders(std::iter::once(&task), &BTreeMap::new(), false, at + 1000).is_empty()
+        let offline = build_reminders(
+            std::iter::empty(),
+            &known,
+            true,
+            at + 1000,
+            &Preferences::default(),
         );
+        assert_eq!(offline.len(), 1, "离线不代表删除，已安排的提醒不能丢失");
+        let restored = build_reminders(
+            std::iter::once(&task),
+            &offline,
+            false,
+            at + 1000,
+            &Preferences::default(),
+        );
+        assert!(!restored[&task.notification_key()].submitted);
+        assert!(build_reminders(
+            std::iter::empty(),
+            &restored,
+            false,
+            at + 1000,
+            &Preferences::default()
+        )
+        .is_empty());
+        assert!(build_reminders(
+            std::iter::once(&task),
+            &BTreeMap::new(),
+            false,
+            at + 1000,
+            &Preferences::default()
+        )
+        .is_empty());
     }
 
     #[test]

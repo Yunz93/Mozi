@@ -23,6 +23,7 @@ export interface TaskCalendarPreferences {
   language: string;
   macCalendar: boolean;
   calendarId: string;
+  reminderTimes?: string[];
 }
 
 export type TaskCalendarPreferencesPatch = Partial<
