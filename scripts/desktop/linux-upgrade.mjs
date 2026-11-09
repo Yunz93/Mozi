@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DesktopDriver, until } from "./driver.mjs";
 import { seedSettingsOnUnload } from "./fixture-settings.mjs";
-import { freePort, launch, stop } from "./process.mjs";
+import { launch, stop } from "./process.mjs";
 import { appendText, loaded, openWindow } from "./support.mjs";
 import {
   assertHostedRunner,
@@ -26,6 +26,7 @@ import {
   OLD_VERSION,
   NEW_VERSION,
   sha256,
+  processLoopbackPort,
 } from "./linux-upgrade-support.mjs";
 
 assertHostedRunner(process.platform, process.env, process.getuid?.());
@@ -298,7 +299,6 @@ try {
   await mkdir(vault);
   await writeFile(active, "# UPGRADE_ACTIVE\n");
   await writeFile(other, "# UPGRADE_OTHER\n");
-  const port = await freePort();
   child = launch(
     `/usr/bin/${PACKAGE}`,
     [],
@@ -306,9 +306,15 @@ try {
       PATH: `${bin}:${process.env.PATH}`,
       TMPDIR: downloads,
       MOZI_UPGRADE_POLICY: policyPath,
-      TAURI_WEBDRIVER_PORT: String(port),
+      // 重启会短暂重叠两个进程，内核分别分配监听端口，避免旧驱动占用新驱动。
+      TAURI_WEBDRIVER_PORT: "0",
     },
     join(output, "app.log"),
+  );
+  const port = await until(
+    () => processLoopbackPort(child.pid),
+    "Installed updater driver did not bind a loopback port",
+    60_000,
   );
   driver = new DesktopDriver(port);
   await until(
@@ -380,7 +386,12 @@ try {
     "New installed app did not relaunch",
     60_000,
   );
-  driver = new DesktopDriver(port);
+  const nextPort = await until(
+    () => processLoopbackPort(nextPid),
+    "Relaunched app driver did not bind a loopback port",
+    60_000,
+  );
+  driver = new DesktopDriver(nextPort);
   await until(
     () => driver.request("GET", "/status").then(() => true),
     "Relaunched app driver did not start",
@@ -400,6 +411,8 @@ try {
     status: "passed",
     oldPid: child.pid,
     newPid: nextPid,
+    initialDriverPort: port,
+    relaunchedDriverPort: nextPort,
     installed: installed(),
   });
   await driver.screenshot(join(output, "upgraded.png"));

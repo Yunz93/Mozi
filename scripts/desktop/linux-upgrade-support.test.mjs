@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:net";
 import {
   assertHostedRunner,
   assertPackageMetadata,
@@ -18,7 +19,66 @@ import {
   authorizationExit,
   PACKAGE,
   NEW_VERSION,
+  loopbackListenerPort,
+  processLoopbackPort,
 } from "./linux-upgrade-support.mjs";
+
+test("driver discovery follows the owning process and ignores other sockets", () => {
+  const row = (address, port, state, inode) =>
+    `0: ${address}:${port.toString(16).toUpperCase()} 00000000:0000 ${state} 00000000:00000000 00:00000000 00000000 1001 0 ${inode}`;
+  const tcp = [
+    row("0100007F", 41001, "0A", "11"),
+    row("0100007F", 41002, "0A", "22"),
+    row("00000000", 41003, "0A", "33"),
+    row("0100007F", 41004, "01", "44"),
+  ].join("\n");
+  assert.equal(loopbackListenerPort(tcp, new Set(["11"])), 41001);
+  assert.equal(loopbackListenerPort(tcp, new Set(["22"])), 41002);
+  assert.equal(
+    loopbackListenerPort(tcp, new Set(["33", "44", "unknown"])),
+    null,
+  );
+  assert.throws(() => loopbackListenerPort(tcp, new Set(["11", "22"])));
+});
+
+test("a kernel-assigned driver port permits overlap during process relaunch", async () => {
+  const old = createServer();
+  const conflicting = createServer();
+  const next = createServer();
+  const bind = (server, port) =>
+    new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", resolve);
+    });
+  try {
+    await bind(old, 0);
+    await assert.rejects(bind(conflicting, old.address().port), {
+      code: "EADDRINUSE",
+    });
+    await bind(next, 0);
+    assert.notEqual(next.address().port, old.address().port);
+  } finally {
+    await Promise.all(
+      [old, next]
+        .filter((server) => server.listening)
+        .map((server) => new Promise((resolve) => server.close(resolve))),
+    );
+  }
+});
+
+test(
+  "Linux driver discovery reads the socket owned by the actual process",
+  { skip: process.platform !== "linux" },
+  async () => {
+    const server = createServer();
+    try {
+      await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+      assert.equal(processLoopbackPort(process.pid), server.address().port);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  },
+);
 
 test("Linux upgrade refuses local, persistent and root runners", () => {
   const env = { GITHUB_ACTIONS: "true", RUNNER_ENVIRONMENT: "github-hosted" };

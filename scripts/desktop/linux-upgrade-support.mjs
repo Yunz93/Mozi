@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import {
+  appendFileSync,
+  lstatSync,
+  readFileSync,
+  realpathSync,
+  readdirSync,
+  readlinkSync,
+} from "node:fs";
 import { basename, dirname, isAbsolute, relative, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -10,6 +17,45 @@ export const OLD_VERSION = "99.0.1";
 export const NEW_VERSION = "99.0.2";
 export const sha256 = (bytes) =>
   createHash("sha256").update(bytes).digest("hex");
+
+/** 只识别目标进程拥有的 IPv4 回环监听，不把其他进程或公网端口当作驱动。 */
+export function loopbackListenerPort(tcp, socketInodes) {
+  const ports = new Set();
+  for (const line of tcp.trim().split("\n")) {
+    const fields = line.trim().split(/\s+/);
+    const [address, port] = (fields[1] ?? "").split(":");
+    if (
+      address !== "0100007F" ||
+      fields[3] !== "0A" ||
+      !socketInodes.has(fields[9])
+    )
+      continue;
+    const value = Number.parseInt(port, 16);
+    if (value > 0 && value <= 65535) ports.add(value);
+  }
+  assert(ports.size <= 1, "Test process has multiple loopback listeners");
+  return [...ports][0] ?? null;
+}
+
+export function processLoopbackPort(pid) {
+  assert(Number.isInteger(pid) && pid > 0);
+  const root = `/proc/${pid}`;
+  assert.equal(
+    lstatSync(root).uid,
+    process.getuid(),
+    "Test process belongs to another user",
+  );
+  const sockets = new Set();
+  for (const fd of readdirSync(`${root}/fd`)) {
+    try {
+      const match = /^socket:\[(\d+)\]$/.exec(readlinkSync(`${root}/fd/${fd}`));
+      if (match) sockets.add(match[1]);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  return loopbackListenerPort(readFileSync(`${root}/net/tcp`, "utf8"), sockets);
+}
 
 export function assertHostedRunner(platform, env, uid) {
   assert.equal(platform, "linux", "Linux upgrade testing requires Linux");
