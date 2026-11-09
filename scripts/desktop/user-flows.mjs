@@ -3,6 +3,7 @@ import { chmod, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { until } from "./driver.mjs";
 import {
+  activateTasks,
   appendText,
   closeWindow,
   hasTask,
@@ -42,6 +43,12 @@ const selectionOf = (driver) =>
 
 export async function editorFlows(context, check) {
   const { driver: d, vault, output } = context;
+  // 每个场景使用全新配置，须先从界面登记知识库，再断言保存后的任务索引。
+  await activateTasks(d);
+  await until(
+    () => hasTask(d, "ACCEPTANCE_INITIAL_TASK"),
+    "Fresh editor session did not initialize the task index",
+  );
   await d.click('button[aria-label="实时预览"]');
   await check(
     context,
