@@ -152,19 +152,7 @@ export function MacCalendarSettings({
               ]}
             />
           </div>
-          {choosing ? (
-            <button
-              type="button"
-              className="task-primary-button"
-              disabled={busy || pending || !calendarId || !!missing}
-              onClick={() => {
-                setChoosing(false);
-                onChange({ macCalendar: true, calendarId });
-              }}
-            >
-              {t("tasks_calendarStart")}
-            </button>
-          ) : (
+          {!choosing && (
             <p className="task-settings-note" role="status">
               {pending
                 ? t("tasks_syncing")
@@ -181,15 +169,34 @@ export function MacCalendarSettings({
       {preferences.macCalendar ||
       choosing ||
       access?.permission === "granted" ? (
-        <button
-          type="button"
-          className="task-small-button"
-          disabled={busy || pending}
-          onClick={() => void refresh()}
+        <div
+          className="task-calendar-actions"
+          role="group"
+          aria-label={t("tasks_calendarActions")}
         >
-          <RefreshCw size={14} aria-hidden />
-          {t("tasks_calendarRefresh")}
-        </button>
+          {choosing && (
+            <button
+              type="button"
+              className="task-primary-button"
+              disabled={busy || pending || !calendarId || !!missing}
+              onClick={() => {
+                setChoosing(false);
+                onChange({ macCalendar: true, calendarId });
+              }}
+            >
+              {t("tasks_calendarStart")}
+            </button>
+          )}
+          <button
+            type="button"
+            className="task-small-button"
+            disabled={busy || pending}
+            onClick={() => void refresh()}
+          >
+            <RefreshCw size={14} aria-hidden />
+            {t("tasks_calendarRefresh")}
+          </button>
+        </div>
       ) : null}
       <p className="task-settings-note">{t("tasks_calendarBoundary")}</p>
       {issue ? (

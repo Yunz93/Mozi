@@ -135,6 +135,17 @@ it("keeps explicit authorization and target selection intact when the app regain
   await act(async () => resolve(granted));
   expect(screen.getByText("Saved calendar")).toBeTruthy();
   expect(props.onChange).not.toHaveBeenCalled();
+  const actions = screen.getByRole("group", { name: "tasks_calendarActions" });
+  expect(
+    actions.contains(
+      screen.getByRole("button", { name: "tasks_calendarStart" }),
+    ),
+  ).toBe(true);
+  expect(
+    actions.contains(
+      screen.getByRole("button", { name: "tasks_calendarRefresh" }),
+    ),
+  ).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "tasks_calendarStart" }));
   expect(props.onChange).toHaveBeenCalledWith({
     macCalendar: true,

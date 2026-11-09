@@ -59,6 +59,7 @@ struct Runtime {
     calendar_error: Option<String>,
     observation: Option<Observer>,
     observer_retry: Instant,
+    tray_refresh: super::tray::RefreshState,
 }
 
 impl TaskManager {
@@ -87,6 +88,7 @@ impl TaskManager {
                     calendar_error: None,
                     observation: None,
                     observer_retry: Instant::now(),
+                    tray_refresh: Default::default(),
                 };
                 runtime.publish(true);
                 runtime.configure_observation();
@@ -453,32 +455,43 @@ impl Runtime {
         let Ok(mut shared) = self.shared.write() else {
             return;
         };
-        if shared.tasks == tasks
+        let changed = !(shared.tasks == tasks
             && shared.vaults == self.saved.vaults
             && shared.excluded_vaults == self.saved.excluded_vaults
             && shared.preferences == self.saved.preferences
             && shared.scanning == scanning
             && shared.error == self.error
             && shared.calendar_error == self.calendar_error
-            && shared.calendar_synced_at == self.calendar_synced_at
-        {
-            return;
+            && shared.calendar_synced_at == self.calendar_synced_at);
+        if changed {
+            self.version += 1;
+            *shared = Snapshot {
+                version: self.version,
+                tasks,
+                vaults: self.saved.vaults.clone(),
+                excluded_vaults: self.saved.excluded_vaults.clone(),
+                preferences: self.saved.preferences.clone(),
+                scanning,
+                last_synced_at: Some(Local::now().timestamp_millis()),
+                error: self.error.clone(),
+                calendar_error: self.calendar_error.clone(),
+                calendar_synced_at: self.calendar_synced_at,
+            };
         }
-        self.version += 1;
-        *shared = Snapshot {
-            version: self.version,
-            tasks,
-            vaults: self.saved.vaults.clone(),
-            excluded_vaults: self.saved.excluded_vaults.clone(),
-            preferences: self.saved.preferences.clone(),
-            scanning,
-            last_synced_at: Some(Local::now().timestamp_millis()),
-            error: self.error.clone(),
-            calendar_error: self.calendar_error.clone(),
-            calendar_synced_at: self.calendar_synced_at,
-        };
-        // 事件只携带版本，窗口按需读取快照，避免向每个编辑窗口广播全部正文索引。
-        let _ = self.app.emit("task-calendar-changed", self.version);
+        // 快照不变时仍检查日期和逾期状态，时间变化不必广播整个索引。
+        let refresh_tray = self.tray_refresh.update(&shared, Local::now());
+        // 原生菜单读取共享快照前先释放写锁，避免跨线程菜单调用互相等待。
+        drop(shared);
+        if refresh_tray {
+            if let Err(error) = super::tray::refresh(&self.app) {
+                self.tray_refresh.invalidate();
+                log::warn!("更新托盘待办菜单失败：{error}");
+            }
+        }
+        if changed {
+            // 事件只携带版本，窗口按需读取快照。
+            let _ = self.app.emit("task-calendar-changed", self.version);
+        }
     }
 
     fn scan(&mut self) {

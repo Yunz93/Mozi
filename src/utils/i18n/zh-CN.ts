@@ -55,6 +55,7 @@ export default {
   tasks_calendarSynced: "已同步到系统日历",
   tasks_calendarPending: "等待同步到系统日历",
   tasks_calendarRefresh: "刷新日历列表",
+  tasks_calendarActions: "日历同步操作",
   tasks_calendarSyncError: "系统日历同步失败：",
   tasks_calendarBoundary:
     "仅同步有有效日期的未完成待办，完成或删除后移除墨知创建的对应事件。全天任务同步为全天事件，定时任务显示为 30 分钟事件。日历修改不回写笔记；关闭同步后保留已有事件。日历事件不另设提醒，避免重复通知。",
@@ -69,6 +70,8 @@ export default {
   tasks_addReminderTime: "添加提醒时刻",
   tasks_removeReminderTime: "移除 {time} 提醒",
   tasks_optionalTime: "时间（可选）",
+  tasks_hour: "小时",
+  tasks_minute: "分钟",
   tasks_notificationBoundary:
     "完全退出墨知后停止提醒。休眠期间错过的待办，在恢复后汇总提示。通知横幅与声音由系统设置和专注模式决定。",
   tasks_testNotification: "发送测试提醒",

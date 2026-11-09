@@ -9,7 +9,8 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import type { EditorView } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
+import { StateEffect } from "@codemirror/state";
 import { undo } from "@codemirror/commands";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useCodeMirror } from "./useCodeMirror";
@@ -59,6 +60,98 @@ function type(view: EditorView, text: string, pos = view.state.doc.length) {
 }
 
 describe("task date picker in the editor", () => {
+  it("keeps the open picker across a layout-only editor reconfiguration", async () => {
+    const { view } = await mount();
+    type(view, "@");
+    const dialog = await screen.findByRole("dialog", { name: "选择到期日期" });
+    act(() =>
+      view.dispatch({
+        effects: StateEffect.appendConfig.of(EditorView.lineWrapping),
+      }),
+    );
+    expect(screen.getByRole("dialog", { name: "选择到期日期" })).toBe(dialog);
+    fireEvent.change(screen.getByRole("combobox", { name: "小时" }), {
+      target: { value: "14" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "分钟" }), {
+      target: { value: "37" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "今天" }));
+    expect(view.state.doc.toString()).toMatch(/@\d{4}-\d{2}-\d{2} 14:37$/);
+  });
+
+  it("keeps the picker open while a native time menu temporarily takes DOM focus", async () => {
+    const { view } = await mount();
+    type(view, "@");
+    const dialog = await screen.findByRole("dialog", { name: "选择到期日期" });
+    const hour = screen.getByRole("combobox", { name: "小时" });
+    await act(async () => {
+      hour.focus();
+      hour.blur();
+    });
+    expect(document.activeElement).toBe(document.body);
+    expect(screen.getByRole("dialog", { name: "选择到期日期" })).toBe(dialog);
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    await act(async () => outside.focus());
+    expect(screen.queryByRole("dialog", { name: "选择到期日期" })).toBeNull();
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
+  it("selects an optional hour and minute without closing or changing the editor selection", async () => {
+    const { view } = await mount();
+    type(view, "@2026-11-");
+    const dialog = await screen.findByRole("dialog", { name: "选择到期日期" });
+    const cursor = view.state.selection.main.head;
+    const hour = screen.getByRole("combobox", { name: "小时" });
+    const minute = screen.getByRole("combobox", { name: "分钟" });
+    const pointer = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+    });
+    fireEvent(hour, pointer);
+    expect(pointer.defaultPrevented).toBe(false);
+    act(() => hour.focus());
+    fireEvent.change(hour, { target: { value: "14" } });
+    fireEvent.change(minute, { target: { value: "37" } });
+    await act(async () => {});
+    expect(screen.getByRole("dialog", { name: "选择到期日期" })).toBe(dialog);
+    expect(view.state.selection.main.head).toBe(cursor);
+    fireEvent.click(dialog.querySelector('[data-date="2026-11-20"]')!);
+    expect(view.state.doc.toString()).toBe("- [ ] 整理笔记 @2026-11-20 14:37");
+    expect(view.state.selection.main.head).toBe(view.state.doc.length);
+    expect(view.hasFocus).toBe(true);
+    act(() => expect(undo(view)).toBe(true));
+    expect(view.state.doc.toString()).toBe("- [ ] 整理笔记 @2026-11-");
+  });
+
+  it.each([false, true])(
+    "preserves an existing time or clears it with all-day selection %s",
+    async (clear) => {
+      const original = "- [ ] 整理笔记 @2026-11-2 09:45";
+      const { view } = await mount(original);
+      type(view, "0", original.indexOf(" 09:45"));
+      const dialog = await screen.findByRole("dialog", {
+        name: "选择到期日期",
+      });
+      const hour = screen.getByRole("combobox", {
+        name: "小时",
+      }) as HTMLSelectElement;
+      const minute = screen.getByRole("combobox", {
+        name: "分钟",
+      }) as HTMLSelectElement;
+      expect(hour.value).toBe("09");
+      expect(minute.value).toBe("45");
+      if (clear) fireEvent.change(hour, { target: { value: "" } });
+      expect(minute.disabled).toBe(clear);
+      fireEvent.click(dialog.querySelector('[data-date="2026-11-21"]')!);
+      expect(view.state.doc.toString()).toBe(
+        `- [ ] 整理笔记 @2026-11-21${clear ? "" : " 09:45"}`,
+      );
+    },
+  );
+
   it.each([false, true])(
     "opens after @ and inserts a day in live mode %s",
     async (live) => {
