@@ -17,6 +17,7 @@ import {
 export interface UseSidebarDragAndDropReturn {
   isDragging: boolean;
   handleDragCapture: (event: React.DragEvent<HTMLElement>) => void;
+  handleDragLeaveCapture: (event: React.DragEvent<HTMLElement>) => void;
   stopAutoScroll: () => void;
   isRootDragOver: boolean;
   setIsRootDragOver: (value: boolean) => void;
@@ -120,6 +121,19 @@ export function useSidebarDragAndDrop(
     };
   }, [stopAutoScroll]);
   const [isRootDragOver, setIsRootDragOver] = useState(false);
+  const handleDragLeaveCapture = useCallback(
+    (event: React.DragEvent<HTMLElement>) => {
+      if (
+        event.relatedTarget instanceof Node &&
+        event.currentTarget.contains(event.relatedTarget)
+      )
+        return;
+      stopAutoScroll();
+      setIsDragging(false);
+      setIsRootDragOver(false);
+    },
+    [stopAutoScroll],
+  );
 
   const extractDraggedNodeId = useCallback(
     (event: React.DragEvent): string | null =>
@@ -195,6 +209,7 @@ export function useSidebarDragAndDrop(
   return {
     isDragging,
     handleDragCapture,
+    handleDragLeaveCapture,
     stopAutoScroll,
     isRootDragOver,
     setIsRootDragOver,

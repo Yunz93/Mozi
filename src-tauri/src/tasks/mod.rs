@@ -12,7 +12,7 @@ use model::{PreferencesPatch, Snapshot, Vault};
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_plugin_notification::NotificationExt;
-pub use tray::show_window;
+pub use tray::{show_window, TRAY_WINDOW_LABEL};
 
 pub fn initialize(app: &AppHandle) -> Result<(), String> {
     let path = app
@@ -155,6 +155,15 @@ pub async fn task_calendar_flush(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn task_calendar_open_app(app: AppHandle) -> Result<(), String> {
+    tray::show_window(&app, false);
+    if let Some(window) = app.get_webview_window(TRAY_WINDOW_LABEL) {
+        window.hide().map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn task_calendar_keep_background(
     app: AppHandle,
     window: WebviewWindow,
@@ -192,7 +201,10 @@ fn reserve_background_window(
     // 决策与原生操作共用进程锁；尚未销毁的其他关窗请求也按即将关闭计数。
     closing.retain(|label| windows.contains(label));
     closing.insert(current.into());
-    let keep = windows.iter().all(|label| closing.contains(label));
+    let keep = windows
+        .iter()
+        .filter(|label| label.as_str() != TRAY_WINDOW_LABEL)
+        .all(|label| closing.contains(label));
     if keep {
         closing.remove(current);
     }
@@ -205,7 +217,7 @@ mod tests {
     use std::collections::BTreeSet;
     #[test]
     fn simultaneous_window_closes_retain_one_background_window() {
-        let windows = BTreeSet::from(["main".into(), "win-1".into()]);
+        let windows = BTreeSet::from(["main".into(), "win-1".into(), TRAY_WINDOW_LABEL.into()]);
         let mut closing = BTreeSet::new();
         assert!(!reserve_background_window(&mut closing, &windows, "main"));
         assert!(reserve_background_window(&mut closing, &windows, "win-1"));

@@ -49,7 +49,7 @@ Run the `.exe` installer. If SmartScreen appears, choose **More info** → **Run
 A Linux x64 `.deb` package is available for Ubuntu 24.04 and compatible environments, with a desktop launcher and Markdown file associations.
 
 ```bash
-sudo apt install ./Mozi_2.3.1_amd64.deb
+sudo apt install ./Mozi_2.3.3_amd64.deb
 ```
 
 Check for updates and install them in **Settings → About**. Installation requires administrator authorization. Users on v2.3.0 must first manually install a newer `.deb` that includes this feature; subsequent updates can be installed from the app.

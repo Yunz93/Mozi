@@ -1,4 +1,6 @@
 export default {
+  sidebar_switchKnowledgeBase: "Open or switch knowledge base",
+  tasks_openApp: "Open Mozi",
   tasks_title: "Tasks & calendar",
   tasks_button: "Tasks",
   tasks_close: "Close tasks",

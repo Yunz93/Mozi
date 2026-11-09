@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./src/App";
+import { TrayTaskPopover } from "./src/components/tasks/TrayTaskPopover";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import {
   isIgnorableWindowErrorEvent,
@@ -62,7 +63,12 @@ async function bootstrap() {
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        <App />
+        {new URLSearchParams(window.location.search).get("trayTasks") ===
+        "1" ? (
+          <TrayTaskPopover />
+        ) : (
+          <App />
+        )}
       </ErrorBoundary>
     </React.StrictMode>,
   );

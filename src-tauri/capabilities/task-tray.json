@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "task-tray",
+  "description": "托盘待办仅需要事件、窗口主题与收起权限",
+  "windows": ["task-tray"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-theme",
+    "core:window:allow-hide"
+  ],
+  "platforms": ["macOS", "windows", "linux"]
+}

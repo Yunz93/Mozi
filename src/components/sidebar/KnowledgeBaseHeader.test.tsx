@@ -39,7 +39,7 @@ describe("KnowledgeBaseHeader", () => {
     expect(onSwitch).not.toHaveBeenCalled();
   });
 
-  it("switches the knowledge base from the name, not the gear", async () => {
+  it("switches the knowledge base through the name menu", async () => {
     const onSwitch = vi.fn();
     const onOpenSettings = vi.fn();
     const user = userEvent.setup();
@@ -53,6 +53,10 @@ describe("KnowledgeBaseHeader", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Lingbot" }));
+    expect(onSwitch).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole("menuitem", { name: "打开或切换知识库" }),
+    );
     expect(onSwitch).toHaveBeenCalledTimes(1);
     expect(onOpenSettings).not.toHaveBeenCalled();
   });

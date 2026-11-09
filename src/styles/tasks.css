@@ -726,3 +726,85 @@
   border-radius: 6px;
   padding: 5px 8px;
 }
+
+/* 系统托盘使用独立窄窗口，页脚固定，清单单独滚动。 */
+.task-tray {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--workspace-menu);
+  overflow: hidden;
+}
+.task-tray-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--workspace-divider);
+}
+.task-tray-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875em;
+  font-weight: 600;
+}
+.task-tray-header h1 svg {
+  color: var(--workspace-accent);
+}
+.task-tray-header button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  color: var(--workspace-muted);
+}
+.task-tray-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+}
+.task-tray .task-list-view {
+  max-width: none;
+}
+.task-tray .task-list-heading {
+  margin-bottom: 12px;
+}
+.task-tray .task-item {
+  padding: 10px;
+}
+.task-tray-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--workspace-divider);
+  padding: 6px 8px;
+}
+.task-tray-footer button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.8125em;
+}
+.task-tray-footer span {
+  flex: 1;
+  text-align: left;
+}
+.task-tray-footer button svg:first-child {
+  color: var(--workspace-accent);
+}
+.task-tray-header button:hover,
+.task-tray-footer button:hover {
+  background: var(--workspace-hover);
+}
+.task-tray-retry {
+  color: var(--workspace-accent);
+  font-size: 0.8125em;
+  padding: 6px 0;
+}
