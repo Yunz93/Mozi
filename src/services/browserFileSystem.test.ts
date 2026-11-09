@@ -14,6 +14,8 @@ type Entry = {
 };
 
 function createFixture(caseSensitive = false) {
+  const writes: unknown[] = [];
+  let aborts = 0;
   const root: Entry = {
     name: "vault",
     kind: "directory",
@@ -45,15 +47,21 @@ function createFixture(caseSensitive = false) {
       async createWritable() {
         let pending = entry.bytes.slice();
         return {
-          async write(value: ArrayBuffer | Uint8Array) {
+          async write(value: ArrayBuffer | Uint8Array | Blob) {
+            writes.push(value);
             if (fail?.("write", path))
               throw new Error("Injected write failure");
-            pending = new Uint8Array(value).slice();
+            pending =
+              value instanceof Blob
+                ? new Uint8Array(await value.arrayBuffer())
+                : new Uint8Array(value).slice();
           },
           async close() {
             entry.bytes = pending;
           },
-          async abort() {},
+          async abort() {
+            aborts++;
+          },
         };
       },
       async getFileHandle(name: string, options: { create?: boolean } = {}) {
@@ -124,6 +132,10 @@ function createFixture(caseSensitive = false) {
   Object.assign(fs, { directoryHandle: directory, rootPath: "vault" });
   return {
     fs,
+    writes,
+    get aborts() {
+      return aborts;
+    },
     root,
     directory,
     add,
@@ -138,6 +150,20 @@ const bytes = new Uint8Array([0, 255, 128, 1]);
 afterEach(() => vi.restoreAllMocks());
 
 describe("BrowserFileSystem safe rename", () => {
+  it("passes imported blobs directly to the browser writer and aborts failed writes", async () => {
+    const fixture = createFixture();
+    const blob = new Blob([bytes]);
+    await fixture.fs.writeBlobFile("vault/attachment.bin", blob);
+    expect(fixture.writes).toEqual([blob]);
+    expect(await fixture.fs.readBinaryFile("vault/attachment.bin")).toEqual(
+      bytes,
+    );
+    fixture.setFailure((operation) => operation === "write");
+    await expect(
+      fixture.fs.writeBlobFile("vault/failed.bin", blob),
+    ).rejects.toThrow("Injected write failure");
+    expect(fixture.aborts).toBe(1);
+  });
   it("keeps case-only file renames intact even when raw handles compare unequal", async () => {
     const fixture = createFixture();
     fixture.add("Note.md", bytes);

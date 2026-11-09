@@ -40,18 +40,20 @@ export function assertPackageContents(listing) {
     .map((line) => {
       const match = /^\S+\s+\S+\s+\d+\s+\S+\s+\S+\s+(.+)$/.exec(line);
       assert(match, "Unrecognized Debian content listing");
-      return match[1].split(" -> ")[0];
+      const entry = match[1];
+      assert(!entry.includes(" -> "), "Refusing package symlinks");
+      assert(!entry.startsWith("/") && !entry.split("/").includes(".."));
+      return entry.replace(/^\.\//, "");
     });
   assert(
-    paths.includes(`./usr/bin/${PACKAGE}`),
+    paths.includes(`usr/bin/${PACKAGE}`),
     "Test binary is missing from package",
   );
   for (const entry of paths) {
-    assert(entry.startsWith("./") && !entry.split("/").includes(".."));
-    if (entry.startsWith("./usr/bin/") && entry !== "./usr/bin/")
+    if (entry.startsWith("usr/bin/") && entry !== "usr/bin/")
       assert.equal(
         entry,
-        `./usr/bin/${PACKAGE}`,
+        `usr/bin/${PACKAGE}`,
         "Refusing a package with other binary names",
       );
   }

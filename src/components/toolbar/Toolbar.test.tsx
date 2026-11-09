@@ -39,6 +39,17 @@ function setup(overrides: Partial<React.ComponentProps<typeof Toolbar>> = {}) {
 }
 
 describe("Toolbar", () => {
+  it("opens Trash from More without requiring an active document", async () => {
+    const onOpenTrash = vi.fn();
+    const { user } = setup({ fileName: "", onOpenTrash });
+    expect(screen.queryByRole("menuitem", { name: "回收站" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "更多操作" }));
+    const item = screen.getByRole("menuitem", { name: "回收站" });
+    expect((item as HTMLButtonElement).disabled).toBe(false);
+    await user.click(item);
+    expect(onOpenTrash).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
   beforeEach(() => {
     exportState.inFlight = false;
     useAppStore.setState({

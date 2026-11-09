@@ -42,6 +42,15 @@ const MAIN_WINDOW_CHROME_KEYS = [
   "dragDropEnabled",
 ] as const;
 
+it("allows the native binary IPC endpoint so WKWebView does not fall back to JSON for file bytes", () => {
+  const config = readTauriConfig("src-tauri/tauri.conf.json");
+  const directives = String(config.app?.security?.csp)
+    .split(";")
+    .map((part) => part.trim().split(/\s+/));
+  const connect = directives.find(([name]) => name === "connect-src") ?? [];
+  expect(connect).toContain("ipc:");
+});
+
 function readTauriConfig(path: string): TauriConfig {
   return JSON.parse(
     readFileSync(resolve(process.cwd(), path), "utf8"),

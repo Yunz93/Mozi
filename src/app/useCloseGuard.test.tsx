@@ -15,6 +15,7 @@ const {
   updateListenMock,
   beginShutdownMock,
   releaseShutdownMock,
+  windowIdentity,
 } = vi.hoisted(() => ({
   listenMock: vi.fn(),
   updateLockMock: vi.fn(() => false),
@@ -25,6 +26,7 @@ const {
   exitMock: vi.fn(async () => {}),
   flushAllDirtyMock: vi.fn(async () => true),
   invokeMock: vi.fn(async (_cmd?: string): Promise<unknown> => undefined),
+  windowIdentity: { label: "main" },
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -37,6 +39,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
+    label: windowIdentity.label,
     destroy: destroyMock,
   }),
 }));
@@ -87,6 +90,7 @@ describe("useCloseGuard", () => {
   let closeListener: ((event: { payload?: unknown }) => void) | null = null;
 
   beforeEach(() => {
+    windowIdentity.label = "main";
     closeListener = null;
     releaseShutdownMock.mockReset().mockResolvedValue(undefined);
     beginShutdownMock.mockReset().mockResolvedValue(releaseShutdownMock);
@@ -227,6 +231,35 @@ describe("useCloseGuard", () => {
       expect(forceSave).toHaveBeenCalledWith(undefined, { trigger: "system" });
       expect(destroyMock).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("saves and closes only the window addressed by a native close request", async () => {
+    const listeners: Array<{
+      handler: (event: { payload: string }) => void;
+      target?: { kind: string; label?: string };
+    }> = [];
+    listenMock.mockImplementation(async (_event, handler, options) => {
+      listeners.push({ handler, target: options?.target });
+      return vi.fn();
+    });
+    const mainSave = vi.fn(async () => true);
+    const otherSave = vi.fn(async () => true);
+    render(<Harness forceSave={mainSave} />);
+    await waitFor(() => expect(listeners).toHaveLength(1));
+    windowIdentity.label = "file-1";
+    render(<Harness forceSave={otherSave} />);
+    await waitFor(() => expect(listeners).toHaveLength(2));
+
+    await act(async () => {
+      // Tauri 的 Any 监听器会收到定向事件，只有明确的窗口目标才会隔离。
+      for (const { handler, target } of listeners) {
+        if (!target || target.kind === "Any" || target.label === "file-1")
+          handler({ payload: "window" });
+      }
+    });
+    await waitFor(() => expect(otherSave).toHaveBeenCalledTimes(1));
+    expect(mainSave).not.toHaveBeenCalled();
+    expect(destroyMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not destroy when forceSave fails and asks to discard and close", async () => {

@@ -23,11 +23,13 @@ import type {
   FileWatchEvent,
   DirectoryWatchEvent,
   IFileSystem,
+  FileEntryMetadata,
 } from "../types/filesystem";
 import { useAppStore } from "../store/appStore";
 import { sanitizeTrashFolder } from "../utils/trashFolder";
 import { buildFileTreeSignature } from "../utils/fileTree";
 import { isFileNotFoundError } from "./filesystem/fileWatchErrors";
+import { FILE_IMPORT_CHUNK_BYTES } from "../utils/droppedFiles";
 import {
   createEncodingUnsupportedError,
   decodeTextFileBytes,
@@ -49,6 +51,8 @@ const IMAGE_EXTENSIONS = [
 const DOCUMENT_EXTENSIONS = [".pdf"];
 const HTML_EXTENSIONS = [".html", ".htm"];
 const CONFIG_EXTENSIONS = [".json", ".yaml", ".yml", ".toml"];
+const IMPORT_TEMP_FILE_PATTERN =
+  /^mozi-import-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.tmp$/i;
 type LineEnding = "\n" | "\r\n";
 
 interface FileFormatState {
@@ -69,6 +73,11 @@ interface CopySampleNotesResult {
  * Uses native Tauri FS and Dialog plugins for all file operations
  */
 export class TauriFileSystem implements IFileSystem {
+  async fileMetadata(
+    paths: string[],
+  ): Promise<Record<string, FileEntryMetadata>> {
+    return invoke("sidebar_file_metadata", { paths });
+  }
   private static instance: TauriFileSystem;
   private showHiddenFiles: boolean = false;
   private showImages: boolean = true;
@@ -322,6 +331,45 @@ export class TauriFileSystem implements IFileSystem {
     }
   }
 
+  async writeBlobFile(path: string, content: Blob): Promise<void> {
+    // 复用已授权的目标目录，避免隐藏文件的额外权限随导入次数累积。
+    const temporary = await join(
+      await dirname(path),
+      `mozi-import-${crypto.randomUUID()}.tmp`,
+    );
+    // 临时文件不进入侧边栏和 Markdown 索引，完整写入后才发布到目标位置。
+    let created = false;
+    try {
+      await writeFile(temporary, new Uint8Array(), {
+        create: true,
+        createNew: true,
+      });
+      created = true;
+      for (
+        let offset = 0;
+        offset < content.size;
+        offset += FILE_IMPORT_CHUNK_BYTES
+      ) {
+        const bytes = new Uint8Array(
+          await content
+            .slice(offset, offset + FILE_IMPORT_CHUNK_BYTES)
+            .arrayBuffer(),
+        );
+        await writeFile(temporary, bytes, { append: true, create: false });
+      }
+      if (await exists(path))
+        throw new Error("Import destination already exists.");
+      await rename(temporary, path);
+      created = false;
+      this.invalidateObjectUrl(path);
+    } finally {
+      if (created)
+        await remove(temporary).catch((error) =>
+          console.warn("清理未完成的导入文件失败：", error),
+        );
+    }
+  }
+
   /**
    * Save file - shows save dialog if path is null
    */
@@ -523,6 +571,9 @@ export class TauriFileSystem implements IFileSystem {
 
       for (const entry of entries) {
         if (!entry.name || entry.isSymlink) continue;
+        // 保留普通附件，仅隐藏本软件导入流程的随机临时文件。
+        if (!entry.isDirectory && IMPORT_TEMP_FILE_PATTERN.test(entry.name))
+          continue;
         const isTrashDirectory =
           entry.isDirectory && isAtRoot && entry.name === trashFolder;
         const nodeInTrash = inTrash || isTrashDirectory;
@@ -743,12 +794,15 @@ export class TauriFileSystem implements IFileSystem {
         const trash = sanitizeTrashFolder(
           useAppStore.getState().settings.trashFolder,
         );
-        const visible = (path: string) => {
-          if (this.showHiddenFiles) return true;
+        const visible = (path: string, isDirectory: boolean) => {
           const parts = watchPath(path)
             .slice(watchPath(dirPath).length)
             .split("/")
             .filter(Boolean);
+          // 分块写入的临时文件不触发结构重扫，发布后的最终路径仍正常处理。
+          if (!isDirectory && IMPORT_TEMP_FILE_PATTERN.test(parts.at(-1) ?? ""))
+            return false;
+          if (this.showHiddenFiles) return true;
           return (
             parts[0] === trash || !parts.some((part) => part.startsWith("."))
           );
@@ -758,8 +812,8 @@ export class TauriFileSystem implements IFileSystem {
           dirPath,
           changes.filter(
             (change) =>
-              visible(change.path) ||
-              (change.oldPath && visible(change.oldPath)),
+              visible(change.path, change.isDirectory) ||
+              (change.oldPath && visible(change.oldPath, change.isDirectory)),
           ),
           (parent, previous) => {
             const trash = sanitizeTrashFolder(

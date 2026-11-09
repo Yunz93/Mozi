@@ -25,6 +25,7 @@ interface TaskDateRange {
   to: number;
   date: Date;
   separator: string;
+  time: string;
 }
 
 const closeTaskDatePicker = StateEffect.define<void>();
@@ -66,15 +67,17 @@ function taskDateRange(state: EditorState): TaskDateRange | null {
   const after = line.text.slice(pos - line.from + tail.length);
   if (after && !/^\s/.test(after)) return null;
   const rawDate = match[1] + tail;
+  const existingTime = /^\s+(\d{2}:\d{2})(?=\s|$)/.exec(after);
   const parts = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(rawDate);
   const date = parts
     ? new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3] || 1))
     : new Date();
   return {
     from,
-    to: pos + tail.length,
+    to: pos + tail.length + (existingTime?.[0].length ?? 0),
     date,
     separator: /\s/.test(state.sliceDoc(from - 1, from)) ? "" : " ",
+    time: existingTime?.[1] ?? "",
   };
 }
 
@@ -94,6 +97,15 @@ function createDatePicker(view: EditorView, range: TaskDateRange): TooltipView {
   grid.className = "cm-task-date-grid";
   const footer = document.createElement("div");
   footer.className = "cm-task-date-footer";
+  const timeLabel = document.createElement("label");
+  timeLabel.className = "cm-task-time-field";
+  timeLabel.textContent = t(language, "tasks_optionalTime");
+  const timeInput = document.createElement("input");
+  timeInput.type = "time";
+  timeInput.step = "60";
+  timeInput.value = range.time;
+  timeInput.setAttribute("aria-label", t(language, "tasks_optionalTime"));
+  timeLabel.append(timeInput);
   let month = new Date(range.date.getFullYear(), range.date.getMonth(), 1);
 
   const close = (restoreFocus = false) => {
@@ -103,7 +115,7 @@ function createDatePicker(view: EditorView, range: TaskDateRange): TooltipView {
   const choose = (date: Date) => {
     if (isEditorImeComposing(view)) return;
     // 日期标记与任务正文之间需要空格，保证保存后可被日程索引识别。
-    const insert = `${range.separator}@${localDateKey(date)}`;
+    const insert = `${range.separator}@${localDateKey(date)}${timeInput.value ? ` ${timeInput.value}` : ""}`;
     view.dispatch({
       changes: { from: range.from, to: range.to, insert },
       selection: { anchor: range.from + insert.length },
@@ -210,9 +222,11 @@ function createDatePicker(view: EditorView, range: TaskDateRange): TooltipView {
     }),
     button(t(language, "common_cancel"), () => close(true)),
   );
-  dom.append(title, header, grid, footer);
+  dom.append(title, header, grid, timeLabel, footer);
   // 鼠标选日期时保留正文的焦点与光标，键盘仍可进入日期按钮。
-  dom.addEventListener("mousedown", (event) => event.preventDefault());
+  dom.addEventListener("mousedown", (event) => {
+    if (!(event.target instanceof HTMLInputElement)) event.preventDefault();
+  });
   dom.addEventListener("keydown", (event) => {
     if (
       event.key !== "Escape" ||
@@ -349,6 +363,22 @@ const datePickerTheme = EditorView.baseTheme({
     marginTop: "8px",
     paddingTop: "8px",
     borderTop: "1px solid var(--workspace-border, #ded9d0)",
+  },
+  ".cm-task-time-field": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: "8px",
+    gap: "8px",
+    color: "var(--workspace-muted)",
+  },
+  ".cm-task-time-field input": {
+    font: "inherit",
+    color: "var(--workspace-text)",
+    background: "var(--workspace-menu)",
+    border: "1px solid var(--workspace-border)",
+    borderRadius: "6px",
+    padding: "4px 6px",
   },
 });
 

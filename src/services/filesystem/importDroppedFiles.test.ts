@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { importDroppedFiles } from "./importDroppedFiles";
 
 function createMemoryFs(existing: string[] = []) {
@@ -27,6 +27,34 @@ function createMemoryFs(existing: string[] = []) {
 }
 
 describe("importDroppedFiles", () => {
+  it.each([
+    ["large.pdf", 1024 * 1024 * 1024],
+    ["presentation.ppt", 900_000_000],
+    ["presentation.pptx", 900_000_000],
+  ])(
+    "passes %s directly to the bounded blob writer without materializing its full buffer",
+    async (name, size) => {
+      const { fs } = createMemoryFs();
+      const file = new File(["fixture"], name);
+      Object.defineProperty(file, "size", { value: size });
+      const wholeRead = vi
+        .spyOn(file, "arrayBuffer")
+        .mockRejectedValue(new Error("Whole-file read must not happen"));
+      const writeBlobFile = vi.fn(async () => {});
+      const result = await importDroppedFiles({
+        files: [file],
+        targetFolderPath: "/vault",
+        fs: { ...fs, writeBlobFile },
+      });
+      expect(result.failed).toEqual([]);
+      expect(writeBlobFile).toHaveBeenCalledWith(`/vault/${name}`, file);
+      expect(wholeRead).not.toHaveBeenCalled();
+      expect(result.imported[0]).toMatchObject({
+        path: `/vault/${name}`,
+        size: file.size,
+      });
+    },
+  );
   it("writes dropped files into the target folder", async () => {
     const { fs, files } = createMemoryFs();
     const note = new File(["hello"], "hello.md", { type: "text/markdown" });
@@ -38,7 +66,7 @@ describe("importDroppedFiles", () => {
     });
 
     expect(result.imported).toEqual([
-      { path: "/vault/hello.md", name: "hello.md" },
+      { path: "/vault/hello.md", name: "hello.md", size: note.size },
     ]);
     expect(new TextDecoder().decode(files.get("/vault/hello.md"))).toBe(
       "hello",
@@ -56,6 +84,21 @@ describe("importDroppedFiles", () => {
     });
 
     expect(result.imported[0]?.name).toBe("hello (1).md");
+  });
+
+  it("does not attempt an unbounded read when a legacy file system cannot stream a large file", async () => {
+    const { fs } = createMemoryFs();
+    const file = new File(["fixture"], "large.bin");
+    Object.defineProperty(file, "size", { value: 1024 * 1024 * 1024 });
+    const wholeRead = vi.spyOn(file, "arrayBuffer");
+    const result = await importDroppedFiles({
+      files: [file],
+      targetFolderPath: "/vault",
+      fs,
+    });
+    expect(result.failed).toHaveLength(1);
+    expect(wholeRead).not.toHaveBeenCalled();
+    expect(result.imported).toEqual([]);
   });
 
   it("recreates folder structure from webkitRelativePath", async () => {

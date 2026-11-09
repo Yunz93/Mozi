@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "墨知",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "identifier": "com.bxyz.markdown-press",
   "build": {
     "frontendDist": "../dist",
@@ -29,7 +29,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http: https: blob: asset:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: asset:; worker-src 'self' blob: asset:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http: https:; font-src 'self' data: blob: asset:; frame-src 'self' https: blob: asset:; object-src 'self' blob: asset:; media-src 'self' blob: asset: http: https:;",
+      "csp": "default-src 'self'; connect-src 'self' ipc: http: https: blob: asset:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: asset:; worker-src 'self' blob: asset:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http: https:; font-src 'self' data: blob: asset:; frame-src 'self' https: blob: asset:; object-src 'self' blob: asset:; media-src 'self' blob: asset: http: https:;",
       "dangerousDisableAssetCspModification": ["style-src"]
     }
   },

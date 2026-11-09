@@ -87,30 +87,35 @@ export async function listenForUpdateSaveRequests(): Promise<() => void> {
     replyTo: string;
     reason: ShutdownReason;
     backupOnly?: boolean;
-  }>(REQUEST_EVENT, (event) => {
-    const { requestId, replyTo, reason, backupOnly } = event.payload;
-    void (async () => {
-      let saved = false;
-      if (lock(requestId, reason)) {
-        try {
-          saved = backupOnly
-            ? await backupDirtyWindowDocuments()
-            : await flushAllDirtyOpenTabs();
-        } catch {
-          /* 保存异常按失败回报。 */
+  }>(
+    REQUEST_EVENT,
+    (event) => {
+      const { requestId, replyTo, reason, backupOnly } = event.payload;
+      void (async () => {
+        let saved = false;
+        if (lock(requestId, reason)) {
+          try {
+            saved = backupOnly
+              ? await backupDirtyWindowDocuments()
+              : await flushAllDirtyOpenTabs();
+          } catch {
+            /* 保存异常按失败回报。 */
+          }
         }
-      }
-      await emitTo(replyTo, RESULT_EVENT, { requestId, label, saved });
-    })().catch(() => {
-      unlock(requestId);
-    });
-  });
+        await emitTo(replyTo, RESULT_EVENT, { requestId, label, saved });
+      })().catch(() => {
+        unlock(requestId);
+      });
+    },
+    { target: { kind: "WebviewWindow", label } },
+  );
   try {
     const unlistenRelease = await listen<{ requestId: string }>(
       RELEASE_EVENT,
       (event) => {
         unlock(event.payload.requestId);
       },
+      { target: { kind: "WebviewWindow", label } },
     );
     return () => {
       unlistenRequest();
@@ -157,16 +162,20 @@ export async function beginDocumentShutdown(
       requestId: string;
       label: string;
       saved: boolean;
-    }>(RESULT_EVENT, (event) => {
-      if (
-        event.payload.requestId !== requestId ||
-        !participants.has(event.payload.label)
-      )
-        return;
-      if (event.payload.saved) saved.add(event.payload.label);
-      else failed = true;
-      wake?.();
-    });
+    }>(
+      RESULT_EVENT,
+      (event) => {
+        if (
+          event.payload.requestId !== requestId ||
+          !participants.has(event.payload.label)
+        )
+          return;
+        if (event.payload.saved) saved.add(event.payload.label);
+        else failed = true;
+        wake?.();
+      },
+      { target: { kind: "WebviewWindow", label: current } },
+    );
     const deadline = Date.now() + SAVE_TIMEOUT_MS;
     let saveTimer: ReturnType<typeof setTimeout> | undefined;
     try {

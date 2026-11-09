@@ -246,6 +246,60 @@ mod tests {
     }
 }
 
+#[cfg(all(test, target_os = "macos"))]
+mod bridge_lifecycle_tests {
+    #[test]
+    fn native_calendar_bridge_restores_access_without_reprompting() {
+        use std::{fs, path::Path, process::Command};
+        let directory =
+            std::env::temp_dir().join(format!("mozi-calendar-bridge-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        let binary = directory.join("calendar-bridge-test");
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/calendar_bridge_harness.m");
+        let compilation = Command::new("clang")
+            .args([
+                "-fobjc-arc",
+                "-fblocks",
+                "-Wno-deprecated-declarations",
+                "-framework",
+                "Foundation",
+                "-framework",
+                "EventKit",
+            ])
+            .arg(&source)
+            .arg("-o")
+            .arg(&binary)
+            .output()
+            .unwrap();
+        assert!(
+            compilation.status.success(),
+            "{}",
+            String::from_utf8_lossy(&compilation.stderr)
+        );
+        let mut failures = Vec::new();
+        for scenario in [
+            "restore-access",
+            "restore-sync",
+            "no-prompt",
+            "explicit-enable",
+            "revocation",
+            "retry-failure",
+            "refused-connection",
+            "explicit-denial",
+        ] {
+            let output = Command::new(&binary).arg(scenario).output().unwrap();
+            if !output.status.success() {
+                failures.push(format!(
+                    "{scenario}: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ));
+            }
+        }
+        fs::remove_dir_all(directory).unwrap();
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+}
+
 #[cfg(all(test, unix))]
 mod source_path_tests {
     use super::super::model::Vault;

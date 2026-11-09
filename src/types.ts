@@ -189,7 +189,10 @@ export interface ImageHostingConfig {
   custom: ImageHostingCustomConfig;
 }
 
+export type FileSortMode = "name" | "created" | "modified" | "type";
+
 export interface AppSettings {
+  sidebarSortMode?: FileSortMode;
   language: AppLanguage;
   aiProvider: AIProvider;
   fontDefaultsVersion: number;

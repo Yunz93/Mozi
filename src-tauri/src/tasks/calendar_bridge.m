@@ -25,13 +25,23 @@ static NSDictionary *MoziCalendarError(NSString *message) {
     return @{ @"error": message ?: @"Calendar operation failed" };
 }
 
-static NSDictionary *MoziCalendarAccess(BOOL request) {
-    EKEventStore *store = MoziEventStore();
-    if (request && ![MoziCalendarPermission() isEqualToString:@"granted"]) {
+static NSDictionary *MoziPrepareCalendarAccess(BOOL request) {
+    // 系统授权跨启动保留，但新建的 EventStore 仍须完成本次进程的访问初始化。
+    // 这个标记只缓存连接就绪状态，每次调用仍以系统权限为准。
+    static BOOL ready = NO;
+    NSString *permission = MoziCalendarPermission();
+    BOOL granted = [permission isEqualToString:@"granted"];
+    if (!granted) ready = NO;
+    BOOL canRequest = request && ([permission isEqualToString:@"notDetermined"]
+                                  || [permission isEqualToString:@"writeOnly"]);
+    if (!granted && !canRequest) return nil;
+    if (!ready) {
+        EKEventStore *store = MoziEventStore();
         dispatch_semaphore_t done = dispatch_semaphore_create(0);
         __block NSError *failure;
+        __block BOOL allowed = NO;
         void (^completion)(BOOL, NSError *) = ^(BOOL granted, NSError *error) {
-            (void)granted;
+            allowed = granted;
             failure = error;
             dispatch_semaphore_signal(done);
         };
@@ -47,9 +57,22 @@ static NSDictionary *MoziCalendarAccess(BOOL request) {
             return MoziCalendarError(@"Calendar permission request timed out. Try again in settings.");
         }
         if (failure) return MoziCalendarError(failure.localizedDescription);
+        ready = allowed && [MoziCalendarPermission() isEqualToString:@"granted"];
+        if (!ready && (allowed || [MoziCalendarPermission() isEqualToString:@"granted"])) {
+            return MoziCalendarError(@"Calendar access is not ready. Refresh the calendar list to retry.");
+        }
     }
+    return nil;
+}
+
+static NSDictionary *MoziCalendarAccess(BOOL request) {
+    NSDictionary *failure = MoziPrepareCalendarAccess(request);
+    if (failure) return failure;
+    NSString *permission = MoziCalendarPermission();
     NSMutableArray *calendars = [NSMutableArray array];
-    if ([MoziCalendarPermission() isEqualToString:@"granted"]) {
+    NSString *defaultCalendarId = @"";
+    if ([permission isEqualToString:@"granted"]) {
+        EKEventStore *store = MoziEventStore();
         for (EKCalendar *calendar in [store calendarsForEntityType:EKEntityTypeEvent]) {
             if (!calendar.allowsContentModifications) continue;
             [calendars addObject:@{
@@ -58,10 +81,11 @@ static NSDictionary *MoziCalendarAccess(BOOL request) {
                 @"source": calendar.source.title ?: @""
             }];
         }
+        defaultCalendarId = store.defaultCalendarForNewEvents.calendarIdentifier ?: @"";
     }
-    return @{ @"supported": @YES, @"permission": MoziCalendarPermission(),
+    return @{ @"supported": @YES, @"permission": permission,
               @"calendars": calendars,
-              @"defaultCalendarId": store.defaultCalendarForNewEvents.calendarIdentifier ?: @"" };
+              @"defaultCalendarId": defaultCalendarId };
 }
 
 static NSString *MoziCalendarMarker(NSString *owner, NSString *key) {
@@ -92,6 +116,8 @@ static EKEvent *MoziFindEvent(EKEventStore *store, NSString *marker, NSDictionar
 }
 
 static NSDictionary *MoziCalendarSync(NSDictionary *input) {
+    NSDictionary *failure = MoziPrepareCalendarAccess(NO);
+    if (failure) return failure;
     if (![MoziCalendarPermission() isEqualToString:@"granted"]) {
         return MoziCalendarError(@"Calendar access is unavailable. Allow full access in System Settings > Privacy & Security > Calendars.");
     }
@@ -165,7 +191,11 @@ char *mozi_calendar_call(const char *json) {
         @try {
             NSData *data = [[NSString stringWithUTF8String:json] dataUsingEncoding:NSUTF8StringEncoding];
             NSDictionary *input = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            @synchronized (MoziEventStore()) {
+            // 查询未授权状态时也要串行，但不能为加锁提前初始化 EventKit 数据连接。
+            static NSObject *lock;
+            static dispatch_once_t once;
+            dispatch_once(&once, ^{ lock = [NSObject new]; });
+            @synchronized (lock) {
                 response = [input[@"operation"] isEqualToString:@"sync"]
                     ? MoziCalendarSync(input) : MoziCalendarAccess([input[@"request"] boolValue]);
             }

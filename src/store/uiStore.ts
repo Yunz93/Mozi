@@ -152,6 +152,7 @@ export const defaultImageHostingConfig: ImageHostingConfig = {
 };
 
 export const defaultSettings: AppSettings = {
+  sidebarSortMode: "name",
   language: "zh-CN",
   aiProvider: "deepseek",
   fontDefaultsVersion: FONT_DEFAULTS_VERSION,

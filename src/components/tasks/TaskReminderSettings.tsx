@@ -1,4 +1,5 @@
-import { BellRing, MinusCircle } from "lucide-react";
+import { useState } from "react";
+import { BellRing, MinusCircle, Plus, X } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
 import { isMacOSPlatform } from "../../utils/platform";
 import { MacCalendarSettings } from "./MacCalendarSettings";
@@ -30,6 +31,8 @@ export function TaskReminderSettings({
   calendarSyncedAt: number | null;
 }) {
   const { t } = useI18n();
+  const [newTime, setNewTime] = useState("18:00");
+  const reminderTimes = preferences.reminderTimes ?? ["09:00"];
   return (
     <div className="task-settings task-settings-inline">
       <label className="task-setting-row">
@@ -60,9 +63,65 @@ export function TaskReminderSettings({
           onChange={(event) => onChange({ background: event.target.checked })}
         />
       </label>
-      <div className="task-setting-row">
-        <span>{t("tasks_allDayReminder")}</span>
-        <span>09:00</span>
+      <div className="task-setting-row task-reminder-times-row">
+        <span>
+          {t("tasks_allDayReminder")}
+          <small>{t("tasks_reminderTimesHint")}</small>
+        </span>
+        <div className="task-reminder-times">
+          <div className="task-reminder-time-list">
+            {reminderTimes.map((time) => (
+              <span className="task-reminder-time" key={time}>
+                <time>{time}</time>
+                <button
+                  type="button"
+                  className="task-icon-button"
+                  disabled={busy || reminderTimes.length <= 1}
+                  aria-label={t("tasks_removeReminderTime", { time })}
+                  onClick={() =>
+                    onChange({
+                      reminderTimes: reminderTimes.filter(
+                        (item) => item !== time,
+                      ),
+                    })
+                  }
+                >
+                  <X size={13} aria-hidden />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="task-reminder-time-add">
+            <input
+              type="time"
+              step={60}
+              value={newTime}
+              disabled={busy}
+              aria-label={t("tasks_reminderTime")}
+              onChange={(event) => setNewTime(event.target.value)}
+            />
+            <button
+              type="button"
+              className="task-icon-button"
+              disabled={
+                busy ||
+                !/^\d{2}:\d{2}$/.test(newTime) ||
+                reminderTimes.includes(newTime)
+              }
+              aria-label={t("tasks_addReminderTime")}
+              title={t("tasks_addReminderTime")}
+              onClick={() =>
+                onChange({
+                  reminderTimes: [
+                    ...new Set([...reminderTimes, newTime]),
+                  ].sort(),
+                })
+              }
+            >
+              <Plus size={16} aria-hidden />
+            </button>
+          </div>
+        </div>
       </div>
       <p className="task-settings-note">{t("tasks_notificationBoundary")}</p>
       <button

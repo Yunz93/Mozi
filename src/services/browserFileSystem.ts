@@ -14,6 +14,26 @@ type IterableDirectoryHandle = FileSystemDirectoryHandle & {
  * Provides a fallback for non-Tauri environments
  */
 export class BrowserFileSystem implements IFileSystem {
+  async fileMetadata(paths: string[]) {
+    const result: Record<
+      string,
+      { createdAt: number | null; modifiedAt: number | null }
+    > = {};
+    for (const path of paths) {
+      try {
+        const handle = await this.getFileHandle(
+          this.directoryHandle!,
+          this.getRelativePath(path),
+        );
+        const file = await handle.getFile();
+        // 浏览器文件 API 不提供创建时间，不能用修改时间冒充。
+        result[path] = { createdAt: null, modifiedAt: file.lastModified };
+      } catch {
+        // 目录或已移除文件没有可用时间，排序时稳定回退到名称。
+      }
+    }
+    return result;
+  }
   private static instance: BrowserFileSystem;
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private fileHandles: Map<string, FileSystemFileHandle> = new Map();
@@ -209,6 +229,17 @@ export class BrowserFileSystem implements IFileSystem {
   }
 
   async writeBinaryFile(path: string, content: Uint8Array): Promise<void> {
+    return this.writeBinaryContent(path, content);
+  }
+
+  async writeBlobFile(path: string, content: Blob): Promise<void> {
+    return this.writeBinaryContent(path, content);
+  }
+
+  private async writeBinaryContent(
+    path: string,
+    content: Uint8Array | Blob,
+  ): Promise<void> {
     try {
       let fileHandle: FileSystemFileHandle;
 
@@ -226,8 +257,13 @@ export class BrowserFileSystem implements IFileSystem {
       }
 
       const writable = await fileHandle.createWritable();
-      await writable.write(content);
-      await writable.close();
+      try {
+        await writable.write(content);
+        await writable.close();
+      } catch (error) {
+        await writable.abort().catch(() => {});
+        throw error;
+      }
       this.invalidateObjectUrl(path);
     } catch (error) {
       console.error(`Failed to write binary file ${path}:`, error);

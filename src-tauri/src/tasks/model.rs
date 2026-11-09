@@ -9,6 +9,7 @@ pub struct Preferences {
     pub language: String,
     pub mac_calendar: bool,
     pub calendar_id: String,
+    pub reminder_times: Vec<String>,
 }
 
 impl Default for Preferences {
@@ -19,6 +20,7 @@ impl Default for Preferences {
             language: "zh-CN".into(),
             mac_calendar: false,
             calendar_id: String::new(),
+            reminder_times: vec!["09:00".into()],
         }
     }
 }
@@ -30,6 +32,7 @@ pub struct PreferencesPatch {
     pub background: Option<bool>,
     pub mac_calendar: Option<bool>,
     pub calendar_id: Option<String>,
+    pub reminder_times: Option<Vec<String>>,
 }
 
 impl PreferencesPatch {
@@ -42,6 +45,9 @@ impl PreferencesPatch {
             calendar_id: self
                 .calendar_id
                 .unwrap_or_else(|| current.calendar_id.clone()),
+            reminder_times: self
+                .reminder_times
+                .unwrap_or_else(|| current.reminder_times.clone()),
         }
     }
 }

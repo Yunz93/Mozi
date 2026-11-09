@@ -4,6 +4,8 @@ import type { FileNode } from "../../types";
 import { isOpenableFile } from "../../utils/fileTypes";
 import { getFileTypeBadge } from "../../utils/fileIconKind";
 import { useI18n } from "../../hooks/useI18n";
+import { useAppStore } from "../../store/appStore";
+import { beginNativeFileDrag, nativeDraggedNodeId } from "./nativeFileDrag";
 import {
   extractDraggedNodeId as extractDraggedNodeIdFromEvent,
   hasDragPayload,
@@ -50,6 +52,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     onExpandedChange,
   }) {
     const { t } = useI18n();
+    const showNotification = useAppStore((state) => state.showNotification);
     const setExpanded = useCallback(
       (value: boolean) => {
         onExpandedChange?.(node.id, value);
@@ -96,10 +99,21 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     const handleDragStart = useCallback(
       (e: React.DragEvent) => {
         e.stopPropagation();
+        if (
+          beginNativeFileDrag(
+            node,
+            () => setIsDragging(false),
+            () => showNotification(t("sidebar_nativeDragFailed"), "error"),
+          )
+        ) {
+          e.preventDefault();
+          setIsDragging(true);
+          return;
+        }
         setDragPayload(e, node.id, node.type);
         setIsDragging(true);
       },
-      [node.id, node.type],
+      [node, showNotification, t],
     );
 
     const clearAutoExpandTimer = useCallback(() => {
@@ -114,11 +128,16 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
     const handleDragOver = useCallback(
       (e: React.DragEvent) => {
         if (!isDropTarget) return;
-        const intent = resolveSidebarDropIntent(e, hasDragPayload(e));
+        const intent = resolveSidebarDropIntent(
+          e,
+          hasDragPayload(e),
+          !!nativeDraggedNodeId(),
+        );
         if (!intent) return;
         e.preventDefault();
         e.stopPropagation();
-        e.dataTransfer.dropEffect = intent === "import-files" ? "copy" : "move";
+        e.dataTransfer.dropEffect =
+          intent === "import-files" || nativeDraggedNodeId() ? "copy" : "move";
         setIsDragOver(true);
         if (isFolder && !expanded && autoExpandTimerRef.current === null) {
           autoExpandTimerRef.current = window.setTimeout(() => {
@@ -148,7 +167,11 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         setIsDragOver(false);
         clearAutoExpandTimer();
 
-        const intent = resolveSidebarDropIntent(e, hasDragPayload(e));
+        const intent = resolveSidebarDropIntent(
+          e,
+          hasDragPayload(e),
+          !!nativeDraggedNodeId(),
+        );
         if (intent === "import-files") {
           const dropped = extractDroppedFiles(e);
           if (dropped.length > 0) {
@@ -192,18 +215,20 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         <div
           className={`
           workspace-tree-row group relative flex items-center py-2 px-3 mx-2 rounded-lg text-sm border border-transparent
-          ${canOpen ? "cursor-pointer" : "cursor-not-allowed"}
+          ${canOpen ? "cursor-pointer" : "cursor-grab"}
           ${
             isActive
               ? "bg-accent-DEFAULT/14 text-gray-900 font-semibold shadow-sm ring-1 ring-inset ring-accent-DEFAULT/35 dark:bg-accent-DEFAULT/22 dark:text-white dark:ring-accent-DEFAULT/45"
               : canOpen
                 ? "font-medium text-gray-600 hover:bg-black/[0.04] hover:text-black dark:text-slate-400 dark:hover:bg-[#121923] dark:hover:text-white"
-                : "font-medium text-gray-400/80 opacity-55 dark:text-slate-500 dark:opacity-50"
+                : "font-medium text-gray-600 hover:bg-black/[0.04] dark:text-slate-400 dark:hover:bg-white/[0.04]"
           }
           ${isDragOver ? "bg-accent-DEFAULT/20 border-accent-DEFAULT dark:bg-accent-DEFAULT/20 dark:border-accent-DEFAULT" : ""}
           ${isDragging ? "opacity-60" : ""}
         `}
-          style={{ paddingLeft: `${level * 8 + 12}px` }}
+          style={{ paddingLeft: `${level * 18 + 12}px` }}
+          data-tree-level={level}
+          data-tree-folder={isFolder || undefined}
           aria-selected={isActive}
           aria-disabled={!canOpen}
           data-drag-over={isDragOver || undefined}
@@ -217,6 +242,14 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
           onContextMenu={handleRightClick}
           title={itemTitle}
         >
+          {Array.from({ length: level }, (_, index) => (
+            <span
+              key={index}
+              aria-hidden
+              className="workspace-tree-guide"
+              style={{ left: `${20 + index * 18}px` }}
+            />
+          ))}
           {isActive && (
             <span
               aria-hidden

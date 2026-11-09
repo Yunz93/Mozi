@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useI18n } from "../../hooks/useI18n";
 import { getMacCalendarAccess } from "../../services/taskCalendarService";
@@ -28,29 +28,42 @@ export function MacCalendarSettings({
   const [error, setError] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [selectedId, setSelectedId] = useState("");
+  const latestRequest = useRef(0);
+  const enabling = useRef(false);
   const refresh = useCallback(async () => {
+    if (enabling.current) return;
+    const request = ++latestRequest.current;
     setPending(true);
     try {
-      setAccess(await getMacCalendarAccess());
+      const next = await getMacCalendarAccess();
+      if (request !== latestRequest.current) return;
+      setAccess(next);
       setError(null);
     } catch (error) {
-      setError(String(error));
+      if (request === latestRequest.current) setError(String(error));
     } finally {
-      setPending(false);
+      if (request === latestRequest.current) setPending(false);
     }
   }, []);
   useEffect(() => {
+    const requests = latestRequest;
     void refresh();
     const update = () => void refresh();
     window.addEventListener("focus", update);
-    return () => window.removeEventListener("focus", update);
+    return () => {
+      requests.current++;
+      window.removeEventListener("focus", update);
+    };
   }, [refresh]);
 
   async function enable() {
+    const request = ++latestRequest.current;
+    enabling.current = true;
     setPending(true);
     setError(null);
     try {
       const next = await getMacCalendarAccess(true);
+      if (request !== latestRequest.current) return;
       setAccess(next);
       if (next.permission !== "granted") {
         setError(t("tasks_calendarPermissionHint"));
@@ -68,16 +81,19 @@ export function MacCalendarSettings({
       setSelectedId(calendarId);
       setChoosing(true);
     } catch (error) {
-      setError(String(error));
+      if (request === latestRequest.current) setError(String(error));
     } finally {
-      setPending(false);
+      enabling.current = false;
+      if (request === latestRequest.current) setPending(false);
     }
   }
   const issue = error || (preferences.macCalendar ? syncError : null);
   const calendarId = choosing ? selectedId : preferences.calendarId;
-  const missing =
+  const targetUnknown =
     calendarId &&
     !access?.calendars.some((calendar) => calendar.id === calendarId);
+  const missing =
+    targetUnknown && !pending && !error && access?.permission === "granted";
   return (
     <div className="task-mac-calendar">
       <label className="task-setting-row">
@@ -112,11 +128,17 @@ export function MacCalendarSettings({
               className="task-calendar-target-select"
               aria-label={t("tasks_calendarTarget")}
               options={[
-                ...(missing
+                ...(targetUnknown
                   ? [
                       {
                         value: calendarId,
-                        label: t("tasks_calendarUnavailable"),
+                        label: t(
+                          missing
+                            ? "tasks_calendarUnavailable"
+                            : pending || (!access && !error)
+                              ? "tasks_syncing"
+                              : "tasks_calendarTarget",
+                        ),
                         disabled: true,
                       },
                     ]
@@ -151,7 +173,7 @@ export function MacCalendarSettings({
                   : t("tasks_calendarPending")}
             </p>
           )}
-          {access && access.permission !== "granted" ? (
+          {access && !pending && access.permission !== "granted" ? (
             <p className="task-error">{t("tasks_calendarPermissionHint")}</p>
           ) : null}
         </>

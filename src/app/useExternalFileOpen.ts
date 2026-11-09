@@ -60,16 +60,26 @@ export function useExternalFileOpen({
 
     void (async () => {
       try {
-        const [{ listen }, { invoke }] = await Promise.all([
-          import("@tauri-apps/api/event"),
-          import("@tauri-apps/api/core"),
-        ]);
+        const [{ listen }, { invoke }, { getCurrentWindow }] =
+          await Promise.all([
+            import("@tauri-apps/api/event"),
+            import("@tauri-apps/api/core"),
+            import("@tauri-apps/api/window"),
+          ]);
 
-        const unlistenFn = await listen("opened-files", (event) => {
-          const paths = uniquePaths(normalizeOpenedFilePayload(event.payload));
-          if (paths.length === 0) return;
-          void onRuntimePaths(paths);
-        });
+        const unlistenFn = await listen(
+          "opened-files",
+          (event) => {
+            const paths = uniquePaths(
+              normalizeOpenedFilePayload(event.payload),
+            );
+            if (paths.length === 0) return;
+            void onRuntimePaths(paths);
+          },
+          {
+            target: { kind: "WebviewWindow", label: getCurrentWindow().label },
+          },
+        );
         if (cancelled) {
           unlistenFn();
           return;

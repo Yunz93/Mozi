@@ -15,7 +15,7 @@ import type { Plugin } from "vite";
 // 使 release 的 style-src 与本文件保持一致。详见 webkitCompat.ts Quirk 7。
 export const DEV_CSP =
   "default-src 'self'; " +
-  "connect-src 'self' http: https: ws: blob: asset:; " +
+  "connect-src 'self' ipc: http: https: ws: blob: asset:; " +
   "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' blob: asset:; " +
   "worker-src 'self' blob: asset:; " +
   "style-src 'self' 'unsafe-inline'; " +

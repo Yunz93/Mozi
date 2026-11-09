@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { listen } from "@tauri-apps/api/event";
 
 const mocks = vi.hoisted(() => ({
   listeners: new Map<
@@ -95,6 +96,21 @@ afterEach(async () => {
 });
 
 describe("update saves across windows", () => {
+  it("receives save requests, releases and acknowledgements only in their addressed window", async () => {
+    const stop = await guard.listenForUpdateSaveRequests();
+    release = await guard.beginUpdateInstall();
+    for (const event of [
+      "update-save-request",
+      "update-save-release",
+      "update-save-result",
+    ]) {
+      expect(listen).toHaveBeenCalledWith(event, expect.any(Function), {
+        target: { kind: "WebviewWindow", label: "main" },
+      });
+    }
+    stop();
+  });
+
   it("locks the initiating window and waits for every other window acknowledgement", async () => {
     let request: Record<string, unknown> | undefined;
     mocks.emit.mockImplementation(async (_label, name, payload) => {

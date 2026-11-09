@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTaskCalendarStore } from "../store/taskCalendarStore";
 import { isTauriEnvironment } from "../types/filesystem";
 import { saveTaskCalendarLanguage } from "../services/taskCalendarService";
@@ -26,12 +27,27 @@ export function useTaskCalendar(): void {
     const stops: Array<() => void> = [];
     const subscribe = async () => {
       for (const event of ["task-calendar-changed", "task-calendar-open"]) {
-        const stop = await listen(event, () => {
-          const state = useTaskCalendarStore.getState();
-          if (event === "task-calendar-open") state.open();
-          if (state.isOpen || state.snapshot || event === "task-calendar-open")
-            void state.reload();
-        });
+        const stop = await listen(
+          event,
+          () => {
+            const state = useTaskCalendarStore.getState();
+            if (event === "task-calendar-open") state.open();
+            if (
+              state.isOpen ||
+              state.snapshot ||
+              event === "task-calendar-open"
+            )
+              void state.reload();
+          },
+          event === "task-calendar-open"
+            ? {
+                target: {
+                  kind: "WebviewWindow",
+                  label: getCurrentWindow().label,
+                },
+              }
+            : undefined,
+        );
         if (disposed) stop();
         else stops.push(stop);
       }

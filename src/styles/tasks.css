@@ -691,3 +691,38 @@
     transform: none;
   }
 }
+
+.task-reminder-times-row {
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.task-reminder-times {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.task-reminder-time-list,
+.task-reminder-time-add {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.task-reminder-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 10px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.task-reminder-time-add input {
+  font: inherit;
+  color: var(--workspace-text);
+  background: var(--workspace-menu);
+  border: 1px solid var(--workspace-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}

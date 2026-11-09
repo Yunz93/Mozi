@@ -24,6 +24,55 @@ function createRootDragEvent(
 }
 
 describe("useSidebarDragAndDrop", () => {
+  it("keeps scrolling at the edge without more drag events and stops after drop", () => {
+    let frame: FrameRequestCallback | undefined;
+    let nextId = 0;
+    const request = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback) => {
+        frame = callback;
+        return ++nextId;
+      });
+    const cancel = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => {});
+    const element = document.createElement("div");
+    element.scrollTop = 100;
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 300,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 300,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    });
+    const ref = { current: element };
+    const { result, unmount } = renderHook(() => useSidebarDragAndDrop(ref));
+    const event = Object.assign(createRootDragEvent([DRAG_DATA_TYPE]), {
+      clientX: 100,
+      clientY: 295,
+    });
+    try {
+      act(() => result.current.handleDragCapture?.(event));
+      expect(request).toHaveBeenCalledOnce();
+      act(() => frame!(0));
+      const first = element.scrollTop;
+      expect(first).toBeGreaterThan(100);
+      act(() => frame!(16));
+      expect(element.scrollTop).toBeGreaterThan(first);
+      act(() => document.dispatchEvent(new Event("drop")));
+      expect(cancel).toHaveBeenCalledWith(nextId);
+      expect(result.current.isDragging).toBe(false);
+    } finally {
+      unmount();
+      request.mockRestore();
+      cancel.mockRestore();
+    }
+  });
+
   it("accepts OS file drags on the root zone with a copy cursor", () => {
     const { result } = renderHook(() => useSidebarDragAndDrop());
     const event = createRootDragEvent(["Files", "text/plain"]);

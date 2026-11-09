@@ -10,6 +10,7 @@ mod native_notification;
 mod publishing;
 mod sample_notes;
 mod secure_settings;
+mod sidebar;
 mod updater_signature;
 mod system_fonts;
 mod tasks;
@@ -898,6 +899,8 @@ pub fn run() {
             set_secure_secret,
             list_system_fonts,
             register_allowed_path,
+            sidebar::sidebar_file_metadata,
+            sidebar::sidebar_start_file_drag,
             delete_path_recursively,
             reveal_in_explorer,
             copy_sample_notes,

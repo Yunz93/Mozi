@@ -2,6 +2,7 @@ mod calendar;
 mod index;
 mod model;
 mod parser;
+mod reminders;
 mod storage;
 mod tray;
 

@@ -15,7 +15,7 @@ pub fn show_window(app: &AppHandle, tasks: bool) {
         let _ = window.show();
         let _ = window.set_focus();
         if tasks {
-            let _ = window.emit("task-calendar-open", ());
+            let _ = window.emit_to(window.label(), "task-calendar-open", ());
         }
     } else {
         let url = if tasks {

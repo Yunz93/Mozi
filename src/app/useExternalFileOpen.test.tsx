@@ -21,6 +21,10 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: invokeMock,
 }));
 
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ label: "main" }),
+}));
+
 vi.mock("../utils/bootOpenFile", () => ({
   takeBootOpenFileQuery: () => ({ paths: [], withVault: false }),
 }));
@@ -61,6 +65,13 @@ describe("useExternalFileOpen", () => {
     await waitFor(() => {
       expect(resolveListen).toEqual(expect.any(Function));
     });
+    expect(listenMock).toHaveBeenCalledWith(
+      "opened-files",
+      expect.any(Function),
+      {
+        target: { kind: "WebviewWindow", label: "main" },
+      },
+    );
 
     unmount();
     resolveListen?.(unlisten);

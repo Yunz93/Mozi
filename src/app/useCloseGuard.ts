@@ -197,10 +197,14 @@ export function useCloseGuard(forceSave: ForceSaveFn): void {
       if (cancelled) return;
       try {
         const { listen } = await import("@tauri-apps/api/event");
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const unlistenFn = await listen<unknown>(
           "app-close-requested",
           (event) => {
             void handleCloseRequested(normalizeCloseSource(event.payload));
+          },
+          {
+            target: { kind: "WebviewWindow", label: getCurrentWindow().label },
           },
         );
         if (cancelled) {

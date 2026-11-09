@@ -46,17 +46,28 @@ test("Debian inventory requires the isolated binary and rejects unsafe package p
     `-rwxr-xr-x root/root 987654321 2026-11-09 10:00 ${path}`;
   const valid = listing(`./usr/bin/${PACKAGE}`);
   assert.doesNotThrow(() => assertPackageContents(valid));
+  // Tauri 的实际 Debian 包省略 tar 路径开头的 ./。
+  assert.doesNotThrow(() =>
+    assertPackageContents(listing(`usr/bin/${PACKAGE}`)),
+  );
   for (const extra of [
     "./usr/bin/mozi",
     "./usr/bin/other",
     "./usr/lib/../bin/mozi",
     "/usr/bin/mozi",
+    `/usr/bin/${PACKAGE}`,
+    `usr/lib/../bin/${PACKAGE}`,
   ])
     assert.throws(() => assertPackageContents(`${valid}\n${listing(extra)}`));
   assert.throws(() =>
     assertPackageContents(listing("./usr/lib/only-resource")),
   );
   assert.throws(() => assertPackageContents("malformed"));
+  assert.throws(() =>
+    assertPackageContents(
+      `lrwxrwxrwx root/root 0 2026-11-09 10:00 usr/bin/${PACKAGE} -> /usr/bin/mozi`,
+    ),
+  );
 });
 
 test("authorization cancellation blocks every updater fallback", () => {
