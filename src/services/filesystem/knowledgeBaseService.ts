@@ -72,6 +72,26 @@ async function withTimeout<T>(
   return Promise.race([promise, timeoutPromise]);
 }
 
+/** 原生打开文件会返回 Windows 扩展路径，恢复时仍使用文件树中的原始 ID。 */
+function windowsRestoreAliases(path: string): string[] {
+  const normalized = path.replace(/\\/g, "/");
+  const plain = normalized
+    .replace(/^\/\/\?\/UNC\//, "//")
+    .replace(/^\/\/\?\/(?=[A-Za-z]:\/)/, "");
+  const drive = /^[A-Za-z]:\//.test(plain);
+  const unc =
+    !plain.startsWith("//?/") &&
+    (path.startsWith("\\\\") || normalized.startsWith("//?/UNC/")) &&
+    /^\/\/[^/]+\/[^/]+\//.test(plain);
+  if (!drive && !unc) return [];
+  const extended = drive ? `//?/${plain}` : `//?/UNC/${plain.slice(2)}`;
+  // 保留文件名大小写，避免 Windows 大小写敏感目录和 POSIX 名称被误匹配。
+  return [plain, extended].flatMap((value) => [
+    value,
+    value.replace(/\//g, "\\"),
+  ]);
+}
+
 export async function openKnowledgeBaseWorkspace(
   params: OpenKnowledgeBaseParams,
 ): Promise<OpenKnowledgeBaseResult | null> {
@@ -157,7 +177,11 @@ export async function openKnowledgeBaseWorkspace(
   const shouldRestoreLastOpenedFile = Boolean(options?.restoreLastOpenedFile);
   const initialFile =
     shouldRestoreLastOpenedFile && lastOpenedFilePath
-      ? (findPreferredFile(fileNodes, lastOpenedFilePath) ?? null)
+      ? (findPreferredFile(fileNodes, lastOpenedFilePath) ??
+        windowsRestoreAliases(lastOpenedFilePath)
+          .map((path) => findPreferredFile(fileNodes, path))
+          .find((file) => file !== undefined) ??
+        null)
       : null;
 
   let openedPreviewOnly = false;

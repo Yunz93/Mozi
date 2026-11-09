@@ -208,6 +208,13 @@ export async function check(context, name, action) {
       ["body", () => context.driver.body()],
       ["tasks", () => context.driver.invoke("task_calendar_snapshot")],
       [
+        "restoredPaths",
+        () =>
+          context.driver.execute(
+            "const s=JSON.parse(localStorage.getItem('markdown-press-settings')||'null')?.state?.settings;return {vault:s?.lastKnowledgeBasePath,file:s?.lastOpenedFilePath}",
+          ),
+      ],
+      [
         "tree",
         () =>
           context.driver.execute(
