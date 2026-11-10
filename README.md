@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-ma
 指定版本（可选）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.3.5 bash
+curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.3.6 bash
 ```
 
 已配置 Apple 开发者证书与公证凭据的 Release 通常也可直接拖入「应用程序」打开。若系统仍提示无法验证开发者，将 `墨知.app` 放入「应用程序」后执行：
@@ -49,7 +49,7 @@ xattr -cr /Applications/墨知.app
 提供 Linux x64 的 `.deb` 安装包，适用于 Ubuntu 24.04 及兼容环境；支持桌面启动器和 Markdown 文件关联。
 
 ```bash
-sudo apt install ./Mozi_2.3.5_amd64.deb
+sudo apt install ./Mozi_2.3.6_amd64.deb
 ```
 
 安装后可在 **设置 → 关于** 检查并下载安装更新，安装时需要系统管理员授权。已安装 v2.3.0 的用户需先手动安装一次包含此功能的新版 `.deb`，之后即可在应用内更新。
