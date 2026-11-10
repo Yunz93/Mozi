@@ -42,6 +42,54 @@ afterEach(() => {
 });
 
 describe("小知助手 history persistence", () => {
+  it("旧磁盘历史满额时仍先合并更新的本地备份，再按时间截取50条", async () => {
+    const root = "/legacy-capacity";
+    const owned = (id: string, at: number) => {
+      const item = historyItem({ id, at });
+      item.answer.citations = [
+        {
+          index: 1,
+          path: `${root}/a.md`,
+          relPath: "a.md",
+          titlePath: [],
+          snippet: "",
+          startLine: 1,
+          endLine: 1,
+          headingAnchor: null,
+        },
+      ];
+      return item;
+    };
+    await writeIndexJson(
+      root,
+      LEGACY_ASK_HISTORY_FILE,
+      Array.from({ length: 50 }, (_, index) => owned(`old-${index}`, index)),
+      "ask-history",
+    );
+    const newest = owned("newest-local", 100);
+    localStorage.setItem(
+      `markdown-press.ask-history.${await hashLegacyVaultId(root)}`,
+      JSON.stringify([newest]),
+    );
+    const history = await loadAskVaultHistory(root);
+    expect(history).toHaveLength(50);
+    expect(history[0]).toEqual(newest);
+  });
+
+  it("并发追加保留所有记录，并按时间排序和按ID去重", async () => {
+    const root = "/history-concurrent";
+    const first = historyItem({ id: "first", at: 1 });
+    const second = historyItem({ id: "second", at: 2 });
+    await Promise.all([
+      appendAskVaultHistory(root, first),
+      appendAskVaultHistory(root, second),
+    ]);
+    await expect(loadAskVaultHistory(root)).resolves.toEqual([second, first]);
+    const updated = { ...first, question: "更新的问题", at: 3 };
+    await appendAskVaultHistory(root, updated);
+    await expect(loadAskVaultHistory(root)).resolves.toEqual([updated, second]);
+  });
+
   it("隔离大小写不同的POSIX知识库历史", async () => {
     const item = historyItem({ id: "case-sensitive" });
     expect(await hashVaultId("/vault/Work")).not.toBe(

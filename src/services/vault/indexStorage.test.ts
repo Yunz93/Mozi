@@ -3,17 +3,20 @@ import {
   clearIndexStorage,
   readIndexJson,
   writeIndexJson,
+  mergeAskHistoryItems,
+  ASK_HISTORY_FILE,
 } from "./indexStorage";
 
-const { files, writeTextFile, rename } = vi.hoisted(() => ({
+const { files, writeTextFile, rename, invoke } = vi.hoisted(() => ({
   files: new Map<string, string>(),
   writeTextFile: vi.fn<(path: string, value: string) => Promise<void>>(),
   rename: vi.fn<(from: string, to: string) => Promise<void>>(),
+  invoke: vi.fn(),
 }));
 
 vi.mock("../../types/filesystem", () => ({ isTauriEnvironment: () => true }));
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue(undefined),
+  invoke,
 }));
 vi.mock("@tauri-apps/api/path", () => ({
   appDataDir: async () => "/app-data",
@@ -32,6 +35,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
 
 beforeEach(() => {
   files.clear();
+  invoke.mockReset().mockResolvedValue(undefined);
   writeTextFile.mockReset().mockImplementation(async (path, value) => {
     files.set(path, value);
   });
@@ -42,6 +46,74 @@ beforeEach(() => {
 });
 
 describe("index persistence failure safety", () => {
+  it("通过后端合并跨窗口历史，成功后不让旧内存快照遮住磁盘", async () => {
+    const current = { id: "current", at: 2 };
+    const otherWindow = { id: "other", at: 1 };
+    invoke.mockImplementation(async (command: string) =>
+      command === "merge_ask_vault_history"
+        ? [current, otherWindow]
+        : undefined,
+    );
+    const saved = await mergeAskHistoryItems("/history-native", [current]);
+    expect(saved).toEqual([current, otherWindow]);
+    const mergeCall = invoke.mock.calls.find(
+      ([command]) => command === "merge_ask_vault_history",
+    );
+    expect(mergeCall).toBeDefined();
+    expect(mergeCall![1]).toMatchObject({
+      vaultRoot: "/history-native",
+      items: [current],
+    });
+    const target = mergeCall![1].path;
+    files.set(
+      target,
+      JSON.stringify({
+        version: 2,
+        vaultRoot: "/history-native",
+        items: [otherWindow],
+      }),
+    );
+    await expect(
+      readIndexJson("/history-native", ASK_HISTORY_FILE, "ask-history"),
+    ).resolves.toMatchObject({ items: [otherWindow] });
+  });
+
+  it("原生历史合并失败时保留磁盘与待重试记录，不退回盲写", async () => {
+    const root = "/history-native-failure";
+    const old = { id: "old", at: 1 };
+    const newest = { id: "newest", at: 2 };
+    await writeIndexJson(
+      root,
+      ASK_HISTORY_FILE,
+      { version: 2, vaultRoot: root, items: [old] },
+      "ask-history",
+    );
+    const [target, raw] = [...files.entries()][0];
+    invoke.mockRejectedValueOnce(new Error("disk failure"));
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(mergeAskHistoryItems(root, [newest, old])).resolves.toEqual([
+        newest,
+        old,
+      ]);
+      expect(files.get(target)).toBe(raw);
+      await expect(
+        readIndexJson(root, ASK_HISTORY_FILE, "ask-history"),
+      ).resolves.toMatchObject({ items: [newest, old] });
+      invoke.mockResolvedValueOnce([newest, old]);
+      await expect(mergeAskHistoryItems(root, [old])).resolves.toEqual([
+        newest,
+        old,
+      ]);
+      expect(invoke).toHaveBeenLastCalledWith(
+        "merge_ask_vault_history",
+        expect.objectContaining({ items: [newest, old] }),
+      );
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it("Windows路径别名共享写失败后的最新内存值，也可按别名清理", async () => {
     rename.mockRejectedValueOnce(new Error("disk unavailable"));
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});

@@ -387,6 +387,9 @@ export function resolveWikiLinkFile(
   currentFilePath?: string | null,
 ): FileNode | null {
   const parsedReference = parseWikiLinkReference(target);
+  const explicitRelative = /^\.{1,2}(?:\/|$)/.test(
+    normalizeSlashes(decodeWikiLinkPath(parsedReference.path)).trim(),
+  );
   const normalizedTarget = normalizeWikiLinkTarget(parsedReference.path);
   if (!normalizedTarget) return null;
 
@@ -402,14 +405,26 @@ export function resolveWikiLinkFile(
   const currentDir = currentRelativePath.includes("/")
     ? currentRelativePath.split("/").slice(0, -1).join("/")
     : "";
-  const relativeCandidate = currentDir
-    ? `${currentDir}/${normalizedTarget}`
-    : normalizedTarget;
+  const relativeSegments = currentDir.split("/").filter(Boolean);
+  let staysWithinRoot = !/^(?:\/|[a-z]:\/)/i.test(currentRelativePath);
+  for (const segment of normalizedTarget.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (relativeSegments.length === 0) staysWithinRoot = false;
+      else relativeSegments.pop();
+    } else {
+      relativeSegments.push(segment);
+    }
+  }
+  const relative = staysWithinRoot
+    ? lookup.paths.get(
+        relativeSegments.join("/").toLowerCase().normalize("NFC"),
+      )
+    : undefined;
+  // 显式相对路径只允许精确匹配，不可被根目录同名项或全库兜底替换。
+  if (explicitRelative) return relative ?? null;
 
   const exact = lookup.paths.get(normalizedTarget);
-  const relative = lookup.paths.get(
-    relativeCandidate.toLowerCase().normalize("NFC"),
-  );
   const suffix = lookup.suffixes.get(normalizedTarget);
   if (exact || relative || suffix) return exact || relative || suffix || null;
 

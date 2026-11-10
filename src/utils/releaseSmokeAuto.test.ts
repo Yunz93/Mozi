@@ -19,7 +19,7 @@ import {
 import {
   protectShikiPresInHtmlString,
   restoreShikiPresFromSnapshots,
-} from "../components/editor/preview/shikiHtmlSnapshots";
+} from "./shikiHtmlSnapshots";
 import { renderMarkdown, clearMarkdownCache } from "./markdown";
 import { shouldUseAsyncPreviewEnhancement } from "../components/editor/preview/previewRenderCore";
 

@@ -3,7 +3,7 @@ import githubMarkdownCss from "github-markdown-css/github-markdown.css?inline";
 import { escapeHtml } from "./core";
 import { flattenHeadingNodes, parseHeadings } from "../outline";
 import { PREVIEW_PANEL_WIDTH_PX } from "./types";
-import { getPaneLayoutMetrics } from "../../components/editor/paneLayout";
+import { getPaneLayoutMetrics } from "../paneLayout";
 import {
   buildDynamicFontFaceCss,
   type FontSettings,
