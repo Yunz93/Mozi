@@ -80,3 +80,101 @@ it("写失败后重启仍从同库本地副本找回未落盘历史，再合并�
     warning.mockRestore();
   }
 });
+
+it.each([
+  { count: 1, reuseId: false },
+  { count: 55, reuseId: false },
+  { count: 1, reuseId: true },
+])(
+  "旧窗口延迟响应保留另一窗口写失败的恢复记录（$count条，同ID=$reuseId）",
+  async ({ count, reuseId }) => {
+    const root = "/history-cross-window-recovery";
+    const item = (id: string, at: number) => ({
+      id,
+      at,
+      question: id,
+      answer: {
+        answerMarkdown: id,
+        citations: [],
+        usedChunkIds: [],
+        model: "fixture",
+        retrievedAt: at,
+      },
+    });
+    const old = item("old-window", 1);
+    const pendingItems = Array.from({ length: count }, (_, index) =>
+      item(reuseId ? old.id : `failed-window-${index}`, index + 2),
+    );
+    let response!: () => void;
+    let started!: () => void;
+    const firstWritten = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let delayFirst = true;
+    let rejectNewest = true;
+    invoke.mockImplementation(async (command: string, args) => {
+      if (command !== "merge_ask_vault_history") return;
+      if (
+        rejectNewest &&
+        args.items.some((entry: typeof old) => entry.at > old.at)
+      ) {
+        throw new Error("disk unavailable");
+      }
+      const previous = JSON.parse(files.get(args.path) ?? '{"items":[]}')
+        .items as (typeof old)[];
+      const unique = new Map<string, typeof old>(
+        previous.map((entry) => [entry.id, entry]),
+      );
+      for (const entry of args.items as (typeof old)[])
+        unique.set(entry.id, entry);
+      const saved = [...unique.values()]
+        .sort((left, right) => right.at - left.at)
+        .slice(0, 50);
+      files.set(
+        args.path,
+        JSON.stringify({ version: 2, vaultRoot: root, items: saved }),
+      );
+      if (delayFirst) {
+        delayFirst = false;
+        started();
+        return new Promise((resolve) => {
+          response = () => resolve(saved);
+        });
+      }
+      return saved;
+    });
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const firstRenderer = await import("./askVaultService");
+      const pendingReply = firstRenderer.appendAskVaultHistory(root, old);
+      await firstWritten;
+      // 模块隔离代表两个 WebView；磁盘和 localStorage 仍是共享介质。
+      vi.resetModules();
+      const otherRenderer = await import("./askVaultService");
+      for (const newest of pendingItems)
+        await otherRenderer.appendAskVaultHistory(root, newest);
+      response();
+      await pendingReply;
+      vi.resetModules();
+      rejectNewest = false;
+      const restarted = await import("./askVaultService");
+      const expected = [...pendingItems, ...(reuseId ? [] : [old])]
+        .sort((left, right) => right.at - left.at)
+        .slice(0, 50);
+      await expect(restarted.loadAskVaultHistory(root)).resolves.toEqual(
+        expected,
+      );
+      expect(
+        [...files.values()].some(
+          (raw) => JSON.parse(raw).items[0]?.id === expected[0].id,
+        ),
+      ).toBe(true);
+      const recoveryRecords = Object.values(localStorage)
+        .map((raw) => JSON.parse(raw))
+        .filter((value) => value.version === 3 && value.item);
+      expect(recoveryRecords).toHaveLength(expected.length);
+    } finally {
+      warning.mockRestore();
+    }
+  },
+);

@@ -9,6 +9,9 @@ import {
   buildSimpleBlogPostUrl,
   prepareSimpleBlogPublish,
   ensureSimpleBlogPublishBinding,
+  validateSimpleBlogPublishSource,
+  SIMPLE_BLOG_PUBLISH_SOURCE_ERROR,
+  SIMPLE_BLOG_PUBLISH_DUPLICATE_SOURCE_ERROR,
   type SimpleBlogPublishInput,
 } from "../utils/simpleBlogPublish";
 import {
@@ -357,8 +360,35 @@ export function usePublishActions(
         // uploaded markdown payload so the remote post is marked correctly.
         publishCheckpointContent = currentContent;
 
-        const boundContent = ensureSimpleBlogPublishBinding(
+        const { invoke } = await import("@tauri-apps/api/core");
+        const sourceRoot = useAppStore.getState().rootFolderPath;
+        const sourceCheckedContent = await validateSimpleBlogPublishSource(
           currentContent,
+          activeFile.path,
+          useAppStore.getState().files,
+          (path) => invoke<string>("read_file_prefix", { path }),
+          normalizedBlogRepoUrl,
+          normalizedBlogSiteUrl,
+        );
+        const checkedState = useAppStore.getState();
+        // 读头期间可能发生输入、切库或移动；不能继续用旧快照强制保存。
+        if (
+          checkedState.rootFolderPath !== sourceRoot ||
+          findFileInTree(checkedState.files, targetTabId)?.path !==
+            activeFile.path ||
+          !shouldApplyPublishWriteback(
+            checkedState.fileContents[targetTabId],
+            currentContent,
+          )
+        ) {
+          showNotification(
+            t(language, "notifications_publishContentChangedDuring"),
+            "warning",
+          );
+          return false;
+        }
+        const boundContent = ensureSimpleBlogPublishBinding(
+          sourceCheckedContent,
           activeFile.path,
           normalizedBlogRepoUrl,
           normalizedBlogSiteUrl,
@@ -581,7 +611,17 @@ export function usePublishActions(
           error instanceof Error
             ? localizeKnownError(language, error.message)
             : t(language, "notifications_publishFailed");
-        showNotification(message, "error");
+        showNotification(
+          message,
+          "error",
+          error instanceof Error &&
+            [
+              SIMPLE_BLOG_PUBLISH_SOURCE_ERROR,
+              SIMPLE_BLOG_PUBLISH_DUPLICATE_SOURCE_ERROR,
+            ].includes(error.message)
+            ? 15000
+            : undefined,
+        );
         return false;
       } finally {
         setPublishing(false);

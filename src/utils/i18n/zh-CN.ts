@@ -1103,6 +1103,10 @@ export default {
     "发布等待超时，结果未知：远端可能已发布成功。请确认远端状态后再重试，本地状态未回滚。",
   notifications_blogLegacyTargetMissing:
     "未能确认原来发布的文章，已停止发布且未修改远端内容。原笔记可能改过文件名或位置；请恢复原文件名并成功更新一次，建立关联后即可再次改名。",
+  notifications_blogLocalAssociationUnverified:
+    "无法核验发布关联，已停止发布并保留原文章。请确认同库笔记可读取、属性区完整，再重试。",
+  notifications_blogLocalAssociationConflict:
+    "存在沿用同一发布关联的笔记，已停止发布并保留原文章。副本请先移除 frontmatter 中的 mozi_blog_*、is_publish 和 link 字段后重试。",
   notifications_blogOwnershipConflict:
     "目标文章不属于当前笔记，已停止发布并保留远端内容。请使用原笔记更新；若要发布新文章，请新建笔记并复制正文后重试。",
   notifications_blogSourceMismatch:

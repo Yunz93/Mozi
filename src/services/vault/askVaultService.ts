@@ -223,6 +223,8 @@ export interface AskVaultHistoryItem {
 }
 
 const ASK_HISTORY_LS_PREFIX = "markdown-press.ask-history.v2.";
+const ASK_HISTORY_RECORD_PREFIX = "markdown-press.ask-history-record.v3.";
+const ASK_HISTORY_MARKER_PREFIX = "markdown-press.ask-history.v3.";
 const ASK_HISTORY_LIMIT = 50;
 
 export function askVaultHistoryLocalStorageKey(vaultId: string): string {
@@ -279,11 +281,67 @@ function readLocalAskVaultHistory(
   if (typeof localStorage === "undefined") return null;
   try {
     const raw = localStorage.getItem(askVaultHistoryLocalStorageKey(vaultId));
-    if (!raw) return null;
-    return ownedHistory(JSON.parse(raw), vaultRoot);
+    let previous: AskVaultHistoryItem[] | null = null;
+    try {
+      previous = raw ? ownedHistory(JSON.parse(raw), vaultRoot) : null;
+    } catch {
+      // 旧快照损坏不应阻止读取各自独立的恢复记录。
+    }
+    const records = localAskVaultHistoryRecords(vaultId, vaultRoot);
+    let known = previous !== null || records.length > 0;
+    try {
+      const marker = JSON.parse(
+        localStorage.getItem(`${ASK_HISTORY_MARKER_PREFIX}${vaultId}`) ??
+          "null",
+      );
+      known ||= isOwnedLocalHistory(marker, vaultRoot);
+    } catch {
+      // 标记损坏时，仍保留能够校验归属的记录。
+    }
+    if (!known) return null;
+    const latest = new Map<string, AskVaultHistoryItem>();
+    for (const item of [
+      ...(previous ?? []),
+      ...records.map(({ item }) => item),
+    ]) {
+      if (!latest.has(item.id) || latest.get(item.id)!.at < item.at)
+        latest.set(item.id, item);
+    }
+    return parseAskVaultHistory([...latest.values()]);
   } catch {
     return null;
   }
+}
+
+function isOwnedLocalHistory(value: unknown, vaultRoot: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  const record = value as { version?: unknown; vaultRoot?: unknown };
+  return (
+    record.version === 3 &&
+    typeof record.vaultRoot === "string" &&
+    normalizeVaultIdentityPath(record.vaultRoot) ===
+      normalizeVaultIdentityPath(vaultRoot)
+  );
+}
+
+function localAskVaultHistoryRecords(
+  vaultId: string,
+  vaultRoot: string,
+): { key: string; item: AskVaultHistoryItem }[] {
+  const records: { key: string; item: AskVaultHistoryItem }[] = [];
+  const prefix = `${ASK_HISTORY_RECORD_PREFIX}${vaultId}.`;
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(prefix)) continue;
+    try {
+      const value = JSON.parse(localStorage.getItem(key) ?? "null");
+      if (isOwnedLocalHistory(value, vaultRoot) && isHistoryItem(value.item))
+        records.push({ key, item: value.item });
+    } catch {
+      // 无法解析或确认归属的原件不参与恢复，也不删除。
+    }
+  }
+  return records;
 }
 
 function writeLocalAskVaultHistory(
@@ -292,12 +350,35 @@ function writeLocalAskVaultHistory(
 ): void {
   if (typeof localStorage === "undefined") return;
   try {
+    const prefix = `${ASK_HISTORY_RECORD_PREFIX}${vaultId}.`;
+    // 不同窗口只写独立版本；旧请求的迟到响应不能覆盖另一条回答。
+    for (const item of envelope.items) {
+      const version = encodeURIComponent(JSON.stringify([item.id, item.at]));
+      localStorage.setItem(
+        `${prefix}${version}`,
+        JSON.stringify({ version: 3, vaultRoot: envelope.vaultRoot, item }),
+      );
+    }
     localStorage.setItem(
-      askVaultHistoryLocalStorageKey(vaultId),
-      JSON.stringify(envelope),
+      `${ASK_HISTORY_MARKER_PREFIX}${vaultId}`,
+      JSON.stringify({ version: 3, vaultRoot: envelope.vaultRoot }),
     );
+    // 只清理已实际读到且归属明确的旧版本，不依据当前窗口的过期快照清理。
+    const records = localAskVaultHistoryRecords(
+      vaultId,
+      envelope.vaultRoot,
+    ).sort(
+      (left, right) =>
+        right.item.at - left.item.at || left.key.localeCompare(right.key),
+    );
+    const kept = new Set<string>();
+    for (const { key, item } of records) {
+      if (kept.has(item.id) || kept.size >= ASK_HISTORY_LIMIT)
+        localStorage.removeItem(key);
+      else kept.add(item.id);
+    }
   } catch {
-    // Quota or private mode — disk persist is the primary copy.
+    // 存储空间不足或隐私模式下，保留已有副本，磁盘仍是主要持久化介质。
   }
 }
 
