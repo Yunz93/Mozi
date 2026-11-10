@@ -56,7 +56,7 @@ function writeCargoVersion(filePath) {
 
 function writeCargoLockVersion(filePath) {
   const source = readFileSync(filePath, "utf8");
-  const pattern = /(\[\[package\]\]\nname = "app"\nversion = ")([^"]+)(")/;
+  const pattern = /(\[\[package\]\]\r?\nname = "app"\r?\nversion = ")([^"]+)(")/;
   if (!pattern.test(source))
     throw new Error("Cargo.lock is missing the app package");
   writeFileSync(

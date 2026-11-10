@@ -64,60 +64,68 @@ test("channel CLI writes GitHub outputs and rejects a mismatched manual channel"
   assert.equal(readFileSync(output, "utf8"), written);
 });
 
-test("version sync preserves the beta suffix and rejects unsupported tags before writing", () => {
-  const root = mkdtempSync(join(tmpdir(), "mozi-release-version-"));
-  mkdirSync(join(root, "scripts"));
-  mkdirSync(join(root, "src-tauri"));
-  for (const name of ["sync-version-from-tag.mjs", "release-channel.mjs"]) {
-    copyFileSync(resolve("scripts", name), join(root, "scripts", name));
-  }
-  writeFileSync(join(root, "package.json"), '{"version":"2.3.5"}');
-  writeFileSync(
-    join(root, "package-lock.json"),
-    '{"version":"2.3.5","packages":{"":{"version":"2.3.5"}}}',
-  );
-  writeFileSync(
-    join(root, "src-tauri/Cargo.lock"),
-    '[[package]]\nname = "app"\nversion = "2.3.5"\n',
-  );
-  writeFileSync(join(root, "src-tauri/tauri.conf.json"), '{"version":"2.3.5"}');
-  writeFileSync(
-    join(root, "src-tauri/Cargo.toml"),
-    '[package]\nname = "app"\nversion = "2.3.5"\n',
-  );
-  const files = [
-    "package.json",
-    "package-lock.json",
-    "src-tauri/Cargo.lock",
-    "src-tauri/tauri.conf.json",
-    "src-tauri/Cargo.toml",
-  ];
-  for (const tag of ["v2.3.6-beta.2", "v2.3.6"]) {
-    const result = spawnSync(
-      process.execPath,
-      [join(root, "scripts/sync-version-from-tag.mjs"), tag],
-      { encoding: "utf8" },
+for (const [ending, eol] of [
+  ["LF", "\n"],
+  ["CRLF", "\r\n"],
+]) {
+  test(`version sync preserves beta and rejects unsupported tags before writing (${ending})`, () => {
+    const root = mkdtempSync(join(tmpdir(), "mozi-release-version-"));
+    mkdirSync(join(root, "scripts"));
+    mkdirSync(join(root, "src-tauri"));
+    for (const name of ["sync-version-from-tag.mjs", "release-channel.mjs"]) {
+      copyFileSync(resolve("scripts", name), join(root, "scripts", name));
+    }
+    writeFileSync(join(root, "package.json"), '{"version":"2.3.5"}');
+    writeFileSync(
+      join(root, "package-lock.json"),
+      '{"version":"2.3.5","packages":{"":{"version":"2.3.5"}}}',
     );
-    assert.equal(result.status, 0, result.stderr);
-    for (const file of files)
-      assert(readFileSync(join(root, file), "utf8").includes(tag.slice(1)));
-    assert.equal(
-      JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8"))
-        .packages[""].version,
-      tag.slice(1),
+    writeFileSync(
+      join(root, "src-tauri/Cargo.lock"),
+      '[[package]]\nname = "app"\nversion = "2.3.5"\n'.replace(/\n/g, eol),
     );
-  }
-  const before = files.map((file) => readFileSync(join(root, file), "utf8"));
-  const invalid = spawnSync(process.execPath, [
-    join(root, "scripts/sync-version-from-tag.mjs"),
-    "v2.3.7-rc.1",
-  ]);
-  assert.equal(invalid.status, 1);
-  assert.deepEqual(
-    files.map((file) => readFileSync(join(root, file), "utf8")),
-    before,
-  );
-});
+    writeFileSync(
+      join(root, "src-tauri/tauri.conf.json"),
+      '{"version":"2.3.5"}',
+    );
+    writeFileSync(
+      join(root, "src-tauri/Cargo.toml"),
+      '[package]\nname = "app"\nversion = "2.3.5"\n'.replace(/\n/g, eol),
+    );
+    const files = [
+      "package.json",
+      "package-lock.json",
+      "src-tauri/Cargo.lock",
+      "src-tauri/tauri.conf.json",
+      "src-tauri/Cargo.toml",
+    ];
+    for (const tag of ["v2.3.6-beta.2", "v2.3.6"]) {
+      const result = spawnSync(
+        process.execPath,
+        [join(root, "scripts/sync-version-from-tag.mjs"), tag],
+        { encoding: "utf8" },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      for (const file of files)
+        assert(readFileSync(join(root, file), "utf8").includes(tag.slice(1)));
+      assert.equal(
+        JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8"))
+          .packages[""].version,
+        tag.slice(1),
+      );
+    }
+    const before = files.map((file) => readFileSync(join(root, file), "utf8"));
+    const invalid = spawnSync(process.execPath, [
+      join(root, "scripts/sync-version-from-tag.mjs"),
+      "v2.3.7-rc.1",
+    ]);
+    assert.equal(invalid.status, 1);
+    assert.deepEqual(
+      files.map((file) => readFileSync(join(root, file), "utf8")),
+      before,
+    );
+  });
+}
 
 test("release builds require the channel gate and keep user update feeds stable", () => {
   const workflow = yaml.load(
