@@ -77,6 +77,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xvfb xauth dbus-x11 openbox fonts-noto-cjk
       - run: npm ci
+      - name: Release configuration and installer regression gates
+        run: npm run test:release-parity
       - name: Test profile safety and protocol error handling
         run: node --test scripts/desktop/safety.test.mjs
       - name: Check test/release boundary

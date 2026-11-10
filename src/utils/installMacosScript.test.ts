@@ -52,11 +52,32 @@ describe("install-macos.sh", () => {
         const target = resolve(root, "墨知.app");
         mkdirSync(resolve(source, "Contents/MacOS"), { recursive: true });
         writeFileSync(resolve(source, "Contents/Info.plist"), "new-plist");
-        writeFileSync(resolve(source, "Contents/MacOS/app"), "new-app");
+        const newExecutable = "#!/bin/sh\nprintf new-app\n";
+        writeFileSync(resolve(source, "Contents/MacOS/app"), newExecutable);
         chmodSync(resolve(source, "Contents/MacOS/app"), 0o755);
         mkdirSync(target);
         writeFileSync(resolve(target, "old-content"), "old-app");
-        const runner = `set -eu\nwarn(){ :; }\nlog(){ :; }\nditto(){ if [ "$FAILURE" = copy ]; then return 1; fi; cp -R "$1" "$2"; }\nxattr(){ :; }\nplutil(){ if [ "$FAILURE" = validation ]; then return 1; fi; if [ "$1" = -extract ]; then printf com.bxyz.markdown-press; fi; }\nmv(){ if [ "$FAILURE" = swap ] && [[ "$1" == */new.app ]]; then return 1; fi; command mv "$@"; if [ "$FAILURE" = signal ] && [[ "$2" == */previous.app ]]; then kill -TERM $$; fi; }\n${cleanup}\nMOUNT_POINT=""\nTMP_DIR="$(mktemp -d)"\ntrap cleanup EXIT\ntrap 'exit 143' TERM\n${helper}\ninstall_app_bundle "$SOURCE" "$TARGET"`;
+        // Git Bash 不会自动转换环境变量里的 Windows 路径，夹具必须显式转换。
+        const runner = `set -eu
+warn(){ :; }
+log(){ :; }
+if command -v cygpath >/dev/null 2>&1; then
+  SOURCE="$(cygpath -u "$SOURCE")"
+  TARGET="$(cygpath -u "$TARGET")"
+fi
+chmod +x "$SOURCE/Contents/MacOS/app"
+printf fixture-ready
+ditto(){ if [ "$FAILURE" = copy ]; then printf failure:copy >&2; return 1; fi; cp -R "$1" "$2"; }
+xattr(){ :; }
+plutil(){ if [ "$FAILURE" = validation ]; then printf failure:validation >&2; return 1; fi; if [ "$1" = -extract ]; then printf com.bxyz.markdown-press; fi; }
+mv(){ if [ "$FAILURE" = swap ] && [[ "$1" == */new.app ]]; then printf failure:swap >&2; return 1; fi; command mv "$@"; if [ "$FAILURE" = signal ] && [[ "$2" == */previous.app ]]; then printf failure:signal >&2; kill -TERM $$; fi; }
+${cleanup}
+MOUNT_POINT=""
+TMP_DIR="$(mktemp -d)"
+trap cleanup EXIT
+trap 'exit 143' TERM
+${helper}
+install_app_bundle "$SOURCE" "$TARGET"`;
         const result = spawnSync("bash", ["-c", runner], {
           encoding: "utf8",
           env: {
@@ -66,13 +87,16 @@ describe("install-macos.sh", () => {
             FAILURE: failure,
           },
         });
+        expect(result.error).toBeUndefined();
+        expect(result.stdout, result.stderr).toContain("fixture-ready");
         if (failure === "success") {
-          expect(result.status).toBe(0);
+          expect(result.status, result.stderr).toBe(0);
           expect(readText(resolve(target, "Contents/MacOS/app"), "utf8")).toBe(
-            "new-app",
+            newExecutable,
           );
         } else {
-          expect(result.status).not.toBe(0);
+          expect(result.status, result.stderr).not.toBe(0);
+          expect(result.stderr).toContain(`failure:${failure}`);
           expect(existsSync(resolve(target, "old-content"))).toBe(true);
           expect(readText(resolve(target, "old-content"), "utf8")).toBe(
             "old-app",
