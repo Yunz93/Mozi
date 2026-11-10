@@ -43,6 +43,7 @@ import { useSystemThemeFollow } from "./hooks/useSystemThemeFollow";
 import { useAIAnalyze } from "./hooks/useAIAnalyze";
 import { useFileOperations } from "./hooks/useFileOperations";
 import { Sidebar } from "./components/sidebar/Sidebar";
+import { TrashDialog } from "./components/sidebar/TrashDialog";
 import { Toolbar } from "./components/toolbar/Toolbar";
 import { DocumentWorkspace } from "./components/editor/DocumentWorkspace";
 import type { CodeMirrorContentChangeMeta } from "./components/editor/hooks/useCodeMirror";
@@ -78,6 +79,7 @@ import {
   isPreviewOnlyFile,
 } from "./utils/fileTypes";
 import { getResolvedEditorFontFamily } from "./utils/fontSettings";
+import { useUsageStatisticsActivity } from "./hooks/useUsageStatisticsActivity";
 import { useAppBootstrap } from "./app/useAppBootstrap";
 import { useActiveFileWatch } from "./app/useActiveFileWatch";
 import { useKnowledgeBaseWatch } from "./app/useKnowledgeBaseWatch";
@@ -222,6 +224,7 @@ const App: React.FC = () => {
   );
   const { toggleTheme } = useSettings();
   const settingsHydrated = useStoreHydration();
+  useUsageStatisticsActivity(settings.language, settingsHydrated);
   const { highlighter } = useShikiHighlighter(content);
   const {
     handleAIAnalyze,
@@ -266,6 +269,7 @@ const App: React.FC = () => {
     language: settings.language,
     settingsHydrated,
     autoCheckForUpdates: settings.autoCheckForUpdates,
+    acceptBetaUpdates: settings.acceptBetaUpdates === true,
     skippedUpdateVersion: settings.skippedUpdateVersion,
     updateSettings,
     showNotification,
@@ -303,7 +307,8 @@ const App: React.FC = () => {
   >([]);
   const [sidebarSearchRequestKey, setSidebarSearchRequestKey] = useState(0);
   const [sidebarLocateRequestKey, setSidebarLocateRequestKey] = useState(0);
-  const [sidebarTrashRequestKey, setSidebarTrashRequestKey] = useState(0);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
+  useEffect(() => setIsTrashOpen(false), [rootFolderPath]);
 
   const [isSearchBarOpen, setIsSearchBarOpen] = useState(false);
   const [isNewNoteDialogOpen, setIsNewNoteDialogOpen] = useState(false);
@@ -516,6 +521,7 @@ const App: React.FC = () => {
     {
       onSearch: () => setIsSearchBarOpen(true),
       onSidebarSearch: () => {
+        setIsTrashOpen(false);
         setSidebarOpen(true);
         setSidebarSearchRequestKey((prev) => prev + 1);
       },
@@ -1127,6 +1133,7 @@ const App: React.FC = () => {
 
   useFocusMode(isFocusModeActive, {
     settings: isSettingsOpen,
+    trash: isTrashOpen,
     search: isSearchBarOpen,
     commands: isCommandPaletteOpen,
     newNote: isNewNoteDialogOpen,
@@ -1140,7 +1147,7 @@ const App: React.FC = () => {
     tasks: isTaskCalendarOpen,
   });
 
-  const taskPopoverBlocked =
+  const otherModalOpen =
     isSettingsOpen ||
     isCommandPaletteOpen ||
     isNewNoteDialogOpen ||
@@ -1152,6 +1159,10 @@ const App: React.FC = () => {
     isAiEnhanceConfirmOpen ||
     Boolean(pendingCleanupAttachments?.length);
   useEffect(() => {
+    if (otherModalOpen || isSearchBarOpen) setIsTrashOpen(false);
+  }, [otherModalOpen, isSearchBarOpen]);
+  const taskPopoverBlocked = otherModalOpen || isTrashOpen;
+  useEffect(() => {
     if (taskPopoverBlocked && isTaskCalendarOpen) closeTaskCalendar();
   }, [taskPopoverBlocked, isTaskCalendarOpen, closeTaskCalendar]);
   useEffect(() => {
@@ -1160,21 +1171,22 @@ const App: React.FC = () => {
       useAppStore.getState().updateSettings({ focusMode: false });
   }, [isTaskCalendarOpen]);
 
-  const taskPanel = isTaskCalendarOpen ? (
-    <TaskWorkspace
-      rootPath={rootFolderPath}
-      trashFolder={settings.trashFolder}
-      hasUnsavedChanges={
-        !!activeTabId && useAppStore.getState().hasUnsavedChanges(activeTabId)
-      }
-      onOpenTask={handleOpenTaskSource}
-      onClose={returnFromTaskCalendar}
-      onOpenSettings={() => {
-        closeTaskCalendar();
-        setSettingsOpen(true, "tasks");
-      }}
-    />
-  ) : null;
+  const taskPanel =
+    isTaskCalendarOpen && !taskPopoverBlocked ? (
+      <TaskWorkspace
+        rootPath={rootFolderPath}
+        trashFolder={settings.trashFolder}
+        hasUnsavedChanges={
+          !!activeTabId && useAppStore.getState().hasUnsavedChanges(activeTabId)
+        }
+        onOpenTask={handleOpenTaskSource}
+        onClose={returnFromTaskCalendar}
+        onOpenSettings={() => {
+          closeTaskCalendar();
+          setSettingsOpen(true, "tasks");
+        }}
+      />
+    ) : null;
 
   if (shouldShowKnowledgeBaseLoading) {
     return (
@@ -1265,11 +1277,9 @@ const App: React.FC = () => {
             onMoveToTrash={fileOps.handleMoveToTrash}
             onRestoreFromTrash={fileOps.handleRestoreFromTrash}
             onDeleteForever={fileOps.handleDeleteForever}
-            onEmptyTrash={fileOps.handleEmptyTrash}
             onMoveNode={fileOps.handleMoveNode}
             onMoveToRoot={fileOps.handleMoveToRoot}
             onImportDroppedFiles={fileOps.handleImportDroppedFiles}
-            trashOpenRequestKey={sidebarTrashRequestKey}
             currentKnowledgeBaseName={currentKnowledgeBaseName}
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
@@ -1293,9 +1303,7 @@ const App: React.FC = () => {
                   onOpenTrash={
                     rootFolderPath
                       ? () => {
-                          closeTaskCalendar();
-                          setSidebarOpen(true);
-                          setSidebarTrashRequestKey((key) => key + 1);
+                          setIsTrashOpen(true);
                         }
                       : undefined
                   }
@@ -1397,6 +1405,15 @@ const App: React.FC = () => {
         </div>
 
         {taskPanel}
+        <TrashDialog
+          isOpen={isTrashOpen && !!rootFolderPath && !isFocusModeActive}
+          onClose={() => setIsTrashOpen(false)}
+          files={files}
+          trashFolder={settings.trashFolder}
+          onRestore={fileOps.handleRestoreFromTrash}
+          onDeleteForever={fileOps.handleDeleteForever}
+          onEmptyTrash={fileOps.handleEmptyTrash}
+        />
         {!isFocusModeActive && (
           <AppDialogs
             isSettingsOpen={isSettingsOpen}

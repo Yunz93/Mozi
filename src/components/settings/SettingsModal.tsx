@@ -164,9 +164,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           ),
         )
         .filter((element) => element.getClientRects().length > 0);
-    const frame = requestAnimationFrame(() =>
-      (focusable()[0] ?? dialogRef.current)?.focus({ preventScroll: true }),
-    );
+    const frame = requestAnimationFrame(() => {
+      // 焦点跟随当前设置页，避免打开编辑器设置时另一个导航项出现焦点边框。
+      const selectedTab = dialogRef.current?.querySelector<HTMLElement>(
+        '.workspace-settings-nav-button[aria-current="page"]',
+      );
+      (selectedTab ?? focusable()[0] ?? dialogRef.current)?.focus({
+        preventScroll: true,
+      });
+    });
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isImeComposingEvent(event)) return;
       if (event.key === "Tab") {

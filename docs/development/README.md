@@ -85,20 +85,31 @@ npm run tauri:build
 
 仓库已配置 GitHub Actions 发布流程，推送 `v` 前缀标签后会自动构建并上传 macOS / Windows / Linux x64 安装包。Linux 复用 `tauri.linux.conf.json` 构建并签名 `.deb`，校验包信息、桌面启动器与 Markdown 文件关联后，上传包及 `.deb.sig` 到同一 Release，再保留 macOS / Windows 条目并向 `latest.json` 合并 `linux-x86_64-deb` 更新条目，按安装包类型匹配。Linux 安装通过 Tauri updater 调用系统包管理器，需要管理员授权。
 
+**默认发布 beta 验证版。** 用户未明确要求「发布正式版本」时，使用下一计划正式版本的 `-beta.N` 标签；`N` 从 1 递增，先查询远程标签，不能覆盖或移动已有标签。例如计划下一正式版本为 `2.3.6`：
+
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git ls-remote --tags origin 'v2.3.6-beta.*'
+# 确认未占用后使用下一个序号，以下以首次验证为例。
+git tag v2.3.6-beta.1
+git push origin v2.3.6-beta.1
+```
+
+beta 会标记为 GitHub Pre-release，不成为 Latest。只有用户明确要求发布正式版本，才使用无后缀标签：
+
+```bash
+git tag v2.3.6
+git push origin v2.3.6
 ```
 
 CI 会自动将 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 的版本号同步为当前 tag 对应版本，再执行 Tauri 打包和 GitHub Release 上传。
 
-macOS 发布固定使用 `macos-15` Arm64 runner。若 macOS 任务一直未分配 runner，可在原任务停止后，手动触发 Release 工作流并指定 `release_tag`（如 `v2.0.1`）。手动补包只构建该既有标签的 macOS 文件，跳过 Windows；检出、版本同步和上传使用同一标签，不移动标签。完成后需重新下载并核对两端文件及 `latest.json`，避免把只有部分平台文件的 Release 当作发布完成。
+macOS 发布固定使用 `macos-15` Arm64 runner。若 macOS 任务一直未分配 runner，可在原任务停止后，手动触发 Release 工作流并指定 `release_tag`（如 `v2.3.6-beta.1`）。`release_channel` 默认 beta；补齐正式版需显式选择 stable，且必须与标签一致。手动补包只构建该既有标签的 macOS 文件，跳过 Windows；检出、版本同步和上传使用同一标签，不移动标签。完成后需重新下载并核对各平台文件及 `latest.json`，避免把只有部分平台文件的 Release 当作发布完成。
 
 手动补包默认仍使用托管 runner。只有得到本机所有者明确授权后，才可选择 `build_runner=local-once`，注册带 `mozi-release-once` 标签的 macOS Arm64 一次性 runner；执行一次任务后应确认其已注销。本机模式跳过 Rust 缓存上传，使用独立的 runner 工作目录；不得复用托管 runner 标签或在原项目检出目录执行 CI。
 
 本机模式也禁用 npm 缓存上传，并应设置独立的 npm 缓存及临时目录。该模式仅支持 Apple ad-hoc 签名与应用更新签名；若已配置 Apple 证书或公证私钥，会在签名准备前停止，需改用托管 runner，防止改变本机钥匙串或落地 Apple 私钥。任务结束后核对 runner 注销，清空本次临时凭据内容；不触碰原有证书和用户缓存。
 
-macOS 用户推荐使用一键安装脚本 `scripts/install-macos.sh`（自动下载 Release、执行 `xattr -cr` 并安装到 `/Applications`）。桌面应用设置页的「检查更新」在 macOS 上走同一套安装脚本，并显示下载进度。
+macOS 一键安装脚本 `scripts/install-macos.sh` 只从正式版渠道下载安装包、执行 `xattr -cr` 并安装到 `/Applications`；默认使用 `releases/latest`，`RELEASE_TAG` 也只接受正式版标签。各平台应用内更新默认读取正式版的 `releases/latest/download/latest.json`。软件更新中的「接收 Beta 更新」默认关闭，主动开启后才从已发布的正式版与 beta 中按语义版本选择更新，并使用对应标签的签名产物；关闭后只检查正式版，不自动降级已安装的 Beta。beta 也可从对应预发布页面手动下载安装包验证，其 `latest.json` 不能替换正式版更新源。
 
 ### macOS 签名与公证
 

@@ -52,7 +52,7 @@ pub async fn sidebar_start_file_drag(
     app: AppHandle,
     window: WebviewWindow,
     path: String,
-    on_end: tauri::ipc::Channel<()>,
+    on_end: tauri::ipc::Channel<bool>,
 ) -> Result<(), String> {
     let path = tauri::async_runtime::spawn_blocking(move || {
         let path = PathBuf::from(path);
@@ -87,8 +87,8 @@ pub async fn sidebar_start_file_drag(
                 &source,
                 drag::DragItem::Files(vec![path]),
                 drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec()),
-                move |_, _| {
-                    let _ = on_end.send(());
+                move |result, _| {
+                    let _ = on_end.send(matches!(result, drag::DragResult::Cancel));
                 },
                 drag::Options {
                     mode: drag::DragMode::Copy,

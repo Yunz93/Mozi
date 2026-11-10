@@ -36,6 +36,7 @@ export function useSidebarDragAndDrop(
   scrollElementRef?: React.RefObject<HTMLDivElement | null>,
 ): UseSidebarDragAndDropReturn {
   const [isDragging, setIsDragging] = useState(false);
+  const nativeHover = useRef(false);
   const scrollFrame = useRef<number | null>(null);
   const scrollSpeed = useRef(0);
   const stopAutoScroll = useCallback(() => {
@@ -50,10 +51,11 @@ export function useSidebarDragAndDrop(
         !resolveSidebarDropIntent(
           event,
           hasDragPayload(event),
-          !!nativeDraggedNodeId(),
+          !!nativeDraggedNodeId(event),
         )
       )
         return;
+      if (nativeDraggedNodeId(event)) nativeHover.current = true;
       setIsDragging(true);
       const element = scrollElementRef?.current;
       if (!element) return;
@@ -100,24 +102,53 @@ export function useSidebarDragAndDrop(
         else unsubscribe = stop;
       })
       .catch(() => {});
+    let finishTimer: number | null = null;
     const finish = () => {
+      if (finishTimer !== null) window.clearTimeout(finishTimer);
+      finishTimer = null;
+      nativeHover.current = false;
       stopAutoScroll();
       setIsDragging(false);
+      setIsRootDragOver(false);
     };
-    const nativeChange = () => {
-      setIsDragging(!!nativeDraggedNodeId());
-      if (!nativeDraggedNodeId()) stopAutoScroll();
+    const finishAfterDrop = () => {
+      stopAutoScroll();
+      // 当前 drop 的 React 处理器必须先运行，捕获阶段不能卸载正在接收文件的快捷区。
+      if (finishTimer !== null) window.clearTimeout(finishTimer);
+      finishTimer = window.setTimeout(finish, 0);
+    };
+    const finishBrowserDrag = () => {
+      if (nativeDraggedNodeId() || nativeHover.current) stopAutoScroll();
+      else finish();
+    };
+    const nativeChange = (event: Event) => {
+      if (nativeDraggedNodeId()) {
+        if (finishTimer !== null) window.clearTimeout(finishTimer);
+        finishTimer = null;
+        setIsDragging(true);
+      } else {
+        stopAutoScroll();
+        // 已悬停的根目录目标保持原位，直到 drop；取消或拖出时则立即收起。
+        if (
+          (event as CustomEvent<{ canceled?: boolean }>).detail?.canceled ||
+          !nativeHover.current
+        )
+          finish();
+      }
     };
     window.addEventListener(NATIVE_DRAG_STATE_EVENT, nativeChange);
-    document.addEventListener("dragend", finish, true);
-    document.addEventListener("drop", finish, true);
+    window.addEventListener("blur", finish);
+    document.addEventListener("dragend", finishBrowserDrag, true);
+    document.addEventListener("drop", finishAfterDrop, true);
     return () => {
       disposed = true;
       unsubscribe?.();
+      if (finishTimer !== null) window.clearTimeout(finishTimer);
       stopAutoScroll();
       window.removeEventListener(NATIVE_DRAG_STATE_EVENT, nativeChange);
-      document.removeEventListener("dragend", finish, true);
-      document.removeEventListener("drop", finish, true);
+      window.removeEventListener("blur", finish);
+      document.removeEventListener("dragend", finishBrowserDrag, true);
+      document.removeEventListener("drop", finishAfterDrop, true);
     };
   }, [stopAutoScroll]);
   const [isRootDragOver, setIsRootDragOver] = useState(false);
@@ -128,6 +159,7 @@ export function useSidebarDragAndDrop(
         event.currentTarget.contains(event.relatedTarget)
       )
         return;
+      nativeHover.current = false;
       stopAutoScroll();
       setIsDragging(false);
       setIsRootDragOver(false);
@@ -155,12 +187,15 @@ export function useSidebarDragAndDrop(
       const intent = resolveSidebarDropIntent(
         event,
         hasDragPayload(event),
-        !!nativeDraggedNodeId(),
+        !!nativeDraggedNodeId(event),
       );
       if (!intent) return;
       event.preventDefault();
+      if (nativeDraggedNodeId(event)) nativeHover.current = true;
       event.dataTransfer.dropEffect =
-        intent === "import-files" || nativeDraggedNodeId() ? "copy" : "move";
+        intent === "import-files" || nativeDraggedNodeId(event)
+          ? "copy"
+          : "move";
       setIsRootDragOver(true);
     },
     [],
@@ -182,6 +217,8 @@ export function useSidebarDragAndDrop(
       onImportDroppedFiles?: (files: File[]) => void,
     ) => {
       event.preventDefault();
+      event.stopPropagation();
+      nativeHover.current = false;
       stopAutoScroll();
       setIsDragging(false);
       setIsRootDragOver(false);
@@ -189,7 +226,7 @@ export function useSidebarDragAndDrop(
       const intent = resolveSidebarDropIntent(
         event,
         hasDragPayload(event),
-        !!nativeDraggedNodeId(),
+        !!nativeDraggedNodeId(event),
       );
       if (intent === "import-files") {
         const files = extractDroppedFiles(event);

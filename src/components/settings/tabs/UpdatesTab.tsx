@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../../../hooks/useI18n";
 import { useAppStore } from "../../../store/appStore";
 import type { AppSettings } from "../../../types";
@@ -16,6 +16,7 @@ import {
   type AvailableUpdate,
   type UpdateDownloadEvent,
 } from "../../../services/updaterService";
+import { UsageStatisticsPreference } from "../UsageStatisticsPreference";
 import { UpdateProgressPanel } from "../UpdateProgressPanel";
 import {
   INITIAL_UPDATE_DOWNLOAD_PROGRESS,
@@ -52,6 +53,9 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
   const isLinux = useMemo(() => isLinuxPlatform(), []);
   const isMac = useMemo(() => isMacOSPlatform(), []);
   const canUpdateInApp = isInAppUpdaterSupported();
+  const acceptBetaUpdates = settings.acceptBetaUpdates === true;
+  const updateChannelRef = useRef(acceptBetaUpdates);
+  updateChannelRef.current = acceptBetaUpdates;
   const [currentVersion, setCurrentVersion] = useState<string>("");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -90,6 +94,12 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
     };
   }, [availableUpdate]);
 
+  useEffect(() => {
+    setAvailableUpdate(null);
+    setStatusMessage("");
+    setDownloadProgress(INITIAL_UPDATE_DOWNLOAD_PROGRESS);
+  }, [acceptBetaUpdates]);
+
   const lastCheckedAt = formatTimestamp(settings.lastUpdateCheckAt, language);
   const updateBody = formatUpdateBody(availableUpdate?.body);
   const updatePublishedAt = formatTimestamp(
@@ -124,7 +134,12 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
         return null;
       }
 
-      const update = await checkForAppUpdate();
+      const update = await checkForAppUpdate(acceptBetaUpdates);
+      // 切换渠道后丢弃旧请求结果，避免显示或安装上一个渠道的更新。
+      if (updateChannelRef.current !== acceptBetaUpdates) {
+        await update?.close().catch(() => {});
+        return null;
+      }
       onUpdateSettings({ lastUpdateCheckAt: new Date().toISOString() });
       await replaceAvailableUpdate(update);
 
@@ -224,6 +239,8 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
         </p>
       </div>
 
+      <UsageStatisticsPreference />
+
       <div>
         <h5 className="text-base font-semibold text-gray-900 dark:text-white">
           {t("settings_updatesSectionTitle")}
@@ -274,6 +291,28 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
                   </p>
                   <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
                     {t("settings_updatesAutoCheckDesc")}
+                  </p>
+                </div>
+              </label>
+
+              <label className="mt-3 flex items-start gap-3 rounded-2xl border border-gray-200/70 bg-white/80 px-4 py-4 dark:border-white/10 dark:bg-black/10">
+                <input
+                  type="checkbox"
+                  checked={acceptBetaUpdates}
+                  disabled={isChecking || isInstalling}
+                  onChange={(event) =>
+                    onUpdateSettings({
+                      acceptBetaUpdates: event.target.checked,
+                    })
+                  }
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-black focus:ring-black disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20 dark:bg-white/5 dark:text-white dark:focus:ring-white"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {t("settings_updatesAcceptBeta")}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                    {t("settings_updatesAcceptBetaDesc")}
                   </p>
                 </div>
               </label>

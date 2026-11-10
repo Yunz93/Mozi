@@ -1,6 +1,7 @@
 # Project documentation
 
 - [Development](development/README.en.md) / [开发指南](development/README.md)
+- [匿名使用统计接入](development/USAGE_STATISTICS.md)
 - [Performance measurements and platform checklist](performance/README.md)
 - [Cross-platform desktop acceptance](testing/desktop-acceptance.md)
 - [Product requirements](product/PRD.md), [roadmap](product/ROADMAP.md),

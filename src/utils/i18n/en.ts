@@ -137,6 +137,13 @@ export default {
   app_openingDocument: "Opening Document",
   app_openingDocumentDesc: "Opening the selected file.",
   app_openingDocumentStatus: "Opening file...",
+  statistics_participate: "Anonymous usage statistics",
+  statistics_description:
+    "On by default; turn it off anytime. Aptabase records daily activity, app version, system and language, and estimates country distribution from your network exit IP. Notes, file paths and search content are never sent.",
+  statistics_unavailable:
+    "Anonymous usage statistics are not available in this version.",
+  statistics_saveFailed:
+    "Could not save your statistics preference. Please try again.",
   app_chooseKnowledgeBase: "Choose Your Knowledge Base",
   app_chooseKnowledgeBaseDesc:
     "Open a folder as your knowledge base to start writing.",
@@ -478,6 +485,8 @@ export default {
   sidebar_filenameMatched: "Filename match",
   sidebar_paragraphAroundLine: "Around line {line}",
   sidebar_tryAnotherFilenameKeyword: "Try another filename keyword.",
+  trash_empty: "Trash is empty",
+  trash_operationFailed: "The operation failed. Please try again.",
   sidebar_trash: "Trash ({count})",
   sidebar_trashEmpty: "Empty",
   sidebar_fileTypeNotSupported: "This file type cannot be opened",
@@ -1086,6 +1095,9 @@ export default {
   settings_updatesNeverChecked: "Never checked",
   settings_updatesCurrentVersion: "Current version:",
   settings_updatesAutoCheck: "Check for updates on launch",
+  settings_updatesAcceptBeta: "Receive beta updates",
+  settings_updatesAcceptBetaDesc:
+    "Try new features early. Beta versions may be less stable. Turning this off checks stable releases only and does not downgrade an installed beta.",
   settings_updatesAutoCheckDesc:
     "New versions show a reminder without interrupting your current work.",
   settings_updatesCheckNow: "Check now",
@@ -1117,9 +1129,9 @@ export default {
   settings_updatesLinuxGuide2:
     "Installation requires administrator authorization. If you cancel authorization or installation fails, the app stays open. Try again later or install the package manually from GitHub Releases.",
   settings_updatesMacGuide1:
-    "macOS in-app updates download the GitHub Release DMG and install it with the same script used on the website, including clearing quarantine attributes.",
+    "macOS in-app updates download and verify a signed package from the selected channel. The one-line installer always installs stable releases only.",
   settings_updatesMacGuide2:
-    "The app restarts after installation. If a new release is not detected yet, confirm the GitHub Release includes a DMG for this Mac architecture, then check again.",
+    "The app is replaced and restarted after every window saves successfully. If an update is missing, confirm the release includes a signed package for this Mac architecture and an updater manifest.",
   settings_updatesCheckFailed: "Failed to check for updates: {error}",
   settings_updatesInstallFailed: "Failed to install the update: {error}",
 

@@ -7,9 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "补齐既有版本的 macOS 发布文件，例如 v2.0.1"
+        description: "补齐既有版本的 macOS 发布文件，例如 v2.3.6-beta.1"
         required: true
         type: string
+      release_channel:
+        description: "默认 beta 验证；正式补包必须选择 stable，且与标签匹配"
+        required: true
+        default: beta
+        type: choice
+        options:
+          - beta
+          - stable
       build_runner:
         description: "构建环境；local-once 需要提前授权并注册一次性本机 runner"
         required: true
@@ -23,7 +31,31 @@ permissions:
   contents: write
 
 jobs:
+  release-channel:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+      prerelease: ${{ steps.channel.outputs.prerelease }}
+      release_name: ${{ steps.channel.outputs.release_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # 固定 v5
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # 固定 v5
+        with:
+          node-version: "22"
+      - name: Resolve and validate release channel
+        id: channel
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+          RELEASE_CHANNEL: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel || '' }}
+        run: node scripts/release-channel.mjs
+
   build-macos:
+    needs: [release-channel]
+    environment: TAURI
     permissions:
       contents: write
     runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.build_runner == 'local-once' && fromJSON('["self-hosted","macOS","ARM64","mozi-release-once"]') || fromJSON('["macos-15"]') }}
@@ -130,18 +162,21 @@ jobs:
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # 固定 v0
         env:
+          MOZI_APTABASE_APP_KEY: ${{ secrets.MOZI_APTABASE_APP_KEY || vars.MOZI_APTABASE_APP_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY || '-' }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: Release ${{ env.RELEASE_TAG }}
+          releaseName: ${{ needs.release-channel.outputs.release_name }}
           releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ needs.release-channel.outputs.prerelease == 'true' }}
           assetNamePattern: Mozi_[version]_[arch][setup][ext]
           args: --bundles app,dmg
 
   build-windows:
+    needs: [release-channel]
+    environment: TAURI
     if: github.event_name != 'workflow_dispatch'
     permissions:
       contents: write
@@ -218,19 +253,21 @@ jobs:
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # 固定 v0
         env:
+          MOZI_APTABASE_APP_KEY: ${{ secrets.MOZI_APTABASE_APP_KEY || vars.MOZI_APTABASE_APP_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Release ${{ github.ref_name }}
+          releaseName: ${{ needs.release-channel.outputs.release_name }}
           releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ needs.release-channel.outputs.prerelease == 'true' }}
           assetNamePattern: Mozi_[version]_[arch][setup][ext]
           args: --bundles nsis
 
   build-linux:
+    environment: TAURI
     if: github.event_name != 'workflow_dispatch'
-    needs: [build-macos, build-windows]
+    needs: [release-channel, build-macos, build-windows]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -288,6 +325,8 @@ jobs:
           fi
 
       - name: Build the Linux release package
+        env:
+          MOZI_APTABASE_APP_KEY: ${{ secrets.MOZI_APTABASE_APP_KEY || vars.MOZI_APTABASE_APP_KEY }}
         run: npm run tauri -- build --bundles deb
 
       - name: Validate Debian metadata and installed launcher targets
@@ -311,7 +350,7 @@ jobs:
 
   verify-published-assets:
     if: github.event_name != 'workflow_dispatch'
-    needs: [build-macos, build-windows, build-linux]
+    needs: [release-channel, build-macos, build-windows, build-linux]
     permissions:
       contents: read
     runs-on: ubuntu-24.04

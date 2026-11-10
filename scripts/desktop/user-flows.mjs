@@ -141,15 +141,91 @@ export async function editorFlows(context, check) {
       await until(
         () =>
           d.execute(
-            "return [...document.querySelectorAll('.workspace-sidebar-footer button')].some(e=>e.textContent.trim().startsWith('回收站（'))",
+            "return !!document.querySelector('.workspace-trash-dialog[role=dialog]')",
           ),
-        "Save confirmation blocked opening the trash panel",
+        "Save confirmation blocked opening the trash dialog",
+      );
+      assert.equal(
+        await d.execute(
+          "return [...document.querySelectorAll('.workspace-sidebar-footer button')].some(e=>e.textContent.trim().startsWith('回收站（'))",
+        ),
+        false,
       );
       await d.screenshot(join(output, "save-notification-toolbar.png"));
-      const trashToggle = await d.execute(
-        "return [...document.querySelectorAll('.workspace-sidebar-footer button')].find(e=>e.textContent.trim().startsWith('回收站（')).textContent.trim()",
+      await d.shortcut(",");
+      await until(
+        () =>
+          d.execute(
+            "return !!document.querySelector('.workspace-settings[role=dialog]') && !document.querySelector('.workspace-trash-dialog') && !!document.activeElement?.closest('.workspace-settings')",
+          ),
+        "Opening Settings left Trash covering the focused settings dialog",
       );
-      await d.button(trashToggle);
+      await d.screenshot(join(output, "trash-to-settings.png"));
+      await d.button("完成");
+      for (const [key, input] of [
+        ["s", ".workspace-search input"],
+        ["f", 'input[placeholder="搜索..."]'],
+      ]) {
+        await d.click('button[aria-label="更多操作"]');
+        await d.click('button[aria-label="回收站"]');
+        await until(
+          () =>
+            d.execute(
+              "return !!document.querySelector('.workspace-trash-dialog')",
+            ),
+          "Trash did not open before the search shortcut",
+        );
+        await d.shortcut(key, true);
+        await until(
+          () =>
+            d.execute(
+              "return !document.querySelector('.workspace-trash-dialog') && !!document.activeElement?.matches(arguments[0])",
+              input,
+            ),
+          "Closing Trash stole focus from the requested search input",
+        );
+        if (key === "f") {
+          await d.chord(["\uE00C"]);
+          await until(
+            () =>
+              d.execute("return !document.querySelector(arguments[0])", input),
+            "Escape did not close content search",
+          );
+        }
+      }
+      await d.click('button[aria-label="更多操作"]');
+      await d.click('button[aria-label="回收站"]');
+      await until(
+        () =>
+          d.execute(
+            "return !!document.querySelector('.workspace-trash-dialog')",
+          ),
+        "Trash did not reopen after Settings closed",
+      );
+      const target = await d.request("GET", d.path("/window"));
+      // 使用原生托盘的同一事件，验证被阻止的任务浮窗不会挂载或抢走焦点。
+      await d.invoke("plugin:event|emit_to", {
+        target: { kind: "AnyLabel", label: target },
+        event: "task-calendar-open",
+        payload: null,
+      });
+      await d.asyncExecute(
+        "const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));",
+      );
+      assert.equal(
+        await d.execute(
+          "return !!document.querySelector('.workspace-trash-dialog') && !document.querySelector('.task-workspace') && !!document.activeElement?.closest('.workspace-trash-dialog')",
+        ),
+        true,
+      );
+      await d.chord(["\uE00C"]);
+      await until(
+        () =>
+          d.execute(
+            "return !document.querySelector('.workspace-trash-dialog')",
+          ),
+        "Escape did not close Trash",
+      );
       await d.click(".cm-content");
       return geometry;
     },

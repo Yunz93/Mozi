@@ -14,7 +14,7 @@
 
 ## 下载安装
 
-在 [GitHub Releases](https://github.com/Yunz93/Mozi/releases) 获取当前平台的安装包。
+在 [最新正式版](https://github.com/Yunz93/Mozi/releases/latest) 获取当前平台的安装包。安装脚本只拉取正式版；应用内更新默认只检查正式版，可在软件更新中勾选「接收 Beta 更新」提前体验验证版本。
 
 ### macOS
 
@@ -24,7 +24,7 @@
 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
 ```
 
-指定版本（可选）：
+指定正式版本（可选，不接受 beta 等预发布标签）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.3.6 bash

@@ -67,9 +67,15 @@ export const Dialog: React.FC<DialogProps> = ({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  // Restore focus on close
+  // 关闭时仅恢复尚未被其他弹层或搜索控件接管的焦点。
   useEffect(() => {
-    if (!isOpen && previousActiveElement.current) {
+    if (isOpen || !previousActiveElement.current?.isConnected) return;
+    const active = document.activeElement;
+    const focusTransferred =
+      active?.isConnected &&
+      active !== document.body &&
+      active !== document.documentElement;
+    if (!focusTransferred) {
       previousActiveElement.current.focus({ preventScroll: true });
     }
   }, [isOpen]);
@@ -195,7 +201,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const variantStyles = {
     danger: "bg-red-500 hover:bg-red-600 text-white",
     warning: "bg-yellow-500 hover:bg-yellow-600 text-white",
-    info: "bg-black hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-black",
+    info: "workspace-dialog-primary",
   };
 
   return (

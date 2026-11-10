@@ -128,6 +128,11 @@ export default {
   app_openingDocument: "正在打开文档",
   app_openingDocumentDesc: "正在打开所选文件。",
   app_openingDocumentStatus: "正在打开文件...",
+  statistics_participate: "匿名使用统计",
+  statistics_description:
+    "默认开启，可随时关闭。Aptabase 仅记录每日活跃、版本、系统和语言，并按出口 IP 估算国家分布；不上传笔记、文件路径或搜索内容。",
+  statistics_unavailable: "当前版本暂不可用。",
+  statistics_saveFailed: "暂时无法保存统计偏好，请稍后重试。",
   app_chooseKnowledgeBase: "选择知识库",
   app_chooseKnowledgeBaseDesc: "先打开一个文件夹作为知识库，再开始写作。",
   app_openKnowledgeBase: "打开知识库",
@@ -440,6 +445,8 @@ export default {
   sidebar_filenameMatched: "文件名匹配",
   sidebar_paragraphAroundLine: "第 {line} 行附近",
   sidebar_tryAnotherFilenameKeyword: "换个文件名关键词试试。",
+  trash_empty: "回收站为空",
+  trash_operationFailed: "操作失败，请重试。",
   sidebar_trash: "回收站（{count}）",
   sidebar_trashEmpty: "无",
   sidebar_fileTypeNotSupported: "暂不支持打开此类型",
@@ -1000,6 +1007,9 @@ export default {
   settings_updatesNeverChecked: "尚未检查更新",
   settings_updatesCurrentVersion: "当前版本：",
   settings_updatesAutoCheck: "启动后自动检查更新",
+  settings_updatesAcceptBeta: "接收 Beta 更新",
+  settings_updatesAcceptBetaDesc:
+    "提前体验新功能，Beta 版本可能不够稳定。关闭后只检查正式版，不会自动降级已安装的 Beta 版本。",
   settings_updatesAutoCheckDesc:
     "发现新版本后会给出提示，但不会立刻打断当前写作。",
   settings_updatesCheckNow: "立即检查",
@@ -1031,9 +1041,9 @@ export default {
   settings_updatesLinuxGuide2:
     "安装需要系统管理员授权。取消授权或安装失败时，应用会继续运行，可稍后重试或从 GitHub Releases 手动安装。",
   settings_updatesMacGuide1:
-    "macOS 应用内更新会下载 GitHub Release 中的 DMG，并用与官网相同的安装脚本清除隔离属性后安装到「应用程序」。",
+    "macOS 应用内更新会下载所选渠道的签名更新包，校验签名后安装。一键安装脚本始终只安装正式版。",
   settings_updatesMacGuide2:
-    "安装完成后应用会自动重启。如果刚发布了新版本但还没检测到，请确认 Release 已包含对应架构的 DMG，再重新检查一次。",
+    "所有窗口保存成功后才会替换应用并重启。如果未检测到更新，请确认对应 Release 已包含当前架构的签名更新包和更新清单。",
   settings_updatesCheckFailed: "检查更新失败：{error}",
   settings_updatesInstallFailed: "安装更新失败：{error}",
 

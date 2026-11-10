@@ -10,7 +10,6 @@ import { createPortal } from "react-dom";
 import { BookOpen, Plus, FolderOpen } from "lucide-react";
 import { useSidebarSorting } from "./hooks/useSidebarSorting";
 import { VirtualFileTree } from "./VirtualFileTree";
-import { TrashView } from "./TrashView";
 import { getFileSystem } from "../../types/filesystem";
 import { readBackgroundFile } from "../../services/filesystem/readBackgroundFile";
 import { useAppStore } from "../../store/appStore";
@@ -31,11 +30,7 @@ import { ContextMenu } from "./components";
 import { KnowledgeBaseHeader } from "./KnowledgeBaseHeader";
 import { ConfirmDialog, PromptDialog } from "../ui/Dialog";
 
-import {
-  getTrashItems,
-  filterNodesByFileName,
-  highlightSearchText,
-} from "./utils";
+import { filterNodesByFileName, highlightSearchText } from "./utils";
 import { useI18n } from "../../hooks/useI18n";
 import { isSavableDocumentFile } from "../../utils/fileTypes";
 import { applyFixedMenuViewportFit } from "../../utils/fitFixedMenuToViewport";
@@ -56,11 +51,9 @@ export interface SidebarProps {
   onMoveToTrash: (file: FileNode) => void;
   onRestoreFromTrash: (file: FileNode) => void;
   onDeleteForever: (file: FileNode) => void;
-  onEmptyTrash: (files: FileNode[]) => void;
   onMoveNode: (sourceId: string, targetId: string) => void;
   onMoveToRoot: (sourceId: string) => void;
   onImportDroppedFiles?: (destFolderPath: string, files: File[]) => void;
-  trashOpenRequestKey?: number;
   currentKnowledgeBaseName?: string;
   currentKnowledgeBasePath?: string;
   onSwitchKnowledgeBase: () => void;
@@ -244,11 +237,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     onMoveToTrash,
     onRestoreFromTrash,
     onDeleteForever,
-    onEmptyTrash,
     onMoveNode,
     onMoveToRoot,
     onImportDroppedFiles,
-    trashOpenRequestKey = 0,
     currentKnowledgeBaseName,
     currentKnowledgeBasePath,
     onSwitchKnowledgeBase,
@@ -268,7 +259,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
       [],
     );
     const fileContents = useAppStore((state) => state.fileContents);
-    const trashFolder = useAppStore((state) => state.settings.trashFolder);
     const showNotification = useAppStore((state) => state.showNotification);
     const updateSettings = useAppStore((state) => state.updateSettings);
     const sorting = useSidebarSorting(files);
@@ -276,20 +266,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
     const sidebarRef = useRef<HTMLElement>(null);
     const treeScrollRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const [showTrash, setShowTrash] = useState(false);
-    useEffect(() => {
-      if (trashOpenRequestKey > 0) setShowTrash(true);
-    }, [trashOpenRequestKey]);
     const [locatedFileId, setLocatedFileId] = useState<string | null>(null);
     const [rootContextMenu, setRootContextMenu] = useState<{
       x: number;
       y: number;
     } | null>(null);
-
-    const trashItems = useMemo(
-      () => getTrashItems(files, trashFolder),
-      [files, trashFolder],
-    );
 
     // Hooks
     const { handleResizeStart } = useSidebarResize({ onWidthChange });
@@ -353,16 +334,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
         onNewFolder,
         // Delete dialog is only opened for permanent trash deletion.
         onDelete: onDeleteForever,
-        onEmptyTrash,
       }),
-      [
-        onCreateFile,
-        onCreateDrawing,
-        onRename,
-        onNewFolder,
-        onDeleteForever,
-        onEmptyTrash,
-      ],
+      [onCreateFile, onCreateDrawing, onRename, onNewFolder, onDeleteForever],
     );
 
     const {
@@ -372,14 +345,12 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
       openRenameDialog,
       openNewFolderDialog,
       openDeleteDialog,
-      openEmptyTrashDialog,
       closeDialog,
       handleNewFileConfirm,
       handleNewDrawingConfirm,
       handleRenameConfirm,
       handleNewFolderConfirm,
       handleDeleteConfirm,
-      handleEmptyTrashConfirm,
     } = useSidebarDialogs(dialogOptions);
 
     // Focus search input when requested
@@ -393,7 +364,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
       if (locateCurrentFileRequestKey <= 0 || !activeFileId) return;
 
       setSearchQuery("");
-      setShowTrash(false);
       setLocatedFileId(activeFileId);
     }, [activeFileId, locateCurrentFileRequestKey, setSearchQuery]);
 
@@ -800,60 +770,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
           </div>
 
           <div className="workspace-sidebar-footer p-3 space-y-2">
-            {showTrash && (
-              <div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowTrash(false)}
-                    className="flex min-w-0 flex-1 items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-black/[0.04] dark:text-gray-400 dark:hover:bg-white/[0.06]"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <svg
-                        className="h-4 w-4 shrink-0"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                      <span className="truncate">
-                        {t("sidebar_trash", { count: trashItems.length })}
-                      </span>
-                    </div>
-                    <svg
-                      className="h-3.5 w-3.5 shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-                  {trashItems.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => openEmptyTrashDialog()}
-                      className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-red-600/80 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400/80 dark:hover:bg-red-950/40 dark:hover:text-red-300"
-                      title={t("context_emptyTrash")}
-                    >
-                      {t("context_emptyTrash")}
-                    </button>
-                  )}
-                </div>
-
-                <TrashView
-                  trashItems={trashItems}
-                  onRestore={onRestoreFromTrash}
-                  onDeleteForever={(node) => openDeleteDialog(node)}
-                  onContextMenu={openContextMenu}
-                />
-              </div>
-            )}
-
             <KnowledgeBaseHeader
               name={currentKnowledgeBaseName}
               path={currentKnowledgeBasePath}
@@ -1021,16 +937,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
           confirmText={t("common_delete")}
           variant="danger"
           onConfirm={() => handleDeleteConfirm(dialogState.file)}
-          onClose={closeDialog}
-        />
-
-        <ConfirmDialog
-          isOpen={dialogState.type === "emptyTrash"}
-          title={t("sidebar_emptyTrashTitle")}
-          message={t("sidebar_emptyTrashConfirm", { count: trashItems.length })}
-          confirmText={t("context_emptyTrash")}
-          variant="danger"
-          onConfirm={() => handleEmptyTrashConfirm(trashItems)}
           onClose={closeDialog}
         />
       </>

@@ -3,14 +3,11 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { resolveReleaseChannel } from "../release-channel.mjs";
 
 export function verifyReleaseAssets(directory, tag, repository) {
-  assert(
-    /^v\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(tag),
-    "Invalid release tag",
-  );
+  const { version, prerelease, channel } = resolveReleaseChannel(tag);
   assert(/^[\w.-]+\/[\w.-]+$/.test(repository), "Invalid release repository");
-  const version = tag.slice(1);
   const mac = `Mozi_${version}_aarch64.app.tar.gz`;
   const windows = `Mozi_${version}_x64-setup.exe`;
   const linux = `Mozi_${version}_amd64.deb`;
@@ -36,7 +33,11 @@ export function verifyReleaseAssets(directory, tag, repository) {
   );
   assert.equal(release.tag_name, tag, "Release metadata has a different tag");
   assert.equal(release.draft, false);
-  assert.equal(release.prerelease, false);
+  assert.equal(
+    release.prerelease,
+    prerelease,
+    "Release channel does not match its tag",
+  );
   const assets = release.assets;
   assert(
     Array.isArray(assets) && assets.length === required.length,
@@ -108,6 +109,7 @@ export function verifyReleaseAssets(directory, tag, repository) {
   }
   return {
     tag,
+    channel,
     assetDigests: digests,
     signedArtifacts: [mac, windows, linux],
     platforms: Object.keys(platforms),

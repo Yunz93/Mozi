@@ -123,3 +123,28 @@ describe("FileTreeItem external file drop", () => {
     expect(onImportDroppedFiles).not.toHaveBeenCalled();
   });
 });
+
+describe("文件类型标记", () => {
+  it.each([
+    ["note.md", "MD"],
+    ["NOTE.MD", "MD"],
+    ["paper.pdf", "PDF"],
+  ])("为 %s 显示 %s 标记", (name, badge) => {
+    const { getByText } = render(
+      <FileTreeItem
+        node={{
+          id: `/vault/${name}`,
+          path: `/vault/${name}`,
+          name,
+          type: "file",
+        }}
+        level={0}
+        activeId={null}
+        onSelect={vi.fn()}
+        onContextMenu={vi.fn()}
+        onMoveNode={vi.fn()}
+      />,
+    );
+    expect(getByText(badge)).not.toBeNull();
+  });
+});

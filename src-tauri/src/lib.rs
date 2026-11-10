@@ -9,10 +9,12 @@ mod native_app_exit;
 #[cfg(target_os = "macos")]
 mod native_notification;
 mod publishing;
+mod release_channel;
 mod sample_notes;
 mod secure_settings;
 mod sidebar;
 mod updater_signature;
+mod usage_statistics;
 mod system_fonts;
 mod tasks;
 mod vault_watch;
@@ -861,6 +863,11 @@ async fn upload_image_to_hosting(
     image_hosting::upload_image(&provider, &config_json, &image_bytes, &filename).await
 }
 
+fn allow_app_webview_navigation(url: &tauri::Url) -> bool {
+    // 本地文件由应用的打开/导入流程接收，不能通过浏览器默认拖放替换应用页面。
+    url.scheme() != "file"
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -881,7 +888,13 @@ pub fn run() {
     }
 
     builder
+        .plugin(
+            tauri::plugin::Builder::<_, ()>::new("file-navigation-guard")
+                .on_navigation(|_, url| allow_app_webview_navigation(url))
+                .build(),
+        )
         .manage(SecurityState::default())
+        .manage(usage_statistics::UsageStatistics::default())
         .manage(OpenedFilesState::default())
         .manage(WindowLogicalSizeMemory::default())
         .plugin(tauri_plugin_shell::init())
@@ -897,6 +910,9 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             ping,
+            usage_statistics::usage_statistics_status,
+            usage_statistics::set_usage_statistics_enabled,
+            usage_statistics::record_usage_statistics_activity,
             vault_watch::vault_watch_mode,
             vault_watch::subscribe_vault,
             vault_watch::get_vault_changes,
@@ -923,6 +939,7 @@ pub fn run() {
             weread_skill::weread_update_skill,
             upload_image_to_hosting,
             check_macos_update,
+            check_beta_update,
             prepare_macos_update,
             set_update_install_lock,
             install_macos_update,
@@ -1547,10 +1564,20 @@ async fn copy_sample_notes(
 #[tauri::command]
 async fn check_macos_update(
     app: tauri::AppHandle,
+    accept_beta_updates: Option<bool>,
 ) -> Result<Option<macos_update::MacosUpdateInfo>, String> {
-    tauri::async_runtime::spawn_blocking(move || macos_update::check_macos_update_command(app))
-        .await
-        .map_err(|error| format!("Failed to join macOS update check: {error}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        macos_update::check_macos_update_command(app, accept_beta_updates.unwrap_or(false))
+    })
+    .await
+    .map_err(|error| format!("Failed to join macOS update check: {error}"))?
+}
+
+#[tauri::command]
+async fn check_beta_update(
+    webview: tauri::Webview,
+) -> Result<Option<release_channel::UpdateMetadata>, String> {
+    release_channel::check_beta_update(webview).await
 }
 
 #[tauri::command]
@@ -1590,6 +1617,27 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn file_drop_cannot_navigate_away_from_the_application_document() {
+        for url in [
+            "file:///vault/note.md",
+            "file:///vault/slides.pptx",
+            "file://localhost/vault/note.md",
+            "file:/tmp/note.md",
+        ] {
+            assert!(!allow_app_webview_navigation(&tauri::Url::parse(url).unwrap()));
+        }
+        for url in [
+            "tauri://localhost/index.html",
+            "http://tauri.localhost/index.html",
+            "http://127.0.0.1:3002",
+            "asset://localhost/vault/note.pdf",
+            "about:blank",
+        ] {
+            assert!(allow_app_webview_navigation(&tauri::Url::parse(url).unwrap()));
+        }
+    }
 
     #[test]
     fn read_file_prefix_bounds_large_files_and_preserves_utf8() {

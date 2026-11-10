@@ -11,11 +11,17 @@ import type React from "react";
 
 const bridge = vi.hoisted(() => ({
   invoke: vi.fn(),
-  end: null as (() => void) | null,
+  end: null as ((canceled?: boolean) => void) | null,
   emit: vi.fn(),
   listener: null as
     | ((event: {
-        payload: { id: string; token: string; vault: string; ended?: boolean };
+        payload: {
+          id: string;
+          token: string;
+          vault: string;
+          ended?: boolean;
+          canceled?: boolean;
+        };
       }) => void)
     | null,
 }));
@@ -23,7 +29,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: bridge.invoke,
   Channel: class {
     cleanupCallback() {}
-    set onmessage(callback: () => void) {
+    set onmessage(callback: (canceled?: boolean) => void) {
       bridge.end = callback;
     }
   },
@@ -105,6 +111,7 @@ it("moves its native file inside the sidebar instead of importing a second copy,
   const file = new File(["# Note"], "note.md");
   const event = {
     preventDefault: vi.fn(),
+    stopPropagation: vi.fn(),
     dataTransfer: {
       types: ["Files"],
       files: [file],
@@ -156,6 +163,7 @@ it("shares native move origins across windows in the same vault and imports from
   const file = new File(["# Note"], "note.md");
   const event = {
     preventDefault: vi.fn(),
+    stopPropagation: vi.fn(),
     dataTransfer: {
       types: ["Files"],
       files: [file],
@@ -190,4 +198,204 @@ it("shares native move origins across windows in the same vault and imports from
     }),
   );
   act(() => vi.runAllTimers());
+});
+
+function NativeDropZone({
+  move,
+  copy,
+}: {
+  move: (id: string) => void;
+  copy: (files: File[]) => void;
+}) {
+  const drag = useSidebarDragAndDrop();
+  return (
+    <div
+      data-testid="drop-zone"
+      data-dragging={drag.isDragging}
+      onDragOver={drag.handleRootDragOver}
+      onDrop={(event) => drag.handleRootDrop(event, move, copy)}
+    />
+  );
+}
+
+const nativeTransfer = () => ({
+  types: ["Files"],
+  files: [new File(["note"], "note.md")],
+  items: [],
+  getData: () => "",
+  dropEffect: "none",
+});
+
+it("keeps a witnessed native origin when the end callback arrives before the root drop", async () => {
+  const move = vi.fn(),
+    copy = vi.fn();
+  const { getByTestId } = render(<NativeDropZone move={move} copy={copy} />);
+  await act(async () => {
+    beginNativeFileDrag(node, vi.fn(), vi.fn());
+    await Promise.resolve();
+  });
+  const zone = getByTestId("drop-zone"),
+    dataTransfer = nativeTransfer();
+  fireEvent.dragEnter(zone, { dataTransfer });
+  fireEvent.dragOver(zone, { dataTransfer });
+  act(() => {
+    bridge.end?.(false);
+    vi.runAllTimers();
+  });
+  expect(nativeDraggedNodeId()).toBeNull();
+  expect(zone.getAttribute("data-dragging")).toBe("true");
+  fireEvent.drop(zone, { dataTransfer });
+  expect(zone.getAttribute("data-dragging")).toBe("false");
+  expect(move).toHaveBeenCalledExactlyOnceWith(node.id);
+  expect(copy).not.toHaveBeenCalled();
+});
+
+it("keeps a witnessed native origin for folder drops after native session cleanup", async () => {
+  const move = vi.fn(),
+    copy = vi.fn();
+  const { result } = renderHook(() => useSidebarDragAndDrop());
+  expect(result.current).toBeDefined();
+  const { getByTitle } = render(
+    <FileTreeItem
+      node={{
+        id: "/vault/folder",
+        path: "/vault/folder",
+        name: "folder",
+        type: "folder",
+      }}
+      level={0}
+      activeId={null}
+      onSelect={vi.fn()}
+      onContextMenu={vi.fn()}
+      onMoveNode={move}
+      onImportDroppedFiles={copy}
+    />,
+  );
+  await act(async () => {
+    beginNativeFileDrag(node, vi.fn(), vi.fn());
+    await Promise.resolve();
+  });
+  const target = getByTitle("folder"),
+    dataTransfer = nativeTransfer();
+  fireEvent.dragEnter(target, { dataTransfer });
+  fireEvent.dragOver(target, { dataTransfer });
+  act(() => {
+    bridge.end?.(false);
+    vi.runAllTimers();
+  });
+  fireEvent.drop(target, { dataTransfer });
+  expect(move).toHaveBeenCalledExactlyOnceWith(node.id, "/vault/folder");
+  expect(copy).not.toHaveBeenCalled();
+});
+
+it("does not reuse a cancelled source for the next external drag", async () => {
+  const move = vi.fn(),
+    copy = vi.fn();
+  const { getByTestId } = render(<NativeDropZone move={move} copy={copy} />);
+  await act(async () => {
+    beginNativeFileDrag(node, vi.fn(), vi.fn());
+    await Promise.resolve();
+  });
+  const zone = getByTestId("drop-zone"),
+    dataTransfer = nativeTransfer();
+  fireEvent.dragEnter(zone, { dataTransfer });
+  fireEvent.dragOver(zone, { dataTransfer });
+  act(() => {
+    bridge.end?.(true);
+    vi.runAllTimers();
+  });
+  fireEvent.dragEnter(zone, { dataTransfer });
+  fireEvent.drop(zone, { dataTransfer });
+  expect(move).not.toHaveBeenCalled();
+  expect(copy).toHaveBeenCalledExactlyOnceWith(dataTransfer.files);
+});
+
+it("clears the witnessed source when the drag leaves the window before an external import", async () => {
+  const move = vi.fn(),
+    copy = vi.fn();
+  const { getByTestId } = render(<NativeDropZone move={move} copy={copy} />);
+  await act(async () => {
+    beginNativeFileDrag(node, vi.fn(), vi.fn());
+    await Promise.resolve();
+  });
+  const zone = getByTestId("drop-zone"),
+    dataTransfer = nativeTransfer();
+  fireEvent.dragEnter(zone, { dataTransfer });
+  fireEvent.dragOver(zone, { dataTransfer });
+  fireEvent.dragLeave(zone, { dataTransfer });
+  act(() => {
+    bridge.end?.(false);
+    vi.runAllTimers();
+  });
+  fireEvent.dragEnter(zone, { dataTransfer });
+  fireEvent.drop(zone, { dataTransfer });
+  expect(move).not.toHaveBeenCalled();
+  expect(copy).toHaveBeenCalledExactlyOnceWith(dataTransfer.files);
+});
+
+it("does not move a captured source into another vault", async () => {
+  const move = vi.fn(),
+    copy = vi.fn();
+  const { getByTestId } = render(<NativeDropZone move={move} copy={copy} />);
+  await act(async () => {
+    beginNativeFileDrag(node, vi.fn(), vi.fn());
+    await Promise.resolve();
+  });
+  const zone = getByTestId("drop-zone"),
+    dataTransfer = nativeTransfer();
+  fireEvent.dragEnter(zone, { dataTransfer });
+  fireEvent.dragOver(zone, { dataTransfer });
+  act(() => {
+    bridge.end?.(false);
+    vi.runAllTimers();
+    useAppStore.setState({ rootFolderPath: "/other" });
+  });
+  fireEvent.drop(zone, { dataTransfer });
+  expect(move).not.toHaveBeenCalled();
+  expect(copy).toHaveBeenCalledExactlyOnceWith(dataTransfer.files);
+});
+
+it("prevents a root drop from bubbling into another import handler", async () => {
+  const move = vi.fn(),
+    copy = vi.fn(),
+    outer = vi.fn();
+  const { getByTestId } = render(
+    <div onDrop={outer}>
+      <NativeDropZone move={move} copy={copy} />
+    </div>,
+  );
+  fireEvent.drop(getByTestId("drop-zone"), { dataTransfer: nativeTransfer() });
+  expect(copy).toHaveBeenCalledOnce();
+  expect(outer).not.toHaveBeenCalled();
+});
+
+it("still accepts a file-URL dragover on the root shortcut after native completion", async () => {
+  const move = vi.fn(),
+    copy = vi.fn();
+  const { getByTestId } = render(<NativeDropZone move={move} copy={copy} />);
+  await act(async () => {
+    beginNativeFileDrag(node, vi.fn(), vi.fn());
+    await Promise.resolve();
+  });
+  const zone = getByTestId("drop-zone");
+  fireEvent.dragEnter(zone, { dataTransfer: nativeTransfer() });
+  fireEvent.dragOver(zone, { dataTransfer: nativeTransfer() });
+  act(() => {
+    bridge.end?.(false);
+    vi.runAllTimers();
+  });
+  const dataTransfer = {
+    types: ["text/uri-list"],
+    files: [],
+    items: [],
+    getData: () => "file:///vault/note.md",
+    dropEffect: "none",
+  };
+  const over = new Event("dragover", { bubbles: true, cancelable: true });
+  Object.defineProperty(over, "dataTransfer", { value: dataTransfer });
+  fireEvent(zone, over);
+  expect(over.defaultPrevented).toBe(true);
+  fireEvent.drop(zone, { dataTransfer });
+  expect(move).toHaveBeenCalledExactlyOnceWith(node.id);
+  expect(copy).not.toHaveBeenCalled();
 });

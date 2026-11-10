@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./src/App";
+import { installFileDropNavigationGuard } from "./src/app/fileDropNavigationGuard";
 import { TrayTaskPopover } from "./src/components/tasks/TrayTaskPopover";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import {
@@ -12,6 +13,9 @@ import {
   ensureDynamicFontFaces,
   getInitialFontSettingsFromLocalStorage,
 } from "./src/utils/fontSettings";
+
+const removeFileDropNavigationGuard = installFileDropNavigationGuard();
+if (import.meta.hot) import.meta.hot.dispose(removeFileDropNavigationGuard);
 
 ensureExcalidrawAssetPath();
 import "github-markdown-css/github-markdown.css";

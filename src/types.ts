@@ -302,6 +302,7 @@ export interface AppSettings {
   metadataFields: MetadataField[];
   autoSaveInterval: number; // Auto-save interval in milliseconds
   autoCheckForUpdates: boolean;
+  acceptBetaUpdates: boolean;
   skippedUpdateVersion: string;
   lastUpdateCheckAt: string;
 }

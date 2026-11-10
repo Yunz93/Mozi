@@ -31,7 +31,7 @@ export function setDragPayload(
  * only `types` is readable.
  */
 export function hasDragPayload(event: React.DragEvent): boolean {
-  if (nativeDraggedNodeId()) return true;
+  if (nativeDraggedNodeId(event)) return true;
   const types = event.dataTransfer.types;
   if (!types) return false;
   return (
@@ -43,7 +43,7 @@ export function hasDragPayload(event: React.DragEvent): boolean {
 
 /** Extract the dragged node id on drop. Tries every payload flavor we write. */
 export function extractDraggedNodeId(event: React.DragEvent): string | null {
-  const nativeId = nativeDraggedNodeId();
+  const nativeId = nativeDraggedNodeId(event);
   if (nativeId) return nativeId;
   try {
     const direct = event.dataTransfer.getData(DRAG_DATA_TYPE);

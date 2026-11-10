@@ -131,13 +131,13 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         const intent = resolveSidebarDropIntent(
           e,
           hasDragPayload(e),
-          !!nativeDraggedNodeId(),
+          !!nativeDraggedNodeId(e),
         );
         if (!intent) return;
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect =
-          intent === "import-files" || nativeDraggedNodeId() ? "copy" : "move";
+          intent === "import-files" || nativeDraggedNodeId(e) ? "copy" : "move";
         setIsDragOver(true);
         if (isFolder && !expanded && autoExpandTimerRef.current === null) {
           autoExpandTimerRef.current = window.setTimeout(() => {
@@ -170,7 +170,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
         const intent = resolveSidebarDropIntent(
           e,
           hasDragPayload(e),
-          !!nativeDraggedNodeId(),
+          !!nativeDraggedNodeId(e),
         );
         if (intent === "import-files") {
           const dropped = extractDroppedFiles(e);
@@ -298,7 +298,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = React.memo(
             )}
           </span>
           <span className="truncate min-w-0 flex-1">{displayName}</span>
-          {typeBadge && typeBadge !== "MD" && (
+          {typeBadge && (
             <span
               className={`ml-2 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide leading-none ${
                 canOpen

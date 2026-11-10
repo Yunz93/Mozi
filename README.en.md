@@ -14,7 +14,7 @@ A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. V
 
 ## Download
 
-Grab the installer for your platform from [GitHub Releases](https://github.com/Yunz93/Mozi/releases).
+Grab the installer for your platform from the [latest stable release](https://github.com/Yunz93/Mozi/releases/latest). The installer script downloads stable releases only. In-app updates check stable releases by default; enable **Receive beta updates** in software updates to try beta versions.
 
 ### macOS
 
@@ -24,7 +24,7 @@ Grab the installer for your platform from [GitHub Releases](https://github.com/Y
 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | bash
 ```
 
-Pin a release (optional):
+Pin a stable release (optional; beta and other prerelease tags are rejected):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Yunz93/Mozi/main/scripts/install-macos.sh | RELEASE_TAG=v2.3.6 bash
