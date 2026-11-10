@@ -9,6 +9,7 @@ mod native_app_exit;
 #[cfg(target_os = "macos")]
 mod native_notification;
 mod publishing;
+mod release_channel;
 mod sample_notes;
 mod secure_settings;
 mod sidebar;
@@ -938,6 +939,7 @@ pub fn run() {
             weread_skill::weread_update_skill,
             upload_image_to_hosting,
             check_macos_update,
+            check_beta_update,
             prepare_macos_update,
             set_update_install_lock,
             install_macos_update,
@@ -1562,10 +1564,20 @@ async fn copy_sample_notes(
 #[tauri::command]
 async fn check_macos_update(
     app: tauri::AppHandle,
+    accept_beta_updates: Option<bool>,
 ) -> Result<Option<macos_update::MacosUpdateInfo>, String> {
-    tauri::async_runtime::spawn_blocking(move || macos_update::check_macos_update_command(app))
-        .await
-        .map_err(|error| format!("Failed to join macOS update check: {error}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        macos_update::check_macos_update_command(app, accept_beta_updates.unwrap_or(false))
+    })
+    .await
+    .map_err(|error| format!("Failed to join macOS update check: {error}"))?
+}
+
+#[tauri::command]
+async fn check_beta_update(
+    webview: tauri::Webview,
+) -> Result<Option<release_channel::UpdateMetadata>, String> {
+    release_channel::check_beta_update(webview).await
 }
 
 #[tauri::command]

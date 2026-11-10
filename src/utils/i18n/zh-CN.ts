@@ -1007,6 +1007,9 @@ export default {
   settings_updatesNeverChecked: "尚未检查更新",
   settings_updatesCurrentVersion: "当前版本：",
   settings_updatesAutoCheck: "启动后自动检查更新",
+  settings_updatesAcceptBeta: "接收 Beta 更新",
+  settings_updatesAcceptBetaDesc:
+    "提前体验新功能，Beta 版本可能不够稳定。关闭后只检查正式版，不会自动降级已安装的 Beta 版本。",
   settings_updatesAutoCheckDesc:
     "发现新版本后会给出提示，但不会立刻打断当前写作。",
   settings_updatesCheckNow: "立即检查",
@@ -1038,9 +1041,9 @@ export default {
   settings_updatesLinuxGuide2:
     "安装需要系统管理员授权。取消授权或安装失败时，应用会继续运行，可稍后重试或从 GitHub Releases 手动安装。",
   settings_updatesMacGuide1:
-    "macOS 应用内更新会下载 GitHub Release 中的 DMG，并用与官网相同的安装脚本清除隔离属性后安装到「应用程序」。",
+    "macOS 应用内更新会下载所选渠道的签名更新包，校验签名后安装。一键安装脚本始终只安装正式版。",
   settings_updatesMacGuide2:
-    "安装完成后应用会自动重启。如果刚发布了新版本但还没检测到，请确认 Release 已包含对应架构的 DMG，再重新检查一次。",
+    "所有窗口保存成功后才会替换应用并重启。如果未检测到更新，请确认对应 Release 已包含当前架构的签名更新包和更新清单。",
   settings_updatesCheckFailed: "检查更新失败：{error}",
   settings_updatesInstallFailed: "安装更新失败：{error}",
 

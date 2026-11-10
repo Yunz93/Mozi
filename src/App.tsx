@@ -269,6 +269,7 @@ const App: React.FC = () => {
     language: settings.language,
     settingsHydrated,
     autoCheckForUpdates: settings.autoCheckForUpdates,
+    acceptBetaUpdates: settings.acceptBetaUpdates === true,
     skippedUpdateVersion: settings.skippedUpdateVersion,
     updateSettings,
     showNotification,

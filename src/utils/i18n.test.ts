@@ -114,7 +114,7 @@ describe("t", () => {
     );
     expect(t("zh-CN", "ai_confirmTitle")).toBe("开始 AI 增强？");
     expect(t("en", "ai_confirmRun")).toBe("Start enhance");
-    expect(t("en", "settings_updatesMacGuide2")).toContain("DMG");
+    expect(t("en", "settings_updatesMacGuide2")).toContain("signed package");
   });
 });
 

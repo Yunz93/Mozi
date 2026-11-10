@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "补齐既有版本的 macOS 发布文件，例如 v2.0.1"
+        description: "补齐既有版本的 macOS 发布文件，例如 v2.3.6-beta.1"
         required: true
         type: string
       release_channel:

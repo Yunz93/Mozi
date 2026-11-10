@@ -260,6 +260,7 @@ export const defaultSettings: AppSettings = {
   metadataFields: DEFAULT_METADATA_FIELDS,
   autoSaveInterval: 60000,
   autoCheckForUpdates: true,
+  acceptBetaUpdates: false,
   skippedUpdateVersion: "",
   lastUpdateCheckAt: "",
 };
@@ -321,6 +322,7 @@ export function createUISlice(
           uiAccentColor: normalizeUiAccentColor(settings.uiAccentColor),
           showReadingProperties: settings.showReadingProperties !== false,
           themeFollowSystem: settings.themeFollowSystem === true,
+          acceptBetaUpdates: settings.acceptBetaUpdates === true,
           markdownStylePreset: normalizeMarkdownStylePreset(
             settings.markdownStylePreset,
           ),

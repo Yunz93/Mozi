@@ -85,14 +85,27 @@ Artifacts are generated under `src-tauri/target/release/bundle/`.
 
 The repository is configured with a GitHub Actions release workflow. Push a `v`-prefixed tag to automatically build and upload macOS / Windows / Linux x64 installers. Linux uses `tauri.linux.conf.json` to build and sign a `.deb`, validates its metadata, desktop launcher, and Markdown file associations, then uploads the package and `.deb.sig` to the same Release. It preserves the macOS / Windows entries while merging `linux-x86_64-deb` into `latest.json` to match the installed package type. Linux installation uses the system package manager through the Tauri updater and requires administrator authorization.
 
+**Use beta releases for validation by default.** Unless the user explicitly requests a stable release, use `vX.Y.Z-beta.N`, where `X.Y.Z` is the next planned stable version and `N` starts at 1 and increases. Check remote tags first and never overwrite or move existing tags:
+
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git ls-remote --tags origin 'v2.3.6-beta.*'
+# 确认未占用后使用下一个序号，以下以首次验证为例。
+git tag v2.3.6-beta.1
+git push origin v2.3.6-beta.1
+```
+
+Beta releases are marked as GitHub prereleases and never become Latest. Only an explicit request for a stable release authorizes a tag without a suffix:
+
+```bash
+git tag v2.3.6
+git push origin v2.3.6
 ```
 
 CI automatically syncs the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` to the tag, then runs the Tauri build and uploads to GitHub Releases.
 
-macOS users should prefer the one-line installer `scripts/install-macos.sh`, which downloads the release, runs `xattr -cr`, and copies the app into `/Applications`. The in-app Settings → About updater on macOS uses the same script and shows download progress.
+Manual macOS asset recovery requires an existing `release_tag`. The `release_channel` input defaults to beta; select stable explicitly for a stable tag. A channel/tag mismatch stops the workflow before building. Recovery preserves the tag and channel and does not build the other platforms.
+
+The macOS one-line installer `scripts/install-macos.sh` downloads stable releases only, clears quarantine, and copies the app into `/Applications`. It defaults to `releases/latest`; `RELEASE_TAG` accepts only stable tags. In-app updates on all platforms default to `releases/latest/download/latest.json`. **Receive beta updates** is off by default. Enabling it selects the highest newer semantic version among published stable and beta releases and uses that tag's signed artifacts. Turning it off checks stable releases only and does not downgrade an installed beta. Beta installers can also be downloaded manually from their prerelease pages; their manifests must stay under their own tags.
 
 ### macOS signing & notarization
 

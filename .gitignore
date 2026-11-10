@@ -30,7 +30,8 @@ src-tauri/target
 *.sln
 *.sw?
 .claude
-AGENTS.md
+# 项目规则需要随仓库版本管理。
+!/AGENTS.md
 .omx/
 secure-settings.json
 secure-settings.key

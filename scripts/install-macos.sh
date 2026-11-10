@@ -150,6 +150,11 @@ normalize_release_tag() {
 
   [[ -n "${tag}" ]] || return 1
   [[ "${tag}" == v* ]] || tag="v${tag}"
+  # 用户安装入口只接受正式版，指定标签也不能绕过渠道限制。
+  if [[ ! "${tag}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    warn "仅支持正式版本标签（如 v2.3.6）；beta 请从对应预发布页面手动下载验证。"
+    return 1
+  fi
   printf '%s' "${tag}"
 }
 
@@ -186,7 +191,7 @@ if [[ -n "${DMG_FILE:-}" ]]; then
   DMG_PATH="${DMG_FILE}"
   log "使用已下载的安装包: ${DMG_PATH}"
 else
-  log "正在查询 ${REPO} 的最新 macOS 安装包 (${ASSET_ARCH})..."
+  log "正在查询 ${REPO} 的正式版 macOS 安装包 (${ASSET_ARCH})..."
   if ! ASSET_URL="$(resolve_asset_url)"; then
     if [[ "${ASSET_ARCH}" == "x64" ]]; then
       die "未找到 Intel (x64) 版 macOS 安装包。当前 Release 可能仅提供 Apple Silicon (aarch64) 版本。"

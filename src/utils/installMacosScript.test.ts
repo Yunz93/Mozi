@@ -41,6 +41,36 @@ describe("install-macos.sh", () => {
   });
 
   it.each([
+    ["", "v2.3.5", "v2.3.5"],
+    ["2.3.4", "", "v2.3.4"],
+    [" v2.3.4 ", "", "v2.3.4"],
+    ["v2.3.6-beta.1", "", null],
+    ["v2.3.6-nightly.1", "", null],
+    ["v2.3.6+beta.1", "", null],
+    ["", "v2.3.6-beta.2", null],
+    ["", "https://github.com/Yunz93/Mozi/releases/latest", null],
+    ["v2.3.6/other", "", null],
+  ])("只解析正式版标签：指定 %s，latest 返回 %s", (tag, latest, expected) => {
+    const helper = script.match(
+      /normalize_release_tag\(\) \{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(helper).toBeTruthy();
+    const runner = `set -eu\nREPO=Yunz93/Mozi\nwarn(){ printf '%s' "$*" >&2; }\ncurl(){ printf '%s' "$LATEST_TAG"; }\n${helper}\nnormalize_release_tag "$REQUESTED_TAG"`;
+    const result = spawnSync("bash", ["-c", runner], {
+      encoding: "utf8",
+      env: { ...process.env, REQUESTED_TAG: tag, LATEST_TAG: latest },
+    });
+    if (expected === null) {
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("仅支持正式版本标签");
+    } else {
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe(expected);
+    }
+  });
+
+  it.each([
     "copy",
     "validation",
     "swap",

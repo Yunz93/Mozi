@@ -12,6 +12,7 @@ interface UseAppUpdaterOptions {
   language: AppSettings["language"];
   settingsHydrated: boolean;
   autoCheckForUpdates: boolean;
+  acceptBetaUpdates: boolean;
   skippedUpdateVersion: string;
   updateSettings: (patch: Partial<AppSettings>) => void;
   showNotification: (msg: string, type?: "success" | "error" | "info") => void;
@@ -23,12 +24,13 @@ export function useAppUpdater(options: UseAppUpdaterOptions): void {
     language,
     settingsHydrated,
     autoCheckForUpdates,
+    acceptBetaUpdates,
     skippedUpdateVersion,
     updateSettings,
     showNotification,
     t,
   } = options;
-  const hasCheckedInSessionRef = useRef(false);
+  const checkedChannelRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (
@@ -40,10 +42,9 @@ export function useAppUpdater(options: UseAppUpdaterOptions): void {
       return;
     }
 
-    if (hasCheckedInSessionRef.current) {
+    if (checkedChannelRef.current === acceptBetaUpdates) {
       return;
     }
-    hasCheckedInSessionRef.current = true;
 
     let cancelled = false;
     const win = window;
@@ -53,9 +54,11 @@ export function useAppUpdater(options: UseAppUpdaterOptions): void {
         return;
       }
 
-      void checkForAppUpdate()
+      checkedChannelRef.current = acceptBetaUpdates;
+      void checkForAppUpdate(acceptBetaUpdates)
         .then((update) => {
           if (cancelled) {
+            void update?.close().catch(() => {});
             return;
           }
 
@@ -67,6 +70,7 @@ export function useAppUpdater(options: UseAppUpdaterOptions): void {
               "info",
             );
           }
+          void update?.close().catch(() => {});
         })
         .catch((error) => {
           console.warn(
@@ -91,6 +95,7 @@ export function useAppUpdater(options: UseAppUpdaterOptions): void {
     };
   }, [
     autoCheckForUpdates,
+    acceptBetaUpdates,
     language,
     settingsHydrated,
     showNotification,

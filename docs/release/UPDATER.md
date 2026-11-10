@@ -2,6 +2,14 @@
 
 This repository uses the Tauri updater plugin on Windows and Linux, and the same signed updater artifacts for native macOS updates.
 
+## Release channels
+
+- Default to beta validation unless the user explicitly requests a stable release. Use `vX.Y.Z-beta.N` for the next planned stable version, increasing `N` from 1 after checking remote tags. Never reuse or move a published tag.
+- Only an explicit stable-release request authorizes `vX.Y.Z`. The workflow validates the tag and marks beta as `prerelease: true` and stable as `prerelease: false`. GitHub excludes prereleases from Latest; beta builds keep their own signed assets and `latest.json` under their tags.
+- Manual macOS asset recovery defaults to the beta channel. Recovering a stable tag requires selecting stable explicitly; the channel must match the existing tag.
+- The installer script downloads stable releases only; its optional `RELEASE_TAG` accepts stable tags only. In-app updates default to `releases/latest/download/latest.json`.
+- **Receive beta updates** is off by default. When enabled, manual and automatic checks select the highest newer semantic version among published stable and beta releases with updater manifests. Drafts and releases whose prerelease flag disagrees with their tag are excluded. The selected tag's signed updater artifacts use the existing download, save, signature verification, installation, and relaunch flow. Disabling the option clears previous check results and checks stable releases only; it never downgrades an installed beta.
+
 ## Build configuration
 
 `src-tauri/tauri.conf.json` must keep:
@@ -57,7 +65,7 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
 
 ## Per-release checklist
 
-1. Bump or tag the release as usual. Tagged releases still sync versions through `npm run release:sync-version`.
+1. Choose beta by default, or stable only when explicitly requested, and create the corresponding unused tag. Tagged releases sync versions through `npm run release:sync-version`.
 2. Let GitHub Actions build the tagged release.
 3. After the workflow finishes, confirm the GitHub Release contains:
    - the Windows NSIS installer
@@ -66,15 +74,16 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
    - the macOS `.dmg` (and `.app.tar.gz` updater artifact)
    - the Linux `.deb` and `.deb.sig`, with a `linux-x86_64-deb` entry in `latest.json` matching the installed package type
 4. Install the new release on Windows, macOS, and a supported Linux desktop where an older build is already present.
-5. Open `Settings -> About` and confirm:
+5. For stable releases, open `Settings -> About` and confirm:
    - the app detects the newer version
    - release notes load
    - download and install complete successfully
    - macOS downloads the signed `.app.tar.gz` for the current architecture, verifies it before installation, and atomically replaces the app after all windows have saved
+6. For beta releases, confirm the Release is marked as a prerelease and stable install/update endpoints still resolve to the previous stable release. Enable **Receive beta updates** to check and install the beta, or download it manually. With the option off, publishing a beta must not trigger an update. Verify that a higher beta sequence and the final stable version of the same base version are both detected, and that turning the option off does not downgrade the app.
 
 ## Automated verification
 
-Tagged releases finish with `verify-published-assets`: download the eight published assets, verify GitHub SHA-256 digests, exact version/platform inventory, repository-bound URLs and matching signature sidecars. The `verify-updater` Rust example then verifies all three updater packages using the public key embedded in that tag's source. It shares the signature implementation with the macOS installer and never reads a key from the feed or environment. This job has read-only repository access and no signing secrets. The older macOS-only repair dispatch is outside the complete eight-asset contract.
+Tagged releases finish with `verify-published-assets`: download the eight published assets, verify the stable/beta metadata matches the tag, GitHub SHA-256 digests, exact version/platform inventory, repository-bound URLs and matching signature sidecars. The `verify-updater` Rust example then verifies all three updater packages using the public key embedded in that tag's source. It shares the signature implementation with the macOS installer and never reads a key from the feed or environment. This job has read-only repository access and no signing secrets. The older macOS-only repair dispatch is outside the complete eight-asset contract.
 
 Desktop acceptance also performs a real installed Linux `.deb` upgrade with a separate package identity, ephemeral signing key and localhost feed. It checks signature corruption, authorization cancellation, saving two dirty windows, `dpkg` replacement and relaunch. Its child-only authorization proxy exercises success and failure without requiring interactive credentials. Real OS prompts and installed-release upgrades remain on the [physical-device checklist](../testing/physical-release-checklist.md).
 

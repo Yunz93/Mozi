@@ -89,15 +89,7 @@ pub fn normalize_release_tag(tag: &str) -> String {
 }
 
 pub fn is_valid_release_tag(tag: &str) -> bool {
-    let Some(payload) = tag.strip_prefix('v') else {
-        return false;
-    };
-    if payload.is_empty() || tag.len() > 32 {
-        return false;
-    }
-    payload
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || ch == '.' || ch == '-')
+    tag.len() <= 32 && crate::release_channel::release_version(tag).is_some()
 }
 
 pub fn version_from_tag(tag: &str) -> String {
@@ -105,24 +97,11 @@ pub fn version_from_tag(tag: &str) -> String {
 }
 
 pub fn compare_semver(left: &str, right: &str) -> i32 {
-    let parse = |value: &str| -> [u64; 3] {
-        let mut parts = [0_u64; 3];
-        for (index, raw) in value
-            .trim()
-            .trim_start_matches('v')
-            .split('.')
-            .take(3)
-            .enumerate()
-        {
-            let digits: String = raw.chars().take_while(|ch| ch.is_ascii_digit()).collect();
-            parts[index] = digits.parse().unwrap_or(0);
-        }
-        parts
+    let parse = |value: &str| semver::Version::parse(value.trim().trim_start_matches('v'));
+    let (Ok(left), Ok(right)) = (parse(left), parse(right)) else {
+        return 0;
     };
-
-    let left_parts = parse(left);
-    let right_parts = parse(right);
-    match left_parts.cmp(&right_parts) {
+    match left.cmp(&right) {
         std::cmp::Ordering::Greater => 1,
         std::cmp::Ordering::Less => -1,
         std::cmp::Ordering::Equal => 0,
@@ -247,8 +226,12 @@ fn http_client(timeout_secs: u64) -> Result<reqwest::blocking::Client, String> {
 }
 
 fn fetch_latest_json(client: &reqwest::blocking::Client) -> Result<LatestJson, String> {
+    fetch_manifest(client, LATEST_JSON_URL)
+}
+
+fn fetch_manifest(client: &reqwest::blocking::Client, url: &str) -> Result<LatestJson, String> {
     let response = client
-        .get(LATEST_JSON_URL)
+        .get(url)
         .send()
         .map_err(|error| format!("获取 latest.json 失败: {error}"))?;
     if !response.status().is_success() {
@@ -387,17 +370,27 @@ fn spawn_relaunch_waiter(app_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-pub fn check_macos_update(current_version: &str) -> Result<Option<MacosUpdateInfo>, String> {
+pub fn check_macos_update(
+    current_version: &str,
+    accept_beta_updates: bool,
+) -> Result<Option<MacosUpdateInfo>, String> {
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = current_version;
+        let _ = (current_version, accept_beta_updates);
         return Err("macOS in-app updates are only available on macOS.".to_string());
     }
 
     #[cfg(target_os = "macos")]
     {
         let client = http_client(CHECK_TIMEOUT_SECS)?;
-        let latest = fetch_latest_json(&client)?;
+        let latest = if accept_beta_updates {
+            let Some(url) = crate::release_channel::beta_manifest_url(current_version)? else {
+                return Ok(None);
+            };
+            fetch_manifest(&client, &url)?
+        } else {
+            fetch_latest_json(&client)?
+        };
         let version = latest
             .version
             .as_deref()
@@ -407,6 +400,9 @@ pub fn check_macos_update(current_version: &str) -> Result<Option<MacosUpdateInf
         let tag = normalize_release_tag(version);
         if !is_valid_release_tag(&tag) {
             return Err(format!("无效的版本号: {version}"));
+        }
+        if !accept_beta_updates && version.contains('-') {
+            return Err("正式版更新源包含预发布版本，已停止检查。".to_string());
         }
         if compare_semver(version, current_version) <= 0 {
             return Ok(None);
@@ -486,7 +482,11 @@ pub fn prepare_macos_update(
         return Err(format!("无效的版本标签: {tag}"));
     }
     let client = http_client(DOWNLOAD_TIMEOUT_SECS)?;
-    let latest = fetch_latest_json(&client)?;
+    let latest = if tag.contains("-beta.") {
+        fetch_manifest(&client, &crate::release_channel::manifest_url_for_tag(tag)?)?
+    } else {
+        fetch_latest_json(&client)?
+    };
     let latest_tag = normalize_release_tag(latest.version.as_deref().unwrap_or_default());
     if latest_tag != tag {
         return Err("可用更新版本已变化，请重新检查更新。".to_string());
@@ -558,9 +558,10 @@ pub fn install_macos_update(download_id: &str) -> Result<(), String> {
 
 pub fn check_macos_update_command(
     app: AppHandle,
+    accept_beta_updates: bool,
 ) -> Result<Option<MacosUpdateInfo>, String> {
     let current_version = app.package_info().version.to_string();
-    check_macos_update(&current_version)
+    check_macos_update(&current_version, accept_beta_updates)
 }
 
 pub fn install_macos_update_command(app: AppHandle, download_id: String) -> Result<(), String> {
@@ -789,11 +790,14 @@ mod tests {
     }
 
     #[test]
-    fn compares_semver_without_prerelease_noise() {
+    fn compares_semver_with_beta_sequences() {
         assert!(compare_semver("0.9.1", "0.9.0") > 0);
         assert!(compare_semver("v0.9.0", "0.9.0") == 0);
         assert!(compare_semver("0.8.9", "0.9.0") < 0);
         assert!(compare_semver("1.0.0", "0.9.9") > 0);
+        assert!(compare_semver("2.3.6-beta.10", "2.3.6-beta.2") > 0);
+        assert!(compare_semver("2.3.6", "2.3.6-beta.10") > 0);
+        assert_eq!(compare_semver("2.3.6-beta.2", "2.3.6-beta.2"), 0);
     }
 
     #[test]
@@ -816,7 +820,7 @@ mod tests {
     fn check_is_macos_only() {
         #[cfg(not(target_os = "macos"))]
         {
-            let error = check_macos_update("0.9.0").expect_err("linux stub");
+            let error = check_macos_update("0.9.0", false).expect_err("linux stub");
             assert!(error.contains("macOS"));
         }
     }

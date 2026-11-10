@@ -1,10 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { Channel, invoke } from "@tauri-apps/api/core";
-import {
-  check,
-  type DownloadEvent,
-  type Update,
-} from "@tauri-apps/plugin-updater";
+import { check, type DownloadEvent, Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { isTauriEnvironment } from "../types/filesystem";
 import {
@@ -108,8 +104,14 @@ function fromMacosUpdate(info: MacosUpdateInfo): AvailableUpdate {
   };
 }
 
-async function checkMacOSUpdate(): Promise<AvailableUpdate | null> {
-  const info = await invoke<MacosUpdateInfo | null>("check_macos_update");
+async function checkMacOSUpdate(
+  acceptBetaUpdates: boolean,
+): Promise<AvailableUpdate | null> {
+  const info = acceptBetaUpdates
+    ? await invoke<MacosUpdateInfo | null>("check_macos_update", {
+        acceptBetaUpdates: true,
+      })
+    : await invoke<MacosUpdateInfo | null>("check_macos_update");
   return info ? fromMacosUpdate(info) : null;
 }
 
@@ -135,9 +137,11 @@ async function installMacOSUpdate(
   }
 }
 
-export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
+export async function checkForAppUpdate(
+  acceptBetaUpdates = false,
+): Promise<AvailableUpdate | null> {
   if (isMacOSUpdaterSupported()) {
-    return checkMacOSUpdate();
+    return checkMacOSUpdate(acceptBetaUpdates);
   }
 
   if (!isWindowsUpdaterSupported() && !isLinuxUpdaterSupported()) {
@@ -149,6 +153,12 @@ export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
     return null;
   }
 
+  if (acceptBetaUpdates) {
+    const metadata = await invoke<
+      ConstructorParameters<typeof Update>[0] | null
+    >("check_beta_update");
+    return metadata ? fromTauriUpdate(new Update(metadata)) : null;
+  }
   const update = await check({ timeout: CHECK_TIMEOUT_MS });
   return update ? fromTauriUpdate(update) : null;
 }
