@@ -233,6 +233,18 @@
   cursor: not-allowed;
 }
 
+.workspace-notification {
+  position: fixed;
+  bottom: 4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 10rem);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
 .app-toolbar {
   position: sticky;
   top: 0;
