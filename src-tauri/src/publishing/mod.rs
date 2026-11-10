@@ -62,10 +62,7 @@ fn publish_log(message: impl AsRef<str>) {
         }
         if let Ok(meta) = fs::metadata(&path) {
             if meta.len() > PUBLISH_DEBUG_LOG_MAX_BYTES {
-                let _ = OpenOptions::new()
-                    .write(true)
-                    .truncate(true)
-                    .open(&path);
+                let _ = OpenOptions::new().write(true).truncate(true).open(&path);
             }
         }
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
@@ -98,6 +95,16 @@ pub(crate) struct PublishSimpleBlogRequest {
     asset_directory_relative_path: String,
     markdown_content: String,
     assets: Vec<PublishSimpleBlogAsset>,
+    #[serde(default)]
+    publish_id: String,
+    #[serde(default)]
+    legacy_slug: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubBlobResponse {
+    content: String,
+    encoding: String,
 }
 
 #[derive(Deserialize)]
@@ -348,7 +355,6 @@ pub(crate) async fn publish_wechat_draft(
     wechat::publish_remote_wechat_draft(&request).await
 }
 
-
 mod blog;
 mod wechat;
 
@@ -389,4 +395,3 @@ fn validate_wechat_publish_request_access(
 
     Ok(())
 }
-

@@ -3,9 +3,15 @@ import { isTauriEnvironment } from "../../types/filesystem";
 
 export type AppDataNamespace = "vault-index" | "ask-history";
 
-/** Stable short id for a vault root path. */
-export async function hashVaultId(vaultRoot: string): Promise<string> {
-  const normalized = normalizePath(vaultRoot).toLowerCase();
+/** POSIX 路径保留大小写，Windows 路径兼容大小写和分隔符别名。 */
+export function normalizeVaultIdentityPath(vaultRoot: string): string {
+  const path = normalizePath(vaultRoot);
+  return /^[a-z]:\//i.test(path) || path.startsWith("//")
+    ? path.toLowerCase()
+    : path;
+}
+
+async function hashPath(normalized: string): Promise<string> {
   if (typeof crypto !== "undefined" && crypto.subtle) {
     const data = new TextEncoder().encode(normalized);
     const digest = await crypto.subtle.digest("SHA-256", data);
@@ -22,6 +28,15 @@ export async function hashVaultId(vaultRoot: string): Promise<string> {
     hash = (hash * 31 + normalized.charCodeAt(i)) >>> 0;
   }
   return hash.toString(16).padStart(8, "0");
+}
+
+export function hashVaultId(vaultRoot: string): Promise<string> {
+  return hashPath(normalizeVaultIdentityPath(vaultRoot));
+}
+
+/** 旧身份只用于读取迁移源，不能再作为新记录的写入位置。 */
+export function hashLegacyVaultId(vaultRoot: string): Promise<string> {
+  return hashPath(normalizePath(vaultRoot).toLowerCase());
 }
 
 /**
@@ -50,12 +65,15 @@ async function ensureAppDataScope(): Promise<void> {
 async function resolveDataDir(
   vaultRoot: string,
   namespace: AppDataNamespace,
+  legacy = false,
 ): Promise<string | null> {
   if (!isTauriEnvironment()) return null;
   try {
     await ensureAppDataScope();
     const { appDataDir, join } = await import("@tauri-apps/api/path");
-    const vaultId = await hashVaultId(vaultRoot);
+    const vaultId = await (legacy
+      ? hashLegacyVaultId(vaultRoot)
+      : hashVaultId(vaultRoot));
     const root = await appDataDir();
     return join(root, "MarkdownPress", namespace, vaultId);
   } catch {
@@ -70,7 +88,7 @@ function memoryKey(
   fileName: string,
   namespace: AppDataNamespace,
 ): string {
-  return `${normalizePath(vaultRoot)}::${namespace}::${fileName}`;
+  return `${normalizeVaultIdentityPath(vaultRoot)}::${namespace}::${fileName}`;
 }
 
 function readMemoryJson<T>(
@@ -92,7 +110,27 @@ export async function readIndexJson<T>(
   fileName: string,
   namespace: AppDataNamespace = "vault-index",
 ): Promise<T | null> {
-  const dir = await resolveDataDir(vaultRoot, namespace);
+  return readStoredJson<T>(vaultRoot, fileName, namespace, false);
+}
+
+export function readLegacyIndexJson<T>(
+  vaultRoot: string,
+  fileName: string,
+  namespace: AppDataNamespace,
+): Promise<T | null> {
+  return readStoredJson<T>(vaultRoot, fileName, namespace, true);
+}
+
+async function readStoredJson<T>(
+  vaultRoot: string,
+  fileName: string,
+  namespace: AppDataNamespace,
+  legacy: boolean,
+): Promise<T | null> {
+  // 尚未成功持久化的最新值优先于磁盘旧副本，避免写失败后又恢复旧历史。
+  const pending = readMemoryJson<T>(vaultRoot, fileName, namespace);
+  if (pending !== null) return pending;
+  const dir = await resolveDataDir(vaultRoot, namespace, legacy);
   if (!dir) {
     return readMemoryJson<T>(vaultRoot, fileName, namespace);
   }
@@ -135,13 +173,14 @@ export async function writeIndexJson(
     await writeTextFile(tmp, payload);
     try {
       await rename(tmp, target);
-    } catch {
-      await writeTextFile(target, payload);
+    } catch (error) {
       try {
         await remove(tmp);
       } catch {
         // ignore tmp cleanup failures
       }
+      // 保留旧文件与内存副本，不能以截断写作为原子替换失败的回退。
+      throw error;
     }
     // Disk is authoritative after a successful write. Keeping another full JSON
     // string per index (and per window/vault) needlessly doubles retained data.
@@ -156,7 +195,7 @@ export async function writeIndexJson(
 }
 
 export async function clearIndexStorage(vaultRoot: string): Promise<void> {
-  const prefix = `${normalizePath(vaultRoot)}::vault-index::`;
+  const prefix = `${normalizeVaultIdentityPath(vaultRoot)}::vault-index::`;
   for (const key of [...memoryStore.keys()]) {
     if (key.startsWith(prefix)) {
       memoryStore.delete(key);
@@ -176,4 +215,5 @@ export async function clearIndexStorage(vaultRoot: string): Promise<void> {
 export const LINK_INDEX_FILE = "link-index.json";
 export const CHUNK_INDEX_FILE = "chunk-index.json";
 export const VECTOR_INDEX_FILE = "vector-index.json";
-export const ASK_HISTORY_FILE = "ask-history.json";
+export const ASK_HISTORY_FILE = "ask-history.v2.json";
+export const LEGACY_ASK_HISTORY_FILE = "ask-history.json";

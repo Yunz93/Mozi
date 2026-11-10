@@ -39,6 +39,26 @@ export function t(
 }
 
 const knownErrorMessages: Record<string, TranslationKey> = {
+  "Publishing identity is missing. Reopen the note and publish again.":
+    "notifications_blogSourceMismatch",
+  "Publishing identity does not match the note.":
+    "notifications_blogSourceMismatch",
+  "Publishing target does not match the note.":
+    "notifications_blogTargetMismatch",
+  "Publishing resources do not belong to this note.":
+    "notifications_blogTargetMismatch",
+  "Unsupported remote post encoding. Existing article was preserved.":
+    "notifications_blogExistingReadFailed",
+  "Could not decode the existing article. It was preserved.":
+    "notifications_blogExistingReadFailed",
+  "Existing article is not UTF-8. It was preserved.":
+    "notifications_blogExistingReadFailed",
+  "The previously published article was not found at its saved path. Restore the original note filename before migrating its publishing identity; no remote article was changed.":
+    "notifications_blogLegacyTargetMissing",
+  "The remote article belongs to another note. Existing content was preserved.":
+    "notifications_blogOwnershipConflict",
+  "The existing article could not be safely matched to this note. Existing content was preserved.":
+    "notifications_blogOwnershipConflict",
   "Please configure OpenAI API Key in settings.": "notifications_aiConfigFirst",
   "Please configure Gemini API Key in settings.": "notifications_aiConfigFirst",
   "Please configure DeepSeek API Key in settings.":

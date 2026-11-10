@@ -27,6 +27,8 @@ import {
 } from "../utils/excalidrawDocument";
 import { normalizeSlashes } from "../utils/pathHelpers";
 import { clearDraftBackup } from "../utils/draftBackup";
+import { sameDocumentText } from "../utils/documentText";
+import { acquireDocumentWrite } from "../services/filesystem/documentWriteQueue";
 import {
   normalizeNewNoteLocation,
   resolveNewNoteFolderPath,
@@ -457,47 +459,96 @@ export function useFileOperations() {
         if (result.modifiedFiles.length === 0) return;
 
         const appliedMods: typeof result.modifiedFiles = [];
-        const skippedUnsaved: string[] = [];
+        const skippedChanges: string[] = [];
 
         for (const mod of result.modifiedFiles) {
-          const stateNow = useAppStore.getState();
-          if (stateNow.hasUnsavedChanges(mod.path)) {
-            skippedUnsaved.push(mod.path);
-            continue;
-          }
+          const release = await acquireDocumentWrite(mod.path);
+          try {
+            const canApply = () => {
+              flushActiveEditorPendingChanges();
+              const current = useAppStore.getState();
+              const cached = current.fileContents[mod.path];
+              return (
+                current.rootFolderPath === state.rootFolderPath &&
+                !current.hasUnsavedChanges(mod.path) &&
+                (cached === undefined ||
+                  sameDocumentText(cached, mod.originalContent))
+              );
+            };
+            if (!canApply()) {
+              skippedChanges.push(mod.path);
+              continue;
+            }
 
-          await fs.writeFile(mod.path, mod.newContent);
-          appliedMods.push(mod);
+            // 扫描整库期间可能已经保存了新内容，必须再次比对磁盘和当前缓冲。
+            const diskContent = await fs.readFile(mod.path);
+            if (
+              !sameDocumentText(diskContent, mod.originalContent) ||
+              !canApply()
+            ) {
+              skippedChanges.push(mod.path);
+              continue;
+            }
+            if (fs.writeFileIfUnchanged) {
+              if (
+                !(await fs.writeFileIfUnchanged(
+                  mod.path,
+                  mod.newContent,
+                  mod.originalContent,
+                ))
+              ) {
+                skippedChanges.push(mod.path);
+                continue;
+              }
+            } else {
+              await fs.writeFile(mod.path, mod.newContent);
+            }
+
+            appliedMods.push(mod);
+            useAppStore.setState((current) => {
+              if (current.rootFolderPath !== state.rootFolderPath) return {};
+              const cached = current.fileContents[mod.path];
+              const saved = current.lastSavedContent[mod.path];
+              if (
+                saved !== undefined &&
+                !sameDocumentText(saved, mod.originalContent)
+              )
+                return {};
+              // 写盘等待期间的新输入保留为脏内容，只更新它对应的磁盘基线。
+              return {
+                ...(cached !== undefined &&
+                sameDocumentText(cached, mod.originalContent)
+                  ? {
+                      fileContents: {
+                        ...current.fileContents,
+                        [mod.path]: mod.newContent,
+                      },
+                    }
+                  : {}),
+                ...(saved !== undefined
+                  ? {
+                      lastSavedContent: {
+                        ...current.lastSavedContent,
+                        [mod.path]: mod.newContent,
+                      },
+                    }
+                  : {}),
+              };
+            });
+          } finally {
+            release();
+          }
         }
 
         if (appliedMods.length === 0) {
-          if (skippedUnsaved.length > 0) {
+          if (skippedChanges.length > 0) {
             showNotification(
-              t(settings.language, "notifications_linksSkippedUnsaved", {
-                count: String(skippedUnsaved.length),
-              }),
+              t(settings.language, "notifications_linkUpdateFailed"),
               "error",
             );
           }
           return;
         }
-
-        useAppStore.setState((s) => {
-          const nextContents = { ...s.fileContents };
-          const nextSaved = { ...s.lastSavedContent };
-          for (const mod of appliedMods) {
-            if (s.hasUnsavedChanges(mod.path)) {
-              continue;
-            }
-            if (mod.path in nextContents) {
-              nextContents[mod.path] = mod.newContent;
-            }
-            if (mod.path in nextSaved) {
-              nextSaved[mod.path] = mod.newContent;
-            }
-          }
-          return { fileContents: nextContents, lastSavedContent: nextSaved };
-        });
 
         clearAttachmentResolverCache();
 
@@ -506,10 +557,12 @@ export function useFileOperations() {
         }
 
         showNotification(
-          t(settings.language, "notifications_linksUpdated", {
-            count: String(appliedMods.length),
-          }),
-          "success",
+          skippedChanges.length > 0
+            ? t(settings.language, "notifications_linkUpdateFailed")
+            : t(settings.language, "notifications_linksUpdated", {
+                count: String(appliedMods.length),
+              }),
+          skippedChanges.length > 0 ? "error" : "success",
         );
       } catch (e) {
         console.error("Failed to update links after move:", e);
@@ -519,7 +572,7 @@ export function useFileOperations() {
         );
       }
     },
-    [showNotification],
+    [showNotification, settings.language],
   );
 
   const handleRename = useCallback(

@@ -20,16 +20,14 @@ vi.mock("../services/secureSettingsService", () => ({
   hydrateSensitiveSettingsIntoStore: async () =>
     useAppStore.getState().settings,
 }));
-vi.mock("../utils/simpleBlogPublish", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../utils/simpleBlogPublish")>()),
-  prepareSimpleBlogPublish: vi.fn(async (options) => ({
-    markdownContent: options.markdownContent,
-    postRelativePath: "posts/note.md",
-    assetDirectoryRelativePath: "assets/note",
-    assets: [],
-    unresolvedImages: [],
-  })),
-}));
+vi.mock("../utils/simpleBlogPublish", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../utils/simpleBlogPublish")>();
+  return {
+    ...actual,
+    prepareSimpleBlogPublish: vi.fn(actual.prepareSimpleBlogPublish),
+  };
+});
 
 const path = "/vault/note.md";
 const input = { title: "Note", slug: "note", aliases: "" };
@@ -168,6 +166,10 @@ describe("发布完成后的正文回写", () => {
       expect(await result.current.handlePublishSimpleBlog(input)).toBe(true);
     });
     expect(invoke).toHaveBeenCalledTimes(2);
+    const requests = invoke.mock.calls.map((call) => call[1].request);
+    expect(requests[0].publishId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(requests[1].publishId).toBe(requests[0].publishId);
+    expect(requests[1].postRelativePath).toBe(requests[0].postRelativePath);
     vi.restoreAllMocks();
   });
 });

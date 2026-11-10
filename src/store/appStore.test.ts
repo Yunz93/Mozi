@@ -53,6 +53,7 @@ describe("stripNonRuntimeSettings", () => {
       imageHostingS3SecretAccessKey: "s3-secret",
       imageHostingOssAccessKeySecret: "oss-secret",
       imageHostingQiniuSecretKey: "qiniu-secret",
+      imageHostingCustomHeaders: '{"Authorization":"Bearer custom-secret"}',
       language: "en",
     });
 

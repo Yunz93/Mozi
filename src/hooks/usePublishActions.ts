@@ -8,6 +8,7 @@ import {
   applySimpleBlogPublishInput,
   buildSimpleBlogPostUrl,
   prepareSimpleBlogPublish,
+  ensureSimpleBlogPublishBinding,
   type SimpleBlogPublishInput,
 } from "../utils/simpleBlogPublish";
 import {
@@ -29,6 +30,7 @@ import {
 } from "../utils/blogRepo";
 import { refreshDocumentUpdateTime } from "../utils/metadataFields";
 import { getErrorMessage } from "../utils/errorHandler";
+import { getWechatErrorNotificationDuration } from "../utils/wechatPublishErrors";
 import { localizeKnownError, t, type TranslationKey } from "../utils/i18n";
 import { findFileInTree } from "../utils/fileTree";
 import { isMarkdownFile } from "../utils/fileTypes";
@@ -355,10 +357,18 @@ export function usePublishActions(
         // uploaded markdown payload so the remote post is marked correctly.
         publishCheckpointContent = currentContent;
 
-        const contentWithMeta = applySimpleBlogPublishInput(
+        const boundContent = ensureSimpleBlogPublishBinding(
           currentContent,
+          activeFile.path,
+          normalizedBlogRepoUrl,
+          normalizedBlogSiteUrl,
+        );
+        const contentWithMeta = applySimpleBlogPublishInput(
+          boundContent,
           input,
         );
+        // 失败回滚也必须保留发布身份，避免远端成功但响应丢失后重试创建另一篇。
+        publishCheckpointContent = boundContent;
         const contentBeforeMeta =
           useAppStore.getState().fileContents[targetTabId] ?? currentContent;
         if (shouldApplyPublishWriteback(contentBeforeMeta, currentContent)) {
@@ -486,6 +496,8 @@ export function usePublishActions(
               assetDirectoryRelativePath: prepared.assetDirectoryRelativePath,
               markdownContent: prepared.markdownContent,
               assets: prepared.assets,
+              publishId: prepared.publishId,
+              legacySlug: prepared.legacySlug,
             },
           },
         );
@@ -500,9 +512,11 @@ export function usePublishActions(
         const backfilled = await backfillFrontmatter(
           targetTabId,
           activeFile.path,
-          publishedUrl
-            ? { is_publish: true, link: publishedUrl }
-            : { is_publish: true },
+          {
+            is_publish: true,
+            ...(publishedUrl ? { link: publishedUrl } : {}),
+            mozi_blog_legacy_slug: null,
+          },
           "notifications_publishBackfillFailed",
         );
 
@@ -778,7 +792,11 @@ export function usePublishActions(
         const message = rawMessage
           ? localizeKnownError(hydratedSettings.language, rawMessage)
           : t(hydratedSettings.language, "notifications_wechatPublishFailed");
-        showNotification(message, "error");
+        showNotification(
+          message,
+          "error",
+          getWechatErrorNotificationDuration(rawMessage),
+        );
         return false;
       } finally {
         setPublishing(false);

@@ -40,6 +40,8 @@ export interface PreparedSimpleBlogPublish {
   assetDirectoryRelativePath: string;
   assets: SimpleBlogPublishAsset[];
   unresolvedImages: string[];
+  publishId: string;
+  legacySlug?: string;
 }
 
 interface PrepareSimpleBlogPublishOptions {
@@ -49,6 +51,66 @@ interface PrepareSimpleBlogPublishOptions {
   currentFilePath: string;
   markdownContent: string;
   markdownStylePreset?: MarkdownStylePreset;
+}
+
+const PUBLISH_ID_PATTERN = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+
+/** 将远端归属保存到笔记，改名或重试不再根据同名文件猜测覆盖目标。 */
+export function ensureSimpleBlogPublishBinding(
+  markdownContent: string,
+  currentFilePath: string,
+  repository?: string,
+  blogSiteUrl?: string,
+): string {
+  const { frontmatter, body } = parseFrontmatter(markdownContent);
+  const previous = frontmatter ?? {};
+  const previousId = String(previous.mozi_blog_id ?? "");
+  const previousRepository = String(previous.mozi_blog_repository ?? "");
+  const target = String(previous.mozi_blog_post_path ?? "");
+  const legacyTarget = buildSimpleBlogPostRelativePath(currentFilePath);
+  if (
+    PUBLISH_ID_PATTERN.test(previousId) &&
+    (!repository || previousRepository === repository) &&
+    /^posts\/[^/\\]+\.md$/.test(target)
+  ) {
+    // 旧文首次迁移成功前仍以原文件名定位；目标缺失时可恢复原名重试，不能另建重复文章。
+    if (
+      typeof previous.mozi_blog_legacy_slug === "string" &&
+      previous.mozi_blog_legacy_slug &&
+      target !== legacyTarget
+    ) {
+      return `${generateFrontmatter({ ...previous, mozi_blog_post_path: legacyTarget })}${body}`;
+    }
+    return markdownContent;
+  }
+
+  const id = crypto.randomUUID();
+  const baseName =
+    stripExtension(getPathBasename(currentFilePath)) || "published-post";
+  let legacySlug = "";
+  // 只迁移已明确绑定当前站点的旧文章；新文章和切换仓库不能借旧文件名接管正文。
+  if (
+    !previousId &&
+    previous.is_publish === true &&
+    typeof previous.link === "string" &&
+    blogSiteUrl
+  ) {
+    const site = normalizeBlogSiteUrl(blogSiteUrl);
+    if (site && previous.link.startsWith(`${site}/posts/`)) {
+      legacySlug = String(previous.slug || "").trim();
+    }
+  }
+  const next: Frontmatter = {
+    ...previous,
+    mozi_blog_id: id,
+    mozi_blog_repository: repository ?? previousRepository,
+    mozi_blog_post_path: legacySlug
+      ? `posts/${baseName}.md`
+      : `posts/${Array.from(baseName).slice(0, 70).join("")}-${id}.md`,
+  };
+  if (legacySlug) next.mozi_blog_legacy_slug = legacySlug;
+  else delete next.mozi_blog_legacy_slug;
+  return `${generateFrontmatter(next)}${body}`;
 }
 
 const WIKI_LINK_REGEX = /(^|[^!])\[\[([^\]\n]+)\]\]/gm;
@@ -97,21 +159,6 @@ function encodeUrlPath(value: string): string {
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-}
-
-function sanitizeAssetDirectoryName(value: string): string {
-  const normalized = value
-    .trim()
-    .replace(/[^\w.-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  const hash = Array.from(value)
-    .reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) >>> 0, 7)
-    .toString(16)
-    .slice(0, 8);
-
-  return normalized ? `${normalized}-${hash}` : `post-assets-${hash}`;
 }
 
 function sanitizeAssetFileName(fileName: string): string {
@@ -296,10 +343,30 @@ export function extractSimpleBlogPublishDefaults(
   const aliases = Array.isArray(aliasesValue)
     ? aliasesValue.join(", ")
     : aliasesValue;
+  const { frontmatter } = parseFrontmatter(markdownContent);
+  const hasExplicitSlug =
+    typeof frontmatter?.slug === "string" && !!frontmatter.slug.trim();
+  const wasPublished =
+    frontmatter?.is_publish === true ||
+    (typeof frontmatter?.link === "string" && !!frontmatter.link.trim());
+  const baseSlug = resolveSimpleBlogPublishSlug(
+    markdownContent,
+    currentFilePath,
+  );
+  // 新文档的建议在弹窗展示前区分同名路径，确认后的 URL 始终由用户填写值决定。
+  let suggestedSlug = baseSlug;
+  if (!hasExplicitSlug && !wasPublished) {
+    const normalizedPath = currentFilePath.replace(/\\/g, "/").normalize("NFC");
+    let pathHash = 0xcbf29ce484222325n;
+    for (const byte of new TextEncoder().encode(normalizedPath)) {
+      pathHash = BigInt.asUintN(64, (pathHash ^ BigInt(byte)) * 0x100000001b3n);
+    }
+    suggestedSlug = `${baseSlug}-${pathHash.toString(16).padStart(16, "0")}`;
+  }
 
   return {
     title,
-    slug: resolveSimpleBlogPublishSlug(markdownContent, currentFilePath),
+    slug: suggestedSlug,
     aliases,
   };
 }
@@ -423,15 +490,18 @@ export async function prepareSimpleBlogPublish(
     rootFolderPath,
     markdownStylePreset,
   } = options;
-  const published = ensurePublishedFrontmatter(
+  const boundContent = ensureSimpleBlogPublishBinding(
     markdownContent,
+    currentFilePath,
+  );
+  const published = ensurePublishedFrontmatter(
+    boundContent,
     currentFilePath,
     markdownStylePreset,
   );
-  const currentFileName = getPathBasename(currentFilePath);
-  const baseName = stripExtension(currentFileName) || "published-post";
-  const assetDirectoryRelativePath = `resource/${sanitizeAssetDirectoryName(baseName)}`;
-  const postRelativePath = `posts/${baseName}.md`;
+  const publishId = String(published.frontmatter.mozi_blog_id);
+  const assetDirectoryRelativePath = `resource/mozi-${publishId}`;
+  const postRelativePath = String(published.frontmatter.mozi_blog_post_path);
 
   const resolverContext = createAttachmentResolverContext(
     files,
@@ -619,5 +689,10 @@ export async function prepareSimpleBlogPublish(
     assetDirectoryRelativePath,
     assets,
     unresolvedImages,
+    publishId,
+    legacySlug:
+      typeof published.frontmatter.mozi_blog_legacy_slug === "string"
+        ? published.frontmatter.mozi_blog_legacy_slug
+        : undefined,
   };
 }

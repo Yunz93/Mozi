@@ -235,7 +235,7 @@ export default {
   wechatDraftDialog_unresolvedImages:
     "Some images could not be resolved. Fix the paths before publishing.",
   wechatDraftDialog_ipHint:
-    "If the IP is not allowlisted, add it under Official Account Settings → Basic Configuration → IP whitelist.",
+    "If the IP is not allowlisted, add the outbound IP under Settings and Development → Security Center → IP Whitelist in the WeChat Official Accounts Platform.",
 
   wereadImport_title: "Import WeRead notes",
   wereadImport_desc:
@@ -1033,7 +1033,7 @@ export default {
   settings_wechatGuide2:
     "The first version supports one Official Account only. Republishing the same note prefers the saved `wechat_draft_media_id` and updates that draft.",
   settings_wechatGuide3:
-    "The IP allowlist is also on Basic Configuration: click Modify next to IP Whitelist and add this machine's public IPv4. Look up your public IP, or use the address shown when publish fails. Without it, WeChat will not issue an access token.",
+    "Go to Settings and Development → Security Center → IP Whitelist and add this machine's outbound IPv4. You can copy it from the publish error message. Without it, WeChat will not issue an access token.",
   settings_wereadSectionTitle: "WeRead note import",
   settings_wereadSectionDesc:
     "Import WeRead highlights and thoughts as local Markdown notes with a Skill API key stored on this device only.",
@@ -1204,6 +1204,16 @@ export default {
     "The document is very long, so the export resolution was reduced automatically to avoid a crash.",
   notifications_publishResultUnknown:
     "Timed out waiting for the publish result: it may still have succeeded remotely. Verify the remote state before retrying; local state was not rolled back.",
+  notifications_blogLegacyTargetMissing:
+    "The original published article could not be confirmed, so publishing stopped without changing remote content. The note may have been renamed or moved. Restore its original filename and update it successfully once to establish the link; you can then rename it again.",
+  notifications_blogOwnershipConflict:
+    "The target article belongs to another note. Publishing stopped and remote content was preserved. Update it from the original note, or create a new note and copy only the body to publish a separate article.",
+  notifications_blogSourceMismatch:
+    "The source note could not be confirmed, so publishing stopped. Reopen the note and retry. If it still fails, create a new note and copy only the body before publishing.",
+  notifications_blogTargetMismatch:
+    "The publishing target or image directory does not match this note, so publishing stopped. Reopen the note and retry. If it still fails, create a new note and copy only the body before publishing.",
+  notifications_blogExistingReadFailed:
+    "The existing article could not be read. Remote content was preserved. Check that the original article is readable in your blog repository, then retry.",
   notifications_publishInProgress:
     "A publish is already in progress. Wait for it to finish before trying again.",
   notifications_publishBackfillFailed:

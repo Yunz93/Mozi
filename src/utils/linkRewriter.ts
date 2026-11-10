@@ -12,10 +12,12 @@ import {
   getPathBasename,
 } from "./pathHelpers";
 import { parseWikiLinkReference } from "./wikiLinks";
+import { markdownLanguage } from "@codemirror/lang-markdown";
 
 export interface RewriteResult {
   modifiedFiles: Array<{
     path: string;
+    originalContent: string;
     newContent: string;
   }>;
 }
@@ -43,6 +45,7 @@ interface ResolvedLink {
 }
 
 interface WikiRewriteInfo {
+  newAbsolutePath: string;
   newRelativePath: string;
   newBasename: string;
   basenameChanged: boolean;
@@ -51,6 +54,9 @@ interface WikiRewriteInfo {
 interface WikiRewriteIndex {
   byRelativePath: Map<string, WikiRewriteInfo>;
   byBasename: Map<string, WikiRewriteInfo>;
+  originalPaths: Set<string>;
+  destinationBasenameCounts: Map<string, number>;
+  rootFolderPath: string;
 }
 
 // ── Sync path helpers (no Tauri dependency) ─────────────────────────────
@@ -139,21 +145,62 @@ function buildRewriteContext(
   };
 }
 
-function buildWikiRewriteIndex(
-  pathMap: Map<string, string>,
-  rootFolderPath: string,
-): WikiRewriteIndex {
-  const normRoot = canonicalizePath(rootFolderPath);
+function normalizeWikiRewriteTarget(path: string): string {
+  return stripMdExtension(
+    canonicalizePath(decodeTarget(path))
+      .replace(/^\/+/, "")
+      .replace(/^\.\//, "")
+      .trim(),
+  )
+    .toLowerCase()
+    .normalize("NFC");
+}
+
+function buildWikiRewriteIndex(ctx: RewriteContext): WikiRewriteIndex {
+  const normRoot = ctx.rootFolderPath;
   const byRelativePath = new Map<string, WikiRewriteInfo>();
   const byBasename = new Map<string, WikiRewriteInfo>();
+  const originalPaths = new Set<string>();
+  const destinationPaths = new Set<string>();
+  for (const path of ctx.allFilePaths) {
+    destinationPaths.add(
+      normalizeWikiRewriteTarget(
+        getPathRelativeToRoot(ctx.pathMap.get(path) ?? path, normRoot),
+      ),
+    );
+    originalPaths.add(
+      normalizeWikiRewriteTarget(
+        getPathRelativeToRoot(ctx.reverseMap.get(path) ?? path, normRoot),
+      ),
+    );
+  }
+  for (const path of ctx.pathMap.keys()) {
+    originalPaths.add(
+      normalizeWikiRewriteTarget(getPathRelativeToRoot(path, normRoot)),
+    );
+  }
+  const basenameCounts = new Map<string, number>();
+  for (const path of originalPaths) {
+    const basename = getPathBasename(path);
+    basenameCounts.set(basename, (basenameCounts.get(basename) ?? 0) + 1);
+  }
+  const destinationBasenameCounts = new Map<string, number>();
+  for (const path of destinationPaths) {
+    const basename = getPathBasename(path);
+    destinationBasenameCounts.set(
+      basename,
+      (destinationBasenameCounts.get(basename) ?? 0) + 1,
+    );
+  }
 
-  for (const [oldAbs, newAbs] of pathMap) {
+  for (const [oldAbs, newAbs] of ctx.pathMap) {
     const oldRel = getPathRelativeToRoot(oldAbs, normRoot);
     const newRel = getPathRelativeToRoot(newAbs, normRoot);
     const oldBase = getPathBasename(oldAbs);
     const newBase = getPathBasename(newAbs);
 
     const info: WikiRewriteInfo = {
+      newAbsolutePath: newAbs,
       newRelativePath: stripMdExtension(canonicalizePath(newRel)),
       newBasename: stripMdExtension(newBase.normalize("NFC")),
       basenameChanged:
@@ -169,12 +216,18 @@ function buildWikiRewriteIndex(
     const basenameKey = stripMdExtension(oldBase)
       .toLowerCase()
       .normalize("NFC");
-    if (!byBasename.has(basenameKey)) {
+    if (basenameCounts.get(basenameKey) === 1) {
       byBasename.set(basenameKey, info);
     }
   }
 
-  return { byRelativePath, byBasename };
+  return {
+    byRelativePath,
+    byBasename,
+    originalPaths,
+    destinationBasenameCounts,
+    rootFolderPath: normRoot,
+  };
 }
 
 // ── Link resolution ─────────────────────────────────────────────────────
@@ -224,6 +277,40 @@ function computeNewLinkPath(
 
 // ── Rewriters ───────────────────────────────────────────────────────────
 
+function isEscapedAt(content: string, offset: number): boolean {
+  let backslashes = 0;
+  for (let index = offset - 1; index >= 0 && content[index] === "\\"; index--)
+    backslashes++;
+  return backslashes % 2 === 1;
+}
+
+/** 判断链接起点是否位于代码或注释中，不拆断带行内代码标签的正常链接。 */
+function createRewritePositionGuard(
+  content: string,
+): (offset: number) => boolean {
+  let tree: ReturnType<typeof markdownLanguage.parser.parse> | undefined;
+  const literalTypes = new Set([
+    "FencedCode",
+    "CodeBlock",
+    "InlineCode",
+    "Comment",
+    "CommentBlock",
+  ]);
+  return (offset) => {
+    if (isEscapedAt(content, offset)) return false;
+    // 没有这一类候选链接时不解析整篇笔记，避免整库扫描增加无效开销。
+    tree ??= markdownLanguage.parser.parse(content);
+    let node = tree.resolveInner(offset, 1);
+    while (node) {
+      if (literalTypes.has(node.name)) return false;
+      const parent = node.parent;
+      if (!parent) break;
+      node = parent;
+    }
+    return true;
+  };
+}
+
 export function rewriteMarkdownLinks(
   content: string,
   currentFilePath: string,
@@ -231,10 +318,18 @@ export function rewriteMarkdownLinks(
   ctx: RewriteContext,
 ): string {
   const regex = /(!?\[[^\]]*\]\()(<[^>\n]+>|[^)\n]+)(\))/g;
+  const canRewrite = createRewritePositionGuard(content);
 
   return content.replace(
     regex,
-    (match, prefix: string, rawDest: string, suffix: string) => {
+    (
+      match,
+      prefix: string,
+      rawDest: string,
+      suffix: string,
+      offset: number,
+    ) => {
+      if (!canRewrite(offset)) return match;
       const {
         path: linkPath,
         angleBrackets,
@@ -268,46 +363,87 @@ export function rewriteMarkdownLinks(
 export function rewriteWikiLinks(
   content: string,
   wikiIndex: WikiRewriteIndex,
+  currentFilePath: string,
+  resolveDir: string,
 ): string {
   const regex = /(!?\[\[)([^[\]]+)(\]\])/g;
+  const canRewrite = createRewritePositionGuard(content);
 
   return content.replace(
     regex,
-    (match, prefix: string, inner: string, suffix: string) => {
+    (match, prefix: string, inner: string, suffix: string, offset: number) => {
+      if (!canRewrite(offset)) return match;
       const parsed = parseWikiLinkReference(inner, {
         embed: prefix.startsWith("!"),
       });
       if (!parsed.path) return match;
 
-      const normalizedTarget = stripMdExtension(
-        canonicalizePath(parsed.path)
-          .replace(/^\/+/, "")
-          .replace(/^\.\//, "")
-          .trim(),
-      )
-        .toLowerCase()
-        .normalize("NFC");
+      const normalizedTarget = normalizeWikiRewriteTarget(parsed.path);
       if (!normalizedTarget) return match;
 
       const targetBasename =
         normalizedTarget.split("/").filter(Boolean).pop() || normalizedTarget;
       const isPathBased = normalizedTarget.includes("/");
 
-      let info = wikiIndex.byRelativePath.get(normalizedTarget);
-      if (info) {
-        return `${prefix}${rebuildWikiInner(info.newRelativePath, parsed)}${suffix}`;
+      const rawPath = normalizeSlashes(parsed.path);
+      const explicitRelative = /^\.{1,2}\//.test(rawPath);
+      const relativeTarget = normalizeWikiRewriteTarget(
+        getPathRelativeToRoot(
+          resolvePath(resolveDir, decodeTarget(parsed.path)),
+          wikiIndex.rootFolderPath,
+        ),
+      );
+      let matchedTarget: string | undefined;
+      let viaRelative = false;
+      if (explicitRelative) {
+        if (wikiIndex.originalPaths.has(relativeTarget))
+          matchedTarget = relativeTarget;
+        viaRelative = true;
+      } else if (wikiIndex.originalPaths.has(normalizedTarget)) {
+        matchedTarget = normalizedTarget;
+      } else if (
+        !rawPath.startsWith("/") &&
+        wikiIndex.originalPaths.has(relativeTarget)
+      ) {
+        matchedTarget = relativeTarget;
+        viaRelative = true;
+      }
+      // 先确认实际原目标；同名但未移动的笔记必须保留，无目录的歧义链接不猜测。
+      if (matchedTarget !== undefined) {
+        const info = wikiIndex.byRelativePath.get(matchedTarget);
+        if (
+          !info ||
+          (!isPathBased && !explicitRelative && !info.basenameChanged)
+        )
+          return match;
+        let nextPath = viaRelative
+          ? stripMdExtension(
+              getRelativePath(currentFilePath, info.newAbsolutePath),
+            )
+          : info.newRelativePath;
+        // 根目录同名笔记的优先级更高，必要时明确写出知识库内路径。
+        if (
+          viaRelative &&
+          wikiIndex.originalPaths.has(normalizeWikiRewriteTarget(nextPath)) &&
+          normalizeWikiRewriteTarget(nextPath) !==
+            normalizeWikiRewriteTarget(info.newRelativePath)
+        )
+          nextPath = info.newRelativePath;
+        return `${prefix}${rebuildWikiInner(nextPath, parsed)}${suffix}`;
       }
 
-      info = wikiIndex.byBasename.get(
-        isPathBased ? targetBasename : normalizedTarget,
-      );
+      // 已明确指定目录时不能按同名文件猜测，否则会改坏另一个目录的链接。
+      if (isPathBased || explicitRelative) return match;
+
+      const info = wikiIndex.byBasename.get(targetBasename);
       if (info?.basenameChanged) {
-        if (isPathBased) {
-          const parts = parsed.path.split("/");
-          parts[parts.length - 1] = info.newBasename;
-          return `${prefix}${rebuildWikiInner(parts.join("/"), parsed)}${suffix}`;
-        }
-        return `${prefix}${rebuildWikiInner(info.newBasename, parsed)}${suffix}`;
+        const nextPath =
+          (wikiIndex.destinationBasenameCounts.get(
+            normalizeWikiRewriteTarget(info.newBasename),
+          ) ?? 0) > 1
+            ? info.newRelativePath
+            : info.newBasename;
+        return `${prefix}${rebuildWikiInner(nextPath, parsed)}${suffix}`;
       }
 
       return match;
@@ -342,10 +478,12 @@ export function rewriteHtmlReferences(
 ): string {
   const regex =
     /(<(?:img|audio|video|source|a)\b[^>]*?(?:src|href)\s*=\s*)(["'])([^"']+)\2/gi;
+  const canRewrite = createRewritePositionGuard(content);
 
   return content.replace(
     regex,
-    (match, prefix: string, quote: string, url: string) => {
+    (match, prefix: string, quote: string, url: string, offset: number) => {
+      if (!canRewrite(offset)) return match;
       if (!url || hasUriScheme(url)) return match;
 
       const decoded = decodeTarget(url.trim());
@@ -374,7 +512,7 @@ export async function findAndRewriteAffectedFiles(
   } = options;
 
   const ctx = buildRewriteContext(movedPathMap, files, rootFolderPath);
-  const wikiIndex = buildWikiRewriteIndex(ctx.pathMap, rootFolderPath);
+  const wikiIndex = buildWikiRewriteIndex(ctx);
 
   const markdownFiles = flattenFiles(files).filter(isMarkdownFile);
   const modifiedFiles: RewriteResult["modifiedFiles"] = [];
@@ -397,13 +535,16 @@ export async function findAndRewriteAffectedFiles(
       ? getPathDirname(oldPath)
       : getPathDirname(currentPath);
 
-    let rewritten = content;
-    rewritten = rewriteMarkdownLinks(rewritten, currentPath, resolveDir, ctx);
-    rewritten = rewriteWikiLinks(rewritten, wikiIndex);
+    let rewritten = rewriteMarkdownLinks(content, currentPath, resolveDir, ctx);
+    rewritten = rewriteWikiLinks(rewritten, wikiIndex, currentPath, resolveDir);
     rewritten = rewriteHtmlReferences(rewritten, currentPath, resolveDir, ctx);
 
     if (rewritten !== content) {
-      modifiedFiles.push({ path: file.path, newContent: rewritten });
+      modifiedFiles.push({
+        path: file.path,
+        originalContent: content,
+        newContent: rewritten,
+      });
     }
   }
 

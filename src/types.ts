@@ -173,7 +173,8 @@ export interface ImageHostingQiniuConfig {
 export interface ImageHostingCustomConfig {
   uploadUrl: string;
   method: "POST" | "PUT";
-  headers: string;
+  /** 仅用于迁移旧版明文配置；新配置使用安全存储字段。 */
+  headers?: string;
   fileFieldName: string;
   responseUrlJsonPath: string;
 }
@@ -286,6 +287,7 @@ export interface AppSettings {
   imageHostingS3SecretAccessKey?: string;
   imageHostingOssAccessKeySecret?: string;
   imageHostingQiniuSecretKey?: string;
+  imageHostingCustomHeaders?: string;
   shortcuts: ShortcutConfig;
   knowledgeBases: KnowledgeBaseMeta[];
   lastKnowledgeBasePath?: string;

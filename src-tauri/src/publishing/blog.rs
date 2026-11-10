@@ -118,7 +118,6 @@ pub(super) async fn publish_remote_simple_blog(
     publish_remote_simple_blog_via_github_api(request, &remote_repo, &repo_slug, &token).await
 }
 
-
 async fn publish_remote_simple_blog_via_github_api(
     request: &PublishSimpleBlogRequest,
     remote_repo: &str,
@@ -188,6 +187,29 @@ async fn publish_remote_simple_blog_via_github_api(
     let prepared_files = collect_simple_blog_publish_files(request, remote_repo, branch)?;
     publish_log(format!("prepared files={}", prepared_files.len()));
     let current_files = current_tree_blob_map(&current_tree);
+    let post_path = sanitize_relative_path(&request.post_relative_path)?
+        .to_string_lossy()
+        .replace('\\', "/");
+    let existing_post = if let Some(sha) = current_files.get(&post_path) {
+        let blob: GitHubBlobResponse = github_api_get(
+            &client,
+            &format!("/repos/{}/{}/git/blobs/{}", owner, repo, sha),
+        )
+        .await?;
+        if blob.encoding != "base64" {
+            return Err("Unsupported remote post encoding. Existing article was preserved.".into());
+        }
+        let content = BASE64_STANDARD
+            .decode(blob.content.replace(['\r', '\n'], ""))
+            .map_err(|_| "Could not decode the existing article. It was preserved.")?;
+        Some(
+            String::from_utf8(content)
+                .map_err(|_| "Existing article is not UTF-8. It was preserved.")?,
+        )
+    } else {
+        None
+    };
+    validate_post_ownership(request, existing_post.as_deref())?;
     publish_log(format!("current blob files={}", current_files.len()));
     publish_log("building tree entries");
     let tree_entries = build_github_tree_entries(
@@ -307,6 +329,115 @@ fn collect_simple_blog_publish_files(
     }
 
     Ok(files)
+}
+
+/** 只读取生成器使用的单行标量；不支持的旧 YAML 写法拒绝迁移，不能猜测覆盖。 */
+fn frontmatter_scalar(markdown: &str, key: &str) -> Option<String> {
+    let body = markdown
+        .trim_start_matches('\u{feff}')
+        .strip_prefix("---\n")
+        .or_else(|| {
+            markdown
+                .trim_start_matches('\u{feff}')
+                .strip_prefix("---\r\n")
+        })?;
+    let mut found = None;
+    for line in body.lines() {
+        if line.trim() == "---" {
+            return found;
+        }
+        if let Some(value) = line.strip_prefix(&format!("{key}:")) {
+            if found.is_some() {
+                return None;
+            }
+            let value = value.trim();
+            let scalar = if value.starts_with('"') {
+                serde_json::from_str::<String>(value).ok()?
+            } else if value.starts_with('\'') && value.ends_with('\'') && value.len() >= 2 {
+                value[1..value.len() - 1].replace("''", "'")
+            } else {
+                if value.starts_with(['|', '>', '[', '{']) || value.contains(" #") {
+                    return None;
+                }
+                value.to_string()
+            };
+            found = Some(scalar);
+        }
+    }
+    None
+}
+
+fn validate_post_ownership(
+    request: &PublishSimpleBlogRequest,
+    existing: Option<&str>,
+) -> Result<(), String> {
+    let id = uuid::Uuid::parse_str(&request.publish_id)
+        .map_err(|_| "Publishing identity is missing. Reopen the note and publish again.")?;
+    if id.to_string() != request.publish_id.to_ascii_lowercase()
+        || frontmatter_scalar(&request.markdown_content, "mozi_blog_id").as_deref()
+            != Some(request.publish_id.as_str())
+    {
+        return Err("Publishing identity does not match the note.".into());
+    }
+    let post_path = sanitize_relative_path(&request.post_relative_path)?;
+    if post_path.parent() != Some(Path::new("posts"))
+        || post_path.extension().and_then(|value| value.to_str()) != Some("md")
+        || frontmatter_scalar(&request.markdown_content, "mozi_blog_post_path").as_deref()
+            != Some(request.post_relative_path.as_str())
+    {
+        return Err("Publishing target does not match the note.".into());
+    }
+    // 资源清理只允许触及当前身份的专属目录，不删除旧版可能被其他文章共用的资源。
+    if request.asset_directory_relative_path != format!("resource/mozi-{}", request.publish_id)
+        || request.assets.iter().any(|asset| {
+            !asset
+                .target_relative_path
+                .starts_with(&format!("{}/", request.asset_directory_relative_path))
+        })
+    {
+        return Err("Publishing resources do not belong to this note.".into());
+    }
+    let Some(existing) = existing else {
+        if request
+            .legacy_slug
+            .as_ref()
+            .is_some_and(|slug| !slug.is_empty())
+        {
+            return Err("The previously published article was not found at its saved path. Restore the original note filename before migrating its publishing identity; no remote article was changed.".into());
+        }
+        return Ok(());
+    };
+    let owner = frontmatter_scalar(existing, "mozi_blog_id");
+    if owner.is_none()
+        && existing
+            .lines()
+            .any(|line| line.starts_with("mozi_blog_id:"))
+    {
+        return Err(
+            "The remote article belongs to another note. Existing content was preserved.".into(),
+        );
+    }
+    match owner {
+        Some(owner) if owner == request.publish_id => Ok(()),
+        Some(_) => Err(
+            "The remote article belongs to another note. Existing content was preserved.".into(),
+        ),
+        None => {
+            let expected = request
+                .legacy_slug
+                .as_deref()
+                .filter(|slug| !slug.is_empty());
+            let remote = frontmatter_scalar(existing, "slug");
+            if expected
+                .zip(remote.as_deref())
+                .is_some_and(|(expected, remote)| expected.eq_ignore_ascii_case(remote))
+            {
+                Ok(())
+            } else {
+                Err("The existing article could not be safely matched to this note. Existing content was preserved.".into())
+            }
+        }
+    }
 }
 
 fn rewrite_markdown_asset_urls(
@@ -680,6 +811,66 @@ fn git_blob_sha(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    fn owned_post_request() -> PublishSimpleBlogRequest {
+        let id = "00000000-0000-4000-8000-000000000001";
+        PublishSimpleBlogRequest {
+            blog_repo_url: "https://github.com/example/blog".into(), blog_github_token: None,
+            post_relative_path: "posts/note.md".into(), asset_directory_relative_path: format!("resource/mozi-{id}"),
+            markdown_content: format!("---\nmozi_blog_id: {id}\nmozi_blog_post_path: posts/note.md\nslug: note\n---\nbody"),
+            assets: vec![], publish_id: id.into(), legacy_slug: None,
+        }
+    }
+
+    #[test]
+    fn publish_ownership_rejects_unrelated_posts_before_uploading() {
+        let request = owned_post_request();
+        assert!(validate_post_ownership(&request, None).is_ok());
+        assert!(validate_post_ownership(&request, Some(&request.markdown_content)).is_ok());
+        assert!(
+            validate_post_ownership(&request, Some("---\nslug: unrelated\n---\nprivate body"))
+                .is_err()
+        );
+        let foreign = request
+            .markdown_content
+            .replace(&request.publish_id, "00000000-0000-4000-8000-000000000002");
+        assert!(validate_post_ownership(&request, Some(&foreign)).is_err());
+    }
+
+    #[test]
+    fn legacy_post_migration_requires_a_matching_saved_slug_and_no_foreign_owner() {
+        let mut request = owned_post_request();
+        request.legacy_slug = Some("old-slug".into());
+        assert!(validate_post_ownership(&request, None).is_err());
+        assert!(
+            validate_post_ownership(&request, Some("---\nslug: old-slug\n---\nold body")).is_ok()
+        );
+        assert!(validate_post_ownership(
+            &request,
+            Some("---\nslug: another-slug\n---\nother body")
+        )
+        .is_err());
+        let foreign =
+            "---\nmozi_blog_id: 00000000-0000-4000-8000-000000000002\nslug: old-slug\n---\nbody";
+        assert!(validate_post_ownership(&request, Some(foreign)).is_err());
+        assert_eq!(
+            frontmatter_scalar("---\r\nslug: \"old-slug\"\r\n---\r\n", "slug").as_deref(),
+            Some("old-slug")
+        );
+    }
+
+    #[test]
+    fn publish_resources_cannot_clean_a_shared_legacy_or_foreign_directory() {
+        let mut request = owned_post_request();
+        request.asset_directory_relative_path = "resource/shared-legacy".into();
+        assert!(validate_post_ownership(&request, None).is_err());
+        let mut request = owned_post_request();
+        request.assets.push(PublishSimpleBlogAsset {
+            source_path: "/tmp/image.png".into(),
+            target_relative_path: "resource/other/image.png".into(),
+        });
+        assert!(validate_post_ownership(&request, None).is_err());
+    }
+
     #[test]
     fn publish_requires_github_token() {
         let request = PublishSimpleBlogRequest {
@@ -689,6 +880,8 @@ mod tests {
             asset_directory_relative_path: "resource/test-post".to_string(),
             markdown_content: "---\ntitle: test\n---\n\nbody\n".to_string(),
             assets: vec![],
+            publish_id: String::new(),
+            legacy_slug: None,
         };
 
         let error =

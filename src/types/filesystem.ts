@@ -29,6 +29,12 @@ export interface IFileSystem {
   readBinaryFile?(path: string): Promise<Uint8Array>;
   registerAllowedPath?(path: string, recursive: boolean): Promise<void>;
   writeFile(path: string, content: string): Promise<void>;
+  /** 原生写入前比对当前正文，存在并发修改时保留磁盘内容。 */
+  writeFileIfUnchanged?(
+    path: string,
+    content: string,
+    expectedContent: string,
+  ): Promise<boolean>;
   writeBinaryFile?(path: string, content: Uint8Array): Promise<void>;
   /** 直接导入 Blob，避免把整个大文件加载进 WebView。 */
   writeBlobFile?(path: string, content: Blob): Promise<void>;

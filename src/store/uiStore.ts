@@ -99,6 +99,7 @@ export interface UIActions {
   showNotification: (
     msg: string,
     type?: "success" | "error" | "info" | "warning",
+    durationMs?: number,
   ) => void;
   clearNotification: () => void;
   showUiZoomHint: (percent: number) => void;
@@ -145,7 +146,6 @@ export const defaultImageHostingConfig: ImageHostingConfig = {
   custom: {
     uploadUrl: "",
     method: "POST",
-    headers: "{}",
     fileFieldName: "file",
     responseUrlJsonPath: "data.url",
   },
@@ -384,7 +384,7 @@ export function createUISlice(
         };
       }),
 
-    showNotification: (msg, type) => {
+    showNotification: (msg, type, durationMs = 3000) => {
       if (notificationTimer) {
         clearTimeout(notificationTimer);
       }
@@ -393,7 +393,7 @@ export function createUISlice(
       notificationTimer = setTimeout(() => {
         notificationTimer = null;
         set(() => ({ notification: null }));
-      }, 3000);
+      }, durationMs);
     },
 
     clearNotification: () => {

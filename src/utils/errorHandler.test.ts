@@ -29,6 +29,7 @@ describe("reportUnhandledRuntimeError", () => {
     expect(showNotification).toHaveBeenCalledWith(
       t("zh-CN", "errorBoundary_fallbackMessage"),
       "error",
+      3000,
     );
     errorSpy.mockRestore();
   });
@@ -51,6 +52,7 @@ describe("reportUnhandledRuntimeError", () => {
         " " +
         t("zh-CN", "notifications_wechatErrorCode", { code: 40164 }),
       "error",
+      30_000,
     );
     expect(showNotification.mock.calls[0][0]).not.toBe(
       t("zh-CN", "errorBoundary_fallbackMessage"),

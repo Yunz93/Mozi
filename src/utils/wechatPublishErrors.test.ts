@@ -2,7 +2,26 @@ import { describe, expect, it } from "vitest";
 import {
   classifyWechatPublishError,
   extractWechatAllowlistIps,
+  getWechatErrorNotificationDuration,
 } from "./wechatPublishErrors";
+
+describe("WeChat notification duration", () => {
+  it("extends IP allowlist failures without extending other errors", () => {
+    expect(
+      getWechatErrorNotificationDuration(
+        "WeChat API error 40164: invalid ip 203.0.113.8, not in whitelist",
+      ),
+    ).toBe(30_000);
+    expect(
+      getWechatErrorNotificationDuration(
+        "WeChat API error 40013: invalid appid",
+      ),
+    ).toBe(3000);
+    expect(getWechatErrorNotificationDuration("Network unavailable")).toBe(
+      3000,
+    );
+  });
+});
 
 describe("classifyWechatPublishError", () => {
   it("maps missing credentials and title", () => {

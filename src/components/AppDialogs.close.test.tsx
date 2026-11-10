@@ -48,12 +48,14 @@ vi.mock("../hooks/useI18n", () => ({
   }),
 }));
 import { AppDialogs } from "./AppDialogs";
-function mount() {
+function mount(
+  notification: React.ComponentProps<typeof AppDialogs>["notification"] = null,
+) {
   const props = {
     settings: defaultSettings,
     t: (key: string) => key,
     uiScaleStyle: {},
-    notification: null,
+    notification,
   } as React.ComponentProps<typeof AppDialogs>;
   return render(<AppDialogs {...props} />);
 }
@@ -71,6 +73,13 @@ afterEach(() => {
   useAppStore.setState({ pendingCloseDespiteSaveFailure: null });
 });
 describe("application discard confirmation", () => {
+  it("allows notification text to be selected for copying an IP", () => {
+    mount({ msg: "IP 203.0.113.8", type: "error" });
+    expect(screen.getByRole("status").classList.contains("select-text")).toBe(
+      true,
+    );
+    expect(screen.getByRole("status").textContent).toBe("IP 203.0.113.8");
+  });
   it("uses the all-window backup close path after explicit confirmation", async () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "放弃并关闭" }));
