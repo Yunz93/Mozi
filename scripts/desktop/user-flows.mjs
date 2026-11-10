@@ -131,7 +131,7 @@ export async function editorFlows(context, check) {
         "Save confirmation did not appear",
       );
       const geometry = await d.execute(
-        "const status=[...document.querySelectorAll('[role=status]')].find(e=>e.textContent.trim()==='已保存'),button=document.querySelector('button[aria-label=更多操作]');const a=status.getBoundingClientRect(),b=button.getBoundingClientRect();return {overlaps:a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top,selectable:getComputedStyle(status).userSelect,withinViewport:a.left>=0&&a.right<=innerWidth&&a.top>=0&&a.bottom<=innerHeight}",
+        "const status=[...document.querySelectorAll('[role=status]')].find(e=>e.textContent.trim()==='已保存'),button=document.querySelector('button[aria-label=更多操作]');const a=status.getBoundingClientRect(),b=button.getBoundingClientRect(),style=getComputedStyle(status);return {overlaps:a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top,selectable:style.getPropertyValue('user-select')||style.getPropertyValue('-webkit-user-select'),withinViewport:a.left>=0&&a.right<=innerWidth&&a.top>=0&&a.bottom<=innerHeight}",
       );
       assert.equal(geometry.overlaps, false);
       assert.equal(geometry.selectable, "text");
