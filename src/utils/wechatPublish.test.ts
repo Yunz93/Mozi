@@ -159,6 +159,112 @@ describe("stripLeadingWechatTitleHeading", () => {
 });
 
 describe("prepareWechatDraftPublish", () => {
+  const prepareLinks = (markdownContent: string) =>
+    prepareWechatDraftPublish({
+      files: [],
+      currentFilePath: "/notes/link-post.md",
+      markdownContent,
+      settings: {
+        previewFontFamily: "Arial",
+        codeFontFamily: "Menlo",
+        fontSize: 16,
+        markdownStylePreset: "nord",
+      },
+    });
+
+  it.each([
+    "[文字](https://example.com)",
+    '<a href="https://example.com">文字</a>',
+  ])(
+    "keeps a copyable URL outside the external anchor: %s",
+    async (markdown) => {
+      const prepared = await prepareLinks(markdown);
+      for (const html of [prepared.contentHtml, prepared.previewHtml]) {
+        const host = document.createElement("div");
+        host.innerHTML = html;
+        const anchor = host.querySelector("a")!;
+        expect(anchor.getAttribute("href")).toBe("https://example.com");
+        expect(anchor.textContent).toBe("文字");
+        expect(anchor.nextSibling?.nodeType).toBe(Node.TEXT_NODE);
+        expect(anchor.nextSibling?.textContent).toBe("（https://example.com）");
+        expect(host.textContent?.trim()).toBe("文字（https://example.com）");
+      }
+    },
+  );
+
+  it("escapes URL query parameters as text in content and preview", async () => {
+    const href = "https://example.com/path?a=1&next=%3Ctag%3E";
+    const prepared = await prepareLinks(`[查询](${href})`);
+    for (const html of [prepared.contentHtml, prepared.previewHtml]) {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      expect(host.querySelector("a")?.getAttribute("href")).toBe(href);
+      expect(host.textContent?.trim()).toBe(`查询（${href}）`);
+      expect(html).toContain("&amp;next=");
+      expect(host.querySelector("tag")).toBeNull();
+    }
+  });
+
+  it.each([
+    "https://example.com",
+    "[https://example.com](https://example.com/)",
+    '<a href="https://example.com/">https://EXAMPLE.com</a>',
+  ])(
+    "does not repeat an address already used as link text: %s",
+    async (markdown) => {
+      const prepared = await prepareLinks(markdown);
+      for (const html of [prepared.contentHtml, prepared.previewHtml]) {
+        const host = document.createElement("div");
+        host.innerHTML = html;
+        expect(host.querySelectorAll("a")).toHaveLength(1);
+        expect(host.textContent).not.toContain("（");
+      }
+    },
+  );
+
+  it("does not repeat an existing copyable suffix after an HTML link", async () => {
+    const prepared = await prepareLinks(
+      '<a href="https://example.com">文字</a>（https://example.com）',
+    );
+    for (const html of [prepared.contentHtml, prepared.previewHtml]) {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      expect(host.textContent?.trim()).toBe("文字（https://example.com）");
+    }
+  });
+
+  it("keeps WeChat article links unchanged", async () => {
+    const prepared = await prepareLinks(
+      "[公众号文章](https://mp.weixin.qq.com/s/article)",
+    );
+    for (const html of [prepared.contentHtml, prepared.previewHtml]) {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      const anchor = host.querySelector("a")!;
+      expect(anchor.getAttribute("href")).toBe(
+        "https://mp.weixin.qq.com/s/article",
+      );
+      expect(anchor.getAttribute("tab")).toBe("innerlink");
+      expect(host.textContent?.trim()).toBe("公众号文章");
+    }
+  });
+
+  it("does not add addresses to local, wiki, fragment, or unsafe links", async () => {
+    const prepared = await prepareLinks(
+      '[本地](note.md)\n\n[[笔记]]\n\n[片段](#section)\n\n<a href="javascript:alert(1)">危险</a>\n\n<a href="mailto:test@example.com">邮箱</a>',
+    );
+    for (const html of [prepared.contentHtml, prepared.previewHtml]) {
+      const host = document.createElement("div");
+      host.innerHTML = html;
+      expect(host.textContent).toContain("本地");
+      expect(host.textContent).toContain("笔记");
+      expect(host.textContent).toContain("片段");
+      expect(host.textContent).toContain("危险");
+      expect(host.textContent).not.toContain("（");
+      expect(html).not.toContain("javascript:");
+    }
+  });
+
   it("applies the selected markdown style preset to the prepared HTML", async () => {
     const prepared = await prepareWechatDraftPublish({
       files: [],

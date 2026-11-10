@@ -1206,6 +1206,10 @@ export default {
     "Timed out waiting for the publish result: it may still have succeeded remotely. Verify the remote state before retrying; local state was not rolled back.",
   notifications_blogLegacyTargetMissing:
     "The original published article could not be confirmed, so publishing stopped without changing remote content. The note may have been renamed or moved. Restore its original filename and update it successfully once to establish the link; you can then rename it again.",
+  notifications_blogLocalAssociationUnverified:
+    "The publishing association could not be verified. The existing article was preserved. Check that notes in this vault are readable and their frontmatter is complete, then retry.",
+  notifications_blogLocalAssociationConflict:
+    "Another note shares this publishing association. The existing article was preserved. To publish a copy, remove its mozi_blog_*, is_publish and link frontmatter fields, then retry.",
   notifications_blogOwnershipConflict:
     "The target article belongs to another note. Publishing stopped and remote content was preserved. Update it from the original note, or create a new note and copy only the body to publish a separate article.",
   notifications_blogSourceMismatch:

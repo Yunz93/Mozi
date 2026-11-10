@@ -1,10 +1,11 @@
+import yaml from "js-yaml";
 import {
   createAttachmentResolverContext,
   resolveAttachmentTarget,
 } from "./attachmentResolver";
 import { generateFrontmatter, parseFrontmatter } from "./frontmatter";
 import { normalizeMarkdownStylePreset } from "./markdownStyle";
-import { normalizeBlogSiteUrl } from "./blogRepo";
+import { normalizeBlogRepoUrl, normalizeBlogSiteUrl } from "./blogRepo";
 import { createHeadingSlug } from "./outline";
 import { parseWikiLinkReference, resolveWikiLinkFile } from "./wikiLinks";
 import { getFileSystem } from "../types/filesystem";
@@ -55,6 +56,99 @@ interface PrepareSimpleBlogPublishOptions {
 
 const PUBLISH_ID_PATTERN = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
 
+function sameBlogRepository(left: unknown, right: string): boolean {
+  if (typeof left !== "string") return false;
+  const identity = (value: string) =>
+    normalizeBlogRepoUrl(value)
+      .replace(/^(?:https:\/\/github\.com\/|git@github\.com:)/, "")
+      .replace(/\.git$/, "")
+      .toLowerCase();
+  const leftIdentity = identity(left);
+  return !!leftIdentity && leftIdentity === identity(right);
+}
+
+export const SIMPLE_BLOG_PUBLISH_SOURCE_ERROR =
+  "The publishing association could not be verified. Check that notes in this vault are readable and have complete frontmatter.";
+
+export const SIMPLE_BLOG_PUBLISH_DUPLICATE_SOURCE_ERROR =
+  "Another note shares this publishing association. Remove the copy's publishing fields before publishing it as a new article.";
+
+/** 每次仅检查候选 Markdown 的有界文件头，拒绝副本接管远端原文。 */
+export async function validateSimpleBlogPublishSource(
+  markdownContent: string,
+  currentFilePath: string,
+  files: FileNode[],
+  readHeader: (path: string) => Promise<string>,
+  repository: string,
+  blogSiteUrl: string,
+): Promise<string> {
+  const { frontmatter } = parseFrontmatter(markdownContent);
+  const previous = frontmatter ?? {};
+  const id = String(previous.mozi_blog_id ?? "");
+  const hasBinding =
+    PUBLISH_ID_PATTERN.test(id) &&
+    sameBlogRepository(previous.mozi_blog_repository, repository);
+  const legacyLink =
+    !id &&
+    previous.is_publish === true &&
+    typeof previous.link === "string" &&
+    previous.link.startsWith(`${normalizeBlogSiteUrl(blogSiteUrl)}/posts/`)
+      ? previous.link.replace(/\/+$/, "")
+      : "";
+  if (!hasBinding && !legacyLink) return markdownContent;
+  const normalizePath = (path: string) =>
+    path.replace(/\\/g, "/").normalize("NFC");
+  const currentPath = normalizePath(currentFilePath);
+  const candidates: string[] = [];
+  const visit = (nodes: FileNode[]) => {
+    for (const node of nodes) {
+      if (node.isTrash) continue;
+      if (node.type === "folder") visit(node.children ?? []);
+      else if (
+        isMarkdownFilePath(node.path) &&
+        normalizePath(node.path) !== currentPath
+      )
+        candidates.push(node.path);
+    }
+  };
+  visit(files);
+  for (const path of new Set(candidates)) {
+    let header: string;
+    try {
+      header = (await readHeader(path)).replace(/^\uFEFF/, "");
+    } catch {
+      throw new Error(SIMPLE_BLOG_PUBLISH_SOURCE_ERROR);
+    }
+    // 有界前缀的末行可能被截断，不能把恰好停在 --- 的半行当作闭合。
+    if (header.length >= 65536)
+      header = header.slice(0, header.lastIndexOf("\n") + 1);
+    if (!/^---\r?\n/.test(header)) continue;
+    const metadata = header.match(/^---\r?\n([\s\S]*?)^---(?:\r?\n|$)/m);
+    if (!metadata) throw new Error(SIMPLE_BLOG_PUBLISH_SOURCE_ERROR);
+    let parsed: unknown;
+    try {
+      parsed = yaml.load(metadata[1]);
+    } catch {
+      throw new Error(SIMPLE_BLOG_PUBLISH_SOURCE_ERROR);
+    }
+    // 空元数据或标量不可能声明发布身份，不能阻止其他文章发布。
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      continue;
+    const candidate = parsed as Record<string, unknown>;
+    if (
+      (hasBinding &&
+        candidate.mozi_blog_id === id &&
+        sameBlogRepository(candidate.mozi_blog_repository, repository)) ||
+      (legacyLink &&
+        candidate.is_publish === true &&
+        typeof candidate.link === "string" &&
+        candidate.link.replace(/\/+$/, "") === legacyLink)
+    )
+      throw new Error(SIMPLE_BLOG_PUBLISH_DUPLICATE_SOURCE_ERROR);
+  }
+  return markdownContent;
+}
+
 /** 将远端归属保存到笔记，改名或重试不再根据同名文件猜测覆盖目标。 */
 export function ensureSimpleBlogPublishBinding(
   markdownContent: string,
@@ -70,7 +164,7 @@ export function ensureSimpleBlogPublishBinding(
   const legacyTarget = buildSimpleBlogPostRelativePath(currentFilePath);
   if (
     PUBLISH_ID_PATTERN.test(previousId) &&
-    (!repository || previousRepository === repository) &&
+    (!repository || sameBlogRepository(previousRepository, repository)) &&
     /^posts\/[^/\\]+\.md$/.test(target)
   ) {
     // 旧文首次迁移成功前仍以原文件名定位；目标缺失时可恢复原名重试，不能另建重复文章。

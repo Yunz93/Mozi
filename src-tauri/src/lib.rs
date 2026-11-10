@@ -928,6 +928,7 @@ pub fn run() {
             install_macos_update,
             discard_macos_update,
             write_text_file_atomic,
+            read_file_prefix,
             ask_history::merge_ask_vault_history,
             force_close_window,
             force_exit_app,
@@ -1243,6 +1244,79 @@ async fn write_text_file_atomic(
     .map_err(|error| format!("Failed to join atomic write task: {}", error))?
 }
 
+/// 固定大小的只读元数据探测，避免迁移发布归属时读入整篇大笔记。
+fn read_file_prefix_at(path: &str, security_state: &SecurityState) -> Result<String, String> {
+    use std::io::Read;
+    const PREFIX_LIMIT: usize = 64 * 1024;
+    let canonical = canonicalize_existing_path(path)?;
+    ensure_path_allowed(security_state, &canonical)?;
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        // 替换成符号链接或 FIFO 时不能越权读取或阻塞工作线程。
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let file = options
+        .open(&canonical)
+        .map_err(|error| format!("Failed to open note header: {error}"))?;
+    if !file
+        .metadata()
+        .map_err(|error| format!("Failed to inspect note header: {error}"))?
+        .is_file()
+    {
+        return Err("Note header must be a regular file".to_string());
+    }
+    let mut bytes = Vec::new();
+    file.take(PREFIX_LIMIT as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("Failed to read note header: {error}"))?;
+    if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
+        return Err("Note header encoding must be UTF-8".to_string());
+    }
+    if bytes.len() == PREFIX_LIMIT {
+        // 不完整末行可能恰好停在 YAML 闭合符或多字节字符中间，整行丢弃再交给解析器。
+        let complete_line_end = bytes
+            .iter()
+            .rposition(|byte| *byte == b'\n')
+            .map(|index| index + 1)
+            .unwrap_or(0);
+        bytes.truncate(complete_line_end);
+    }
+    let header_start = if bytes.starts_with(&[0xef, 0xbb, 0xbf]) {
+        3
+    } else {
+        0
+    };
+    let header = &bytes[header_start..];
+    // 没有 YAML 开头的正文不包含发布归属，无需按 UTF-8 解码 GBK 或其他二进制正文。
+    if !header.starts_with(b"---\n") && !header.starts_with(b"---\r\n") {
+        return Ok(String::new());
+    }
+    let mut end = 0;
+    for (index, line) in header.split_inclusive(|byte| *byte == b'\n').enumerate() {
+        end += line.len();
+        let value = line.strip_suffix(b"\n").unwrap_or(line);
+        let value = value.strip_suffix(b"\r").unwrap_or(value);
+        if index > 0 && value == b"---" {
+            // 只解码元数据，正文的编码和体积不能影响归属检查。
+            return String::from_utf8(header[..end].to_vec())
+                .map_err(|_| "Note header encoding must be UTF-8".to_string());
+        }
+    }
+    String::from_utf8(header.to_vec()).map_err(|_| "Note header encoding must be UTF-8".to_string())
+}
+
+#[tauri::command]
+async fn read_file_prefix(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        read_file_prefix_at(&path, app.state::<SecurityState>().inner())
+    })
+    .await
+    .map_err(|error| format!("Failed to join note header read: {error}"))?
+}
+
 #[tauri::command]
 fn ping() -> Result<String, String> {
     Ok("pong".to_string())
@@ -1517,6 +1591,95 @@ mod tests {
 
     static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+    #[test]
+    fn read_file_prefix_bounds_large_files_and_preserves_utf8() {
+        let root = create_test_directory("prefix-bounds");
+        let path = root.join("large.md");
+        let state = SecurityState {
+            allowed_paths: Mutex::new(vec![AllowedPathEntry {
+                path: fs::canonicalize(&root).unwrap(),
+                recursive: true,
+            }]),
+        };
+        fs::write(
+            &path,
+            format!("---\nname: test\n---\n{}中", "x".repeat(65516)),
+        )
+        .unwrap();
+        let prefix = read_file_prefix_at(path.to_str().unwrap(), &state).unwrap();
+        assert!(prefix.len() <= 65536);
+        assert!(prefix.starts_with("---\nname: test\n---\n"));
+        // 截断不能把半个多字节字符或不完整的末行作为有效元数据返回。
+        assert!(prefix.ends_with('\n'));
+        fs::write(&path, [0xff, 0xfe, 0x61, 0]).unwrap();
+        assert!(read_file_prefix_at(path.to_str().unwrap(), &state).is_err());
+        cleanup_test_directory(&root);
+    }
+
+    #[test]
+    fn read_file_prefix_ignores_non_utf8_body_but_keeps_metadata_strict() {
+        let root = create_test_directory("prefix-body-encoding");
+        let path = root.join("note.md");
+        let state = SecurityState {
+            allowed_paths: Mutex::new(vec![AllowedPathEntry {
+                path: fs::canonicalize(&root).unwrap(),
+                recursive: true,
+            }]),
+        };
+        fs::write(&path, [0xc4, 0xe3, 0xba, 0xc3]).unwrap();
+        assert_eq!(
+            read_file_prefix_at(path.to_str().unwrap(), &state).unwrap(),
+            ""
+        );
+        let header = b"---\nmozi_blog_id: original\n---\n";
+        fs::write(
+            &path,
+            [header.as_slice(), &[0xc4, 0xe3, 0xba, 0xc3]].concat(),
+        )
+        .unwrap();
+        assert_eq!(
+            read_file_prefix_at(path.to_str().unwrap(), &state).unwrap(),
+            String::from_utf8(header.to_vec()).unwrap()
+        );
+        fs::write(
+            &path,
+            [b"---\nname: ".as_slice(), &[0xff], b"\n---\n"].concat(),
+        )
+        .unwrap();
+        assert!(read_file_prefix_at(path.to_str().unwrap(), &state).is_err());
+        cleanup_test_directory(&root);
+    }
+
+    #[test]
+    fn read_file_prefix_rejects_unauthorized_paths_and_nonfiles() {
+        let root = create_test_directory("prefix-scope");
+        let vault = root.join("vault");
+        fs::create_dir(&vault).unwrap();
+        let outside = root.join("outside.md");
+        fs::write(&outside, "secret").unwrap();
+        let state = SecurityState {
+            allowed_paths: Mutex::new(vec![AllowedPathEntry {
+                path: fs::canonicalize(&vault).unwrap(),
+                recursive: true,
+            }]),
+        };
+        assert!(read_file_prefix_at(outside.to_str().unwrap(), &state).is_err());
+        assert!(read_file_prefix_at(vault.to_str().unwrap(), &state).is_err());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let link = vault.join("outside.md");
+            symlink(&outside, &link).unwrap();
+            assert!(read_file_prefix_at(link.to_str().unwrap(), &state).is_err());
+            use std::ffi::CString;
+            use std::os::unix::ffi::OsStrExt;
+            let fifo = vault.join("pipe.md");
+            let name = CString::new(fifo.as_os_str().as_bytes()).unwrap();
+            assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+            assert!(read_file_prefix_at(fifo.to_str().unwrap(), &state).is_err());
+        }
+        cleanup_test_directory(&root);
+    }
     #[test]
     fn delete_path_regular_entries_keeps_the_authorized_boundary() {
         let temp_dir = create_test_directory("delete-regular");

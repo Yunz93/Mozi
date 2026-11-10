@@ -3,6 +3,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore, defaultSettings } from "../store/appStore";
 import { usePublishActions } from "./usePublishActions";
+import { ensureSimpleBlogPublishBinding } from "../utils/simpleBlogPublish";
 import { writeDocumentFile } from "../services/filesystem/documentWriteQueue";
 import { registerActiveEditorFlush } from "../utils/editorSelectionBridge";
 
@@ -46,7 +47,7 @@ function setup() {
     }
     return true;
   });
-  return renderHook(() => usePublishActions(forceSave));
+  return { ...renderHook(() => usePublishActions(forceSave)), forceSave };
 }
 
 describe("发布完成后的正文回写", () => {
@@ -77,6 +78,100 @@ describe("发布完成后的正文回写", () => {
   afterEach(() => {
     cleanup();
     registerActiveEditorFlush(null);
+  });
+
+  it.each(["uuid", "legacy"])(
+    "副本%s关联冲突时不保存、不调用远端发布",
+    async (kind) => {
+      const original = "/vault/original.md";
+      const content =
+        kind === "uuid"
+          ? ensureSimpleBlogPublishBinding(
+              "# Original",
+              original,
+              "https://github.com/example/blog",
+              "https://example.com",
+            )
+          : "---\nis_publish: true\nslug: original\nlink: https://example.com/posts/original/\n---\n# Original";
+      disk = content;
+      useAppStore.setState({
+        files: [
+          { id: path, name: "note.md", path, type: "file" },
+          { id: original, name: "original.md", path: original, type: "file" },
+        ],
+        fileContents: { [path]: content, [original]: content },
+        lastSavedContent: { [path]: content },
+      });
+      invoke.mockImplementation(async (command) =>
+        command === "read_file_prefix" ? content : {},
+      );
+      const timer = vi.spyOn(globalThis, "setTimeout");
+      const { result, forceSave } = setup();
+      let published: boolean | undefined;
+      await act(async () => {
+        published = await result.current.handlePublishSimpleBlog(input);
+      });
+      expect(published).toBe(false);
+      expect(
+        invoke.mock.calls.some(
+          ([command]) => command === "publish_simple_blog",
+        ),
+      ).toBe(false);
+      expect(forceSave).not.toHaveBeenCalled();
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(timer).toHaveBeenCalledWith(expect.any(Function), 15000);
+      timer.mockRestore();
+      expect(disk).toBe(content);
+    },
+  );
+
+  it("归属检查读取期间发生输入时不保存旧快照", async () => {
+    const content = ensureSimpleBlogPublishBinding(
+      "# Original",
+      path,
+      "https://github.com/example/blog",
+      "https://example.com",
+    );
+    disk = content;
+    const blocked = deferred();
+    invoke.mockImplementation(async (command) => {
+      if (command === "read_file_prefix") {
+        await blocked.promise;
+        return "# Unrelated";
+      }
+      return {};
+    });
+    const other = "/vault/other.md";
+    useAppStore.setState({
+      files: [
+        { id: path, name: "note.md", path, type: "file" },
+        { id: other, name: "other.md", path: other, type: "file" },
+      ],
+      fileContents: { [path]: content },
+      lastSavedContent: { [path]: content },
+    });
+    const { result, forceSave } = setup();
+    let publishing!: Promise<boolean>;
+    act(() => {
+      publishing = result.current.handlePublishSimpleBlog(input);
+    });
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("read_file_prefix", { path: other }),
+    );
+    act(() =>
+      useAppStore.getState().updateTabContent(path, content + "\nNew typing"),
+    );
+    let published: boolean | undefined;
+    await act(async () => {
+      blocked.resolve();
+      published = await publishing;
+    });
+    expect(published).toBe(false);
+    expect(forceSave).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(useAppStore.getState().fileContents[path]).toBe(
+      content + "\nNew typing",
+    );
   });
 
   it("回写与手动保存共用队列，保留写入期间的新输入", async () => {

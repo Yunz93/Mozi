@@ -223,3 +223,19 @@ describe("博客归属错误提示", () => {
     }
   });
 });
+
+it("localizes unverifiable local publishing association with recovery guidance", () => {
+  const raw =
+    "The publishing association could not be verified. Check that notes in this vault are readable and have complete frontmatter.";
+  expect(localizeKnownError("zh-CN", raw)).toContain("同库笔记");
+  expect(localizeKnownError("zh-CN", raw)).toContain("完整");
+  expect(localizeKnownError("en", raw)).toContain("readable");
+});
+
+it("distinguishes a duplicate publishing association from unreadable notes", () => {
+  const duplicate =
+    "Another note shares this publishing association. Remove the copy's publishing fields before publishing it as a new article.";
+  expect(localizeKnownError("zh-CN", duplicate)).toContain("副本");
+  expect(localizeKnownError("zh-CN", duplicate)).toContain("mozi_blog_*");
+  expect(localizeKnownError("en", duplicate)).toContain("frontmatter fields");
+});

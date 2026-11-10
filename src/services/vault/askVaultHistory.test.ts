@@ -115,13 +115,61 @@ describe("小知助手 history persistence", () => {
   it("keeps a webview localStorage copy so closing the panel cannot drop Q&A", async () => {
     const item = historyItem({ id: "local-1" });
     await appendAskVaultHistory("/notes", item);
-    const vaultId = await hashVaultId("/notes");
-    const stored = JSON.parse(
-      localStorage.getItem(askVaultHistoryLocalStorageKey(vaultId)) ?? "[]",
-    ) as { version: number; vaultRoot: string; items: AskVaultHistoryItem[] };
-    expect(stored.version).toBe(2);
+    const stored = Object.values(localStorage)
+      .map((raw) => JSON.parse(raw))
+      .find((value) => value.version === 3 && value.item?.id === item.id);
+    expect(stored.version).toBe(3);
     expect(stored.vaultRoot).toBe("/notes");
-    expect(stored.items[0]?.question).toBe(item.question);
+    expect(stored.item.question).toBe(item.question);
+  });
+
+  it("兼容有库归属的v2恢复快照，迁移后保留原件", async () => {
+    const root = "/history-v2-local";
+    const item = historyItem({ id: "v2-owned" });
+    const key = askVaultHistoryLocalStorageKey(await hashVaultId(root));
+    const raw = JSON.stringify({ version: 2, vaultRoot: root, items: [item] });
+    localStorage.setItem(key, raw);
+    await expect(loadAskVaultHistory(root)).resolves.toEqual([item]);
+    expect(localStorage.getItem(key)).toBe(raw);
+    expect(await readIndexJson(root, ASK_HISTORY_FILE, "ask-history")).toEqual({
+      version: 2,
+      vaultRoot: root,
+      items: [item],
+    });
+  });
+
+  it("空v2本地快照阻止旧历史复活，且保留无法归属的v3原件", async () => {
+    const root = "/history-empty-local";
+    const vaultId = await hashVaultId(root);
+    const legacyKey = `markdown-press.ask-history.${await hashLegacyVaultId(root)}`;
+    const item = historyItem({ id: "wrong-vault" });
+    item.answer.citations = [
+      {
+        index: 1,
+        path: `${root}/a.md`,
+        relPath: "a.md",
+        titlePath: [],
+        snippet: "",
+        startLine: 1,
+        endLine: 1,
+        headingAnchor: null,
+      },
+    ];
+    localStorage.setItem(legacyKey, JSON.stringify([item]));
+    localStorage.setItem(
+      askVaultHistoryLocalStorageKey(vaultId),
+      JSON.stringify({ version: 2, vaultRoot: root, items: [] }),
+    );
+    const unknownKey = `markdown-press.ask-history-record.v3.${vaultId}.unknown`;
+    const unknownRaw = JSON.stringify({
+      version: 3,
+      vaultRoot: root.toUpperCase(),
+      item,
+    });
+    localStorage.setItem(unknownKey, unknownRaw);
+    await expect(loadAskVaultHistory(root)).resolves.toEqual([]);
+    expect(localStorage.getItem(unknownKey)).toBe(unknownRaw);
+    expect(localStorage.getItem(legacyKey)).not.toBeNull();
   });
 
   it("只迁移引用能确定归属的旧历史，保留原始数组", async () => {

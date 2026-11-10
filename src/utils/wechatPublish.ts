@@ -202,6 +202,14 @@ function resolveWechatLinkTab(value: string): "innerlink" | "outerlink" {
   }
 }
 
+function linkTextShowsUrl(text: string, href: string): boolean {
+  try {
+    return new URL(text).href === new URL(href).href;
+  } catch {
+    return false;
+  }
+}
+
 function isImagePath(value: string): boolean {
   return IMAGE_FILE_PATTERN.test(value);
 }
@@ -329,13 +337,29 @@ function applyWechatPreviewStyles(
   host.querySelectorAll<HTMLAnchorElement>("a").forEach((link) => {
     const href = link.getAttribute("href")?.trim() || "";
     if (isWechatPublishableHref(href)) {
+      const tab = resolveWechatLinkTab(href);
       link.setAttribute("target", "_blank");
       link.setAttribute("data-linktype", "2");
       link.setAttribute("linktype", "text");
-      link.setAttribute("tab", resolveWechatLinkTab(href));
+      link.setAttribute("tab", tab);
       const textValue = link.textContent?.trim();
       if (textValue) {
         link.setAttribute("textvalue", textValue);
+      }
+      if (tab === "outerlink" && !linkTextShowsUrl(textValue ?? "", href)) {
+        const address = `（${href}）`;
+        let followingText = "";
+        for (
+          let sibling = link.nextSibling;
+          sibling && followingText.trimStart().length < address.length;
+          sibling = sibling.nextSibling
+        ) {
+          followingText += sibling.textContent ?? "";
+        }
+        // 地址放在链接标签之外，微信移除超链接后仍可选中复制；不重复已有后缀。
+        if (!followingText.trimStart().startsWith(address)) {
+          link.after(host.ownerDocument.createTextNode(address));
+        }
       }
     }
 

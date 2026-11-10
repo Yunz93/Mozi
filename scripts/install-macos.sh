@@ -31,9 +31,42 @@ require_command hdiutil
 require_command ditto
 require_command xattr
 require_command plutil
+require_command stat
+
+install_directory_identity() {
+  [[ -d "$1" && ! -L "$1" ]] || return 1
+  stat -f '%d:%i' "$1"
+}
+
+restore_install_backup() {
+  local identity restored_identity
+  [[ -n "${INSTALL_BACKUP_PATH:-}" && -d "$INSTALL_BACKUP_PATH" ]] || return 0
+  # 不向已出现的目录移动备份，macOS mv 会将其嵌入而非交换。
+  if [[ -e "$INSTALL_TARGET_PATH" || -L "$INSTALL_TARGET_PATH" ]]; then
+    warn "安装目标已被其他操作占用，原应用保留在 ${INSTALL_BACKUP_PATH}，请手动恢复。"
+    return 1
+  fi
+  identity="$(install_directory_identity "$INSTALL_BACKUP_PATH")" || return 1
+  if mv "$INSTALL_BACKUP_PATH" "$INSTALL_TARGET_PATH"; then
+    restored_identity="$(install_directory_identity "$INSTALL_TARGET_PATH")" || restored_identity=""
+    if [[ "$restored_identity" == "$identity" ]]; then return 0; fi
+    # 即使检查后才出现竞争，也保留并准确指出被 mv 嵌入的旧应用。
+    if [[ "$(install_directory_identity "$INSTALL_TARGET_PATH/previous.app" 2>/dev/null || true)" == "$identity" ]]; then
+      INSTALL_BACKUP_PATH="$INSTALL_TARGET_PATH/previous.app"
+    fi
+  fi
+  warn "恢复旧应用失败，原应用保留在 ${INSTALL_BACKUP_PATH}，请手动恢复。"
+  return 1
+}
 
 install_app_bundle() {
-  local source="$1" target="$2" staging candidate backup bundle_id
+  local source="$1" target="$2" staging candidate backup bundle_id candidate_identity installed_identity
+  # 同一目标的安装串行化；只有成功取得锁的进程才能在退出时释放它。
+  if ! mkdir "${target}.mozi-install-lock"; then
+    warn "已有安装操作或未清理的安装锁：${target}.mozi-install-lock，请确认其他安装已结束后重试。"
+    return 1
+  fi
+  INSTALL_LOCK_DIR="${target}.mozi-install-lock"
   staging="$(mktemp -d "$(dirname "$target")/.mozi-install.XXXXXX")" || return 1
   candidate="${staging}/new.app"
   backup="${staging}/previous.app"
@@ -52,22 +85,25 @@ install_app_bundle() {
     rm -rf "$staging"
     return 1
   fi
+  candidate_identity="$(install_directory_identity "$candidate")" || return 1
   if [[ -e "$target" || -L "$target" ]]; then
     if [[ ! -d "$target" || -L "$target" ]] || ! mv "$target" "$backup"; then
       rm -rf "$staging"
       return 1
     fi
   fi
-  if ! mv "$candidate" "$target"; then
-    if [[ -d "$backup" ]] && ! mv "$backup" "$target"; then
-      warn "恢复旧应用失败，原应用仍保留在 ${backup}，请手动移回 ${target}。"
-      return 1
+  if mv "$candidate" "$target"; then
+    installed_identity="$(install_directory_identity "$target")" || installed_identity=""
+    if [[ "$installed_identity" == "$candidate_identity" ]]; then
+      # 新应用已完整换入后才清理旧应用，不触及偏好、知识库或其他用户数据。
+      rm -rf "$staging"
+      return 0
     fi
-    rm -rf "$staging"
-    return 1
+    warn "安装目标在交换时被其他操作占用，未确认安装成功。"
   fi
-  # 新应用已完整换入后才清理旧应用副本，不触及偏好、知识库或其他用户数据。
+  restore_install_backup || return 1
   rm -rf "$staging"
+  return 1
 }
 
 ARCH="$(uname -m)"
@@ -80,18 +116,20 @@ esac
 TMP_DIR="$(mktemp -d)"
 MOUNT_POINT=""
 cleanup() {
-  # 中断若发生在两次重命名之间，先恢复原应用；恢复失败时保留备份供手动处理。
-  if [[ -n "${INSTALL_BACKUP_PATH:-}" && -d "${INSTALL_BACKUP_PATH}" && ! -e "${INSTALL_TARGET_PATH}" ]]; then
-    mv "${INSTALL_BACKUP_PATH}" "${INSTALL_TARGET_PATH}" || warn "原应用保留在 ${INSTALL_BACKUP_PATH}，请手动恢复。"
-  fi
-  if [[ -n "${INSTALL_STAGING_DIR:-}" && ! -d "${INSTALL_BACKUP_PATH}" ]]; then
+  # 恢复也验证目录身份，竞争时保留备份，不把嵌套移动误当作恢复成功。
+  restore_install_backup || true
+  if [[ -n "${INSTALL_STAGING_DIR:-}" && ! -d "${INSTALL_BACKUP_PATH:-}" ]]; then
     rm -rf "${INSTALL_STAGING_DIR}"
+  fi
+  if [[ -n "${INSTALL_LOCK_DIR:-}" ]]; then
+    rmdir "$INSTALL_LOCK_DIR" || warn "请检查安装锁：${INSTALL_LOCK_DIR}"
   fi
   if [[ -n "${MOUNT_POINT}" && -d "${MOUNT_POINT}" ]]; then
     hdiutil detach "${MOUNT_POINT}" -quiet || true
   fi
   rm -rf "${TMP_DIR}"
 }
+
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM

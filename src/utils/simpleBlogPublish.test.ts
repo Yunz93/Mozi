@@ -1,12 +1,47 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   applySimpleBlogPublishInput,
   extractSimpleBlogPublishDefaults,
   prepareSimpleBlogPublish,
   ensureSimpleBlogPublishBinding,
+  validateSimpleBlogPublishSource,
 } from "./simpleBlogPublish";
 
 describe("Simple Blog 发布归属", () => {
+  it.each([
+    ["https://github.com/example/blog", "git@github.com:example/blog.git"],
+    ["git@github.com:Example/Blog.git", "https://github.com/example/blog"],
+    ["example/blog", "https://github.com/EXAMPLE/BLOG"],
+    ["github.com/example/blog", "git@github.com:EXAMPLE/BLOG.git"],
+  ])(
+    "同一仓库从 %s 改为 %s 后重发仍保留身份和远端路径",
+    async (savedRepo, nextRepo) => {
+      const path = "/vault/Note.md";
+      const bound = ensureSimpleBlogPublishBinding(
+        "---\nslug: existing-article\n---\n# Note",
+        path,
+        savedRepo,
+      );
+      const first = await prepareSimpleBlogPublish({
+        files: [],
+        currentFilePath: path,
+        markdownContent: bound,
+      });
+      const rebound = ensureSimpleBlogPublishBinding(bound, path, nextRepo);
+      const second = await prepareSimpleBlogPublish({
+        files: [],
+        currentFilePath: path,
+        markdownContent: rebound,
+      });
+      expect(second.publishId).toBe(first.publishId);
+      expect(second.postRelativePath).toBe(first.postRelativePath);
+      expect(second.assetDirectoryRelativePath).toBe(
+        first.assetDirectoryRelativePath,
+      );
+      expect(rebound).toBe(bound);
+    },
+  );
+
   it("不同目录同名新笔记使用不同远端正文和资源路径", async () => {
     const first = await prepareSimpleBlogPublish({
       files: [],
@@ -250,5 +285,206 @@ body`,
     expect(next).toContain("- a");
     expect(next).toContain("- b");
     expect(next).not.toContain("slug:");
+  });
+});
+
+describe("发布身份的本地副本保护", () => {
+  const repo = "https://github.com/example/blog";
+  const site = "https://example.com";
+  const note = (path: string) => ({
+    id: path,
+    name: path.split("/").at(-1)!,
+    path,
+    type: "file" as const,
+  });
+  const bound = () =>
+    ensureSimpleBlogPublishBinding(
+      "# Original",
+      "/vault/Original.md",
+      repo,
+      site,
+    );
+  it.each([
+    ["git@github.com:example/blog.git", repo],
+    ["example/blog", repo],
+    [repo, "git@github.com:EXAMPLE/BLOG.git"],
+    [repo, "github.com/Example/Blog"],
+  ])(
+    "当前仓库 %s 与候选绑定 %s 为同一仓库时仍拒绝副本",
+    async (currentRepo, candidateRepo) => {
+      const content = bound();
+      const candidate = content.replace(repo, candidateRepo);
+      await expect(
+        validateSimpleBlogPublishSource(
+          content,
+          "/vault/Copy.md",
+          [note("/vault/Original.md"), note("/vault/Copy.md")],
+          async () => candidate,
+          currentRepo,
+          site,
+        ),
+      ).rejects.toThrow("publishing association");
+    },
+  );
+  it("真正切换到其他仓库时不把原仓库的副本当作关联冲突", async () => {
+    const content = bound();
+    const read = vi.fn(async () => content);
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Copy.md",
+        [note("/vault/Original.md")],
+        read,
+        "git@github.com:example/other.git",
+        site,
+      ),
+    ).resolves.toBe(content);
+    expect(read).not.toHaveBeenCalled();
+  });
+  it("复制已发布笔记后不能接管仍存在的原文", async () => {
+    const content = bound();
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Copy.md",
+        [note("/vault/Original.md"), note("/vault/Copy.md")],
+        async () => content,
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
+  });
+  it("原文已改名但尚未重发，副本仍不能借旧来源路径绕过检查", async () => {
+    const content = bound();
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Copy.md",
+        [note("/vault/Renamed.md"), note("/vault/Copy.md")],
+        async () => content,
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
+  });
+  it("真正移动改名保留归属，正常更新只读取候选头而不读完整正文", async () => {
+    const content = bound();
+    const read = vi.fn(async () => "# Unrelated");
+    const moved = await validateSimpleBlogPublishSource(
+      content,
+      "/vault/Moved.md",
+      [note("/vault/Moved.md"), note("/vault/Other.md")],
+      read,
+      repo,
+      site,
+    );
+    expect(moved).toBe(content);
+    expect(read).toHaveBeenCalledExactlyOnceWith("/vault/Other.md");
+    read.mockClear();
+    expect(
+      await validateSimpleBlogPublishSource(
+        moved,
+        "/vault/Moved.md",
+        [note("/vault/Other.md")],
+        read,
+        repo,
+        site,
+      ),
+    ).toBe(moved);
+    expect(read).toHaveBeenCalledExactlyOnceWith("/vault/Other.md");
+  });
+  it("原文移动后副本回填旧路径仍不能覆盖原文", async () => {
+    const content = bound();
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Original.md",
+        [note("/vault/Original.md"), note("/vault/Moved.md")],
+        async () => content,
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
+  });
+  it("不相关的空元数据或标量不阻止发布，损坏的元数据仍拒绝猜测", async () => {
+    const content = bound();
+    const files = [note("/vault/Other.md")];
+    for (const header of [
+      "---\n---\n",
+      "---\nnull\n---\n",
+      "---\nhello\n---\n",
+      "---\n- item\n---\n",
+    ]) {
+      expect(
+        await validateSimpleBlogPublishSource(
+          content,
+          "/vault/Original.md",
+          files,
+          async () => header,
+          repo,
+          site,
+        ),
+      ).toBe(content);
+    }
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Original.md",
+        files,
+        async () => "---\nvalue: [\n---\n",
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
+  });
+  it("无UUID的旧版已发布笔记也拒绝重复迁移声明", async () => {
+    const content =
+      "---\nis_publish: true\nslug: original\nlink: https://example.com/posts/original/\n---\n# Legacy";
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/copy/Original.md",
+        [note("/vault/Original.md")],
+        async () => content,
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
+  });
+  it("缺失来源标记的旧UUID绑定会先检查副本，读取失败或头未闭合时拒绝猜测", async () => {
+    const content = bound();
+    const files = [note("/vault/Other.md")];
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Original.md",
+        files,
+        async () => content,
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Original.md",
+        files,
+        async () => "---\n" + "x".repeat(65536),
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
+    await expect(
+      validateSimpleBlogPublishSource(
+        content,
+        "/vault/Original.md",
+        files,
+        async () => {
+          throw new Error("denied");
+        },
+        repo,
+        site,
+      ),
+    ).rejects.toThrow("publishing association");
   });
 });

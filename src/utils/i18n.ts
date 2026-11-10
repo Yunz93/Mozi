@@ -39,6 +39,10 @@ export function t(
 }
 
 const knownErrorMessages: Record<string, TranslationKey> = {
+  "Another note shares this publishing association. Remove the copy's publishing fields before publishing it as a new article.":
+    "notifications_blogLocalAssociationConflict",
+  "The publishing association could not be verified. Check that notes in this vault are readable and have complete frontmatter.":
+    "notifications_blogLocalAssociationUnverified",
   "Publishing identity is missing. Reopen the note and publish again.":
     "notifications_blogSourceMismatch",
   "Publishing identity does not match the note.":
