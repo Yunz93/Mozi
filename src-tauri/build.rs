@@ -1,4 +1,5 @@
 fn main() {
+    println!("cargo:rerun-if-env-changed=MOZI_APTABASE_APP_KEY");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         println!("cargo:rerun-if-changed=src/tasks/calendar_bridge.m");
         cc::Build::new()

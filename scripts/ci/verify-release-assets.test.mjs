@@ -6,13 +6,13 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { verifyReleaseAssets } from "./verify-release-assets.mjs";
 
-function fixture() {
+function fixture(version = "2.3.2") {
   const directory = mkdtempSync(join(tmpdir(), "mozi-release-verification-"));
-  const tag = "v2.3.2";
+  const tag = `v${version}`;
   const names = [
-    "Mozi_2.3.2_aarch64.app.tar.gz",
-    "Mozi_2.3.2_x64-setup.exe",
-    "Mozi_2.3.2_amd64.deb",
+    `Mozi_${version}_aarch64.app.tar.gz`,
+    `Mozi_${version}_x64-setup.exe`,
+    `Mozi_${version}_amd64.deb`,
   ];
   const signature = Buffer.from(
     "untrusted comment: test fixture\nnot-a-cryptographic-test",
@@ -28,22 +28,22 @@ function fixture() {
         url: `https://github.com/Yunz93/Mozi/releases/download/${tag}/${names[index]}`,
         signature,
       };
-  const manifest = { version: "2.3.2", platforms };
+  const manifest = { version, platforms };
   writeFileSync(join(directory, "latest.json"), JSON.stringify(manifest));
   for (const name of names) {
     writeFileSync(join(directory, name), "package fixture");
     writeFileSync(join(directory, `${name}.sig`), signature);
   }
-  writeFileSync(join(directory, "Mozi_2.3.2_aarch64.dmg"), "dmg fixture");
+  writeFileSync(join(directory, `Mozi_${version}_aarch64.dmg`), "dmg fixture");
   const files = [
     "latest.json",
-    "Mozi_2.3.2_aarch64.dmg",
+    `Mozi_${version}_aarch64.dmg`,
     ...names.flatMap((name) => [name, `${name}.sig`]),
   ];
   const metadata = {
     tag_name: tag,
     draft: false,
-    prerelease: false,
+    prerelease: version.includes("-beta."),
     assets: files.map((name) => ({
       name,
       digest: `sha256:${createHash("sha256")
@@ -64,6 +64,21 @@ function fixture() {
   writeMetadata();
   return { directory, metadata, manifest, writeManifest, writeMetadata };
 }
+
+test("release inventory validates both channels and rejects mismatched prerelease metadata", () => {
+  for (const version of ["2.3.6", "2.3.6-beta.1", "2.3.6-beta.2"]) {
+    const f = fixture(version);
+    const verify = () =>
+      verifyReleaseAssets(f.directory, `v${version}`, "Yunz93/Mozi");
+    assert.equal(
+      verify().channel,
+      version.includes("-beta.") ? "beta" : "stable",
+    );
+    f.metadata.prerelease = !f.metadata.prerelease;
+    f.writeMetadata();
+    assert.throws(verify, /Release channel does not match its tag/);
+  }
+});
 
 test("release inventory validates real digests and rejects missing or tampered downloads", () => {
   const f = fixture();

@@ -40,6 +40,7 @@ describe("macOS release signing configuration", () => {
         string,
         {
           "runs-on": string;
+          needs?: string[];
           if?: string;
           env?: Record<string, string>;
           steps: Array<{
@@ -92,7 +93,10 @@ describe("macOS release signing configuration", () => {
       step.uses?.startsWith("tauri-apps/tauri-action@"),
     );
     expect(build?.with?.tagName).toBe("${{ env.RELEASE_TAG }}");
-    expect(build?.with?.releaseName).toBe("Release ${{ env.RELEASE_TAG }}");
+    expect(build?.with?.releaseName).toBe(
+      "${{ needs.release-channel.outputs.release_name }}",
+    );
+    expect(workflow.jobs["build-macos"].needs).toContain("release-channel");
     expect(build?.with?.releaseDraft).toBe(false);
     expect(workflow.jobs["build-windows"].if).toBe(
       "github.event_name != 'workflow_dispatch'",

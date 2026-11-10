@@ -137,6 +137,13 @@ export default {
   app_openingDocument: "Opening Document",
   app_openingDocumentDesc: "Opening the selected file.",
   app_openingDocumentStatus: "Opening file...",
+  statistics_participate: "Anonymous usage statistics",
+  statistics_description:
+    "On by default; turn it off anytime. Aptabase records daily activity, app version, system and language, and estimates country distribution from your network exit IP. Notes, file paths and search content are never sent.",
+  statistics_unavailable:
+    "Anonymous usage statistics are not available in this version.",
+  statistics_saveFailed:
+    "Could not save your statistics preference. Please try again.",
   app_chooseKnowledgeBase: "Choose Your Knowledge Base",
   app_chooseKnowledgeBaseDesc:
     "Open a folder as your knowledge base to start writing.",
@@ -478,6 +485,8 @@ export default {
   sidebar_filenameMatched: "Filename match",
   sidebar_paragraphAroundLine: "Around line {line}",
   sidebar_tryAnotherFilenameKeyword: "Try another filename keyword.",
+  trash_empty: "Trash is empty",
+  trash_operationFailed: "The operation failed. Please try again.",
   sidebar_trash: "Trash ({count})",
   sidebar_trashEmpty: "Empty",
   sidebar_fileTypeNotSupported: "This file type cannot be opened",

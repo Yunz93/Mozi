@@ -7,6 +7,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultSettings, useAppStore } from "../../store/appStore";
 import { ViewMode } from "../../types";
 import { Toolbar } from "./Toolbar";
+import { KnowledgeBaseHeader } from "../sidebar/KnowledgeBaseHeader";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { parse } from "postcss";
+
+const workspaceCss = readFileSync(
+  resolve(process.cwd(), "src/styles/workspace.css"),
+  "utf8",
+);
 
 const exportState = vi.hoisted(() => ({ inFlight: false }));
 vi.mock("../../hooks/useExportActions", () => ({
@@ -251,4 +260,63 @@ describe("Toolbar", () => {
     await user.keyboard("{ArrowDown}{Home}");
     expect(document.activeElement).toBe(share);
   });
+
+  it.each(["toolbar", "vault"])(
+    "菜单焦点使用主题底色，入口控件仍保留键盘焦点框（%s）",
+    async (surface) => {
+      const rules = parse(workspaceCss);
+      // 将真实样式规则匹配到交互后的元素，检查菜单与工具栏控件的焦点样式隔离。
+      const matchingValues = (element: Element, property: string) => {
+        const values: string[] = [];
+        rules.walkRules((rule) => {
+          if (element.matches(rule.selector)) {
+            rule.walkDecls(property, (declaration) => {
+              values.push(declaration.value);
+            });
+          }
+        });
+        return values;
+      };
+      const { user } =
+        surface === "toolbar"
+          ? setup()
+          : {
+              user: userEvent.setup(),
+              ...render(
+                <KnowledgeBaseHeader
+                  name="测试知识库"
+                  onSwitch={vi.fn()}
+                  onOpenSettings={vi.fn()}
+                  onSortChange={vi.fn()}
+                />,
+              ),
+            };
+      const trigger = screen.getByRole("button", {
+        name: surface === "toolbar" ? "更多操作" : "测试知识库",
+      });
+      trigger.focus();
+      expect(matchingValues(trigger, "outline")).toContain(
+        "2px solid var(--workspace-accent)",
+      );
+      await user.click(trigger);
+      const first = screen.getByRole("menuitem", {
+        name: surface === "toolbar" ? "导出 PDF" : "打开或切换知识库",
+      });
+      expect(document.activeElement).toBe(first);
+      expect(matchingValues(first, "outline").at(-1)).toBe("none");
+      expect(matchingValues(first, "background").at(-1)).toBe(
+        "var(--workspace-hover)",
+      );
+      await user.keyboard("{ArrowDown}");
+      const next =
+        surface === "toolbar"
+          ? screen.getByRole("menuitem", { name: "导出 HTML" })
+          : screen.getAllByRole("menuitemradio")[0];
+      expect(document.activeElement).toBe(next);
+      expect(matchingValues(next, "outline").at(-1)).toBe("none");
+      expect(matchingValues(next, "background").at(-1)).toBe(
+        "var(--workspace-hover)",
+      );
+    },
+  );
 });

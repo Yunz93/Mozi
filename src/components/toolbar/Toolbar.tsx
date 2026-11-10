@@ -168,6 +168,7 @@ export const Toolbar: React.FC<ToolbarProps> = React.memo(
 
     const runMenuAction = (action: () => void) => {
       setIsMenuOpen(false);
+      menuTriggerRef.current?.focus();
       action();
     };
 

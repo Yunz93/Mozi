@@ -140,3 +140,66 @@ it("preserves an IME dropdown and closes only the dropdown on the next Escape", 
   fireEvent.keyDown(document, { key: "Escape" });
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+
+it("restores its opener on ordinary close but preserves a newly focused dialog", async () => {
+  const opener = document.createElement("button");
+  document.body.append(opener);
+  opener.focus();
+  const props = {
+    title: "Previous dialog",
+    onClose: vi.fn(),
+    children: <p>content</p>,
+  };
+  const view = render(<Dialog {...props} isOpen />);
+  const waitFrame = () =>
+    act(async () => {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+    });
+  await waitFrame();
+  view.rerender(<Dialog {...props} isOpen={false} />);
+  expect(document.activeElement).toBe(opener);
+  view.rerender(<Dialog {...props} isOpen />);
+  await waitFrame();
+  const nextDialog = document.createElement("div");
+  nextDialog.setAttribute("role", "dialog");
+  const nextButton = document.createElement("button");
+  nextDialog.append(nextButton);
+  document.body.append(nextDialog);
+  try {
+    nextButton.focus();
+    expect(document.activeElement).toBe(nextButton);
+    view.rerender(<Dialog {...props} isOpen={false} />);
+    expect(document.activeElement).toBe(nextButton);
+  } finally {
+    nextDialog.remove();
+    opener.remove();
+  }
+});
+
+it("does not reclaim focus from a search input opened as the dialog closes", async () => {
+  const opener = document.createElement("button");
+  const search = document.createElement("input");
+  document.body.append(opener, search);
+  opener.focus();
+  const props = {
+    title: "Previous dialog",
+    onClose: vi.fn(),
+    children: <p>content</p>,
+  };
+  const view = render(<Dialog {...props} isOpen />);
+  await act(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+  });
+  try {
+    search.focus();
+    view.rerender(<Dialog {...props} isOpen={false} />);
+    expect(document.activeElement).toBe(search);
+  } finally {
+    opener.remove();
+    search.remove();
+  }
+});

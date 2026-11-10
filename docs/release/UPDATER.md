@@ -16,6 +16,14 @@ With this enabled, tagged Windows builds emit signed updater packages plus `late
 
 Current release status: `createUpdaterArtifacts` is `true` (1.0 publish gate). Ensure CI has a working updater signing key (`TAURI_SIGNING_PRIVATE_KEY`, and password only if the key requires one).
 
+## Beta channel
+
+Beta tags use `vX.Y.Z-beta.N` with a positive sequence number. The release channel gate rejects unsupported tags and mismatched manual channels before native builds start. Manual repair dispatch defaults to `beta`; repairing an existing stable tag requires explicitly choosing `stable`.
+
+Beta releases are marked as prereleases. Their installers and signed `latest.json` stay under their own tag. The standard installer and the app's stable update feed continue to use `releases/latest`, so stable users do not receive beta builds automatically. Download beta installers from the corresponding GitHub prerelease page.
+
+All native release builds use the `TAURI` environment. The optional `MOZI_APTABASE_APP_KEY` environment Secret is passed only to native build steps; it is not required by asset verification. Updater signatures must match the public key embedded in the release source for both channels.
+
 ## One-time setup
 
 1. Generate a Tauri updater keypair:

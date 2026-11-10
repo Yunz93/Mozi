@@ -473,6 +473,12 @@
 .app-toolbar-menu button:hover {
   background: var(--workspace-hover);
 }
+/* 菜单以主题底色标识键盘焦点，避免继承工具栏按钮的外框。 */
+.app-toolbar-menu button:focus,
+.workspace-vault-menu button:focus {
+  outline: none;
+  background: var(--workspace-hover);
+}
 
 .app-toolbar button:disabled,
 .workspace-view-modes button:disabled {
@@ -486,8 +492,8 @@
 .app-toolbar-publish:disabled:hover {
   background: var(--workspace-primary-bg);
 }
-.app-toolbar button:focus-visible,
-.workspace-vault-row button:focus-visible {
+.app-toolbar button:not([role="menuitem"]):focus-visible,
+.workspace-vault-row > button:focus-visible {
   outline: 2px solid var(--workspace-accent);
   outline-offset: 2px;
 }

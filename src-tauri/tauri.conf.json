@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "墨知",
-  "version": "2.3.6",
+  "version": "2.3.7-beta.1",
   "identifier": "com.bxyz.markdown-press",
   "build": {
     "frontendDist": "../dist",
@@ -30,25 +30,38 @@
     ],
     "security": {
       "csp": "default-src 'self'; connect-src 'self' ipc: http: https: blob: asset:; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob: asset:; worker-src 'self' blob: asset:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http: https:; font-src 'self' data: blob: asset:; frame-src 'self' https: blob: asset:; object-src 'self' blob: asset:; media-src 'self' blob: asset: http: https:;",
-      "dangerousDisableAssetCspModification": ["style-src"]
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
     }
   },
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["app", "dmg", "nsis"],
+    "targets": [
+      "app",
+      "dmg",
+      "nsis"
+    ],
     "fileAssociations": [
       {
-        "ext": ["md", "markdown"],
+        "ext": [
+          "md",
+          "markdown"
+        ],
         "mimeType": "text/markdown",
         "name": "Markdown Document",
         "description": "Markdown document",
         "role": "Editor",
         "rank": "Default",
-        "contentTypes": ["net.daringfireball.markdown"]
+        "contentTypes": [
+          "net.daringfireball.markdown"
+        ]
       },
       {
-        "ext": ["excalidraw"],
+        "ext": [
+          "excalidraw"
+        ],
         "mimeType": "application/vnd.excalidraw+json",
         "name": "Excalidraw Drawing",
         "description": "Excalidraw drawing",

@@ -297,7 +297,6 @@ export const AppDialogs: React.FC<AppDialogsProps> = ({
         message={tr("index_embeddingDownloadConfirmMessage")}
         confirmText={tr("index_embeddingDownloadConfirm")}
         cancelText={tr("index_embeddingDownloadSkip")}
-        variant="warning"
       />
 
       <ConfirmDialog

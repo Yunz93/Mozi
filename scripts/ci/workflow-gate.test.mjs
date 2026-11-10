@@ -99,3 +99,24 @@ test("workflow summary gates depend on every required job and always report", ()
   ]);
   assert.equal(protection.required_status_checks.strict, true);
 });
+
+for (const platform of ["macos", "windows", "linux"]) {
+  test(`release ${platform} reads the Aptabase secret from the TAURI environment at build time`, () => {
+    const workflow = yaml.load(
+      readFileSync(".github/workflows/release.yml", "utf8"),
+    );
+    const job = workflow.jobs[`build-${platform}`];
+    assert.equal(job.environment, "TAURI");
+    const build = job.steps.find(
+      (step) =>
+        step.uses?.startsWith("tauri-apps/tauri-action@") ||
+        step.name === "Build the Linux release package",
+    );
+    assert(build, `${platform} has a native build step`);
+    assert.equal(
+      build.env?.MOZI_APTABASE_APP_KEY,
+      "${{ secrets.MOZI_APTABASE_APP_KEY || vars.MOZI_APTABASE_APP_KEY }}",
+    );
+    assert.equal(workflow.env?.MOZI_APTABASE_APP_KEY, undefined);
+  });
+}

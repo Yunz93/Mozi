@@ -1,10 +1,19 @@
 // @vitest-environment happy-dom
 
-import { act, renderHook } from "@testing-library/react";
-import type React from "react";
-import { describe, expect, it, vi } from "vitest";
+import React from "react";
+import { flushSync } from "react-dom";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DRAG_DATA_TYPE } from "../dragPayload";
 import { useSidebarDragAndDrop } from "./useSidebarDragAndDrop";
+
+afterEach(cleanup);
 
 function createRootDragEvent(
   types: string[],
@@ -13,6 +22,7 @@ function createRootDragEvent(
 ): React.DragEvent<HTMLDivElement> {
   return {
     preventDefault: vi.fn(),
+    stopPropagation: vi.fn(),
     dataTransfer: {
       types,
       files,
@@ -24,7 +34,7 @@ function createRootDragEvent(
 }
 
 describe("useSidebarDragAndDrop", () => {
-  it("keeps scrolling at the edge without more drag events and stops after drop", () => {
+  it("keeps scrolling at the edge without more drag events and stops after drop", async () => {
     let frame: FrameRequestCallback | undefined;
     let nextId = 0;
     const request = vi
@@ -65,6 +75,9 @@ describe("useSidebarDragAndDrop", () => {
       expect(element.scrollTop).toBeGreaterThan(first);
       act(() => document.dispatchEvent(new Event("drop")));
       expect(cancel).toHaveBeenCalledWith(nextId);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
       expect(result.current.isDragging).toBe(false);
     } finally {
       unmount();
@@ -119,4 +132,47 @@ describe("useSidebarDragAndDrop", () => {
     expect(onMoveToRoot).toHaveBeenCalledWith("notes/todo.md");
     expect(onImportDroppedFiles).not.toHaveBeenCalled();
   });
+});
+
+it("keeps the conditional root shortcut mounted until its drop handler prevents file navigation", () => {
+  const move = vi.fn();
+  function RootShortcut() {
+    const drag = useSidebarDragAndDrop();
+    return React.createElement(
+      "aside",
+      { "data-testid": "sidebar", onDragOverCapture: drag.handleDragCapture },
+      drag.isDragging
+        ? React.createElement(
+            "div",
+            {
+              "data-testid": "root-shortcut",
+              onDragOver: drag.handleRootDragOver,
+              onDrop: (event: React.DragEvent<HTMLElement>) =>
+                drag.handleRootDrop(event, move),
+            },
+            "Root",
+          )
+        : null,
+    );
+  }
+  const view = render(React.createElement(RootShortcut));
+  const dataTransfer = {
+    types: [DRAG_DATA_TYPE],
+    getData: () => "/vault/notes/note.md",
+    dropEffect: "none",
+  };
+  fireEvent.dragOver(view.getByTestId("sidebar"), { dataTransfer });
+  const shortcut = view.getByTestId("root-shortcut");
+  // WebView 可在不同原生事件监听器之间提交状态；强制刷新以复现 capture 阶段移除目标。
+  const flush = () => flushSync(() => {});
+  document.addEventListener("drop", flush, true);
+  try {
+    const event = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+    fireEvent(shortcut, event);
+    expect(move).toHaveBeenCalledExactlyOnceWith("/vault/notes/note.md");
+    expect(event.defaultPrevented).toBe(true);
+  } finally {
+    document.removeEventListener("drop", flush, true);
+  }
 });

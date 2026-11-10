@@ -16,6 +16,7 @@ import {
   type AvailableUpdate,
   type UpdateDownloadEvent,
 } from "../../../services/updaterService";
+import { UsageStatisticsPreference } from "../UsageStatisticsPreference";
 import { UpdateProgressPanel } from "../UpdateProgressPanel";
 import {
   INITIAL_UPDATE_DOWNLOAD_PROGRESS,
@@ -223,6 +224,8 @@ export const UpdatesTab: React.FC<SettingsTabProps> = ({
           {t("settings_aboutMessageValue")}
         </p>
       </div>
+
+      <UsageStatisticsPreference />
 
       <div>
         <h5 className="text-base font-semibold text-gray-900 dark:text-white">
