@@ -141,12 +141,15 @@ export async function editorFlows(context, check) {
       await until(
         () =>
           d.execute(
-            "return !!document.querySelector('.workspace-sidebar-footer button[aria-label=还原]')",
+            "return [...document.querySelectorAll('.workspace-sidebar-footer button')].some(e=>e.textContent.trim().startsWith('回收站（'))",
           ),
-        "Save confirmation blocked the trash entry",
+        "Save confirmation blocked opening the trash panel",
       );
       await d.screenshot(join(output, "save-notification-toolbar.png"));
-      await d.button("回收站（1）");
+      const trashToggle = await d.execute(
+        "return [...document.querySelectorAll('.workspace-sidebar-footer button')].find(e=>e.textContent.trim().startsWith('回收站（')).textContent.trim()",
+      );
+      await d.button(trashToggle);
       await d.click(".cm-content");
       return geometry;
     },
