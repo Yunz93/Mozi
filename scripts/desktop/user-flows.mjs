@@ -119,6 +119,43 @@ export async function editorFlows(context, check) {
   );
   await check(
     context,
+    "save-notification-keeps-toolbar-and-trash-accessible",
+    async () => {
+      await appendText(d, "\nSAVE_TO_TOOLBAR_MARKER");
+      await d.shortcut("s");
+      await until(
+        () =>
+          d.execute(
+            "return [...document.querySelectorAll('[role=status]')].some(e=>e.textContent.trim()==='已保存')",
+          ),
+        "Save confirmation did not appear",
+      );
+      const geometry = await d.execute(
+        "const status=[...document.querySelectorAll('[role=status]')].find(e=>e.textContent.trim()==='已保存'),button=document.querySelector('button[aria-label=更多操作]');const a=status.getBoundingClientRect(),b=button.getBoundingClientRect(),style=getComputedStyle(status);return {overlaps:a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top,selectable:style.getPropertyValue('user-select')||style.getPropertyValue('-webkit-user-select'),withinViewport:a.left>=0&&a.right<=innerWidth&&a.top>=0&&a.bottom<=innerHeight}",
+      );
+      assert.equal(geometry.overlaps, false);
+      assert.equal(geometry.selectable, "text");
+      assert.equal(geometry.withinViewport, true);
+      await d.click('button[aria-label="更多操作"]');
+      await d.click('button[aria-label="回收站"]');
+      await until(
+        () =>
+          d.execute(
+            "return [...document.querySelectorAll('.workspace-sidebar-footer button')].some(e=>e.textContent.trim().startsWith('回收站（'))",
+          ),
+        "Save confirmation blocked opening the trash panel",
+      );
+      await d.screenshot(join(output, "save-notification-toolbar.png"));
+      const trashToggle = await d.execute(
+        "return [...document.querySelectorAll('.workspace-sidebar-footer button')].find(e=>e.textContent.trim().startsWith('回收站（')).textContent.trim()",
+      );
+      await d.button(trashToggle);
+      await d.click(".cm-content");
+      return geometry;
+    },
+  );
+  await check(
+    context,
     "background-tree-refresh-keeps-editor-selection-and-focus",
     async () => {
       const before = await selectionOf(d);
