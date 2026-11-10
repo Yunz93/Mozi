@@ -54,6 +54,18 @@ describe("t", () => {
     expect(t("zh-CN", "settings_wechatGuide3")).not.toContain("封面图");
   });
 
+  it("points both IP allowlist guides to Security Center", () => {
+    for (const key of [
+      "wechatDraftDialog_ipHint",
+      "settings_wechatGuide3",
+    ] as const) {
+      expect(t("zh-CN", key)).toContain("设置与开发 → 安全中心 → IP 白名单");
+      expect(t("en", key)).toContain(
+        "Settings and Development → Security Center → IP Whitelist",
+      );
+    }
+  });
+
   it("documents WeRead import settings and dialog copy", () => {
     expect(t("zh-CN", "settings_tab_readingNotes")).toBe("读书笔记同步");
     expect(t("zh-CN", "settings_readingNotesTabWeread")).toBe("微信读书");
@@ -190,5 +202,24 @@ describe("localizeKnownError", () => {
     expect(
       localizeKnownError("zh-CN", "WeRead API key is required."),
     ).toContain("API Key");
+  });
+});
+
+describe("博客归属错误提示", () => {
+  it("提供中文恢复原名操作，不暴露内部归属字段", () => {
+    const raw =
+      "The previously published article was not found at its saved path. Restore the original note filename before migrating its publishing identity; no remote article was changed.";
+    expect(localizeKnownError("zh-CN", raw)).toContain("恢复原文件名");
+    expect(localizeKnownError("zh-CN", raw)).toContain("未修改远端内容");
+  });
+  it("冲突和目标不符的提示说明保留内容及下一步", () => {
+    for (const raw of [
+      "The remote article belongs to another note. Existing content was preserved.",
+      "Publishing target does not match the note.",
+      "Publishing identity does not match the note.",
+    ]) {
+      expect(localizeKnownError("zh-CN", raw)).toContain("新建笔记");
+      expect(localizeKnownError("en", raw)).toContain("new note");
+    }
   });
 });

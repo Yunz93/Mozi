@@ -13,6 +13,7 @@ export const SENSITIVE_SETTING_KEYS = [
   "imageHostingS3SecretAccessKey",
   "imageHostingOssAccessKeySecret",
   "imageHostingQiniuSecretKey",
+  "imageHostingCustomHeaders",
 ] as const;
 
 export type SensitiveSettingKey = (typeof SENSITIVE_SETTING_KEYS)[number];

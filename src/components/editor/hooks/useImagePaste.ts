@@ -234,6 +234,24 @@ export function useImagePaste(
     ): Promise<boolean> => {
       const altText = imageName.replace(/\.[^.]+$/, "");
       const placeholder = `![Uploading ${imageName}...]()`;
+      const replacedText = view.state.sliceDoc(
+        selection.main.from,
+        selection.main.to,
+      );
+
+      const restoreSelectedText = () => {
+        if (!isCurrent()) return;
+        const from = view.state.doc.toString().indexOf(placeholder);
+        if (from < 0) return;
+        // 仅回滚仍存在的原占位符，不能覆盖上传期间用户新写的文字。
+        view.dispatch({
+          changes: {
+            from,
+            to: from + placeholder.length,
+            insert: replacedText,
+          },
+        });
+      };
 
       const moveCaret = view.state.selection.eq(selection);
       view.dispatch({
@@ -290,7 +308,7 @@ export function useImagePaste(
         );
 
         if (settings.imageHosting.keepLocalCopy) {
-          return handleLocalMode(
+          const saved = await handleLocalMode(
             view,
             language,
             arrayBuffer,
@@ -299,14 +317,10 @@ export function useImagePaste(
             isCurrent,
             placeholder,
           );
+          if (!saved) restoreSelectedText();
+          return saved;
         } else {
-          view.dispatch({
-            changes: {
-              from: currentPlaceholderStart,
-              to: currentPlaceholderStart + placeholder.length,
-              insert: "",
-            },
-          });
+          restoreSelectedText();
         }
 
         return false;

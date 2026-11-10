@@ -26,6 +26,7 @@ interface SecureSettingsPayload {
   imageHostingS3SecretAccessKey?: string | null;
   imageHostingOssAccessKeySecret?: string | null;
   imageHostingQiniuSecretKey?: string | null;
+  imageHostingCustomHeaders?: string | null;
   embeddingApiKey?: string | null;
 }
 
@@ -91,6 +92,49 @@ function scrubSensitiveSettingsInObject(target: unknown): boolean {
   });
 
   return changed;
+}
+
+/** 只有安全存储确认成功后，才移除旧配置与备份中的认证头。 */
+function clearLegacyCustomHeaders(): void {
+  const scrub = (target: unknown): boolean => {
+    if (!target || typeof target !== "object") return false;
+    const record = target as Record<string, unknown>;
+    let changed = false;
+    for (const key of ["settings", "state"]) {
+      changed = scrub(record[key]) || changed;
+    }
+    const hosting = record.imageHosting as
+      | AppSettings["imageHosting"]
+      | undefined;
+    if (hosting?.custom && "headers" in hosting.custom) {
+      delete hosting.custom.headers;
+      changed = true;
+    }
+    if ("imageHostingCustomHeaders" in record) {
+      delete record.imageHostingCustomHeaders;
+      changed = true;
+    }
+    return changed;
+  };
+  if (typeof window !== "undefined") {
+    for (const key of [SETTINGS_STORAGE_KEY, `${SETTINGS_STORAGE_KEY}.bak`]) {
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        const value: unknown = JSON.parse(raw);
+        if (scrub(value))
+          window.localStorage.setItem(key, JSON.stringify(value));
+      } catch (error) {
+        console.warn("清理旧版自定义图床认证头失败：", error);
+      }
+    }
+  }
+  const { settings, updateSettings } = useAppStore.getState();
+  if (settings.imageHosting.custom.headers !== undefined) {
+    const custom = { ...settings.imageHosting.custom };
+    delete custom.headers;
+    updateSettings({ imageHosting: { ...settings.imageHosting, custom } });
+  }
 }
 
 export function scrubSensitiveSettingsFromLocalStorage(): void {
@@ -162,6 +206,9 @@ export async function loadSecureSettings(): Promise<
       imageHostingQiniuSecretKey: normalizeSecretValue(
         payload.imageHostingQiniuSecretKey,
       ),
+      imageHostingCustomHeaders: normalizeSecretValue(
+        payload.imageHostingCustomHeaders,
+      ),
       embeddingApiKey: normalizeSecretValue(payload.embeddingApiKey),
     };
     hasLoadedSecureSettingsFromBackend = true;
@@ -196,6 +243,7 @@ export async function persistSecureSetting(
         ...(secureSettingsCache ?? {}),
         [key]: trimmed,
       };
+      if (key === "imageHostingCustomHeaders") clearLegacyCustomHeaders();
     });
 
   secureWriteQueue.set(key, nextWrite);
@@ -217,7 +265,14 @@ export async function migrateLegacySensitiveSettings(
   const next: Partial<SensitiveSettings> = { ...loaded };
 
   for (const key of SENSITIVE_SETTING_KEYS) {
-    const legacyValue = typeof settings[key] === "string" ? settings[key] : "";
+    const legacyValue =
+      key === "imageHostingCustomHeaders"
+        ? (settings.imageHostingCustomHeaders ??
+          settings.imageHosting.custom.headers ??
+          "")
+        : typeof settings[key] === "string"
+          ? settings[key]
+          : "";
     const secureValue = typeof loaded[key] === "string" ? loaded[key] : "";
 
     if (!secureValue && legacyValue.trim() && secureBackendReady) {
@@ -227,6 +282,8 @@ export async function migrateLegacySensitiveSettings(
     }
 
     next[key] = secureValue || legacyValue || "";
+    if (key === "imageHostingCustomHeaders" && secureValue)
+      clearLegacyCustomHeaders();
   }
 
   scrubSensitiveSettingsFromLocalStorage();
@@ -238,7 +295,10 @@ export async function hydrateSensitiveSettingsIntoStore(
 ): Promise<AppSettings> {
   const backendReady = await ensureSecureSettingsBackendReady();
 
-  if (hasLoadedSecureSettingsFromBackend) {
+  if (
+    hasLoadedSecureSettingsFromBackend &&
+    settings.imageHosting.custom.headers === undefined
+  ) {
     return useAppStore.getState().settings;
   }
 

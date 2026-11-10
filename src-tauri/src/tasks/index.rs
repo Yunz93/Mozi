@@ -669,51 +669,8 @@ impl Runtime {
         if candidates.is_empty() {
             return;
         }
-        let english = self.saved.preferences.language == "en";
-        let title = if candidates.len() == 1 && !catch_up {
-            format!(
-                "{}{}",
-                if english {
-                    "Task due: "
-                } else {
-                    "待办到期："
-                },
-                candidates[0].title
-            )
-        } else if english {
-            format!(
-                "{} task reminders{}",
-                candidates.len(),
-                if catch_up { " missed" } else { "" }
-            )
-        } else {
-            format!(
-                "{}{} 项待办",
-                if catch_up { "错过了 " } else { "有 " },
-                candidates.len()
-            )
-        };
-        let first = &candidates[0];
-        let body = if candidates.len() == 1 {
-            format!(
-                "{} {} · {}",
-                first.date.as_deref().unwrap_or_default(),
-                reminders::points(first, &self.saved.preferences)
-                    .iter()
-                    .find(|(key, at)| due.contains(key) && *at <= now)
-                    .and_then(|(_, at)| Local.timestamp_millis_opt(*at).single())
-                    .map(|time| time.format("%H:%M").to_string())
-                    .unwrap_or_default(),
-                first.relative_path
-            )
-        } else {
-            candidates
-                .iter()
-                .take(3)
-                .map(|task| task.title.as_str())
-                .collect::<Vec<_>>()
-                .join(" · ")
-        };
+        let (title, body) =
+            reminder_message(&candidates, catch_up, &self.saved.preferences, &due, now);
         if self.saved.preferences.notifications {
             if let Err(error) = self
                 .app
@@ -740,6 +697,66 @@ impl Runtime {
             self.error = Some(error);
         }
     }
+}
+
+fn reminder_message(
+    candidates: &[Task],
+    catch_up: bool,
+    preferences: &Preferences,
+    due: &BTreeSet<String>,
+    now: i64,
+) -> (String, String) {
+    let english = preferences.language == "en";
+    let title = if candidates.len() == 1 && !catch_up {
+        format!(
+            "{}{}",
+            if english {
+                "Task due: "
+            } else {
+                "待办到期："
+            },
+            candidates[0].title
+        )
+    } else if english {
+        format!(
+            "{} task reminders{}",
+            candidates.len(),
+            if catch_up { " missed" } else { "" }
+        )
+    } else {
+        format!(
+            "{}{} 项待办",
+            if catch_up { "错过了 " } else { "有 " },
+            candidates.len()
+        )
+    };
+    let first = &candidates[0];
+    let body = if candidates.len() == 1 {
+        format!(
+            "{} {} · {}",
+            first.date.as_deref().unwrap_or_default(),
+            reminders::points(first, &preferences)
+                .iter()
+                .find(|(key, at)| due.contains(key) && *at <= now)
+                .and_then(|(_, at)| Local.timestamp_millis_opt(*at).single())
+                .map(|time| time.format("%H:%M").to_string())
+                .unwrap_or_default(),
+            first.relative_path
+        )
+    } else {
+        candidates
+            .iter()
+            .take(3)
+            .map(|task| task.title.as_str())
+            .collect::<Vec<_>>()
+            .join(" · ")
+    };
+    let body = if catch_up && candidates.len() == 1 {
+        format!("{} · {}", first.title, body)
+    } else {
+        body
+    };
+    (title, body)
 }
 
 fn current_timezone() -> (i32, String) {
@@ -846,6 +863,25 @@ fn preferred_vault(vaults: &[Vault], path: &Path, fallback: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn single_catch_up_notification_keeps_the_task_content() {
+        let task = parser::parse(
+            "- [ ] 核对本周方案 @2026-11-10 15:00",
+            Path::new("/vault"),
+            Path::new("/vault/note.md"),
+        )
+        .remove(0);
+        let at = task.reminder_at.unwrap();
+        let due = BTreeSet::from([task.notification_key()]);
+        let (title, body) = reminder_message(&[task], true, &Preferences::default(), &due, at + 1);
+        assert!(title.contains("错过"));
+        assert!(
+            body.contains("核对本周方案"),
+            "single missed reminder must include the task content: {body}"
+        );
+        assert!(body.contains("note.md"));
+    }
 
     #[test]
     fn offline_start_keeps_due_reminders_until_sources_are_verified() {

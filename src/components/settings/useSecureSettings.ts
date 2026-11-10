@@ -35,6 +35,7 @@ export function useSecureSettings(
     imageHostingS3SecretAccessKey: 0,
     imageHostingOssAccessKeySecret: 0,
     imageHostingQiniuSecretKey: 0,
+    imageHostingCustomHeaders: 0,
   });
   const secureSaveResetTimerRef = useRef<
     Partial<Record<SensitiveSettingKey, number>>

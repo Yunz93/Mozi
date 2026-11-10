@@ -30,7 +30,6 @@ import { flattenFiles, isMarkdownFile } from "../utils/markdownLinkUtils";
 import { pathMatchesAnyGlob } from "../utils/pathGlob";
 import type { FileNode } from "../types";
 import {
-  buildFullChunkIndex,
   removeChunkPaths,
   upsertChunkPaths,
 } from "../services/vault/chunkIndexService";
@@ -475,37 +474,11 @@ export function useVaultIndexLifecycle(): {
           files: state.files,
         });
         if (toAdd.length === 0 && toRemove.length === 0) {
-          state.setLinkIndex(cached);
-          prevPathsRef.current = buildFileTreeSignature(state.files);
-
-          if (
-            isValidChunkSnapshot(
-              cachedChunks,
-              vaultRoot,
-              state.files,
-              state.settings.indexExcludeGlobs,
-            )
-          ) {
-            state.setChunkIndex(cachedChunks);
-            setActiveChunkIndex(cachedChunks);
-            const store = ensureActiveVectorStore(vaultRoot);
-            if (isCompatibleVectorSnapshot(cachedVectors, state.settings)) {
-              store.load(cachedVectors);
-              syncSemanticStatus(store.size());
-              return false;
-            }
-            // Snapshot from a different provider/model — rebuild vectors.
-            store.load(null);
-            await refreshSemanticForChunkIndex(cachedChunks, {
-              forceFullReembed: true,
-              linkGeneration: generation,
-            });
-            return false;
-          }
-
           const fs = await getFileSystem();
           if (!isCurrent()) return false;
-          const chunkIndex = await buildFullChunkIndex({
+          // 监听只能看到启动后的变化，路径相同不能证明关闭期间正文未被修改。
+          // 每份正文只读一次供两个索引使用；未变化的缓存和向量继续复用。
+          const fresh = await buildVaultIndexes({
             files: state.files,
             vaultRoot,
             readFile: (path) => readBackgroundFile(fs, path),
@@ -513,7 +486,43 @@ export function useVaultIndexLifecycle(): {
             shouldCancel: () => !isCurrent(),
           });
           if (!isCurrent()) return false;
+          const linksUnchanged =
+            JSON.stringify(cached.outbounds) ===
+            JSON.stringify(fresh.linkIndex.outbounds);
+          const chunksValid = isValidChunkSnapshot(
+            cachedChunks,
+            vaultRoot,
+            state.files,
+            state.settings.indexExcludeGlobs,
+          );
+          const chunksUnchanged =
+            chunksValid &&
+            JSON.stringify(cachedChunks.byPath) ===
+              JSON.stringify(fresh.chunkIndex.byPath);
+          state.setLinkIndex(linksUnchanged ? cached : fresh.linkIndex);
+          if (!linksUnchanged) {
+            await writeIndexJson(vaultRoot, LINK_INDEX_FILE, fresh.linkIndex);
+            if (!isCurrent()) return false;
+          }
+          const chunkIndex = chunksUnchanged ? cachedChunks : fresh.chunkIndex;
+          state.setChunkIndex(chunkIndex);
+          setActiveChunkIndex(chunkIndex);
+          prevPathsRef.current = buildFileTreeSignature(state.files);
+          const store = ensureActiveVectorStore(vaultRoot);
+          const semanticDisabled = state.settings.embeddingProvider === "none";
+          const vectorsCompatible =
+            semanticDisabled ||
+            isCompatibleVectorSnapshot(cachedVectors, state.settings);
+          store.load(
+            !semanticDisabled && vectorsCompatible ? cachedVectors : null,
+          );
+          if (chunksUnchanged && vectorsCompatible) {
+            syncSemanticStatus(store.size());
+            return false;
+          }
           await refreshSemanticForChunkIndex(chunkIndex, {
+            previousByPath: chunksValid ? cachedChunks.byPath : undefined,
+            forceFullReembed: !vectorsCompatible,
             linkGeneration: generation,
           });
           return false;

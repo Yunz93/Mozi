@@ -30,6 +30,45 @@ require_command curl
 require_command hdiutil
 require_command ditto
 require_command xattr
+require_command plutil
+
+install_app_bundle() {
+  local source="$1" target="$2" staging candidate backup bundle_id
+  staging="$(mktemp -d "$(dirname "$target")/.mozi-install.XXXXXX")" || return 1
+  candidate="${staging}/new.app"
+  backup="${staging}/previous.app"
+  INSTALL_STAGING_DIR="$staging"
+  INSTALL_BACKUP_PATH="$backup"
+  INSTALL_TARGET_PATH="$target"
+  # 先在同一文件系统完整复制、校验，任何准备失败都不碰已安装应用。
+  if ! ditto "$source" "$candidate" ||
+     ! plutil -lint "$candidate/Contents/Info.plist" >/dev/null; then
+    rm -rf "$staging"
+    return 1
+  fi
+  bundle_id="$(plutil -extract CFBundleIdentifier raw -o - "$candidate/Contents/Info.plist")" || bundle_id=""
+  if [[ "$bundle_id" != "com.bxyz.markdown-press" || ! -x "$candidate/Contents/MacOS/app" ]] ||
+     ! xattr -cr "$candidate"; then
+    rm -rf "$staging"
+    return 1
+  fi
+  if [[ -e "$target" || -L "$target" ]]; then
+    if [[ ! -d "$target" || -L "$target" ]] || ! mv "$target" "$backup"; then
+      rm -rf "$staging"
+      return 1
+    fi
+  fi
+  if ! mv "$candidate" "$target"; then
+    if [[ -d "$backup" ]] && ! mv "$backup" "$target"; then
+      warn "恢复旧应用失败，原应用仍保留在 ${backup}，请手动移回 ${target}。"
+      return 1
+    fi
+    rm -rf "$staging"
+    return 1
+  fi
+  # 新应用已完整换入后才清理旧应用副本，不触及偏好、知识库或其他用户数据。
+  rm -rf "$staging"
+}
 
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -41,12 +80,21 @@ esac
 TMP_DIR="$(mktemp -d)"
 MOUNT_POINT=""
 cleanup() {
+  # 中断若发生在两次重命名之间，先恢复原应用；恢复失败时保留备份供手动处理。
+  if [[ -n "${INSTALL_BACKUP_PATH:-}" && -d "${INSTALL_BACKUP_PATH}" && ! -e "${INSTALL_TARGET_PATH}" ]]; then
+    mv "${INSTALL_BACKUP_PATH}" "${INSTALL_TARGET_PATH}" || warn "原应用保留在 ${INSTALL_BACKUP_PATH}，请手动恢复。"
+  fi
+  if [[ -n "${INSTALL_STAGING_DIR:-}" && ! -d "${INSTALL_BACKUP_PATH}" ]]; then
+    rm -rf "${INSTALL_STAGING_DIR}"
+  fi
   if [[ -n "${MOUNT_POINT}" && -d "${MOUNT_POINT}" ]]; then
     hdiutil detach "${MOUNT_POINT}" -quiet || true
   fi
   rm -rf "${TMP_DIR}"
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 normalize_release_tag() {
   local tag="${1:-}"
@@ -123,14 +171,8 @@ MOUNT_POINT="$(hdiutil attach "${DMG_PATH}" -nobrowse | awk '/\/Volumes\// {prin
 SOURCE_APP="$(find "${MOUNT_POINT}" -maxdepth 2 -name "${APP_NAME}.app" -type d -print -quit)"
 [[ -n "${SOURCE_APP}" ]] || die "在 DMG 中未找到 ${APP_NAME}.app。"
 
-if [[ -d "${APP_PATH}" ]]; then
-  log "正在替换已安装的 ${APP_NAME}..."
-  rm -rf "${APP_PATH}"
-fi
-
 log "正在安装到 ${INSTALL_DIR}..."
-ditto "${SOURCE_APP}" "${APP_PATH}"
-xattr -cr "${APP_PATH}"
+install_app_bundle "${SOURCE_APP}" "${APP_PATH}" || die "安装失败，原应用已保留或恢复。"
 
 hdiutil detach "${MOUNT_POINT}" -quiet
 MOUNT_POINT=""

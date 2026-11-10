@@ -559,12 +559,20 @@ export const ImageHostingTab: React.FC<SettingsTabProps> = ({
               {t("imageHosting_headersJson")}
             </label>
             <textarea
-              value={ih.custom.headers}
-              onChange={(e) => updateCustom({ headers: e.target.value })}
+              value={
+                settings.imageHostingCustomHeaders ?? ih.custom.headers ?? ""
+              }
+              onChange={(e) =>
+                handleSecureSettingChange(
+                  "imageHostingCustomHeaders",
+                  e.target.value,
+                )
+              }
               placeholder='{"Authorization": "Bearer xxx"}'
               rows={3}
               className={`${inputClass} font-mono resize-none`}
             />
+            {renderSecureSaveState("imageHostingCustomHeaders")}
           </div>
           <div>
             <label className={labelClass}>

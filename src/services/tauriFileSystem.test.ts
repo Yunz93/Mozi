@@ -57,6 +57,7 @@ vi.mock("../store/appStore", () => ({
 
 import { TauriFileSystem } from "./tauriFileSystem";
 import { ENCODING_UNSUPPORTED_CODE } from "./filesystem/textFileEncoding";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 
 describe("TauriFileSystem encoding guard", () => {
   let fs: TauriFileSystem;
@@ -64,6 +65,7 @@ describe("TauriFileSystem encoding guard", () => {
   beforeEach(() => {
     readBinaryFileMock.mockReset();
     invokeMock.mockReset();
+    vi.mocked(writeTextFile).mockReset();
     renameMock.mockReset();
     readDirMock.mockReset();
     writeBinaryMock.mockReset().mockResolvedValue(undefined);
@@ -76,6 +78,34 @@ describe("TauriFileSystem encoding guard", () => {
     invokeMock.mockResolvedValue(undefined);
     renameMock.mockResolvedValue(undefined);
     fs = new TauriFileSystem();
+  });
+
+  it("preserves the original file when atomic save fails instead of truncating it", async () => {
+    const error = new Error("No space left on device");
+    invokeMock.mockRejectedValueOnce(error);
+    await expect(fs.writeFile("/notes/a.md", "new text")).rejects.toBe(error);
+    expect(writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it("uses native compare-and-write while preserving the expected snapshot", async () => {
+    invokeMock.mockResolvedValueOnce(false);
+    expect(
+      await fs.writeFileIfUnchanged(
+        "/notes/a.md",
+        "new\ntext",
+        "\uFEFFold\r\ntext",
+      ),
+    ).toBe(false);
+    expect(invokeMock).toHaveBeenCalledWith("write_text_file_atomic", {
+      path: "/notes/a.md",
+      content: "new\ntext",
+      expectedContent: "\uFEFFold\r\ntext",
+    });
+    invokeMock.mockResolvedValueOnce(true);
+    expect(
+      await fs.writeFileIfUnchanged("/notes/a.md", "new text", "old text"),
+    ).toBe(true);
+    expect(writeTextFile).not.toHaveBeenCalled();
   });
 
   it("imports blobs in bounded chunks and publishes the file only after every write completes", async () => {

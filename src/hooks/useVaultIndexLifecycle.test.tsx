@@ -158,6 +158,35 @@ afterEach(() => {
 });
 
 describe("知识库索引任务的顺序与生命周期", () => {
+  it("启动时刷新软件关闭期间被修改的正文与反向链接", async () => {
+    disk.set(
+      "/vault/a.md",
+      "# Changed\n\nOfflineUniqueTerm with enough changed text for retrieval [[target]]",
+    );
+    await renderReady();
+    await waitFor(() => {
+      expect(getActiveChunkIndex()?.byPath["/vault/a.md"][0].text).toContain(
+        "OfflineUniqueTerm",
+      );
+      expect(
+        useAppStore.getState().linkIndex?.inbounds["/vault/target.md"],
+      ).toContain("/vault/a.md");
+    });
+    expect(readFile).toHaveBeenCalledWith("/vault/a.md");
+  });
+
+  it("恢复未变化的缓存时不重复写索引或请求embedding", async () => {
+    await renderReady();
+    expect(writeIndexJson).not.toHaveBeenCalled();
+    expect(embedChunkIndex).not.toHaveBeenCalled();
+  });
+
+  it("关闭语义检索且没有向量缓存时仍复用未变化的片段", async () => {
+    cache.delete(`/vault:${VECTOR_INDEX_FILE}`);
+    await renderReady();
+    expect(writeIndexJson).not.toHaveBeenCalled();
+    expect(embedChunkIndex).not.toHaveBeenCalled();
+  });
   it("bounds progress publications while still completing a large index", async () => {
     cache.clear();
     const files: FileNode[] = Array.from({ length: 1000 }, (_, i) => ({
@@ -519,6 +548,7 @@ describe("知识库索引任务的顺序与生命周期", () => {
   it("离开后返回同一库也不会接受旧代际保存", async () => {
     const hook = await renderReady();
     const pendingRead = deferred<string>();
+    readFile.mockClear();
     readFile.mockImplementationOnce(() => pendingRead.promise);
     let updating!: Promise<void>;
     act(() => {

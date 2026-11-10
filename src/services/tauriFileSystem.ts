@@ -305,20 +305,30 @@ export class TauriFileSystem implements IFileSystem {
       throw createEncodingUnsupportedError(path);
     }
     const prepared = this.prepareContentForWrite(path, content);
-    try {
-      await invoke("write_text_file_atomic", { path, content: prepared });
+    await invoke("write_text_file_atomic", { path, content: prepared });
+    this.captureFileFormat(path, prepared, true);
+    this.invalidateObjectUrl(path);
+  }
+
+  async writeFileIfUnchanged(
+    path: string,
+    content: string,
+    expectedContent: string,
+  ): Promise<boolean> {
+    if (this.nonUtf8Paths.has(path)) {
+      throw createEncodingUnsupportedError(path);
+    }
+    const prepared = this.prepareContentForWrite(path, content);
+    const written = await invoke<boolean>("write_text_file_atomic", {
+      path,
+      content: prepared,
+      expectedContent,
+    });
+    if (written) {
       this.captureFileFormat(path, prepared, true);
       this.invalidateObjectUrl(path);
-    } catch (error) {
-      try {
-        await writeTextFile(path, prepared);
-        this.captureFileFormat(path, prepared, true);
-        this.invalidateObjectUrl(path);
-      } catch (fallbackError) {
-        console.error(`Failed to write file ${path}:`, fallbackError);
-        throw fallbackError;
-      }
     }
+    return written;
   }
 
   async writeBinaryFile(path: string, content: Uint8Array): Promise<void> {

@@ -21,8 +21,12 @@ import {
 } from "./semanticIndexRuntime";
 import {
   ASK_HISTORY_FILE,
+  LEGACY_ASK_HISTORY_FILE,
   hashVaultId,
+  hashLegacyVaultId,
+  normalizeVaultIdentityPath,
   readIndexJson,
+  readLegacyIndexJson,
   writeIndexJson,
 } from "./indexStorage";
 
@@ -218,7 +222,7 @@ export interface AskVaultHistoryItem {
   at: number;
 }
 
-const ASK_HISTORY_LS_PREFIX = "markdown-press.ask-history.";
+const ASK_HISTORY_LS_PREFIX = "markdown-press.ask-history.v2.";
 const ASK_HISTORY_LIMIT = 50;
 
 export function askVaultHistoryLocalStorageKey(vaultId: string): string {
@@ -242,26 +246,52 @@ export function parseAskVaultHistory(value: unknown): AskVaultHistoryItem[] {
   return value.filter(isHistoryItem).slice(0, ASK_HISTORY_LIMIT);
 }
 
-function readLocalAskVaultHistory(vaultId: string): AskVaultHistoryItem[] {
-  if (typeof localStorage === "undefined") return [];
+interface AskVaultHistoryEnvelope {
+  version: 2;
+  vaultRoot: string;
+  items: AskVaultHistoryItem[];
+}
+
+function ownedHistory(
+  value: unknown,
+  vaultRoot: string,
+): AskVaultHistoryItem[] | null {
+  if (!value || typeof value !== "object") return null;
+  const envelope = value as Partial<AskVaultHistoryEnvelope>;
+  if (
+    envelope.version !== 2 ||
+    typeof envelope.vaultRoot !== "string" ||
+    normalizeVaultIdentityPath(envelope.vaultRoot) !==
+      normalizeVaultIdentityPath(vaultRoot) ||
+    !Array.isArray(envelope.items)
+  )
+    return null;
+  return parseAskVaultHistory(envelope.items);
+}
+
+function readLocalAskVaultHistory(
+  vaultId: string,
+  vaultRoot: string,
+): AskVaultHistoryItem[] | null {
+  if (typeof localStorage === "undefined") return null;
   try {
     const raw = localStorage.getItem(askVaultHistoryLocalStorageKey(vaultId));
-    if (!raw) return [];
-    return parseAskVaultHistory(JSON.parse(raw));
+    if (!raw) return null;
+    return ownedHistory(JSON.parse(raw), vaultRoot);
   } catch {
-    return [];
+    return null;
   }
 }
 
 function writeLocalAskVaultHistory(
   vaultId: string,
-  items: AskVaultHistoryItem[],
+  envelope: AskVaultHistoryEnvelope,
 ): void {
   if (typeof localStorage === "undefined") return;
   try {
     localStorage.setItem(
       askVaultHistoryLocalStorageKey(vaultId),
-      JSON.stringify(items),
+      JSON.stringify(envelope),
     );
   } catch {
     // Quota or private mode — disk persist is the primary copy.
@@ -277,28 +307,91 @@ export async function appendAskVaultHistory(
     item,
     ...existing.filter((entry) => entry.id !== item.id),
   ].slice(0, ASK_HISTORY_LIMIT);
-  const vaultId = await hashVaultId(vaultRoot);
-  writeLocalAskVaultHistory(vaultId, next);
-  await writeIndexJson(vaultRoot, ASK_HISTORY_FILE, next, "ask-history");
+  await saveAskVaultHistory(vaultRoot, next);
+}
+
+async function saveAskVaultHistory(
+  vaultRoot: string,
+  items: AskVaultHistoryItem[],
+): Promise<void> {
+  const envelope: AskVaultHistoryEnvelope = { version: 2, vaultRoot, items };
+  writeLocalAskVaultHistory(await hashVaultId(vaultRoot), envelope);
+  await writeIndexJson(vaultRoot, ASK_HISTORY_FILE, envelope, "ask-history");
+}
+
+/** 旧数组没有库标识，只迁移全部引用都明确属于当前库的记录，原件不删除。 */
+function attributableLegacyHistory(
+  value: unknown,
+  vaultRoot: string,
+): AskVaultHistoryItem[] {
+  const root = normalizeVaultIdentityPath(vaultRoot).replace(/\/+$/, "");
+  return parseAskVaultHistory(value).filter(
+    (item) =>
+      Array.isArray(item.answer.citations) &&
+      item.answer.citations.length > 0 &&
+      item.answer.citations.every(
+        (citation) =>
+          !!citation &&
+          typeof citation.path === "string" &&
+          normalizeVaultIdentityPath(citation.path).startsWith(`${root}/`),
+      ),
+  );
 }
 
 export async function loadAskVaultHistory(
   vaultRoot: string,
 ): Promise<AskVaultHistoryItem[]> {
   const vaultId = await hashVaultId(vaultRoot);
-  const fromDisk = parseAskVaultHistory(
+  const fromDisk = ownedHistory(
     await readIndexJson<unknown>(vaultRoot, ASK_HISTORY_FILE, "ask-history"),
+    vaultRoot,
   );
-  if (fromDisk.length > 0) {
-    writeLocalAskVaultHistory(vaultId, fromDisk);
+  if (fromDisk !== null) {
+    writeLocalAskVaultHistory(vaultId, {
+      version: 2,
+      vaultRoot,
+      items: fromDisk,
+    });
     return fromDisk;
   }
 
-  const fromLocal = readLocalAskVaultHistory(vaultId);
-  if (fromLocal.length > 0) {
-    await writeIndexJson(vaultRoot, ASK_HISTORY_FILE, fromLocal, "ask-history");
+  const fromLocal = readLocalAskVaultHistory(vaultId, vaultRoot);
+  if (fromLocal !== null) {
+    await saveAskVaultHistory(vaultRoot, fromLocal);
+    return fromLocal;
   }
-  return fromLocal;
+
+  const legacyDisk = await readLegacyIndexJson<unknown>(
+    vaultRoot,
+    LEGACY_ASK_HISTORY_FILE,
+    "ask-history",
+  );
+  let legacyLocal: unknown = null;
+  try {
+    if (typeof localStorage !== "undefined") {
+      legacyLocal = JSON.parse(
+        localStorage.getItem(
+          `markdown-press.ask-history.${await hashLegacyVaultId(vaultRoot)}`,
+        ) ?? "null",
+      );
+    }
+  } catch {
+    /* 旧缓存损坏时仍尝试迁移磁盘副本。 */
+  }
+  const entries = [
+    ...attributableLegacyHistory(legacyDisk, vaultRoot),
+    ...attributableLegacyHistory(legacyLocal, vaultRoot),
+  ];
+  const seen = new Set<string>();
+  const migrated: AskVaultHistoryItem[] = [];
+  for (const item of entries) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    migrated.push(item);
+    if (migrated.length === ASK_HISTORY_LIMIT) break;
+  }
+  if (migrated.length > 0) await saveAskVaultHistory(vaultRoot, migrated);
+  return migrated;
 }
 
 export function estimateLineOffset(

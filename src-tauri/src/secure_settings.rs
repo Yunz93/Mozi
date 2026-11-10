@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tauri::Manager;
 
 const SECURE_SETTINGS_FILE_NAME: &str = "secure-settings.json";
@@ -25,6 +26,17 @@ const SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY: &str = "imageHostingS3Secre
 const SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET: &str = "imageHostingOssAccessKeySecret";
 const SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY: &str = "imageHostingQiniuSecretKey";
 const SECRET_KEY_EMBEDDING_API_KEY: &str = "embeddingApiKey";
+const SECRET_KEY_IMAGE_HOSTING_CUSTOM_HEADERS: &str = "imageHostingCustomHeaders";
+static SECURE_SETTINGS_MUTEX: Mutex<()> = Mutex::new(());
+
+fn with_secure_settings_process_lock<R>(
+    operation: impl FnOnce() -> Result<R, String>,
+) -> Result<R, String> {
+    let _guard = SECURE_SETTINGS_MUTEX
+        .lock()
+        .map_err(|_| "安全设置锁不可用。".to_string())?;
+    operation()
+}
 
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +54,7 @@ pub(crate) struct SecureSettingsResult {
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
     image_hosting_qiniu_secret_key: Option<String>,
+    image_hosting_custom_headers: Option<String>,
     embedding_api_key: Option<String>,
 }
 
@@ -61,6 +74,7 @@ struct SecureSettingsFile {
     image_hosting_s3_secret_access_key: Option<String>,
     image_hosting_oss_access_key_secret: Option<String>,
     image_hosting_qiniu_secret_key: Option<String>,
+    image_hosting_custom_headers: Option<String>,
     embedding_api_key: Option<String>,
 }
 
@@ -135,8 +149,15 @@ fn secure_settings_lock_path(app: &tauri::AppHandle) -> Result<PathBuf, String> 
     Ok(secure_settings_file_path(app)?.with_extension("json.lock"))
 }
 
-#[cfg(unix)]
 fn with_secure_settings_lock<R>(
+    app: &tauri::AppHandle,
+    operation: impl FnOnce() -> Result<R, String>,
+) -> Result<R, String> {
+    with_secure_settings_process_lock(|| with_secure_settings_file_lock(app, operation))
+}
+
+#[cfg(unix)]
+fn with_secure_settings_file_lock<R>(
     app: &tauri::AppHandle,
     operation: impl FnOnce() -> Result<R, String>,
 ) -> Result<R, String> {
@@ -170,7 +191,7 @@ fn with_secure_settings_lock<R>(
 }
 
 #[cfg(not(unix))]
-fn with_secure_settings_lock<R>(
+fn with_secure_settings_file_lock<R>(
     _app: &tauri::AppHandle,
     operation: impl FnOnce() -> Result<R, String>,
 ) -> Result<R, String> {
@@ -338,7 +359,8 @@ fn write_secure_settings_file(
         || settings.image_hosting_s3_secret_access_key.is_some()
         || settings.image_hosting_oss_access_key_secret.is_some()
         || settings.image_hosting_qiniu_secret_key.is_some()
-        || settings.embedding_api_key.is_some();
+        || settings.embedding_api_key.is_some()
+        || settings.image_hosting_custom_headers.is_some();
 
     if !has_secrets {
         match fs::remove_file(&path) {
@@ -357,49 +379,59 @@ fn write_secure_settings_file(
     let encrypted = encrypt_secure_settings(app, settings)?;
     let serialized = serde_json::to_vec_pretty(&encrypted)
         .map_err(|e| format!("Failed to serialize encrypted secure settings: {}", e))?;
-    let temp_path = path.with_extension("json.tmp");
+    write_secure_settings_bytes_at(&path, &serialized)
+}
 
-    fs::write(&temp_path, serialized).map_err(|e| {
-        format!(
-            "Failed to write secure settings temp file {}: {}",
-            temp_path.display(),
-            e
-        )
-    })?;
-
-    set_private_permissions(&temp_path)?;
-
-    fs::rename(&temp_path, &path).map_err(|e| {
-        format!(
-            "Failed to replace secure settings file {}: {}",
-            path.display(),
-            e
-        )
-    })
+fn write_secure_settings_bytes_at(path: &Path, serialized: &[u8]) -> Result<(), String> {
+    let temp_path = path.with_extension(format!("json.{}.tmp", uuid::Uuid::new_v4()));
+    let mut created = false;
+    let result = (|| {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|error| format!("创建安全设置临时文件失败: {error}"))?;
+        created = true;
+        // 先设置私有权限，再写入内容；失败时保留原文件。
+        set_private_permissions(&temp_path)?;
+        file.write_all(serialized)
+            .map_err(|error| format!("写入安全设置失败: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("刷新安全设置失败: {error}"))?;
+        drop(file);
+        fs::rename(&temp_path, path).map_err(|error| format!("替换安全设置失败: {error}"))
+    })();
+    if result.is_err() && created {
+        let _ = fs::remove_file(&temp_path);
+    }
+    result
 }
 
 fn read_secure_secret(app: &tauri::AppHandle, key: &str) -> Result<Option<String>, String> {
-    let settings = read_secure_settings_file(app)?;
-    Ok(match key {
-        SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token,
-        SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret,
-        SECRET_KEY_WEREAD_API_KEY => settings.weread_api_key,
-        SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
-        SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
-        SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key,
-        SECRET_KEY_GLM_API_KEY => settings.glm_api_key,
-        SECRET_KEY_KIMI_API_KEY => settings.kimi_api_key,
-        SECRET_KEY_MIMO_API_KEY => settings.mimo_api_key,
-        SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token,
-        SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
-            settings.image_hosting_s3_secret_access_key
-        }
-        SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET => {
-            settings.image_hosting_oss_access_key_secret
-        }
-        SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => settings.image_hosting_qiniu_secret_key,
-        SECRET_KEY_EMBEDDING_API_KEY => settings.embedding_api_key,
-        _ => None,
+    with_secure_settings_lock(app, || {
+        let settings = read_secure_settings_file(app)?;
+        Ok(match key {
+            SECRET_KEY_BLOG_GITHUB_TOKEN => settings.blog_github_token,
+            SECRET_KEY_WECHAT_APP_SECRET => settings.wechat_app_secret,
+            SECRET_KEY_WEREAD_API_KEY => settings.weread_api_key,
+            SECRET_KEY_GEMINI_API_KEY => settings.gemini_api_key,
+            SECRET_KEY_CODEX_API_KEY => settings.codex_api_key,
+            SECRET_KEY_DEEPSEEK_API_KEY => settings.deepseek_api_key,
+            SECRET_KEY_GLM_API_KEY => settings.glm_api_key,
+            SECRET_KEY_KIMI_API_KEY => settings.kimi_api_key,
+            SECRET_KEY_MIMO_API_KEY => settings.mimo_api_key,
+            SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN => settings.image_hosting_github_token,
+            SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY => {
+                settings.image_hosting_s3_secret_access_key
+            }
+            SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET => {
+                settings.image_hosting_oss_access_key_secret
+            }
+            SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY => settings.image_hosting_qiniu_secret_key,
+            SECRET_KEY_EMBEDDING_API_KEY => settings.embedding_api_key,
+            SECRET_KEY_IMAGE_HOSTING_CUSTOM_HEADERS => settings.image_hosting_custom_headers,
+            _ => None,
+        })
     })
 }
 
@@ -435,6 +467,9 @@ fn write_secure_secret(
                 settings.image_hosting_qiniu_secret_key = normalized
             }
             SECRET_KEY_EMBEDDING_API_KEY => settings.embedding_api_key = normalized,
+            SECRET_KEY_IMAGE_HOSTING_CUSTOM_HEADERS => {
+                settings.image_hosting_custom_headers = normalized
+            }
             _ => return Err(format!("Unsupported secure setting key: {}", key)),
         }
 
@@ -464,6 +499,7 @@ fn resolve_secret_key(key: &str) -> Option<&'static str> {
             Some(SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY)
         }
         SECRET_KEY_EMBEDDING_API_KEY => Some(SECRET_KEY_EMBEDDING_API_KEY),
+        SECRET_KEY_IMAGE_HOSTING_CUSTOM_HEADERS => Some(SECRET_KEY_IMAGE_HOSTING_CUSTOM_HEADERS),
         _ => None,
     }
 }
@@ -480,33 +516,25 @@ pub(crate) async fn get_secure_settings(
 }
 
 fn get_secure_settings_blocking(app: &tauri::AppHandle) -> Result<SecureSettingsResult, String> {
-    Ok(SecureSettingsResult {
-        blog_github_token: read_secure_secret(&app, SECRET_KEY_BLOG_GITHUB_TOKEN)?,
-        wechat_app_secret: read_secure_secret(&app, SECRET_KEY_WECHAT_APP_SECRET)?,
-        weread_api_key: read_secure_secret(&app, SECRET_KEY_WEREAD_API_KEY)?,
-        gemini_api_key: read_secure_secret(&app, SECRET_KEY_GEMINI_API_KEY)?,
-        codex_api_key: read_secure_secret(&app, SECRET_KEY_CODEX_API_KEY)?,
-        deepseek_api_key: read_secure_secret(&app, SECRET_KEY_DEEPSEEK_API_KEY)?,
-        glm_api_key: read_secure_secret(&app, SECRET_KEY_GLM_API_KEY)?,
-        kimi_api_key: read_secure_secret(&app, SECRET_KEY_KIMI_API_KEY)?,
-        mimo_api_key: read_secure_secret(&app, SECRET_KEY_MIMO_API_KEY)?,
-        image_hosting_github_token: read_secure_secret(
-            &app,
-            SECRET_KEY_IMAGE_HOSTING_GITHUB_TOKEN,
-        )?,
-        image_hosting_s3_secret_access_key: read_secure_secret(
-            &app,
-            SECRET_KEY_IMAGE_HOSTING_S3_SECRET_ACCESS_KEY,
-        )?,
-        image_hosting_oss_access_key_secret: read_secure_secret(
-            &app,
-            SECRET_KEY_IMAGE_HOSTING_OSS_ACCESS_KEY_SECRET,
-        )?,
-        image_hosting_qiniu_secret_key: read_secure_secret(
-            &app,
-            SECRET_KEY_IMAGE_HOSTING_QINIU_SECRET_KEY,
-        )?,
-        embedding_api_key: read_secure_secret(&app, SECRET_KEY_EMBEDDING_API_KEY)?,
+    with_secure_settings_lock(app, || {
+        let settings = read_secure_settings_file(app)?;
+        Ok(SecureSettingsResult {
+            blog_github_token: settings.blog_github_token,
+            wechat_app_secret: settings.wechat_app_secret,
+            weread_api_key: settings.weread_api_key,
+            gemini_api_key: settings.gemini_api_key,
+            codex_api_key: settings.codex_api_key,
+            deepseek_api_key: settings.deepseek_api_key,
+            glm_api_key: settings.glm_api_key,
+            kimi_api_key: settings.kimi_api_key,
+            mimo_api_key: settings.mimo_api_key,
+            image_hosting_github_token: settings.image_hosting_github_token,
+            image_hosting_s3_secret_access_key: settings.image_hosting_s3_secret_access_key,
+            image_hosting_oss_access_key_secret: settings.image_hosting_oss_access_key_secret,
+            image_hosting_qiniu_secret_key: settings.image_hosting_qiniu_secret_key,
+            image_hosting_custom_headers: settings.image_hosting_custom_headers,
+            embedding_api_key: settings.embedding_api_key,
+        })
     })
 }
 
@@ -536,6 +564,82 @@ pub(crate) fn read_weread_api_key(app: &tauri::AppHandle) -> Result<Option<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn secret_operations_are_serialized_across_threads_on_every_platform() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Barrier,
+        };
+        let start = Arc::new(Barrier::new(8));
+        let active = Arc::new(AtomicUsize::new(0));
+        let maximum = Arc::new(AtomicUsize::new(0));
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                let start = start.clone();
+                let active = active.clone();
+                let maximum = maximum.clone();
+                scope.spawn(move || {
+                    start.wait();
+                    with_secure_settings_process_lock(|| {
+                        let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+                        maximum.fetch_max(count, Ordering::SeqCst);
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                        active.fetch_sub(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                    .unwrap();
+                });
+            }
+        });
+        assert_eq!(maximum.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn unique_temp_files_ignore_old_temp_and_preserve_failed_targets() {
+        let directory = std::env::temp_dir().join(format!(
+            "mozi-secure-settings-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let path = directory.join("secure-settings.json");
+        let old_temp = directory.join("secure-settings.json.tmp");
+        fs::write(&old_temp, b"do not overwrite old temporary files").unwrap();
+        fs::write(&path, b"previous").unwrap();
+        write_secure_settings_bytes_at(&path, b"replacement").unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"replacement");
+        assert_eq!(
+            fs::read(&old_temp).unwrap(),
+            b"do not overwrite old temporary files"
+        );
+        let directory_target = directory.join("directory-target");
+        fs::create_dir(&directory_target).unwrap();
+        fs::write(directory_target.join("original"), b"preserved").unwrap();
+        assert!(
+            write_secure_settings_bytes_at(&directory_target, b"cannot replace directory").is_err()
+        );
+        assert_eq!(
+            fs::read(directory_target.join("original")).unwrap(),
+            b"preserved"
+        );
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 3);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn custom_image_headers_are_supported_by_encrypted_secret_schema() {
+        assert_eq!(
+            resolve_secret_key("imageHostingCustomHeaders"),
+            Some(SECRET_KEY_IMAGE_HOSTING_CUSTOM_HEADERS)
+        );
+        let mut settings = SecureSettingsFile::default();
+        settings.image_hosting_custom_headers = Some("{\"Authorization\":\"Bearer demo\"}".into());
+        let encoded = serde_json::to_value(&settings).unwrap();
+        assert_eq!(
+            encoded["imageHostingCustomHeaders"],
+            "{\"Authorization\":\"Bearer demo\"}"
+        );
+    }
 
     #[test]
     fn resolve_secret_key_accepts_weread_api_key() {

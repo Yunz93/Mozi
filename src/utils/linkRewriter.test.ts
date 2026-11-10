@@ -28,6 +28,106 @@ async function runRewrite(opts: {
 }
 
 describe("linkRewriter", () => {
+  it("does not rewrite code, comments, or escaped link syntax", async () => {
+    const protectedText = [
+      "`[[old]]` and ``[literal](old.md)``",
+      '```md\n[[old]]\n[example](old.md)\n<img src="old.md">\n```',
+      "> ~~~md\n> [[old]]\n> ~~~",
+      "    [[old]]\n    [example](old.md)",
+      "\\[[old]] and \\[example](old.md)",
+      "<!-- [[old]] and [example](old.md) -->",
+    ].join("\n\n");
+    const result = await runRewrite({
+      movedPathMap: { "/vault/old.md": "/vault/new.md" },
+      files: [file("/vault/ref.md"), file("/vault/new.md")],
+      fileContents: {
+        "/vault/ref.md":
+          protectedText +
+          "\n\n[[old]] and [real](old.md) and [escaped\\*label](old.md) and [see `code`](old.md)",
+      },
+    });
+    expect(result.modifiedFiles).toHaveLength(1);
+    expect(result.modifiedFiles[0].newContent).toBe(
+      protectedText +
+        "\n\n[[new]] and [real](new.md) and [escaped\\*label](new.md) and [see `code`](new.md)",
+    );
+  });
+
+  it("only rewrites the matching directory when note basenames collide", async () => {
+    const result = await runRewrite({
+      movedPathMap: { "/vault/a/old.md": "/vault/a/new.md" },
+      files: [
+        file("/vault/ref.md"),
+        file("/vault/a/new.md"),
+        file("/vault/b/old.md"),
+      ],
+      fileContents: { "/vault/ref.md": "[[a/old]] and [[b/old]]" },
+    });
+    expect(result.modifiedFiles[0].newContent).toBe("[[a/new]] and [[b/old]]");
+  });
+
+  it("rewrites a document-relative wiki path to the moved note", async () => {
+    const result = await runRewrite({
+      movedPathMap: { "/vault/old.md": "/vault/new.md" },
+      files: [file("/vault/notes/ref.md"), file("/vault/new.md")],
+      fileContents: { "/vault/notes/ref.md": "[[../old#section|label]]" },
+    });
+    expect(result.modifiedFiles[0]?.newContent).toBe(
+      "[[../new#section|label]]",
+    );
+  });
+
+  it("preserves an unqualified link resolved to an unchanged local namesake", async () => {
+    const result = await runRewrite({
+      movedPathMap: { "/vault/a/old.md": "/vault/a/new.md" },
+      files: [
+        file("/vault/b/ref.md"),
+        file("/vault/a/new.md"),
+        file("/vault/b/old.md"),
+      ],
+      fileContents: { "/vault/b/ref.md": "[[old]] and [[a/old]]" },
+    });
+    expect(result.modifiedFiles[0]?.newContent).toBe("[[old]] and [[a/new]]");
+  });
+
+  it("does not guess the target of an ambiguous unqualified wiki link", async () => {
+    const result = await runRewrite({
+      movedPathMap: { "/vault/a/old.md": "/vault/a/new.md" },
+      files: [
+        file("/vault/ref.md"),
+        file("/vault/a/new.md"),
+        file("/vault/b/old.md"),
+      ],
+      fileContents: { "/vault/ref.md": "[[old]] and [[a/old]]" },
+    });
+    expect(result.modifiedFiles[0]?.newContent).toBe("[[old]] and [[a/new]]");
+  });
+
+  it("qualifies the rewritten name when a root note would shadow its target", async () => {
+    const result = await runRewrite({
+      movedPathMap: { "/vault/a/old.md": "/vault/a/new.md" },
+      files: [
+        file("/vault/a/ref.md"),
+        file("/vault/a/new.md"),
+        file("/vault/new.md"),
+      ],
+      fileContents: { "/vault/a/ref.md": "[[old]]" },
+    });
+    expect(result.modifiedFiles[0]?.newContent).toBe("[[a/new]]");
+  });
+
+  it("qualifies a renamed basename that becomes ambiguous after the move", async () => {
+    const result = await runRewrite({
+      movedPathMap: { "/vault/a/old.md": "/vault/a/new.md" },
+      files: [
+        file("/vault/ref.md"),
+        file("/vault/a/new.md"),
+        file("/vault/b/new.md"),
+      ],
+      fileContents: { "/vault/ref.md": "[[old]]" },
+    });
+    expect(result.modifiedFiles[0]?.newContent).toBe("[[a/new]]");
+  });
   describe("standard markdown links", () => {
     it("rewrites image link when resource file is moved", async () => {
       const files = [
@@ -362,9 +462,7 @@ describe("linkRewriter", () => {
       );
     });
 
-    it("rewrites path-based wiki link when basename changes via basename fallback", async () => {
-      // The wiki link uses a path that doesn't match any byRelativePath entry,
-      // but the basename matches a byBasename entry with basenameChanged=true.
+    it("preserves a path-based wiki link that does not identify the moved note", async () => {
       const files = [
         file("/vault/notes/a.md"),
         file("/vault/notes/new-name.md"),
@@ -379,10 +477,7 @@ describe("linkRewriter", () => {
         },
       });
 
-      expect(result.modifiedFiles).toHaveLength(1);
-      expect(result.modifiedFiles[0].newContent).toBe(
-        "See [[sub/new-name]] for reference.",
-      );
+      expect(result.modifiedFiles).toHaveLength(0);
     });
 
     it("does not rewrite wiki link when file is only moved (basename unchanged)", async () => {

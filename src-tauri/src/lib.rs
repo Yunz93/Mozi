@@ -1191,17 +1191,51 @@ fn write_text_file_atomic_at(path: &Path, content: &str) -> Result<(), String> {
     write_result
 }
 
+static DOCUMENT_WRITE_LOCK: Mutex<()> = Mutex::new(());
+
+fn normalized_document_text(content: &str) -> String {
+    content
+        .strip_prefix('\u{feff}')
+        .unwrap_or(content)
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+}
+
+/// 普通保存与条件写入共用锁，防止其他窗口在比较后插入一次保存。
+fn write_text_file_checked_at(
+    path: &Path,
+    content: &str,
+    expected_content: Option<&str>,
+) -> Result<bool, String> {
+    let _guard = DOCUMENT_WRITE_LOCK
+        .lock()
+        .map_err(|_| "Document write lock is unavailable".to_string())?;
+    if let Some(expected) = expected_content {
+        let current = match fs::read_to_string(path) {
+            Ok(current) => current,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(format!("Failed to read {}: {error}", path.display())),
+        };
+        if normalized_document_text(&current) != normalized_document_text(expected) {
+            return Ok(false);
+        }
+    }
+    write_text_file_atomic_at(path, content)?;
+    Ok(true)
+}
+
 /// Must stay `async`: disk I/O on the main thread freezes every window.
 #[tauri::command]
 async fn write_text_file_atomic(
     app: tauri::AppHandle,
     path: String,
     content: String,
-) -> Result<(), String> {
+    expected_content: Option<String>,
+) -> Result<bool, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let canonical = canonicalize_scope_path(&path)?;
         ensure_path_allowed(app.state::<SecurityState>().inner(), &canonical)?;
-        write_text_file_atomic_at(&canonical, &content)
+        write_text_file_checked_at(&canonical, &content, expected_content.as_deref())
     })
     .await
     .map_err(|error| format!("Failed to join atomic write task: {}", error))?
@@ -1721,6 +1755,52 @@ mod tests {
             resolve_file_window_size(Some((0.0, 100.0))),
             (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         );
+    }
+
+    #[test]
+    fn checked_write_rejects_newer_saved_content_and_missing_files() {
+        let dir = create_test_directory("checked-write-conflict");
+        let target = dir.join("note.md");
+        fs::write(&target, "new paragraph [[old]]").unwrap();
+        assert!(!write_text_file_checked_at(&target, "old [[new]]", Some("old [[old]]")).unwrap());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "new paragraph [[old]]");
+        assert!(!write_text_file_checked_at(&dir.join("missing.md"), "new", Some("old")).unwrap());
+        assert!(!dir.join("missing.md").exists());
+        cleanup_test_directory(&dir);
+    }
+
+    #[test]
+    fn checked_write_accepts_editor_normalized_bom_and_line_endings() {
+        let dir = create_test_directory("checked-write-format");
+        let target = dir.join("note.md");
+        fs::write(&target, "\u{feff}first\r\nsecond\rthird").unwrap();
+        assert!(write_text_file_checked_at(&target, "replacement", Some("first\nsecond\nthird")).unwrap());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "replacement");
+        assert!(write_text_file_checked_at(&target, "manual save", None).unwrap());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "manual save");
+        cleanup_test_directory(&dir);
+    }
+
+    #[test]
+    fn concurrent_checked_writes_have_only_one_winner() {
+        use std::sync::{Arc, Barrier};
+        let dir = create_test_directory("checked-write-concurrent");
+        let target = dir.join("note.md");
+        fs::write(&target, "baseline").unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let workers: Vec<_> = ["first", "second"].into_iter().map(|content| {
+            let target = target.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                write_text_file_checked_at(&target, content, Some("baseline")).unwrap()
+            })
+        }).collect();
+        let wins = workers.into_iter().map(|worker| worker.join().unwrap()).filter(|won| *won).count();
+        assert_eq!(wins, 1);
+        let saved = fs::read_to_string(&target).unwrap();
+        assert!(saved == "first" || saved == "second");
+        cleanup_test_directory(&dir);
     }
 
     #[test]

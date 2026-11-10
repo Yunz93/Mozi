@@ -212,7 +212,7 @@ export default {
   wechatDraftDialog_previewFailed: "预览生成失败，仍可尝试发布。",
   wechatDraftDialog_unresolvedImages: "有图片找不到，修好路径后才能发布。",
   wechatDraftDialog_ipHint:
-    "IP 不在白名单时，请到公众平台「基本配置 → IP 白名单」添加本机出口 IP。",
+    "IP 不在白名单时，请到公众平台「设置与开发 → 安全中心 → IP 白名单」添加本机出口 IP。",
 
   wereadImport_title: "导入微信读书笔记",
   wereadImport_desc:
@@ -950,7 +950,7 @@ export default {
   settings_wechatGuide2:
     "第一版只支持单个公众号账号。再次发布同一篇笔记时，会优先使用笔记里保存的 `wechat_draft_media_id` 更新原草稿。",
   settings_wechatGuide3:
-    "IP 白名单也在「基本配置」页：点「IP 白名单」后的「修改」，加入本机公网 IPv4。可在浏览器搜索「本机 IP」，或看发布失败提示里的地址。未加入时无法获取 access_token。",
+    "在公众平台「设置与开发 → 安全中心 → IP 白名单」中加入本机出口 IPv4，可复制发布失败提示里的地址。未加入时无法获取 access_token。",
   settings_wereadSectionTitle: "微信读书笔记导入",
   settings_wereadSectionDesc:
     "用微信读书 Skill API Key 把划线和想法导入为本地 Markdown 笔记。密钥只保存在本机。",
@@ -1101,6 +1101,16 @@ export default {
     "文档较长，为避免导出崩溃已自动降低输出清晰度。",
   notifications_publishResultUnknown:
     "发布等待超时，结果未知：远端可能已发布成功。请确认远端状态后再重试，本地状态未回滚。",
+  notifications_blogLegacyTargetMissing:
+    "未能确认原来发布的文章，已停止发布且未修改远端内容。原笔记可能改过文件名或位置；请恢复原文件名并成功更新一次，建立关联后即可再次改名。",
+  notifications_blogOwnershipConflict:
+    "目标文章不属于当前笔记，已停止发布并保留远端内容。请使用原笔记更新；若要发布新文章，请新建笔记并复制正文后重试。",
+  notifications_blogSourceMismatch:
+    "无法确认当前笔记的发布来源，已停止发布。请重新打开笔记后重试；若仍失败，请新建笔记并复制正文后发布。",
+  notifications_blogTargetMismatch:
+    "发布目标或图片目录与当前笔记不一致，已停止发布。请重新打开笔记后重试；若仍失败，请新建笔记并复制正文后发布。",
+  notifications_blogExistingReadFailed:
+    "无法读取原来发布的文章，已保留远端内容。请在博客仓库确认原文章可以正常读取，再重试。",
   notifications_publishInProgress: "已有发布任务正在进行，请等待完成后再试。",
   notifications_publishBackfillFailed:
     "已发布到博客，但把文章链接写回笔记失败了。",

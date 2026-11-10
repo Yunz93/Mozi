@@ -1,6 +1,7 @@
 import { useAppStore } from "../store/appStore";
 import type { AppLanguage } from "../types";
 import { localizeKnownError, t } from "./i18n";
+import { getWechatErrorNotificationDuration } from "./wechatPublishErrors";
 
 /**
  * Error codes for file system operations
@@ -220,6 +221,7 @@ export function reportUnhandledRuntimeError(
       .showNotification(
         userFacingRuntimeErrorMessage(error, language),
         "error",
+        getWechatErrorNotificationDuration(getErrorMessage(error)),
       );
   } catch {
     // store / i18n 可能尚未就绪

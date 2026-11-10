@@ -100,6 +100,117 @@ describe("useImagePaste async document safety", () => {
     for (const view of views.splice(0)) view.destroy();
   });
 
+  it("restores selected text when an image upload fails without a local copy", async () => {
+    const upload = deferred<{ url: string }>();
+    mocks.uploadImageToHosting.mockReturnValue(upload.promise);
+    const context = setup();
+    context.view.dispatch({ selection: { anchor: 7, head: 15 } });
+    const { pending } = await startPaste(context);
+    expect(context.view.state.doc.toString()).toContain("Uploading");
+    await act(async () => {
+      upload.reject(new Error("network failed"));
+      expect(await pending).toBe(false);
+    });
+    expect(context.view.state.doc.toString()).toBe("prefix original body");
+  });
+
+  it("keeps same-name same-clock concurrent upload rollbacks independent", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(123456789);
+    try {
+      const first = deferred<{ url: string }>();
+      const second = deferred<{ url: string }>();
+      mocks.uploadImageToHosting
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValueOnce(second.promise);
+      const context = setup();
+      Object.defineProperty(context.file, "name", { value: "same-name.png" });
+      context.view.dispatch({ selection: { anchor: 0, head: 6 } });
+      const firstPaste = await startPaste(context);
+      const firstPlaceholder = context.view.state.doc
+        .toString()
+        .match(/!\[Uploading[^\n]+?\]\(\)/)![0];
+      const secondFrom = context.view.state.doc.toString().indexOf("original");
+      context.view.dispatch({
+        selection: { anchor: secondFrom, head: secondFrom + "original".length },
+      });
+      const secondPaste = await startPaste(context);
+      expect(mocks.uploadImageToHosting.mock.calls[0][1]).not.toBe(
+        mocks.uploadImageToHosting.mock.calls[1][1],
+      );
+      await act(async () => {
+        second.reject(new Error("second failed"));
+        await secondPaste.pending;
+      });
+      expect(context.view.state.doc.toString()).toBe(
+        firstPlaceholder + " original body",
+      );
+      await act(async () => {
+        first.reject(new Error("first failed"));
+        await firstPaste.pending;
+      });
+      expect(context.view.state.doc.toString()).toBe("prefix original body");
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("restores only the upload placeholder and preserves later typing and selection", async () => {
+    const upload = deferred<{ url: string }>();
+    mocks.uploadImageToHosting.mockReturnValue(upload.promise);
+    const context = setup();
+    context.view.dispatch({ selection: { anchor: 7, head: 15 } });
+    const { pending } = await startPaste(context);
+    context.view.dispatch({
+      changes: { from: 0, insert: "new " },
+      selection: { anchor: 0, head: 3 },
+    });
+    await act(async () => {
+      upload.reject(new Error("network failed"));
+      await pending;
+    });
+    expect(context.view.state.doc.toString()).toBe("new prefix original body");
+    expect(context.view.state.selection.main.from).toBe(0);
+    expect(context.view.state.selection.main.to).toBe(3);
+  });
+
+  it("does not restore selected text into a changed document after upload failure", async () => {
+    const upload = deferred<{ url: string }>();
+    mocks.uploadImageToHosting.mockReturnValue(upload.promise);
+    const context = setup();
+    context.view.dispatch({ selection: { anchor: 7, head: 15 } });
+    const { pending } = await startPaste(context);
+    context.rerender({ path: "/vault/b.md" });
+    context.view.setState(EditorState.create({ doc: "second note" }));
+    await act(async () => {
+      upload.reject(new Error("network failed"));
+      await pending;
+    });
+    expect(context.view.state.doc.toString()).toBe("second note");
+  });
+
+  it("restores selected text if uploading and the local fallback both fail", async () => {
+    useAppStore.setState({
+      settings: {
+        ...useAppStore.getState().settings,
+        imageHosting: {
+          ...useAppStore.getState().settings.imageHosting,
+          keepLocalCopy: true,
+        },
+      },
+    });
+    const upload = deferred<{ url: string }>();
+    mocks.uploadImageToHosting.mockReturnValue(upload.promise);
+    const context = setup();
+    context.writeBinaryFile.mockRejectedValue(new Error("disk full"));
+    context.view.dispatch({ selection: { anchor: 7, head: 15 } });
+    const { pending } = await startPaste(context);
+    await act(async () => {
+      upload.reject(new Error("network failed"));
+      expect(await pending).toBe(false);
+    });
+    expect(context.view.state.doc.toString()).toBe("prefix original body");
+  });
+
   it("keeps new text intact when the upload placeholder was deleted", async () => {
     const upload = deferred<{ url: string }>();
     mocks.uploadImageToHosting.mockReturnValue(upload.promise);

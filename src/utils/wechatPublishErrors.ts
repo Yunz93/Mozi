@@ -12,6 +12,11 @@ export type WechatPublishErrorKind =
   | "generic";
 
 const WECHAT_API_ERROR_RE = /WeChat API error\s+(-?\d+)/i;
+
+/** 白名单错误需要留出选中、复制出口 IP 的时间。 */
+export function getWechatErrorNotificationDuration(message: string): number {
+  return classifyWechatPublishError(message) === "ipAllowlist" ? 30_000 : 3000;
+}
 const IPV4_RE =
   /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g;
 
