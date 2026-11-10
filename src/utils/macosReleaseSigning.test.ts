@@ -13,6 +13,18 @@ const releaseWorkflowPath = resolve(
 );
 
 describe("macOS release signing configuration", () => {
+  it("发布流程的外部Action全部固定为完整提交号", () => {
+    const workflow = load(readFileSync(releaseWorkflowPath, "utf8")) as {
+      jobs: Record<string, { steps: Array<{ uses?: string }> }>;
+    };
+    const actions = Object.values(workflow.jobs).flatMap((job) =>
+      job.steps.flatMap((step) => (step.uses ? [step.uses] : [])),
+    );
+    expect(actions.length).toBeGreaterThan(0);
+    for (const action of actions)
+      expect(action).toMatch(/^[\w-]+\/[\w/-]+@[a-f0-9]{40}$/);
+  });
+
   it("recovers macOS assets from an existing tag on a pinned Arm64 runner", () => {
     const workflow = load(readFileSync(releaseWorkflowPath, "utf8")) as {
       on: Record<

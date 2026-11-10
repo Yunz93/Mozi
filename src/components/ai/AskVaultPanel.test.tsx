@@ -151,6 +151,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   __resetPreviewNavigationBridgeForTests();
   vi.unstubAllGlobals();
 });
@@ -536,6 +537,10 @@ describe("AskVaultPanel 检索身份", () => {
   });
 
   it("追问成功后仍将新回答追加到可见历史", async () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: crypto.getRandomValues.bind(crypto),
+    });
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
     renderPanel();
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "first" },
@@ -547,6 +552,10 @@ describe("AskVaultPanel 检索身份", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "askVault_ask" }));
     await waitFor(() => expect(mocks.history).toHaveBeenCalledTimes(2));
+    const firstId = mocks.history.mock.calls[0][1].id;
+    const secondId = mocks.history.mock.calls[1][1].id;
+    now.mockRestore();
+    expect(secondId).not.toBe(firstId);
     expect(mocks.answer.mock.calls[1][3]).toBe("first");
     expect(
       screen.getByRole("tab", { name: /askVault_history/ }).textContent,

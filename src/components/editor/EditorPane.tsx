@@ -31,7 +31,6 @@ import {
   registerActiveEditorFlush,
   registerActiveEditorView,
 } from "../../utils/editorSelectionBridge";
-import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import {
   getResolvedCodeFontFamily,
@@ -60,10 +59,7 @@ import { throttle } from "../../utils/throttle";
 import { decodeUserFacingPath } from "../../utils/pathHelpers";
 import { useI18n } from "../../hooks/useI18n";
 import type { ShikiHighlighter } from "../../hooks/useShikiHighlighter";
-import {
-  uploadImageToHosting,
-  isImageHostingEnabled,
-} from "../../services/imageHostingService";
+import { uploadImageToHosting } from "../../services/imageHostingService";
 import { readFile as tauriReadFile } from "@tauri-apps/plugin-fs";
 import {
   createAttachmentResolverContext,
@@ -175,15 +171,22 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
     const resolvedPlaceholder = placeholder ?? t("editor_placeholder");
 
     const editorFontFamily = useMemo(
-      () => getResolvedEditorFontFamily(settings),
+      () =>
+        getResolvedEditorFontFamily({
+          editorFontFamily: settings.editorFontFamily,
+        }),
       [settings.editorFontFamily],
     );
     const previewFontFamily = useMemo(
-      () => getResolvedPreviewFontFamily(settings),
+      () =>
+        getResolvedPreviewFontFamily({
+          previewFontFamily: settings.previewFontFamily,
+        }),
       [settings.previewFontFamily],
     );
     const codeFontFamily = useMemo(
-      () => getResolvedCodeFontFamily(settings),
+      () =>
+        getResolvedCodeFontFamily({ codeFontFamily: settings.codeFontFamily }),
       [settings.codeFontFamily],
     );
     const { writeBinaryFile, refreshFileTree, readFile } = useFileSystem();
@@ -454,12 +457,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, EditorPaneProps>(
       onContextMenu: handleSelectionContextMenu,
     });
 
+    const editorRef = codeMirror.editorRef;
     const setEditorContainer = useCallback(
       (element: HTMLDivElement | null) => {
         editorRootRef.current = element;
-        codeMirror.editorRef(element);
+        editorRef(element);
       },
-      [codeMirror.editorRef],
+      [editorRef],
     );
 
     const handleGenerateWikiClick = useCallback(async () => {

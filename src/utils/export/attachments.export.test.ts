@@ -6,7 +6,7 @@ import {
   enhanceExportAttachmentEmbeds,
   prepareHtmlForDownload,
 } from "./attachments";
-import * as shikiSnapshots from "../../components/editor/preview/shikiHtmlSnapshots";
+import * as shikiSnapshots from "../shikiHtmlSnapshots";
 
 describe("enhanceExportAttachmentEmbeds", () => {
   beforeEach(() => {

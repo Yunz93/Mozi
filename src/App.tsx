@@ -250,7 +250,9 @@ const App: React.FC = () => {
     );
     document.documentElement.style.setProperty(
       "--editor-font-family",
-      getResolvedEditorFontFamily(settings),
+      getResolvedEditorFontFamily({
+        editorFontFamily: settings.editorFontFamily,
+      }),
     );
   }, [settings.fontSize, settings.uiFontSize, settings.editorFontFamily]);
   useAppBootstrap({
@@ -631,9 +633,12 @@ const App: React.FC = () => {
     [setViewMode],
   );
 
-  const handleSidebarWidthChange = useCallback((nextWidth: number) => {
-    setSidebarWidth(nextWidth);
-  }, []);
+  const handleSidebarWidthChange = useCallback(
+    (nextWidth: number) => {
+      setSidebarWidth(nextWidth);
+    },
+    [setSidebarWidth],
+  );
 
   const handleSubmitNewNote = useCallback(
     (value: string) => {
@@ -702,9 +707,12 @@ const App: React.FC = () => {
     [fileOps, refreshFileTree, rootFolderPath, showNotification, t],
   );
 
-  const handleOutlineWidthChange = useCallback((nextWidth: number) => {
-    setOutlineWidth(nextWidth);
-  }, []);
+  const handleOutlineWidthChange = useCallback(
+    (nextWidth: number) => {
+      setOutlineWidth(nextWidth);
+    },
+    [setOutlineWidth],
+  );
 
   const standaloneDocumentSession = isStandaloneDocumentSession(
     rootFolderPath,
@@ -885,6 +893,7 @@ const App: React.FC = () => {
       isNonMarkdownWorkspaceFile,
       isSidebarOpen,
       setSidebarOpen,
+      setIsOutlineOpen,
       setSettingsOpen,
       setViewMode,
       settings.formatMarkdownOnManualSave,
@@ -975,7 +984,7 @@ const App: React.FC = () => {
     [rootFolderPath],
   );
   const uiFontFamily = useMemo(
-    () => getResolvedUiFontFamily(settings),
+    () => getResolvedUiFontFamily({ uiFontFamily: settings.uiFontFamily }),
     [settings.uiFontFamily],
   );
   const uiScaleStyle = useMemo(

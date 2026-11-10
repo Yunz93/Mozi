@@ -28,7 +28,7 @@ import {
   applyAlphaRomanListAttrs,
 } from "./markdownAlphaRomanList";
 import type { ShikiHighlighter } from "../hooks/useShikiHighlighter";
-import { normalizeHttpUrlForHtmlAttribute } from "../components/editor/preview/previewMedia";
+import { normalizeHttpUrlForHtmlAttribute } from "./httpUrl";
 import { markdownItCallouts } from "./markdownCallouts";
 
 interface MarkdownRenderOptions {

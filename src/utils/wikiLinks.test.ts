@@ -222,6 +222,69 @@ Just some plain text.`;
 });
 
 describe("resolveWikiLinkFile", () => {
+  it("按显式相对路径消除点段，不受同名笔记或根目录优先级影响", () => {
+    const file = (path: string): FileNode => ({
+      id: path,
+      path,
+      name: path.split("/").pop()!,
+      type: "file",
+    });
+    const root = file("/vault/Note.md");
+    const a = file("/vault/a/Note.md");
+    const b = file("/vault/b/Note.md");
+    const files = [root, a, b];
+    expect(
+      resolveWikiLinkFile(files, "../a/Note", "/vault", "/vault/b/ref.md"),
+    ).toBe(a);
+    expect(
+      resolveWikiLinkFile(files, "./Note", "/vault", "/vault/b/ref.md"),
+    ).toBe(b);
+    expect(
+      resolveWikiLinkFile(
+        files,
+        "../a/./Note.md#标题|别名",
+        "/vault",
+        "/vault/b/ref.md",
+      ),
+    ).toBe(a);
+    expect(
+      resolveWikiLinkFile(
+        files,
+        "../missing/Note",
+        "/vault",
+        "/vault/b/ref.md",
+      ),
+    ).toBeNull();
+    expect(
+      resolveWikiLinkFile(files, "../../Note", "/vault", "/vault/b/ref.md"),
+    ).toBeNull();
+    expect(
+      resolveWikiLinkFile(files, "Note", "/vault", "/vault/b/ref.md"),
+    ).toBe(root);
+  });
+
+  it("解析Windows分隔符及编码后的父目录路径", () => {
+    const target: FileNode = {
+      id: "target",
+      path: "C:\\Vault\\a\\笔记.md",
+      name: "笔记.md",
+      type: "file",
+    };
+    const namesake: FileNode = {
+      ...target,
+      id: "other",
+      path: "C:\\Vault\\c\\笔记.md",
+    };
+    expect(
+      resolveWikiLinkFile(
+        [target, namesake],
+        "..\\a\\%E7%AC%94%E8%AE%B0",
+        "C:\\Vault",
+        "C:\\Vault\\b\\ref.md",
+      ),
+    ).toBe(target);
+  });
+
   const files: FileNode[] = [
     {
       id: "/root/notes/hello.md",

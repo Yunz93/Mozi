@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { FileNode } from "../types";
 import { findAndRewriteAffectedFiles } from "./linkRewriter";
+import { resolveWikiLinkFile } from "./wikiLinks";
 
 function file(path: string, name?: string): FileNode {
   return {
@@ -28,6 +29,80 @@ async function runRewrite(opts: {
 }
 
 describe("linkRewriter", () => {
+  it("目录重命名不会伪装成同名笔记并误改已有链接", async () => {
+    const target = file("/vault/x/old.md");
+    const source = "/vault/ref.md";
+    const files: FileNode[] = [
+      file(source),
+      target,
+      {
+        id: "folder",
+        path: "/vault/new",
+        name: "new",
+        type: "folder",
+        children: [file("/vault/new/a.md")],
+      },
+    ];
+    const result = await runRewrite({
+      movedPathMap: {
+        "/vault/old": "/vault/new",
+        "/vault/old/a.md": "/vault/new/a.md",
+      },
+      files,
+      fileContents: { [source]: "[[old]]" },
+    });
+    expect(result.modifiedFiles).toEqual([]);
+    expect(resolveWikiLinkFile(files, "old", ROOT, source)).toBe(target);
+  });
+
+  it("编码后的显式相对链接不跟随根目录同名笔记重命名", async () => {
+    const source = "/vault/b/ref.md";
+    const local = file("/vault/b/old.md");
+    const files = [file(source), local, file("/vault/new.md")];
+    const original = "[[%2E%2Fold]]";
+    expect(
+      resolveWikiLinkFile(files, original.slice(2, -2), ROOT, source),
+    ).toBe(local);
+    const result = await runRewrite({
+      movedPathMap: { "/vault/old.md": "/vault/new.md" },
+      files,
+      fileContents: { [source]: original },
+    });
+    expect(result.modifiedFiles).toEqual([]);
+  });
+
+  it("引用笔记跨目录移动后仍指向原目录中的显式相对目标", async () => {
+    const source = "/vault/c/ref.md";
+    const target = file("/vault/a/Note.md");
+    const files = [file(source), target, file("/vault/c/Note.md")];
+    const result = await runRewrite({
+      movedPathMap: { "/vault/a/ref.md": source },
+      files,
+      fileContents: { [source]: "[[./Note#标题|别名]]" },
+    });
+    const rewritten = result.modifiedFiles[0]?.newContent;
+    expect(rewritten).toBe("[[../a/Note#标题|别名]]");
+    expect(
+      resolveWikiLinkFile(files, rewritten!.slice(2, -2), ROOT, source),
+    ).toBe(target);
+  });
+
+  it("跨目录重命名后，重写的Wiki链接仍能导航到目标而非同名笔记", async () => {
+    const source = "/vault/b/ref.md";
+    const target = file("/vault/a/new.md");
+    const files = [file(source), target, file("/vault/c/new.md")];
+    const result = await runRewrite({
+      movedPathMap: { "/vault/a/old.md": target.path },
+      files,
+      fileContents: { [source]: "[[../a/old#标题|别名]]" },
+    });
+    const rewritten = result.modifiedFiles[0]?.newContent;
+    expect(rewritten).toBe("[[../a/new#标题|别名]]");
+    expect(
+      resolveWikiLinkFile(files, rewritten!.slice(2, -2), ROOT, source),
+    ).toBe(target);
+  });
+
   it("does not rewrite code, comments, or escaped link syntax", async () => {
     const protectedText = [
       "`[[old]]` and ``[literal](old.md)``",
