@@ -17,13 +17,13 @@
 
 Windows 打包工具通过 GitHub Release API 下载，按官方资产摘要校验 SHA-256，并缓存匹配 Tauri CLI 2.11 的 NSIS 3.11 与配套 DLL。遇到临时打包下载失败时，只重试 `tauri bundle`，复用已编译程序。
 
-实施顺序：先验证驱动连接，再执行 33 项功能用例和性能采样，最后检查普通发布配置的程序。修复失败后，要求三个常规平台和 Linux 已安装升级任务通过再合并。各平台独立排队，可选 Intel 检查只在手动启用时加入。
+实施顺序：先验证驱动连接，再执行 34 项功能用例和性能采样，最后检查普通发布配置的程序。修复失败后，要求三个常规平台和 Linux 已安装升级任务通过再合并。各平台独立排队，可选 Intel 检查只在手动启用时加入。
 
 ## 验收内容
 
 原有 25 项用例覆盖初始快照、外部修改与任务索引、原子替换、Unicode 和仅大小写重命名、目录移动删除、回收站与隐藏文件／符号链接策略、自身保存、同路径目录重建、2／5 窗口共享监听、跨窗口令牌所有权、无知识库窗口时的后台任务、单文件授权边界、根目录消失恢复、未保存内容保护、监听丢失后的轮询快照，以及万文件目录的滚动、展开、定位、字体和窗口缩放、短笔记搜索、真实延迟加载的语法高亮。后台任务用例保留一个独立文件窗口维持应用存活；不代表托盘零窗口模式已验收。
 
-新增 8 项覆盖：专注模式与光标、待办 `@` 日期选择、后台刷新保持选区和焦点、紧凑日历角标、正常关闭保存、保存失败取消后重试、全屏关闭保存，以及多窗口退出保存。关闭窗口使用标准 WebDriver `DELETE /window`，经过真实 `CloseRequested`，不再直接调用强制关闭命令。多窗口退出从主窗口接收退出事件开始，不能代替原生菜单／Dock／Cmd+Q 验收。驱动键盘事件也是合成事件，不能代替真实输入法。
+新增 9 项覆盖：专注模式与光标、待办 `@` 日期选择、保存提示出现时仍能打开工具栏回收站、后台刷新保持选区和焦点、紧凑日历角标、正常关闭保存、保存失败取消后重试、全屏关闭保存，以及多窗口退出保存。保存提示的检查同时验证文本可选择、提示留在视口内且不覆盖工具栏。关闭窗口使用标准 WebDriver `DELETE /window`，经过真实 `CloseRequested`，不再直接调用强制关闭命令。多窗口退出从主窗口接收退出事件开始，不能代替原生菜单／Dock／Cmd+Q 验收。驱动键盘事件也是合成事件，不能代替真实输入法。
 
 用例清单由 `scripts/desktop/case-manifest.json` 管理；缺项、重名或失败都会阻止完整验收通过。配置在导航卸载时写入临时 profile，避免旧页面的异步持久化覆盖测试配置。
 
@@ -69,7 +69,7 @@ MOZI_DESKTOP_BINARY='src-tauri/target/release/bundle/macos/Mozi Desktop E2E.app/
   node scripts/desktop/run.mjs
 ```
 
-`MOZI_DESKTOP_PERFORMANCE=full` 扩大性能矩阵。`MOZI_DESKTOP_SUITE=bootstrap` 仅诊断驱动连接，不算完成验收。完整结果必须包含 33 项功能用例与 bootstrap，共 34 项，并以 `status: passed` 结束。性能比较另生成 `performance-comparison.json`；Linux 升级证据位于 `linux-installed-upgrade` 工件。
+`MOZI_DESKTOP_PERFORMANCE=full` 扩大性能矩阵。`MOZI_DESKTOP_SUITE=bootstrap` 仅诊断驱动连接，不算完成验收。完整结果必须包含 34 项功能用例与 bootstrap，共 35 项，并以 `status: passed` 结束。性能比较另生成 `performance-comparison.json`；Linux 升级证据位于 `linux-installed-upgrade` 工件。
 
 ## 合并门禁
 

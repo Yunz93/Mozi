@@ -27,6 +27,7 @@
   "real-lazy-language-switch",
   "focus-mode-dims-paragraphs-and-keeps-caret",
   "task-date-picker-inserts-day-and-restores-caret",
+  "save-notification-keeps-toolbar-and-trash-accessible",
   "background-tree-refresh-keeps-editor-selection-and-focus",
   "task-calendar-badge-is-compact-and-selectable",
   "normal-window-close-saves-unsaved-edits",
