@@ -194,6 +194,57 @@ export async function writeIndexJson(
   }
 }
 
+/** 桌面端由后端持锁合并，浏览器与写失败场景保留同一份待落盘历史。 */
+export async function mergeAskHistoryItems<
+  T extends { id: string; at: number },
+>(vaultRoot: string, items: T[]): Promise<T[]> {
+  const key = memoryKey(vaultRoot, ASK_HISTORY_FILE, "ask-history");
+  const pending = readMemoryJson<{
+    version: number;
+    vaultRoot: string;
+    items: T[];
+  }>(vaultRoot, ASK_HISTORY_FILE, "ask-history");
+  const ownedPending =
+    pending?.version === 2 &&
+    typeof pending.vaultRoot === "string" &&
+    normalizeVaultIdentityPath(pending.vaultRoot) ===
+      normalizeVaultIdentityPath(vaultRoot) &&
+    Array.isArray(pending.items)
+      ? pending.items
+      : [];
+  const seen = new Set<string>();
+  const merged = [...items, ...ownedPending]
+    .filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    .sort((left, right) => right.at - left.at)
+    .slice(0, 50);
+  const payload = JSON.stringify({ version: 2, vaultRoot, items: merged });
+  memoryStore.set(key, payload);
+  if (!isTauriEnvironment()) return merged;
+
+  try {
+    const dir = await resolveDataDir(vaultRoot, "ask-history");
+    if (!dir) throw new Error("History storage is unavailable");
+    const { mkdir } = await import("@tauri-apps/plugin-fs");
+    const { join } = await import("@tauri-apps/api/path");
+    const { invoke } = await import("@tauri-apps/api/core");
+    await mkdir(dir, { recursive: true });
+    const saved = await invoke<T[]>("merge_ask_vault_history", {
+      path: await join(dir, ASK_HISTORY_FILE),
+      vaultRoot,
+      items: merged,
+    });
+    if (memoryStore.get(key) === payload) memoryStore.delete(key);
+    return saved;
+  } catch (error) {
+    console.warn("Failed to persist question history:", error);
+    return merged;
+  }
+}
+
 export async function clearIndexStorage(vaultRoot: string): Promise<void> {
   const prefix = `${normalizeVaultIdentityPath(vaultRoot)}::vault-index::`;
   for (const key of [...memoryStore.keys()]) {

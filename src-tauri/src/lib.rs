@@ -1,4 +1,5 @@
 mod ai_provider;
+mod ask_history;
 mod image_hosting;
 mod macos_update;
 mod native_new_window;
@@ -927,6 +928,7 @@ pub fn run() {
             install_macos_update,
             discard_macos_update,
             write_text_file_atomic,
+            ask_history::merge_ask_vault_history,
             force_close_window,
             force_exit_app,
             tasks::task_calendar_snapshot,

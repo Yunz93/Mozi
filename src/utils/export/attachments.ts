@@ -14,7 +14,7 @@ import {
 import {
   protectShikiPresInHtmlString,
   restoreShikiPresFromSnapshots,
-} from "../../components/editor/preview/shikiHtmlSnapshots";
+} from "../shikiHtmlSnapshots";
 
 export type { ExportAttachmentContext } from "./types";
 

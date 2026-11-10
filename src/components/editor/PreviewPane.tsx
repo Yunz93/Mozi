@@ -124,11 +124,15 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, PreviewPaneProps>(
     const debouncedContent = useLargeDocDebouncedValue(content, activeTabId);
     const previewContent = useDeferredValue(debouncedContent);
     const previewFontFamily = useMemo(
-      () => getResolvedPreviewFontFamily(settings),
+      () =>
+        getResolvedPreviewFontFamily({
+          previewFontFamily: settings.previewFontFamily,
+        }),
       [settings.previewFontFamily],
     );
     const codeFontFamily = useMemo(
-      () => getResolvedCodeFontFamily(settings),
+      () =>
+        getResolvedCodeFontFamily({ codeFontFamily: settings.codeFontFamily }),
       [settings.codeFontFamily],
     );
     const previewRef = useRef<HTMLDivElement>(null);

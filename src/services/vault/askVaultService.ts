@@ -27,7 +27,7 @@ import {
   normalizeVaultIdentityPath,
   readIndexJson,
   readLegacyIndexJson,
-  writeIndexJson,
+  mergeAskHistoryItems,
 } from "./indexStorage";
 
 export interface AskVaultRequest {
@@ -243,7 +243,10 @@ function isHistoryItem(value: unknown): value is AskVaultHistoryItem {
 
 export function parseAskVaultHistory(value: unknown): AskVaultHistoryItem[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isHistoryItem).slice(0, ASK_HISTORY_LIMIT);
+  return value
+    .filter(isHistoryItem)
+    .sort((left, right) => right.at - left.at)
+    .slice(0, ASK_HISTORY_LIMIT);
 }
 
 interface AskVaultHistoryEnvelope {
@@ -298,25 +301,45 @@ function writeLocalAskVaultHistory(
   }
 }
 
+const historyUpdates = new Map<string, Promise<void>>();
+
 export async function appendAskVaultHistory(
   vaultRoot: string,
   item: AskVaultHistoryItem,
 ): Promise<void> {
-  const existing = await loadAskVaultHistory(vaultRoot);
-  const next = [
-    item,
-    ...existing.filter((entry) => entry.id !== item.id),
-  ].slice(0, ASK_HISTORY_LIMIT);
-  await saveAskVaultHistory(vaultRoot, next);
+  const key = normalizeVaultIdentityPath(vaultRoot);
+  const previous = historyUpdates.get(key) ?? Promise.resolve();
+  const update = previous
+    .catch(() => {})
+    .then(async () => {
+      const existing = await loadAskVaultHistory(vaultRoot);
+      await saveAskVaultHistory(vaultRoot, [
+        item,
+        ...existing.filter((entry) => entry.id !== item.id),
+      ]);
+    });
+  historyUpdates.set(key, update);
+  try {
+    await update;
+  } finally {
+    if (historyUpdates.get(key) === update) historyUpdates.delete(key);
+  }
 }
 
 async function saveAskVaultHistory(
   vaultRoot: string,
   items: AskVaultHistoryItem[],
-): Promise<void> {
-  const envelope: AskVaultHistoryEnvelope = { version: 2, vaultRoot, items };
+): Promise<AskVaultHistoryItem[]> {
+  const saved = parseAskVaultHistory(
+    await mergeAskHistoryItems(vaultRoot, items),
+  );
+  const envelope: AskVaultHistoryEnvelope = {
+    version: 2,
+    vaultRoot,
+    items: saved,
+  };
   writeLocalAskVaultHistory(await hashVaultId(vaultRoot), envelope);
-  await writeIndexJson(vaultRoot, ASK_HISTORY_FILE, envelope, "ask-history");
+  return saved;
 }
 
 /** 旧数组没有库标识，只迁移全部引用都明确属于当前库的记录，原件不删除。 */
@@ -346,7 +369,16 @@ export async function loadAskVaultHistory(
     await readIndexJson<unknown>(vaultRoot, ASK_HISTORY_FILE, "ask-history"),
     vaultRoot,
   );
+  const fromLocal = readLocalAskVaultHistory(vaultId, vaultRoot);
   if (fromDisk !== null) {
+    const diskById = new Map(fromDisk.map((item) => [item.id, item]));
+    const unsaved = (fromLocal ?? []).filter((item) => {
+      const saved = diskById.get(item.id);
+      return !saved || item.at > saved.at;
+    });
+    // 写失败后的本地副本可能比磁盘更新，恢复时先合并，不能先覆写唯一备份。
+    if (unsaved.length > 0)
+      return saveAskVaultHistory(vaultRoot, [...unsaved, ...fromDisk]);
     writeLocalAskVaultHistory(vaultId, {
       version: 2,
       vaultRoot,
@@ -355,10 +387,8 @@ export async function loadAskVaultHistory(
     return fromDisk;
   }
 
-  const fromLocal = readLocalAskVaultHistory(vaultId, vaultRoot);
   if (fromLocal !== null) {
-    await saveAskVaultHistory(vaultRoot, fromLocal);
-    return fromLocal;
+    return saveAskVaultHistory(vaultRoot, fromLocal);
   }
 
   const legacyDisk = await readLegacyIndexJson<unknown>(
@@ -384,13 +414,12 @@ export async function loadAskVaultHistory(
   ];
   const seen = new Set<string>();
   const migrated: AskVaultHistoryItem[] = [];
-  for (const item of entries) {
+  for (const item of entries.sort((left, right) => right.at - left.at)) {
     if (seen.has(item.id)) continue;
     seen.add(item.id);
     migrated.push(item);
-    if (migrated.length === ASK_HISTORY_LIMIT) break;
   }
-  if (migrated.length > 0) await saveAskVaultHistory(vaultRoot, migrated);
+  if (migrated.length > 0) return saveAskVaultHistory(vaultRoot, migrated);
   return migrated;
 }
 
