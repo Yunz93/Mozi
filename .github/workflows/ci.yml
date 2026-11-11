@@ -9,33 +9,6 @@ on:
   pull_request:
 
 jobs:
-  apt-network-diagnostics:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 3
-    steps:
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-      - name: Compare Ubuntu DNS and HTTPS with and without sudo
-        run: |
-          cat /etc/resolv.conf
-          for host in archive.ubuntu.com mirrors.edge.kernel.org; do
-            timeout 8s getent ahostsv4 "$host" || true
-            curl --head --fail --silent --show-error --connect-timeout 5 --max-time 8 "https://$host/ubuntu/dists/noble/InRelease" || true
-            sudo curl --head --fail --silent --show-error --connect-timeout 5 --max-time 8 "https://$host/ubuntu/dists/noble/InRelease" || true
-          done
-          node --input-type=module - <<'JS'
-          console.log({node: process.version, httpsProxy: Boolean(process.env.HTTPS_PROXY), httpProxy: Boolean(process.env.HTTP_PROXY), extraCa: Boolean(process.env.NODE_EXTRA_CA_CERTS)});
-          for (const host of ['archive.ubuntu.com', 'mirrors.edge.kernel.org']) {
-            try {
-              const response = await fetch(`https://${host}/ubuntu/dists/noble/InRelease`, {signal: AbortSignal.timeout(8000)});
-              console.log(host, response.status);
-              await response.body.cancel();
-            } catch (error) { console.log(host, error.message, error.cause); }
-          }
-          JS
-
   frontend-checks:
     runs-on: ubuntu-latest
     steps:
