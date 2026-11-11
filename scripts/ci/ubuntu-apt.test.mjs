@@ -4,6 +4,21 @@ import { readFileSync } from "node:fs";
 import yaml from "js-yaml";
 import { useUbuntuHttpsSources } from "./configure-ubuntu-apt.mjs";
 
+test("GitHub runner mirror lists resolve directly to the official HTTPS archive", () => {
+  const source = `Types: deb
+URIs: mirror+file:/etc/apt/apt-mirrors.txt
+Suites: noble noble-updates noble-backports noble-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+`;
+  const expected = source.replace(
+    "mirror+file:/etc/apt/apt-mirrors.txt",
+    "https://archive.ubuntu.com/ubuntu/",
+  );
+  assert.equal(useUbuntuHttpsSources(source), expected);
+  assert.equal(useUbuntuHttpsSources(expected), expected);
+});
+
 test("Ubuntu mirrors use official HTTPS without changing suites or signature trust", () => {
   const source = `Types: deb
 URIs: http://azure.archive.ubuntu.com/ubuntu/
@@ -44,6 +59,7 @@ test("every Linux dependency installation configures HTTPS before refreshing APT
       for (const step of job.steps ?? []) {
         if (!step.run?.includes("sudo apt-get update")) continue;
         installations++;
+        assert(step.run.includes("sudo apt-get update --error-on=any"));
         const configure = step.run.indexOf(
           "scripts/ci/configure-ubuntu-apt.mjs",
         );

@@ -2,13 +2,18 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export function useUbuntuHttpsSources(source) {
-  return source.replace(
-    /http:\/\/(?:azure\.archive|archive|security)\.ubuntu\.com\/ubuntu(?=[/\s]|$)/g,
-    (url) =>
-      url
-        .replace("http://", "https://")
-        .replace("azure.archive.ubuntu.com", "archive.ubuntu.com"),
-  );
+  return source
+    .replace(
+      /mirror\+file:\/etc\/apt\/apt-mirrors\.txt(?=\s|$)/g,
+      "https://archive.ubuntu.com/ubuntu/",
+    )
+    .replace(
+      /http:\/\/(?:azure\.archive|archive|security)\.ubuntu\.com\/ubuntu(?=[/\s]|$)/g,
+      (url) =>
+        url
+          .replace("http://", "https://")
+          .replace("azure.archive.ubuntu.com", "archive.ubuntu.com"),
+    );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
