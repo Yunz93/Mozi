@@ -295,7 +295,8 @@ jobs:
 
       - name: Install Linux build and package validation dependencies
         run: |
-          sudo apt-get update
+          sudo "$(command -v node)" scripts/ci/configure-ubuntu-apt.mjs
+          sudo apt-get update --error-on=any
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf desktop-file-utils
 
       - name: Install frontend dependencies
@@ -370,7 +371,8 @@ jobs:
           shared-key: linux-package
       - name: Install verifier build dependencies
         run: |
-          sudo apt-get update
+          sudo "$(command -v node)" scripts/ci/configure-ubuntu-apt.mjs
+          sudo apt-get update --error-on=any
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - run: npm ci
       - run: npm run build
@@ -395,3 +397,22 @@ jobs:
           name: published-asset-verification
           path: ${{ env.RELEASE_VERIFICATION_DIR }}/verification-summary.json
           if-no-files-found: error
+
+  publish-update-index:
+    needs: [verify-published-assets]
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # 固定 v5
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # 固定 v5
+        with:
+          node-version: "22"
+      - name: Publish verified release index
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/publish-update-index.mjs --publish

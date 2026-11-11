@@ -10,6 +10,44 @@ This repository uses the Tauri updater plugin on Windows and Linux, and the same
 - The installer script downloads stable releases only; its optional `RELEASE_TAG` accepts stable tags only. In-app updates default to `releases/latest/download/latest.json`.
 - **Receive beta updates** is off by default. When enabled, manual and automatic checks select the highest newer semantic version among published stable and beta releases with updater manifests. Drafts and releases whose prerelease flag disagrees with their tag are excluded. The selected tag's signed updater artifacts use the existing download, save, signature verification, installation, and relaunch flow. Disabling the option clears previous check results and checks stable releases only; it never downgrades an installed beta.
 
+## Beta discovery index
+
+Beta-enabled clients read `https://raw.githubusercontent.com/Yunz93/Mozi/updater-index/releases.json`. User devices no longer query the GitHub Releases REST API, whose anonymous quota is shared by the originating IP. The index has `schemaVersion: 1` and a `releases` array with `tag_name`, `draft`, `prerelease`, and `assets` (containing `latest.json`). Clients construct manifest URLs from validated tags rather than accepting arbitrary URLs from the index. The existing signature verification and installation paths remain in use.
+
+The native process caches an index for 60 seconds and errors for 5 seconds, merging concurrent manual, startup and multiwindow requests. Version comparisons happen after reading the cache, so results are not tied to a particular installed version. A missing index, unsupported schema, malformed JSON or HTTP failure is reported as a failed check, never as “up to date.” Stable-only checks continue using `releases/latest/download/latest.json`.
+
+After `verify-published-assets` succeeds, `publish-update-index` uses the Actions token to paginate Releases and add the verified tag to the dedicated `updater-index` branch. Historical candidates must already be in the verified index; an unrelated Release still being built cannot enter it. Rebuilding also removes deleted, draft, incomplete or channel-mismatched entries. Git reference updates are fast-forward only; concurrent publishers re-read and merge the current index after a conflict. This avoids both overwriting a newer version during an older release repair and losing a verified tag through cancellation of a queued concurrency job.
+
+### Initialization and recovery
+
+The first complete tagged release using this workflow creates the index branch. Until then, Beta-enabled clients report that the index has not been published; use the release page for manual downloads. This source change alone does not create the remote branch. No existing version tags or stable release manifests are moved or overwritten.
+
+To seed an older stable/Beta tag, or recover a failed index publication, first run the same complete published-asset, metadata, SHA-256 and updater-signature checks used by `verify-published-assets` for that exact tag. Then run the publisher in an explicitly authorized environment, with repository write access:
+
+```bash
+export GITHUB_REPOSITORY=Yunz93/Mozi
+export RELEASE_TAG=v2.3.6-beta.1
+node scripts/publish-update-index.mjs --output /tmp/mozi-release-index.json
+node scripts/publish-update-index.mjs --publish
+```
+
+`GH_TOKEN` must already contain the authorized token; never put it in a command argument or commit it. Without `--publish`, the script only reads GitHub and optionally writes the local output. Seed each verified historical tag individually. The existing macOS-only repair dispatch does not satisfy the complete verification gate and does not automatically publish the index.
+
+After initialization, confirm that the raw index returns HTTP 200, its first entry is the highest eligible semantic version, the previous stable update URL is unchanged, and both manual and startup checks with **Receive beta updates** enabled find the expected version.
+
+When withdrawing an indexed release (deleting it or making it a draft), immediately rebuild the index with a surviving public tag that has already passed complete verification. Preview with `RELEASE_TAG=<verified-surviving-tag> node scripts/publish-update-index.mjs --output /tmp/mozi-release-index.json`, confirm that the withdrawn tag is absent, then run the same command with `--publish`. The workflow refreshes the index after successful releases; withdrawal alone does not trigger a rebuild. Until the index is refreshed and caches expire, Beta checks can report a manifest download error for the withdrawn tag.
+
+### Local regression verification
+
+```bash
+cargo test --locked --manifest-path src-tauri/Cargo.toml --lib release_channel::tests
+node --test scripts/ci/update-index.test.mjs scripts/ci/release-channel.test.mjs
+npm test -- src/services/updaterService.install.test.ts src/components/settings/tabs/UpdatesTab.test.tsx
+node scripts/desktop/beta-updater.mjs
+```
+
+The last command starts `npm run tauri:dev` with the existing optional desktop driver, a separate application identity and local index/manifest fixtures. It checks missing-index errors, Beta discovery while the old API returns 403, cache sharing between manual and automatic checks, and switching back to the real stable feed. It saves screenshots and results under `.perf/mozi-beta-updater-*` and never installs an update. Fixture URL overrides compile only in debug builds with `desktop-e2e`; production builds always use the fixed repository endpoints.
+
 ## Build configuration
 
 `src-tauri/tauri.conf.json` must keep:
@@ -83,7 +121,7 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
 
 ## Automated verification
 
-Tagged releases finish with `verify-published-assets`: download the eight published assets, verify the stable/beta metadata matches the tag, GitHub SHA-256 digests, exact version/platform inventory, repository-bound URLs and matching signature sidecars. The `verify-updater` Rust example then verifies all three updater packages using the public key embedded in that tag's source. It shares the signature implementation with the macOS installer and never reads a key from the feed or environment. This job has read-only repository access and no signing secrets. The older macOS-only repair dispatch is outside the complete eight-asset contract.
+Tagged releases run `verify-published-assets`: download the eight published assets, verify the stable/beta metadata matches the tag, GitHub SHA-256 digests, exact version/platform inventory, repository-bound URLs and matching signature sidecars. The `verify-updater` Rust example then verifies all three updater packages using the public key embedded in that tag's source. It shares the signature implementation with the macOS installer and never reads a key from the feed or environment. This job has read-only repository access and no signing secrets. Only after it succeeds does the separate `publish-update-index` job update the Beta discovery index. The older macOS-only repair dispatch is outside the complete eight-asset contract.
 
 Desktop acceptance also performs a real installed Linux `.deb` upgrade with a separate package identity, ephemeral signing key and localhost feed. It checks signature corruption, authorization cancellation, saving two dirty windows, `dpkg` replacement and relaunch. Its child-only authorization proxy exercises success and failure without requiring interactive credentials. Real OS prompts and installed-release upgrades remain on the [physical-device checklist](../testing/physical-release-checklist.md).
 
