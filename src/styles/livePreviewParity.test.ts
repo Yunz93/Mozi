@@ -16,7 +16,7 @@ describe("live preview / reading visual parity", () => {
 
   it("clips blockquote fill to the text column instead of full-bleed inset shadow", () => {
     expect(editorCss).toMatch(
-      /\[data-live-preview="true"\]\s+\.cm-live-preview-blockquote\s*\{[^}]*padding-left:\s*calc\(\s*var\(--pane-content-px\)\s*\+\s*var\(--mp-live-quote-inline-pad\)\)/s,
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-blockquote\s*\{[^}]*padding-left:\s*calc\(\s*var\(--pane-content-px\)\s*\+\s*var\(--mp-live-quote-inline-pad\)\s*\*\s*var\(--mp-live-quote-depth,\s*1\)/s,
     );
     expect(editorCss).toMatch(
       /\[data-live-preview="true"\]\s+\.cm-live-preview-blockquote\s*\{[^}]*background-position:\s*var\(--pane-content-px\)/s,
@@ -44,10 +44,13 @@ describe("live preview / reading visual parity", () => {
       /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s*\{[^}]*max-width:\s*calc\(100% - 2 \* var\(--pane-content-px\)\)/s,
     );
     expect(editorCss).toMatch(
-      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s+\.mermaid\s*\{[^}]*justify-content:\s*center/s,
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s+\.mermaid\s*\{[^}]*justify-content:\s*flex-start/s,
     );
     expect(editorCss).toMatch(
       /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s+\.mermaid\s+>\s+svg\s*\{[^}]*margin-inline:\s*auto/s,
+    );
+    expect(editorCss).toMatch(
+      /\[data-live-preview="true"\]\s+\.cm-live-preview-mermaid\s+\.mermaid\s+>\s+svg\s*\{[^}]*flex-shrink:\s*0/s,
     );
   });
 

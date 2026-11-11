@@ -1,7 +1,13 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{fs, io::Read, path::PathBuf, sync::Mutex, time::Duration};
+use std::{
+    fs,
+    io::Read,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 use tauri::{Emitter, Manager};
 
 const PREFERENCES_FILE: &str = "usage-statistics.json";
@@ -13,7 +19,7 @@ struct Preferences {
     #[serde(default = "default_enabled")]
     enabled: bool,
     #[serde(default)]
-    last_attempt_day: String,
+    last_reported_day: String,
 }
 
 fn default_enabled() -> bool {
@@ -24,7 +30,7 @@ impl Default for Preferences {
     fn default() -> Self {
         Self {
             enabled: default_enabled(),
-            last_attempt_day: String::new(),
+            last_reported_day: String::new(),
         }
     }
 }
@@ -40,11 +46,12 @@ pub struct StatisticsStatus {
 struct Inner {
     preferences: Option<Preferences>,
     pending: Option<tauri::async_runtime::JoinHandle<()>>,
+    last_attempt: Option<Instant>,
 }
 
 #[derive(Default)]
 pub struct UsageStatistics {
-    inner: Mutex<Inner>,
+    inner: Arc<Mutex<Inner>>,
 }
 
 fn endpoint(key: &str) -> Option<&'static str> {
@@ -146,6 +153,7 @@ impl UsageStatistics {
             if let Some(pending) = inner.pending.take() {
                 pending.abort();
             }
+            inner.last_attempt = None;
         }
         let mut next = inner.preferences.as_ref().unwrap().clone();
         next.enabled = enabled;
@@ -158,9 +166,20 @@ impl UsageStatistics {
     }
 
     fn record(&self, path: &std::path::Path, language: &str, version: &str) -> Result<(), String> {
-        let Some((key, url)) = configuration() else {
+        self.record_to(path, language, version, configuration())
+    }
+
+    fn record_to(
+        &self,
+        path: &std::path::Path,
+        language: &str,
+        version: &str,
+        configured: Option<(&str, &str)>,
+    ) -> Result<(), String> {
+        let Some((key, url)) = configured else {
             return Ok(());
         };
+        let (key, url) = (key.to_owned(), url.to_owned());
         let mut inner = self
             .inner
             .lock()
@@ -169,7 +188,16 @@ impl UsageStatistics {
         let preferences = inner.preferences.as_ref().unwrap();
         let now = Utc::now();
         let day = now.format("%Y-%m-%d").to_string();
-        if !preferences.enabled || preferences.last_attempt_day == day {
+        if !preferences.enabled
+            || preferences.last_reported_day == day
+            || inner
+                .pending
+                .as_ref()
+                .is_some_and(|task| !task.inner().is_finished())
+            || inner
+                .last_attempt
+                .is_some_and(|last| last.elapsed() < Duration::from_secs(60))
+        {
             return Ok(());
         }
         let locale = if language == "en" { "en-US" } else { "zh-CN" };
@@ -186,11 +214,8 @@ impl UsageStatistics {
             .user_agent(format!("{os}/ {engine}/ {locale}"))
             .build()
             .map_err(|_| "Could not initialize usage statistics")?;
-        // 在同一主进程中统一去重并落盘，避免多窗口或当日重启重复上报。
-        let mut next = preferences.clone();
-        next.last_attempt_day = day;
-        save(path, &next)?;
-        inner.preferences = Some(next);
+        // 请求完成前只做进程内限频，失败不能被误记为当天已经成功上报。
+        inner.last_attempt = Some(Instant::now());
         let session_id = format!(
             "{}{:08}",
             now.timestamp(),
@@ -207,14 +232,60 @@ impl UsageStatistics {
             },
             "props": {}
         }]);
-        // 不缓存历史事件、不后台补发，避免离线积压和错误的日期/IP 归属。
+        let shared = self.inner.clone();
+        let path = path.to_path_buf();
+        // 只在当前活跃时重试同日请求，不缓存或补发历史日期的事件。
         inner.pending = Some(tauri::async_runtime::spawn(async move {
-            let _ = client
+            let delivered = match client
                 .post(url)
                 .header("App-Key", key)
                 .json(&body)
                 .send()
-                .await;
+                .await
+            {
+                Ok(response) if response.status().is_success() => true,
+                Ok(response) => {
+                    log::warn!(
+                        "Usage statistics delivery failed (HTTP {})",
+                        response.status().as_u16()
+                    );
+                    false
+                }
+                Err(error) => {
+                    // 日志只记录错误类别，不包含密钥、请求体或网络地址。
+                    log::warn!(
+                        "Usage statistics delivery failed ({})",
+                        if error.is_timeout() {
+                            "timeout"
+                        } else {
+                            "transport"
+                        }
+                    );
+                    false
+                }
+            };
+            if !delivered {
+                return;
+            }
+            let saved = tauri::async_runtime::spawn_blocking(move || {
+                let mut inner = shared
+                    .lock()
+                    .map_err(|_| "Usage statistics are unavailable".to_string())?;
+                let mut next = inner
+                    .preferences
+                    .as_ref()
+                    .ok_or("Usage statistics preferences are unavailable")?
+                    .clone();
+                next.last_reported_day = day;
+                // 保留请求期间用户修改的开关，成功回调不能重新开启已关闭的统计。
+                // 服务端已确认接收，即使写盘失败，也必须先在内存中防止重复发送。
+                inner.preferences = Some(next.clone());
+                save(&path, &next)
+            })
+            .await;
+            if !matches!(saved, Ok(Ok(()))) {
+                log::warn!("Could not save successful usage statistics delivery");
+            }
         }));
         Ok(())
     }
@@ -267,4 +338,191 @@ pub async fn record_usage_statistics_activity(
     })
     .await
     .map_err(|_| "Could not record usage statistics".to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        io::{BufRead, BufReader, Write},
+        net::{TcpListener, TcpStream},
+        sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+        thread,
+    };
+
+    struct TestEndpoint {
+        url: String,
+        received: Arc<AtomicUsize>,
+        stop: Arc<AtomicBool>,
+        worker: Option<thread::JoinHandle<()>>,
+    }
+
+    impl TestEndpoint {
+        fn start(first_status: Option<u16>) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let received = Arc::new(AtomicUsize::new(0));
+            let stop = Arc::new(AtomicBool::new(false));
+            let (requests, stopped) = (received.clone(), stop.clone());
+            let worker = thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let mut stream = stream.unwrap();
+                    if stopped.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(3)))
+                        .unwrap();
+                    let mut reader = BufReader::new(&mut stream);
+                    let mut length = 0;
+                    loop {
+                        let mut line = String::new();
+                        reader.read_line(&mut line).unwrap();
+                        if line == "\r\n" {
+                            break;
+                        }
+                        if let Some(value) =
+                            line.to_ascii_lowercase().strip_prefix("content-length:")
+                        {
+                            length = value.trim().parse().unwrap();
+                        }
+                    }
+                    let mut body = vec![0; length];
+                    reader.read_exact(&mut body).unwrap();
+                    let event: serde_json::Value = serde_json::from_slice(&body).unwrap();
+                    assert_eq!(event[0]["eventName"], "daily_active");
+                    assert_eq!(event[0]["props"], json!({}));
+                    let attempt = requests.fetch_add(1, Ordering::SeqCst);
+                    if let Some(status) = if attempt == 0 {
+                        first_status
+                    } else {
+                        Some(200)
+                    } {
+                        write!(stream, "HTTP/1.1 {status} Test\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}").unwrap();
+                    }
+                }
+            });
+            Self {
+                url: format!("http://{address}/events"),
+                received,
+                stop,
+                worker: Some(worker),
+            }
+        }
+    }
+
+    impl Drop for TestEndpoint {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::SeqCst);
+            let address = self
+                .url
+                .trim_start_matches("http://")
+                .trim_end_matches("/events");
+            let _ = TcpStream::connect(address);
+            self.worker.take().unwrap().join().unwrap();
+        }
+    }
+
+    fn complete_request(statistics: &UsageStatistics) {
+        let handle = statistics.inner.lock().unwrap().pending.take();
+        assert!(
+            handle.is_some(),
+            "An unsuccessful report must remain retryable on the same day"
+        );
+        tauri::async_runtime::block_on(handle.unwrap()).unwrap();
+    }
+
+    #[test]
+    fn failed_delivery_retries_then_deduplicates_only_after_success() {
+        for first_status in [Some(503), None] {
+            let server = TestEndpoint::start(first_status);
+            let directory =
+                std::env::temp_dir().join(format!("mozi-statistics-test-{}", uuid::Uuid::new_v4()));
+            fs::create_dir_all(&directory).unwrap();
+            let path = directory.join("usage.json");
+            fs::write(&path, r#"{"enabled":true,"lastAttemptDay":""}"#).unwrap();
+            let statistics = UsageStatistics::default();
+            let configured = Some(("A-EU-123", server.url.as_str()));
+            statistics.record_to(&path, "zh", "qa", configured).unwrap();
+            complete_request(&statistics);
+            statistics.record_to(&path, "zh", "qa", configured).unwrap();
+            assert!(
+                statistics.inner.lock().unwrap().pending.is_none(),
+                "Failed requests must be rate-limited before retrying"
+            );
+            statistics.inner.lock().unwrap().last_attempt = None;
+            statistics.record_to(&path, "zh", "qa", configured).unwrap();
+            complete_request(&statistics);
+            assert_eq!(server.received.load(Ordering::SeqCst), 2);
+            let saved: serde_json::Value =
+                serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            assert_eq!(
+                saved["lastReportedDay"],
+                Utc::now().format("%Y-%m-%d").to_string()
+            );
+            statistics.record_to(&path, "zh", "qa", configured).unwrap();
+            assert!(statistics.inner.lock().unwrap().pending.is_none());
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    #[test]
+    fn successful_delivery_stays_deduplicated_when_preferences_cannot_be_saved() {
+        let server = TestEndpoint::start(Some(200));
+        let directory =
+            std::env::temp_dir().join(format!("mozi-statistics-test-{}", uuid::Uuid::new_v4()));
+        let path = directory.join("usage.json");
+        fs::create_dir_all(&path).unwrap();
+        let statistics = UsageStatistics::default();
+        let mut preferences = Preferences::default();
+        preferences.enabled = true;
+        statistics.inner.lock().unwrap().preferences = Some(preferences);
+        let configured = Some(("A-EU-123", server.url.as_str()));
+        statistics.record_to(&path, "zh", "qa", configured).unwrap();
+        complete_request(&statistics);
+        assert_eq!(
+            statistics
+                .inner
+                .lock()
+                .unwrap()
+                .preferences
+                .as_ref()
+                .unwrap()
+                .last_reported_day,
+            Utc::now().format("%Y-%m-%d").to_string()
+        );
+        statistics.inner.lock().unwrap().last_attempt = None;
+        statistics.record_to(&path, "zh", "qa", configured).unwrap();
+        assert!(statistics.inner.lock().unwrap().pending.is_none());
+        assert_eq!(server.received.load(Ordering::SeqCst), 1);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn legacy_attempt_is_retryable_while_optout_and_confirmed_success_survive_restarts() {
+        for enabled in [true, false] {
+            let server = TestEndpoint::start(Some(200));
+            let directory =
+                std::env::temp_dir().join(format!("mozi-statistics-test-{}", uuid::Uuid::new_v4()));
+            fs::create_dir_all(&directory).unwrap();
+            let path = directory.join("usage.json");
+            fs::write(&path, json!({"enabled":enabled,"lastAttemptDay":Utc::now().format("%Y-%m-%d").to_string()}).to_string()).unwrap();
+            let statistics = UsageStatistics::default();
+            let configured = Some(("A-EU-123", server.url.as_str()));
+            statistics.record_to(&path, "zh", "qa", configured).unwrap();
+            if enabled {
+                complete_request(&statistics);
+            } else {
+                assert!(statistics.inner.lock().unwrap().pending.is_none());
+            }
+            let restarted = UsageStatistics::default();
+            restarted.record_to(&path, "zh", "qa", configured).unwrap();
+            assert!(restarted.inner.lock().unwrap().pending.is_none());
+            assert_eq!(server.received.load(Ordering::SeqCst), usize::from(enabled));
+            let preferences: Preferences =
+                serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            assert_eq!(preferences.enabled, enabled);
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
 }

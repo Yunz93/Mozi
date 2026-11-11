@@ -200,7 +200,8 @@ async function ensureOfficialMermaidConfigured(themeMode: "light" | "dark") {
       useMaxWidth: false,
     },
     sequence: { useMaxWidth: false },
-    gantt: { useMaxWidth: false },
+    // 甘特图默认按容器宽度排布十个日期刻度，窄栏会挤叠；用自然宽度绘制后横向滚动。
+    gantt: { useMaxWidth: false, useWidth: 1200 },
     pie: { useMaxWidth: false },
   });
   lastOfficialMermaidThemeMode = themeMode;
