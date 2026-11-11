@@ -286,6 +286,11 @@ mod bridge_lifecycle_tests {
             "retry-failure",
             "refused-connection",
             "explicit-denial",
+            "duplicate-events",
+            "restore-event",
+            "lost-mapping",
+            "shared-date-range",
+            "bucket-boundary",
         ] {
             let output = Command::new(&binary).arg(scenario).output().unwrap();
             if !output.status.success() {

@@ -1,5 +1,6 @@
 #import <EventKit/EventKit.h>
 #import <Foundation/Foundation.h>
+#include <math.h>
 
 static EKEventStore *MoziEventStore(void) {
     static EKEventStore *store;
@@ -96,23 +97,68 @@ static BOOL MoziOwnsEvent(EKEvent *event, NSString *marker) {
     return event && [event.notes containsString:marker];
 }
 
-static EKEvent *MoziFindEvent(EKEventStore *store, NSString *marker, NSDictionary *record,
-                              NSDictionary *item) {
+static NSDictionary *MoziQueryEventMarkers(EKEventStore *store, NSDictionary *candidate,
+                                           NSMutableDictionary *queryCache) {
+    // 统一到 UTC 日边界，让同日不同时刻的待办也能复用同一查询。
+    double startAt = floor(([candidate[@"startAt"] doubleValue] / 1000 - 86400) / 86400) * 86400;
+    double endAt = ceil(([candidate[@"endAt"] doubleValue] / 1000 + 86400) / 86400) * 86400;
+    NSString *queryKey = [NSString stringWithFormat:@"%@:%.0f:%.0f", candidate[@"calendarId"] ?: @"", startAt, endAt];
+    NSDictionary *cached = queryCache[queryKey];
+    if (cached) return cached;
+    NSMutableDictionary *byMarker = [NSMutableDictionary dictionary];
+    EKCalendar *calendar = [store calendarWithIdentifier:candidate[@"calendarId"] ?: @""];
+    if (calendar) {
+        NSDate *start = [NSDate dateWithTimeIntervalSince1970:startAt];
+        NSDate *end = [NSDate dateWithTimeIntervalSince1970:endAt];
+        NSPredicate *predicate = [store predicateForEventsWithStartDate:start endDate:end calendars:@[calendar]];
+        static NSRegularExpression *markerPattern;
+        static dispatch_once_t once;
+        dispatch_once(&once, ^{
+            markerPattern = [NSRegularExpression regularExpressionWithPattern:@"\\[Mozi:[^\\[\\]\\r\\n]+\\]" options:0 error:nil];
+        });
+        for (EKEvent *event in [store eventsMatchingPredicate:predicate]) {
+            NSString *notes = event.notes ?: @"";
+            for (NSTextCheckingResult *match in [markerPattern matchesInString:notes options:0 range:NSMakeRange(0, notes.length)]) {
+                NSString *marker = [notes substringWithRange:match.range];
+                if (!byMarker[marker]) byMarker[marker] = [NSMutableArray array];
+                [byMarker[marker] addObject:event];
+            }
+        }
+    }
+    // 同一次同步按日历、时间窗口缓存并索引标记，避免每条待办重复查询和遍历。
+    queryCache[queryKey] = byMarker;
+    return byMarker;
+}
+
+static NSArray<EKEvent *> *MoziFindEvents(EKEventStore *store, NSString *marker, NSDictionary *record,
+                                         NSDictionary *item, NSMutableDictionary *queryCache) {
+    NSMutableDictionary<NSString *, EKEvent *> *matches = [NSMutableDictionary dictionary];
+    void (^collect)(EKEvent *) = ^(EKEvent *event) {
+        if (!MoziOwnsEvent(event, marker)) return;
+        NSString *identifier = event.eventIdentifier ?: event.calendarItemIdentifier;
+        if (!identifier.length) identifier = [NSString stringWithFormat:@"%p", event];
+        matches[identifier] = event;
+    };
     EKEvent *event = record[@"eventId"] ? [store eventWithIdentifier:record[@"eventId"]] : nil;
-    if (MoziOwnsEvent(event, marker)) return event;
+    collect(event);
     // 标识符可能随账户同步改变，也可能在事件提交后、记录落盘前退出。按专属标记恢复。
     for (NSDictionary *candidate in @[record ?: @{}, item ?: @{}]) {
         if (!candidate[@"startAt"]) continue;
-        EKCalendar *calendar = [store calendarWithIdentifier:candidate[@"calendarId"] ?: @""];
-        if (!calendar) continue;
         NSDate *start = [NSDate dateWithTimeIntervalSince1970:[candidate[@"startAt"] doubleValue] / 1000 - 86400];
         NSDate *end = [NSDate dateWithTimeIntervalSince1970:[candidate[@"endAt"] doubleValue] / 1000 + 86400];
-        NSPredicate *predicate = [store predicateForEventsWithStartDate:start endDate:end calendars:@[calendar]];
-        for (EKEvent *match in [store eventsMatchingPredicate:predicate]) {
-            if (MoziOwnsEvent(match, marker)) return match;
+        for (EKEvent *match in MoziQueryEventMarkers(store, candidate, queryCache)[marker]) {
+            // 缓存查询可覆盖更宽的日期，事件归属仍按原来的时间范围确认。
+            if ([match.startDate compare:end] == NSOrderedAscending && [match.endDate compare:start] == NSOrderedDescending) {
+                collect(match);
+            }
         }
     }
-    return nil;
+    // 所有进程使用相同顺序选择保留项，避免旧映射各自指向不同的重复事件。
+    NSMutableArray<EKEvent *> *ordered = [NSMutableArray array];
+    for (NSString *identifier in [[matches allKeys] sortedArrayUsingSelector:@selector(compare:)]) {
+        [ordered addObject:matches[identifier]];
+    }
+    return ordered;
 }
 
 static NSDictionary *MoziCalendarSync(NSDictionary *input) {
@@ -132,13 +178,24 @@ static NSDictionary *MoziCalendarSync(NSDictionary *input) {
     NSString *owner = input[@"owner"];
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
     NSMutableDictionary *savedEvents = [NSMutableDictionary dictionary];
+    NSMutableDictionary *queryCache = [NSMutableDictionary dictionary];
     NSError *error;
     for (NSString *key in items) {
         NSDictionary *item = items[key];
         NSDictionary *record = previous[key];
         NSString *marker = MoziCalendarMarker(owner, key);
-        EKEvent *event = MoziFindEvent(store, marker, record, item);
-        BOOL unchanged = event && [record[@"fingerprint"] isEqualToString:item[@"fingerprint"]]
+        NSArray<EKEvent *> *matches = MoziFindEvents(store, marker, record, item, queryCache);
+        EKEvent *event = matches.firstObject;
+        // 只合并同一来源同步标记的事件；其他来源或其他应用的日程不参与去重。
+        for (NSUInteger index = 1; index < matches.count; index++) {
+            EKEvent *duplicate = matches[index];
+            if (![store removeEvent:duplicate span:EKSpanThisEvent commit:NO error:&error]) {
+                [store reset];
+                return MoziCalendarError(error.localizedDescription);
+            }
+        }
+        BOOL unchanged = event && [event.eventIdentifier isEqualToString:record[@"eventId"]]
+            && [record[@"fingerprint"] isEqualToString:item[@"fingerprint"]]
             && [event.calendar.calendarIdentifier isEqualToString:calendar.calendarIdentifier];
         if (!unchanged) {
             if (event && !event.calendar.allowsContentModifications) {
@@ -169,10 +226,11 @@ static NSDictionary *MoziCalendarSync(NSDictionary *input) {
     }
     for (NSString *key in previous) {
         if (items[key]) continue;
-        EKEvent *event = MoziFindEvent(store, MoziCalendarMarker(owner, key), previous[key], nil);
-        if (event && ![store removeEvent:event span:EKSpanThisEvent commit:NO error:&error]) {
-            [store reset];
-            return MoziCalendarError(error.localizedDescription);
+        for (EKEvent *event in MoziFindEvents(store, MoziCalendarMarker(owner, key), previous[key], nil, queryCache)) {
+            if (![store removeEvent:event span:EKSpanThisEvent commit:NO error:&error]) {
+                [store reset];
+                return MoziCalendarError(error.localizedDescription);
+            }
         }
     }
     if (![store commit:&error]) {
