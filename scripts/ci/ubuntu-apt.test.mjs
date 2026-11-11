@@ -2,7 +2,49 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import yaml from "js-yaml";
-import { useUbuntuHttpsSources } from "./configure-ubuntu-apt.mjs";
+import {
+  selectUbuntuArchive,
+  useUbuntuHttpsSources,
+} from "./configure-ubuntu-apt.mjs";
+
+test("DNS failure selects a reachable HTTPS mirror and preserves Ubuntu signature trust", async () => {
+  const requests = [];
+  const archive = await selectUbuntuArchive("noble", async (url) => {
+    requests.push(url);
+    if (url.includes("archive.ubuntu.com"))
+      throw new Error("DNS lookup failed");
+    return new Response("-----BEGIN PGP SIGNED MESSAGE-----\nfixture");
+  });
+  assert.deepEqual(requests, [
+    "https://archive.ubuntu.com/ubuntu/dists/noble/InRelease",
+    "https://mirrors.edge.kernel.org/ubuntu/dists/noble/InRelease",
+  ]);
+  const source =
+    "URIs: mirror+file:/etc/apt/apt-mirrors.txt\nSuites: noble noble-security\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n";
+  assert.equal(
+    useUbuntuHttpsSources(source, archive),
+    source.replace("mirror+file:/etc/apt/apt-mirrors.txt", archive),
+  );
+  assert.equal(
+    useUbuntuHttpsSources(
+      `deb http://security.ubuntu.com/ubuntu noble-security main\n`,
+      archive,
+    ),
+    `deb ${archive} noble-security main\n`,
+  );
+});
+
+test("unreachable or unsigned mirror probes stop instead of continuing with stale APT indexes", async () => {
+  for (const fetchImpl of [
+    async () => {
+      throw new Error("DNS lookup failed");
+    },
+    async () => new Response("unavailable", { status: 503 }),
+    async () => new Response("<html>not an archive</html>"),
+  ])
+    await assert.rejects(selectUbuntuArchive("noble", fetchImpl), /均不可达/);
+  await assert.rejects(selectUbuntuArchive(undefined), /无效/);
+});
 
 test("GitHub runner mirror lists resolve directly to the official HTTPS archive", () => {
   const source = `Types: deb
