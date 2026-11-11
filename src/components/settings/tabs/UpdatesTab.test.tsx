@@ -68,6 +68,10 @@ vi.mock("../../../hooks/useI18n", () => ({
         settings_updatesAutoCheckDesc: "desc",
         settings_updatesCheckNow: "立即检查",
         settings_updatesChecking: "正在检查更新...",
+        settings_updatesAcceptBeta: "接收 Beta 更新",
+        settings_updatesAcceptBetaDesc: "接收测试版本",
+        settings_updatesCheckFailed: "检查更新失败：{error}",
+        settings_updatesUpToDate: "已是最新版本",
         settings_updatesAvailableStatus: "发现新版本 {version}。",
         settings_updatesPreparingInstall: "正在准备安装 {version}...",
         settings_updatesDownloading: "正在下载安装包...",
@@ -126,6 +130,66 @@ afterEach(() => {
 beforeEach(() => {
   mockGetInstalledAppVersion.mockResolvedValue("0.9.0");
   mockCheckForAppUpdate.mockResolvedValue(createUpdate());
+});
+
+describe("UpdatesTab update channels", () => {
+  it("clears the Beta result when switching back to stable and uses the new channel", async () => {
+    const renderTab = (acceptBetaUpdates: boolean) => (
+      <UpdatesTab
+        settings={{ ...defaultSettings, acceptBetaUpdates }}
+        onUpdateSettings={vi.fn()}
+      />
+    );
+    const view = render(renderTab(true));
+    fireEvent.click(screen.getByRole("button", { name: "立即检查" }));
+    await screen.findByText("可更新到 0.9.1");
+    expect(mockCheckForAppUpdate).toHaveBeenLastCalledWith(true);
+    view.rerender(renderTab(false));
+    expect(screen.queryByText("可更新到 0.9.1")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "立即检查" }));
+    await waitFor(() =>
+      expect(mockCheckForAppUpdate).toHaveBeenLastCalledWith(false),
+    );
+  });
+
+  it("discards a pending Beta result after switching to stable", async () => {
+    let resolve!: (update: AvailableUpdate) => void;
+    mockCheckForAppUpdate.mockImplementationOnce(
+      () =>
+        new Promise<AvailableUpdate>((done) => {
+          resolve = done;
+        }),
+    );
+    const renderTab = (acceptBetaUpdates: boolean) => (
+      <UpdatesTab
+        settings={{ ...defaultSettings, acceptBetaUpdates }}
+        onUpdateSettings={vi.fn()}
+      />
+    );
+    const view = render(renderTab(true));
+    fireEvent.click(screen.getByRole("button", { name: "立即检查" }));
+    view.rerender(renderTab(false));
+    const update = createUpdate();
+    resolve(update);
+    await waitFor(() => expect(update.close).toHaveBeenCalled());
+    expect(screen.queryByText("可更新到 0.9.1")).toBeNull();
+  });
+
+  it("shows an index failure without claiming the app is up-to-date", async () => {
+    mockCheckForAppUpdate.mockRejectedValueOnce(
+      new Error("Beta 更新索引尚未发布"),
+    );
+    render(
+      <UpdatesTab
+        settings={{ ...defaultSettings, acceptBetaUpdates: true }}
+        onUpdateSettings={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "立即检查" }));
+    await screen.findByText("检查更新失败：Beta 更新索引尚未发布");
+    expect(screen.queryByText("已是最新版本")).toBeNull();
+    expect(screen.queryByRole("button", { name: "下载安装更新" })).toBeNull();
+  });
 });
 
 describe("UpdatesTab download progress", () => {

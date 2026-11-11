@@ -32,7 +32,15 @@ vi.mock("@tauri-apps/api/core", () => ({
   },
 }));
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: vi.fn() }));
-vi.mock("@tauri-apps/plugin-updater", () => ({ check: mocks.check }));
+vi.mock("@tauri-apps/plugin-updater", () => ({
+  check: mocks.check,
+  Update: vi.fn(function (metadata: {
+    version: string;
+    currentVersion: string;
+  }) {
+    return metadata;
+  }),
+}));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: mocks.relaunch }));
 vi.mock("./updaterCapabilities", () => ({
   areUpdaterArtifactsEnabled: () => true,
@@ -80,6 +88,44 @@ beforeEach(() => {
 });
 
 describe("update document preservation", () => {
+  it("uses the native Beta index only when opted in on macOS", async () => {
+    mocks.invoke.mockResolvedValue({
+      version: "2.3.6-beta.10",
+      currentVersion: "2.3.5",
+      tag: "v2.3.6-beta.10",
+    });
+    const available = await checkForAppUpdate(true);
+    expect(available?.version).toBe("2.3.6-beta.10");
+    expect(mocks.invoke).toHaveBeenLastCalledWith("check_macos_update", {
+      acceptBetaUpdates: true,
+    });
+    await checkForAppUpdate(false);
+    expect(mocks.invoke).toHaveBeenLastCalledWith("check_macos_update");
+    expect(mocks.check).not.toHaveBeenCalled();
+  });
+
+  it.each(["windows", "linux"])(
+    "keeps opted-in Beta and default stable checks separate on %s",
+    async (platform) => {
+      mocks.platform = platform;
+      mocks.invoke.mockResolvedValue({
+        version: "2.3.6-beta.10",
+        currentVersion: "2.3.5",
+      });
+      expect((await checkForAppUpdate(true))?.version).toBe("2.3.6-beta.10");
+      expect(mocks.invoke).toHaveBeenCalledWith("check_beta_update");
+      expect(mocks.check).not.toHaveBeenCalled();
+      await checkForAppUpdate();
+      expect(mocks.check).toHaveBeenCalledWith({ timeout: 30_000 });
+      expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("propagates Beta index errors rather than returning up-to-date", async () => {
+    mocks.invoke.mockRejectedValue("Beta 更新索引尚未发布");
+    await expect(checkForAppUpdate(true)).rejects.toBe("Beta 更新索引尚未发布");
+  });
+
   it("waits for saved documents before starting a macOS update", async () => {
     let finish!: (saved: boolean) => void;
     mocks.flush.mockImplementationOnce(
