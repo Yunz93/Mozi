@@ -95,6 +95,7 @@ jobs:
           shared-key: linux-package
       - name: Install Linux build and package validation dependencies
         run: |
+          sudo "$(command -v node)" scripts/ci/configure-ubuntu-apt.mjs
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf desktop-file-utils
       - run: npm ci
