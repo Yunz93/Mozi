@@ -1676,6 +1676,44 @@ describe("callouts / highlight / comments", () => {
     }
   });
 
+  it.each(["> >", ">>"])(
+    "preserves nested quote depth with %s markers, lazy continuations and returns to parent levels",
+    (nestedMarker) => {
+      const doc = [
+        "> 一级",
+        `${nestedMarker} 二级`,
+        "> > > 三级",
+        nestedMarker,
+        `${nestedMarker} 返回二级`,
+        "二级延续",
+        ">",
+        "> 返回一级",
+        "",
+        "正文",
+      ].join("\n");
+      const view = createView(doc, doc.length - 1, [livePreviewBlockquotes]);
+      try {
+        const lines = Array.from(
+          view.dom.querySelectorAll<HTMLElement>(".cm-live-preview-blockquote"),
+        );
+        expect(
+          lines.map((line) =>
+            line.style.getPropertyValue("--mp-live-quote-depth"),
+          ),
+        ).toEqual(["1", "2", "3", "2", "2", "2", "1", "1"]);
+        const selection = view.state.selection;
+        view.dispatch({ changes: { from: doc.indexOf("三级"), insert: "新" } });
+        expect(view.state.selection.main.anchor).toBe(
+          selection.main.anchor + 1,
+        );
+        expect(view.state.selection.main.empty).toBe(true);
+      } finally {
+        view.destroy();
+        view.dom.parentElement?.remove();
+      }
+    },
+  );
+
   it("marks plain blockquote lines for Reading-matched chrome", () => {
     const doc = "> quoted line\n> second\n\npara";
     const view = createView(doc, doc.length - 1, [livePreviewBlockquotes]);

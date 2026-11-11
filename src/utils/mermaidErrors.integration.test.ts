@@ -25,8 +25,63 @@ function createDiagram(source: string) {
   return { host, diagram };
 }
 
+const originalGetBBox = Object.getOwnPropertyDescriptor(
+  SVGElement.prototype,
+  "getBBox",
+);
+
 afterEach(() => {
+  if (originalGetBBox) {
+    Object.defineProperty(SVGElement.prototype, "getBBox", originalGetBBox);
+  } else {
+    Reflect.deleteProperty(SVGElement.prototype, "getBBox");
+  }
+  vi.restoreAllMocks();
   document.body.replaceChildren();
+});
+
+describe("official Mermaid Gantt layout", () => {
+  it("keeps date ticks readable in a narrow preview instead of squeezing the timeline", async () => {
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(480);
+    Object.defineProperty(SVGElement.prototype, "getBBox", {
+      configurable: true,
+      value: function (this: SVGElement) {
+        return {
+          x: 0,
+          y: 0,
+          width: (this.textContent?.length ?? 0) * 8,
+          height: 16,
+        };
+      },
+    });
+    const { host, diagram } = createDiagram(`gantt
+dateFormat YYYY-MM-DD
+section Section
+Completed :done, des1, 2014-01-06,2014-01-08
+Active :active, des2, 2014-01-07, 3d
+Parallel 1 : des3, after des1, 1d
+Parallel 2 : des4, after des1, 1d
+Parallel 3 : des5, after des3, 1d
+Parallel 4 : des6, after des4, 1d`);
+    await renderMermaidDiagrams(host, { themeMode: "light" });
+    expect(diagram.dataset.mermaidRendered).toBe("true");
+    const ticks = Array.from(
+      diagram.querySelectorAll<SVGGElement>(".grid .tick"),
+    );
+    expect(ticks.length).toBeGreaterThan(1);
+    const position = (tick: SVGGElement) =>
+      Number(tick.getAttribute("transform")?.match(/translate\(([^,)]+)/)?.[1]);
+    for (let i = 1; i < ticks.length; i += 1) {
+      const previous = ticks[i - 1]!;
+      const current = ticks[i]!;
+      const labelWidth =
+        (previous.textContent!.length + current.textContent!.length) * 4;
+      expect(position(current) - position(previous)).toBeGreaterThan(
+        labelWidth + 8,
+      );
+    }
+    expect(diagram.querySelector("svg")!.style.maxWidth).toBe("none");
+  });
 });
 
 describe("official Mermaid syntax errors", () => {

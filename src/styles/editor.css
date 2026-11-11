@@ -1456,7 +1456,10 @@
 .editor-pane-layout[data-live-preview="true"] .cm-live-preview-blockquote {
   --mp-live-quote-inline-pad: 1rem;
   color: var(--mp-doc-quote-text, #5b21b6);
-  padding-left: calc(var(--pane-content-px) + var(--mp-live-quote-inline-pad));
+  padding-left: calc(
+    var(--pane-content-px) + var(--mp-live-quote-inline-pad) *
+      var(--mp-live-quote-depth, 1)
+  );
   background-color: transparent;
   background-image: none;
   background-repeat: no-repeat;
@@ -1474,9 +1477,13 @@
   left: var(--pane-content-px);
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: calc(var(--mp-live-quote-inline-pad) * var(--mp-live-quote-depth, 1));
   pointer-events: none;
-  background: var(--mp-doc-muted, #746f67);
+  background: repeating-linear-gradient(
+    to right,
+    var(--mp-doc-muted, #746f67) 0 1px,
+    transparent 1px var(--mp-live-quote-inline-pad)
+  );
 }
 
 .editor-pane-layout[data-live-preview="true"]
@@ -1509,7 +1516,11 @@
 .dark
   .editor-pane-layout[data-live-preview="true"]
   .cm-live-preview-blockquote::before {
-  background: var(--mp-doc-muted, #aaa79e);
+  background: repeating-linear-gradient(
+    to right,
+    var(--mp-doc-muted, #aaa79e) 0 1px,
+    transparent 1px var(--mp-live-quote-inline-pad)
+  );
 }
 
 .dark
@@ -1587,7 +1598,7 @@
   .cm-live-preview-mermaid
   .mermaid {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 /* Match Reading: root diagram is a block SVG, so text-align cannot center it.
@@ -1597,6 +1608,7 @@
   .mermaid
   > svg {
   display: block;
+  flex-shrink: 0;
   width: auto;
   height: auto;
   max-width: none !important;

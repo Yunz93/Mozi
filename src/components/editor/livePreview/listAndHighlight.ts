@@ -675,21 +675,7 @@ export const livePreviewHighlights = defineLivePreviewBlockDecorationField({
   rebuildOnContextChange: false,
 });
 
-const blockquoteLineDeco = Decoration.line({
-  class: "cm-live-preview-blockquote",
-});
-const blockquoteFirstLineDeco = Decoration.line({
-  class: "cm-live-preview-blockquote cm-live-preview-blockquote-first",
-});
-const blockquoteLastLineDeco = Decoration.line({
-  class: "cm-live-preview-blockquote cm-live-preview-blockquote-last",
-});
-const blockquoteOnlyLineDeco = Decoration.line({
-  class:
-    "cm-live-preview-blockquote cm-live-preview-blockquote-first cm-live-preview-blockquote-last",
-});
-
-/** Style plain `>` blockquotes to match Reading mode quote chrome. */
+/** 按语法树中的嵌套深度绘制普通引用，包含省略标记的延续行。 */
 export function buildLivePreviewBlockquoteDecorations(
   view: EditorView,
 ): DecorationSet {
@@ -699,27 +685,27 @@ export function buildLivePreviewBlockquoteDecorations(
   const tree = ensureLivePreviewViewportTree(view, parseTo);
   const { from: viewportFrom, to: viewportTo } =
     getLivePreviewDecorationRange(view);
-  const lineFroms = new Set<number>();
+  const depthByLine = new Map<number, number>();
 
   tree.iterate({
     from: viewportFrom,
     to: viewportTo,
     enter: (node) => {
       if (node.name !== "Blockquote") return;
-      // Nested quotes re-enter; decorate leaf lines once.
+      // 每进入一层引用就累加深度，不能在去重行时丢掉嵌套层级。
       let pos = Math.max(node.from, viewportFrom);
       const end = Math.min(node.to, viewportTo);
       if (pos > end) return;
       while (pos <= end) {
         const line = state.doc.lineAt(pos);
-        lineFroms.add(line.from);
+        depthByLine.set(line.from, (depthByLine.get(line.from) ?? 0) + 1);
         if (line.to >= end) break;
         pos = line.to + 1;
       }
     },
   });
 
-  const sorted = Array.from(lineFroms).sort((a, b) => a - b);
+  const sorted = Array.from(depthByLine.keys()).sort((a, b) => a - b);
   for (let i = 0; i < sorted.length; i += 1) {
     const from = sorted[i]!;
     const prev = sorted[i - 1];
@@ -731,14 +717,15 @@ export function buildLivePreviewBlockquoteDecorations(
       next !== undefined && line.to + 1 === state.doc.lineAt(next).from;
     const isFirst = !prevIsAdjacent;
     const isLast = !nextIsAdjacent;
-    const deco =
-      isFirst && isLast
-        ? blockquoteOnlyLineDeco
-        : isFirst
-          ? blockquoteFirstLineDeco
-          : isLast
-            ? blockquoteLastLineDeco
-            : blockquoteLineDeco;
+    const classes = ["cm-live-preview-blockquote"];
+    if (isFirst) classes.push("cm-live-preview-blockquote-first");
+    if (isLast) classes.push("cm-live-preview-blockquote-last");
+    const deco = Decoration.line({
+      class: classes.join(" "),
+      attributes: {
+        style: `--mp-live-quote-depth: ${depthByLine.get(from)}`,
+      },
+    });
     builder.add(from, from, deco);
   }
 
