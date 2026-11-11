@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "releases": [
+    {
+      "tag_name": "v2.3.7",
+      "draft": false,
+      "prerelease": false,
+      "assets": [
+        {
+          "name": "latest.json"
+        }
+      ]
+    }
+  ]
+}
