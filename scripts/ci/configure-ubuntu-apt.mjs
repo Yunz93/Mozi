@@ -22,7 +22,9 @@ export async function selectUbuntuArchive(suite, fetchImpl = fetch) {
       console.log(`Ubuntu APT archive: ${archive}`);
       return archive;
     } catch (error) {
-      console.log(`Ubuntu APT probe failed: ${archive} (${error.message})`);
+      console.log(
+        `Ubuntu APT probe failed: ${archive} (${error.message}; ${error.cause?.code ?? "no-code"}: ${error.cause?.message ?? "no-cause"})`,
+      );
     }
   }
   throw new Error("Ubuntu 主源与备用镜像均不可达，停止安装系统依赖。");
