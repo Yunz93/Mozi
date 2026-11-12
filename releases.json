@@ -2,6 +2,16 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "tag_name": "v2.3.8",
+      "draft": false,
+      "prerelease": false,
+      "assets": [
+        {
+          "name": "latest.json"
+        }
+      ]
+    },
+    {
       "tag_name": "v2.3.8-beta.3",
       "draft": false,
       "prerelease": true,
