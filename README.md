@@ -2,7 +2,7 @@
 
 英文名：**Mozi**。
 
-[English](./README.en.md) · [开发文档](docs/development/README.md)
+[官网](https://mozi.yunz93.dev/) · [下载](https://github.com/Yunz93/Mozi/releases/latest) · [使用指南](https://mozi.yunz93.dev/#guides) · [English](./README.en.md) · [开发文档](docs/development/README.md)
 
 本地优先的 Markdown 编辑器。把文件夹当知识库，笔记就是普通 `.md` 文件。2.2.0 新增待办日历、到期提醒和可选的 macOS 系统日历同步，支持专注模式与 Live 链接预览。
 
