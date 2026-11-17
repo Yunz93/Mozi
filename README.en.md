@@ -2,7 +2,7 @@
 
 Chinese name: **墨知**.
 
-[中文](./README.md) · [Development guide](docs/development/README.en.md)
+[Website](https://mozi.yunz93.dev/) · [Download](https://github.com/Yunz93/Mozi/releases/latest) · [User guides (中文)](https://mozi.yunz93.dev/#guides) · [中文](./README.md) · [Development guide](docs/development/README.en.md)
 
 A local-first Markdown editor. Your vault is a folder of ordinary `.md` files. Version 2.2.0 adds a task calendar, due reminders, and optional macOS Calendar sync, with focus mode and Live link previews.
 
