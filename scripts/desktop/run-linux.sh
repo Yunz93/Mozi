@@ -6,7 +6,23 @@ case "$desktop_entry" in
   *) echo 'Unsupported desktop test entry' >&2; exit 1 ;;
 esac
 desktop_runtime=$(mktemp -d)
-trap 'rm -rf "$desktop_runtime"' EXIT
+# 文档门户可能挂载 FUSE；先卸载本次测试的挂载，再移除临时目录。
+cleanup_runtime() {
+  desktop_exit=$?
+  trap - EXIT
+  desktop_document_portal="$desktop_runtime/session/doc"
+  if mountpoint -q "$desktop_document_portal"; then
+    if ! fusermount3 -u -z "$desktop_document_portal"; then
+      echo "Failed to unmount desktop test document portal: $desktop_document_portal" >&2
+      exit 1
+    fi
+  fi
+  if ! rm -rf "$desktop_runtime"; then
+    exit 1
+  fi
+  exit "$desktop_exit"
+}
+trap cleanup_runtime EXIT
 export XDG_RUNTIME_DIR="$desktop_runtime/session"
 export XDG_CONFIG_HOME="$desktop_runtime/config"
 export XDG_DATA_HOME="$desktop_runtime/data"
