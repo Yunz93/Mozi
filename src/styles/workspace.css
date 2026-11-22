@@ -1,9 +1,9 @@
 /* 主工作区沿用暖色强调，统一系统字体与金属灰深色表面。 */
 :root {
   --workspace-canvas: #faf8f3;
-  --workspace-sidebar: var(--workspace-canvas);
+  --workspace-sidebar: #efede7;
   --workspace-text: #2c2b28;
-  --workspace-muted: #746f67;
+  --workspace-muted: #6f6a62;
   --workspace-border: #ded9d0;
   --workspace-divider: rgba(44, 43, 40, 0.1);
   --workspace-hover: #eae5dc;
@@ -17,7 +17,7 @@
 
 .dark {
   --workspace-canvas: #24272b;
-  --workspace-sidebar: var(--workspace-canvas);
+  --workspace-sidebar: #1e2125;
   --workspace-text: #e4e1d9;
   --workspace-muted: #aaa79e;
   --workspace-border: #3a4047;
@@ -102,9 +102,9 @@
   gap: 0.65rem;
   min-height: 2.25rem;
   color: var(--workspace-text);
-  font-size: 1.25em;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  font-size: 0.9375em;
+  font-weight: 550;
+  letter-spacing: 0.02em;
 }
 
 .workspace-brand svg {
@@ -274,8 +274,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.875em;
-  font-weight: 550;
+  font-size: 0.9375em;
+  font-weight: 600;
 }
 .app-toolbar-folder {
   display: inline-flex;
@@ -308,7 +308,7 @@
 .app-toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex-shrink: 0;
 }
 .app-toolbar-group {
@@ -317,7 +317,7 @@
   gap: 4px;
   flex-shrink: 0;
   padding: 2px;
-  border: 1px solid var(--workspace-border);
+  border: 1px solid transparent;
   border-radius: 7px;
   height: 40px;
 }
@@ -514,7 +514,7 @@
 }
 .workspace-root .outline-panel {
   color: var(--workspace-muted);
-  background: var(--workspace-canvas);
+  background: var(--workspace-sidebar);
 }
 .workspace-document-footer {
   background: var(--workspace-canvas);
