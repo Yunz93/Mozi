@@ -16,8 +16,8 @@ describe("Windows file association safety", () => {
   });
 
   it("uses a quoted executable and file argument and cleans up its own entries", () => {
-    expect(hooks).toContain(String.raw`$"$INSTDIR`);
-    expect(hooks).toContain(String.raw`$"%1$"`);
+    expect(hooks).toContain(String.raw`$\"$INSTDIR`);
+    expect(hooks).toContain(String.raw`$\"%1$\"`);
     expect(hooks).toContain("NSIS_HOOK_POSTUNINSTALL");
   });
 });
