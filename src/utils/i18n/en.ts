@@ -149,6 +149,9 @@ export default {
   app_chooseKnowledgeBaseDesc:
     "Open a folder as your knowledge base to start writing.",
   app_openKnowledgeBase: "Open Knowledge Base",
+  settings_fileAssociations: "File associations",
+  settings_manageFileAssociations: "Manage Windows default apps",
+  settings_fileAssociationsDesc: "Mozi does not change the default Markdown app automatically. Choose your preferred app in Windows Settings.",
   app_scanningKnowledgeBase: "Scanning knowledge base folders…",
   app_openFile: "Open Markdown File",
   app_skipForNow: "Set Up Later",
