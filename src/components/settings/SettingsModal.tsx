@@ -387,7 +387,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              {t("common_done")}
+              {t("common_close")}
             </button>
           </div>
         </div>
