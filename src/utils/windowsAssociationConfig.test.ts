@@ -7,17 +7,17 @@ const config = JSON.parse(readFileSync(resolve(root, "tauri.windows.conf.json"),
 const hooks = readFileSync(resolve(root, "windows/file-associations.nsh"), "utf8");
 
 describe("Windows file association safety", () => {
-  it("does not use Tauri APP_ASSOCIATE to overwrite .md defaults", () => {
+  it("registers Open With without claiming the default .md ProgID", () => {
     expect(config.bundle.fileAssociations).toEqual([]);
     expect(config.bundle.windows.nsis.installerHooks).toBe("windows/file-associations.nsh");
-    expect(hooks).not.toMatch(/!insertmacro\\s+APP_ASSOCIATE\\b/);
+    expect(hooks).not.toContain("!insertmacro APP_ASSOCIATE ");
     expect(hooks).toContain("OpenWithList");
-    expect(hooks).not.toMatch(/WriteRegStr\\s+SHCTX\\s+"Software\\\\Classes\\\\\\.md"\\s+""/);
+    expect(hooks).not.toContain(String.raw`Software\Classes\.md" ""`);
   });
 
-  it("quotes the executable and %1 in the Windows open command", () => {
-    expect(hooks).toContain('\\$\\\"$INSTDIR');
-    expect(hooks).toContain('%1');
+  it("uses a quoted executable and file argument and cleans up its own entries", () => {
+    expect(hooks).toContain(String.raw`$"$INSTDIR`);
+    expect(hooks).toContain(String.raw`$"%1$"`);
     expect(hooks).toContain("NSIS_HOOK_POSTUNINSTALL");
   });
 });
