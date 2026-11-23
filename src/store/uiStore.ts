@@ -252,6 +252,7 @@ export const defaultSettings: AppSettings = {
   },
   knowledgeBases: [],
   lastKnowledgeBasePath: "",
+  skipKnowledgeBaseOnboarding: false,
   lastOpenedFilePath: "",
   themeMode: "dark",
   uiAccentColor: DEFAULT_UI_ACCENT_COLOR,
