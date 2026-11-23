@@ -546,6 +546,13 @@ export class TauriFileSystem implements IFileSystem {
     return this.getFileObjectUrl(path);
   }
 
+  async readDirectoryWithProgress(
+    dirPath: string,
+    options: { signal?: AbortSignal; onProgress?: (directory: string) => void },
+  ): Promise<FileNode[]> {
+    return this.readDirectory(dirPath, dirPath, false, undefined, false, options);
+  }
+
   /**
    * Recursively read directory and return file nodes
    */
@@ -555,9 +562,13 @@ export class TauriFileSystem implements IFileSystem {
     inTrash: boolean = false,
     reuseChildren?: FileNode[],
     strict: boolean = false,
+    scan?: { signal?: AbortSignal; onProgress?: (directory: string) => void },
   ): Promise<FileNode[]> {
     try {
+      if (scan?.signal?.aborted) throw new DOMException("Directory scan cancelled", "AbortError");
+      scan?.onProgress?.(dirPath);
       const entries = await readDir(dirPath);
+      if (scan?.signal?.aborted) throw new DOMException("Directory scan cancelled", "AbortError");
       // Normalize once through the native path API; entry names are native leaf
       // names from readDir, so appending them needs no per-file IPC. In
       // particular, a backslash in a POSIX filename must remain a literal.
@@ -580,6 +591,7 @@ export class TauriFileSystem implements IFileSystem {
       );
 
       for (const entry of entries) {
+        if (scan?.signal?.aborted) throw new DOMException("Directory scan cancelled", "AbortError");
         if (!entry.name || entry.isSymlink) continue;
         // 保留普通附件，仅隐藏本软件导入流程的随机临时文件。
         if (!entry.isDirectory && IMPORT_TEMP_FILE_PATTERN.test(entry.name))
@@ -608,6 +620,7 @@ export class TauriFileSystem implements IFileSystem {
               nodeInTrash,
               undefined,
               strict,
+              scan,
             ));
           nodes.push({
             id: fullPath,
@@ -642,6 +655,7 @@ export class TauriFileSystem implements IFileSystem {
       }
       return nodes;
     } catch (error) {
+      if (scan?.signal?.aborted) throw error;
       console.error(`Failed to read directory ${dirPath}:`, error);
       const normalizedDir = dirPath.replace(/\\/g, "/").replace(/\/+$/, "");
       const normalizedRoot = rootPath.replace(/\\/g, "/").replace(/\/+$/, "");
