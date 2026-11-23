@@ -137,6 +137,7 @@ export default {
   app_chooseKnowledgeBase: "选择知识库",
   app_chooseKnowledgeBaseDesc: "先打开一个文件夹作为知识库，再开始写作。",
   app_openKnowledgeBase: "打开知识库",
+  app_scanningKnowledgeBase: "正在扫描知识库目录…",
   app_openFile: "打开 Markdown 文件",
   app_skipForNow: "稍后设置",
   app_saved: "已保存",
