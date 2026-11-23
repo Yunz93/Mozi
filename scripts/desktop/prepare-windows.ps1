@@ -3,9 +3,20 @@ $ErrorActionPreference = 'Stop'
 # Install the release-configuration NSIS package in this ephemeral runner.
 $installer = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe')
 if ($installer.Count -ne 1) { throw 'Expected exactly one NSIS installer' }
+# Preserve the user's existing per-user default ProgID across installation.
+function Get-ExtensionProgId([string]$extension) {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\\Classes\\.$extension")
+    if (-not $key) { return $null }
+    try { return $key.GetValue('', $null) } finally { $key.Dispose() }
+}
+$beforeMd = Get-ExtensionProgId 'md'
+$beforeMarkdown = Get-ExtensionProgId 'markdown'
 $installation = Join-Path $env:RUNNER_TEMP 'mozi-desktop-installed'
 $result = Start-Process -FilePath $installer[0].FullName -ArgumentList @('/S', "/D=$installation") -Wait -PassThru
 if ($result.ExitCode -notin @(0, 3010)) { throw "Installer failed: $($result.ExitCode)" }
+if ((Get-ExtensionProgId 'md') -ne $beforeMd) { throw 'NSIS unexpectedly changed .md default ProgID' }
+if ((Get-ExtensionProgId 'markdown') -ne $beforeMarkdown) { throw 'NSIS unexpectedly changed .markdown default ProgID' }
+
 $application = @(Get-ChildItem $installation -Filter '*.exe' | Where-Object { $_.Name -notmatch 'uninstall|unins|卸载' })
 if ($application.Count -ne 1) { throw 'Expected exactly one installed application binary' }
 
