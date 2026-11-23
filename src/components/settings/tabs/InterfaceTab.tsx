@@ -1,4 +1,5 @@
 import React from "react";
+import { isTauriEnvironment } from "../../../types/filesystem";
 import type { AppSettings } from "../../../types";
 import {
   DEFAULT_UI_FONT_FAMILY,
@@ -80,6 +81,26 @@ export const InterfaceTab: React.FC<InterfaceTabProps> = ({
               {t("settings_interfaceDesc")}
             </p>
           </div>
+
+          {isTauriEnvironment() && typeof navigator !== "undefined" && /Win/i.test(navigator.platform) && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t("settings_fileAssociations")}
+              </label>
+              <button
+                type="button"
+                className="rounded-lg border border-current/20 px-4 py-2 text-sm"
+                onClick={() => {
+                  void import("@tauri-apps/api/core").then(({ invoke }) => invoke("open_default_apps_settings")).catch(console.error);
+                }}
+              >
+                {t("settings_manageFileAssociations")}
+              </button>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t("settings_fileAssociationsDesc")}
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
