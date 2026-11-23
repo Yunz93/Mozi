@@ -325,7 +325,6 @@ const App: React.FC = () => {
     useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
     useState(false);
-  const [skipKnowledgeBaseOnboarding, setSkipKnowledgeBaseOnboarding] = useState(false);
 
   useEffect(() => {
     if (!isCommandPaletteOpen) return;
@@ -1207,7 +1206,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (shouldShowKnowledgeBaseOnboarding && !skipKnowledgeBaseOnboarding) {
+  if (shouldShowKnowledgeBaseOnboarding && !settings.skipKnowledgeBaseOnboarding) {
     return (
       <div
         className="workspace-root"
@@ -1218,7 +1217,7 @@ const App: React.FC = () => {
           uiFontFamily={uiFontFamily}
           onOpen={handleSwitchKnowledgeBase}
           onOpenFile={() => { void openFile(); }}
-          onSkip={() => setSkipKnowledgeBaseOnboarding(true)}
+          onSkip={() => updateSettings({ skipKnowledgeBaseOnboarding: true })}
         />
         {taskPanel}
         {notification ? (
