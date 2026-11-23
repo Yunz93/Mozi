@@ -172,6 +172,7 @@ export async function openKnowledgeBaseWorkspace(
 
   // 读取目录期间用户仍可编辑；替换缓冲前再保存，并拒绝已过期的切换请求。
   if (options?.signal?.aborted || !(await beforeCommit())) return null;
+  if (options?.signal?.aborted) return null;
   clearAllCache();
   setCurrentFilePath(null);
   setFiles(fileNodes);

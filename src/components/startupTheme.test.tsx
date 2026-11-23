@@ -39,7 +39,12 @@ describe("startup page theme consistency", () => {
       page === "loading" ? (
         <KnowledgeBaseLoadingScreen {...props} />
       ) : (
-        <KnowledgeBaseOnboarding {...props} onOpen={() => {}} />
+        <KnowledgeBaseOnboarding
+          {...props}
+          onOpen={() => {}}
+          onOpenFile={() => {}}
+          onSkip={() => {}}
+        />
       ),
     );
     const tokens = getComputedStyle(document.documentElement);
