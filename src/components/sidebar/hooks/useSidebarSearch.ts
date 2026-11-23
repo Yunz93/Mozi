@@ -14,6 +14,7 @@ import { createEmbeddingProvider } from "../../../services/vault/embeddingProvid
 import { getActiveVectorStore } from "../../../services/vault/semanticIndexRuntime";
 import { isMarkdownFile } from "../../../utils/fileTypes";
 
+const SEARCH_SNIPPET_CONTEXT_CHARS = 80;
 const SEARCH_READ_CONCURRENCY = 8;
 const SEARCH_CACHE_FILES = 2048;
 const SEARCH_CACHE_CHARS = 1_000_000; // UTF-16 contents: at most about 2 MB.
@@ -99,7 +100,11 @@ export const collectParagraphMatches = (
         line,
         start,
         end,
-        text: content.slice(start, end),
+        text: (() => {
+          const left = Math.max(start, matchPos - SEARCH_SNIPPET_CONTEXT_CHARS);
+          const right = Math.min(end, matchPos + normalizedQuery.length + SEARCH_SNIPPET_CONTEXT_CHARS);
+          return `${left > start ? "…" : ""}${content.slice(left, right)}${right < end ? "…" : ""}`;
+        })(),
       });
     }
   }

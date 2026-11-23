@@ -120,7 +120,6 @@ import {
   openNewAppWindow,
   openPathInNewAppWindow,
 } from "./utils/appWindow";
-import { isStandaloneDocumentSession } from "./utils/standaloneDocumentSession";
 import { shouldRestoreVaultOnBoot } from "./utils/bootOpenFile";
 
 // Layout constants moved to src/config/layout.ts
@@ -209,7 +208,7 @@ const App: React.FC = () => {
   const content = documentSession?.content ?? "";
 
   const {
-    openDirectory,
+    openFile,
     openKnowledgeBase,
     openFilePath,
     readFile,
@@ -324,6 +323,8 @@ const App: React.FC = () => {
     useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
     useState(false);
+  const [scanningDirectory, setScanningDirectory] = useState("");
+  const activeDirectoryScanRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!isCommandPaletteOpen) return;
@@ -357,8 +358,15 @@ const App: React.FC = () => {
           if (isTauriEnvironment() && rootFolderPath) {
             const label = await getCurrentAppWindowLabel();
             if (isPrimaryAppWindow(label)) {
-              await openPathInNewAppWindow(path);
-              continue;
+              try {
+                await openPathInNewAppWindow(path);
+                continue;
+              } catch (error) {
+                console.warn("Failed to create a separate document window; opening in current window:", error);
+                showNotification(t("notifications_openInNewWindowFailed", {
+                  error: error instanceof Error ? error.message : String(error),
+                }), "warning");
+              }
             }
           }
           closeTaskCalendar();
@@ -371,7 +379,7 @@ const App: React.FC = () => {
         }
       }
     },
-    [closeTaskCalendar, openFilePath, rootFolderPath],
+    [closeTaskCalendar, openFilePath, rootFolderPath, showNotification, t],
   );
 
   const externalFileOpen = useExternalFileOpen({
@@ -720,19 +728,7 @@ const App: React.FC = () => {
     [setOutlineWidth],
   );
 
-  const standaloneDocumentSession = isStandaloneDocumentSession(
-    rootFolderPath,
-    files.length,
-  );
-
   const handleSwitchKnowledgeBase = useCallback(async () => {
-    if (isStandaloneDocumentSession(rootFolderPath, files.length)) {
-      showNotification(
-        t("sidebar_openKnowledgeBaseDisabledStandalone"),
-        "error",
-      );
-      return;
-    }
     flushActiveEditorPendingChanges();
     const state = useAppStore.getState();
     const tabId = state.activeTabId;
@@ -746,11 +742,31 @@ const App: React.FC = () => {
         return;
       }
     }
-    await openDirectory();
+    const controller = new AbortController();
+    activeDirectoryScanRef.current?.abort();
+    activeDirectoryScanRef.current = controller;
+    let warningShown = false;
+    try {
+      await openKnowledgeBase(undefined, {
+        signal: controller.signal,
+        onProgress: (directory) => {
+          if (!controller.signal.aborted) setScanningDirectory(directory);
+        },
+        onWarning: (directory, error) => {
+          if (controller.signal.aborted || warningShown) return;
+          warningShown = true;
+          showNotification(t("notifications_knowledgeBaseScanWarning", { path: directory, error }), "warning");
+        },
+      });
+    } finally {
+      if (activeDirectoryScanRef.current === controller) {
+        activeDirectoryScanRef.current = null;
+        setScanningDirectory("");
+      }
+    }
   }, [
-    files.length,
     forceSave,
-    openDirectory,
+    openKnowledgeBase,
     rootFolderPath,
     showNotification,
     t,
@@ -1188,6 +1204,19 @@ const App: React.FC = () => {
       />
     ) : null;
 
+  const directoryScanOverlay = scanningDirectory ? (
+    <div role="status" aria-live="polite" className="fixed inset-0 z-[260] flex items-center justify-center bg-black/40 p-6">
+      <div className="w-full max-w-lg rounded-xl bg-[var(--workspace-menu)] p-6 shadow-xl">
+        <p className="font-semibold">{t("app_scanningKnowledgeBase")}</p>
+        <p className="mt-2 break-all text-xs opacity-70">{scanningDirectory}</p>
+        <button type="button" className="mt-4 rounded-lg border border-current/20 px-4 py-2" onClick={() => {
+          activeDirectoryScanRef.current?.abort();
+          setScanningDirectory("");
+        }}>{t("common_cancel")}</button>
+      </div>
+    </div>
+  ) : null;
+
   if (shouldShowKnowledgeBaseLoading) {
     return (
       <KnowledgeBaseLoadingScreen
@@ -1198,7 +1227,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (shouldShowKnowledgeBaseOnboarding) {
+  if (shouldShowKnowledgeBaseOnboarding && !settings.skipKnowledgeBaseOnboarding) {
     return (
       <div
         className="workspace-root"
@@ -1208,8 +1237,16 @@ const App: React.FC = () => {
           uiScaleStyle={uiScaleStyle}
           uiFontFamily={uiFontFamily}
           onOpen={handleSwitchKnowledgeBase}
+          onOpenFile={() => { void openFile(); }}
+          onSkip={() => updateSettings({ skipKnowledgeBaseOnboarding: true })}
         />
         {taskPanel}
+        {directoryScanOverlay}
+        {notification ? (
+          <div role="status" className="fixed bottom-6 right-6 z-[250] max-w-md rounded-lg border border-current/20 bg-[var(--workspace-menu)] p-4 shadow-lg">
+            {notification.msg}
+          </div>
+        ) : null}
         {isSettingsOpen ? (
           <SettingsModal
             isOpen
@@ -1229,6 +1266,7 @@ const App: React.FC = () => {
         className={`workspace-root flex h-screen flex-col overflow-hidden text-sm${isFocusModeActive ? " is-focus-mode" : ""}`}
         style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
       >
+        {directoryScanOverlay}
         {(() => {
           const isMac =
             typeof navigator !== "undefined" &&
@@ -1284,7 +1322,6 @@ const App: React.FC = () => {
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
             onOpenSettings={() => setSettingsOpen(true)}
-            disableOpenKnowledgeBase={standaloneDocumentSession}
             isOpen={isSidebarOpen && !isFocusModeActive}
             searchFocusRequestKey={sidebarSearchRequestKey}
             locateCurrentFileRequestKey={sidebarLocateRequestKey}

@@ -484,6 +484,9 @@ export function useFileSystem() {
         skipSampleNotes?: boolean;
         suppressErrors?: boolean;
         restoreLastOpenedFile?: boolean;
+        signal?: AbortSignal;
+        onProgress?: (directory: string) => void;
+        onWarning?: (directory: string, error: string) => void;
       },
     ): Promise<string | null> => {
       const generation = ++knowledgeBaseOpenGeneration;
@@ -519,6 +522,9 @@ export function useFileSystem() {
             silentSuccess: options?.silentSuccess,
             skipSampleNotes: options?.skipSampleNotes,
             restoreLastOpenedFile: options?.restoreLastOpenedFile,
+            signal: options?.signal,
+            onProgress: options?.onProgress,
+            onWarning: options?.onWarning,
           },
           registerAllowedPath: registerTauriAllowedPath,
           registerAllowedPathIfExists: registerTauriAllowedPathIfExists,

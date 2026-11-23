@@ -919,6 +919,7 @@ pub fn run() {
             vault_watch::unsubscribe_vault,
             vault_watch::vault_watch_stats,
             take_opened_files,
+            open_default_apps_settings,
             open_file_in_new_window,
             open_new_window,
             get_secure_settings,
@@ -1337,6 +1338,22 @@ async fn read_file_prefix(app: tauri::AppHandle, path: String) -> Result<String,
 #[tauri::command]
 fn ping() -> Result<String, String> {
     Ok("pong".to_string())
+}
+
+#[tauri::command]
+fn open_default_apps_settings() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer.exe")
+            .arg("ms-settings:defaultapps")
+            .spawn()
+            .map_err(|error| format!("Failed to open Windows Default Apps settings: {error}"))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Default Apps settings is only available on Windows.".to_string())
+    }
 }
 
 #[tauri::command]
@@ -1866,6 +1883,25 @@ mod tests {
                 .into_owned()]
         );
 
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
+    fn opened_file_paths_from_args_preserves_unicode_and_spaces() {
+        let temp_dir = create_test_directory("opened-file-unicode");
+        let note_path = temp_dir.join("中文 空格 note.md");
+        fs::write(&note_path, "# Unicode\\n").expect("write unicode note");
+        let paths = opened_file_paths_from_args(
+            &[note_path.to_string_lossy().into_owned()],
+            temp_dir.to_str().expect("temp dir"),
+        );
+        assert_eq!(
+            paths,
+            vec![fs::canonicalize(&note_path)
+                .expect("canonical note path")
+                .to_string_lossy()
+                .into_owned()]
+        );
         cleanup_test_directory(&temp_dir);
     }
 

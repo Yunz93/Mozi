@@ -718,7 +718,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(
                                   line: snippet.line,
                                 })}
                               </div>
-                              <div className="min-w-0 overflow-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-gray-700 dark:text-gray-200">
+                              <div className="min-w-0 overflow-hidden whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-gray-700 dark:text-gray-200 line-clamp-2">
                                 {highlightSearchText(snippet.text, searchQuery)}
                               </div>
                             </button>

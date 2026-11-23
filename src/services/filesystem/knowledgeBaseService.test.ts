@@ -372,3 +372,42 @@ describe("openKnowledgeBaseWorkspace", () => {
     expect(result?.openedPreviewOnly).toBe(false);
   });
 });
+
+describe("cancellable knowledge base scans", () => {
+  it("does not replace the workspace after the scan is cancelled", async () => {
+    const controller = new AbortController();
+    const params = createBaseParams();
+    const readDirectoryWithProgress = vi.fn(async () => {
+      controller.abort();
+      return [];
+    });
+    const fs = { ...params.fs, readDirectoryWithProgress };
+    const result = await openKnowledgeBaseWorkspace({
+      ...params,
+      fs,
+      options: { path: "/vault", skipSampleNotes: true, signal: controller.signal },
+    });
+    expect(result).toBeNull();
+    expect(readDirectoryWithProgress).toHaveBeenCalledOnce();
+    expect(params.setRootFolderPath).not.toHaveBeenCalled();
+    expect(params.clearAllCache).not.toHaveBeenCalled();
+  });
+
+  it("passes progress callbacks through to the filesystem", async () => {
+    const params = createBaseParams();
+    const onProgress = vi.fn();
+    const fs = {
+      ...params.fs,
+      readDirectoryWithProgress: vi.fn(async (path: string, options: { onProgress?: (directory: string) => void }) => {
+        options.onProgress?.(path);
+        return [];
+      }),
+    };
+    await openKnowledgeBaseWorkspace({
+      ...params,
+      fs,
+      options: { path: "/vault", skipSampleNotes: true, onProgress },
+    });
+    expect(onProgress).toHaveBeenCalledWith("/vault");
+  });
+});

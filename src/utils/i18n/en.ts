@@ -100,6 +100,7 @@ export default {
   tasks_desktopOnlyHint:
     "Background file scanning and system reminders require the desktop app.",
   common_done: "Done",
+  common_close: "Close",
   common_cancel: "Cancel",
   common_confirm: "Confirm",
   common_create: "Create",
@@ -148,6 +149,13 @@ export default {
   app_chooseKnowledgeBaseDesc:
     "Open a folder as your knowledge base to start writing.",
   app_openKnowledgeBase: "Open Knowledge Base",
+  settings_fileAssociations: "File associations",
+  settings_manageFileAssociations: "Manage Windows default apps",
+  settings_fileAssociationsDesc: "Mozi does not change the default Markdown app automatically. Choose your preferred app in Windows Settings.",
+  app_scanningKnowledgeBase: "Scanning knowledge base folders…",
+  notifications_knowledgeBaseScanWarning: "Some folders could not be read: {path} ({error}). This folder was skipped.",
+  app_openFile: "Open Markdown File",
+  app_skipForNow: "Set Up Later",
   app_saved: "Saved",
   app_newFile: "New File",
   app_fileName: "File name:",
