@@ -65,3 +65,17 @@ describe("sidebar keyword snippets", () => {
     expect(matchCalls).toHaveLength(3);
   });
 });
+
+describe("bounded sidebar snippets", () => {
+  it("limits a long matching line while retaining the original navigation offsets", () => {
+    const content = `${"a".repeat(500)}needle${"b".repeat(500)}`;
+    const snippets = collectParagraphMatches(content, "needle");
+    expect(snippets).toHaveLength(1);
+    expect(snippets[0].start).toBe(0);
+    expect(snippets[0].end).toBe(content.length);
+    expect(snippets[0].text).toContain("needle");
+    expect(snippets[0].text.startsWith("…")).toBe(true);
+    expect(snippets[0].text.endsWith("…")).toBe(true);
+    expect(snippets[0].text.length).toBeLessThan(180);
+  });
+});
