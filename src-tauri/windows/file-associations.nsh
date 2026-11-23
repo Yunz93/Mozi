@@ -3,7 +3,7 @@
 ; disabled on Windows by tauri.windows.conf.json.
 !macro NSIS_HOOK_POSTINSTALL
   WriteRegStr SHCTX "Software\\Classes\\Applications\\${MAINBINARYNAME}.exe" "FriendlyAppName" "${PRODUCTNAME}"
-  WriteRegStr SHCTX "Software\\Classes\\Applications\\${MAINBINARYNAME}.exe\\shell\\open\\command" "" "$\\"$INSTDIR\\${MAINBINARYNAME}.exe$\\" $\\"%1$\\""
+  WriteRegStr SHCTX "Software\\Classes\\Applications\\${MAINBINARYNAME}.exe\\shell\\open\\command" "" "$\"$INSTDIR\\${MAINBINARYNAME}.exe$\" $\"%1$\""
   WriteRegStr SHCTX "Software\\Classes\\.md\\OpenWithList\\${MAINBINARYNAME}.exe" "" ""
   WriteRegStr SHCTX "Software\\Classes\\.markdown\\OpenWithList\\${MAINBINARYNAME}.exe" "" ""
   WriteRegStr SHCTX "Software\\Classes\\.excalidraw\\OpenWithList\\${MAINBINARYNAME}.exe" "" ""
