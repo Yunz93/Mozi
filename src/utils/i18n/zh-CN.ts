@@ -141,6 +141,7 @@ export default {
   settings_manageFileAssociations: "管理 Windows 默认应用",
   settings_fileAssociationsDesc: "墨知不会自动更改 Markdown 的默认打开方式。请在 Windows 设置中自行选择。",
   app_scanningKnowledgeBase: "正在扫描知识库目录…",
+  notifications_knowledgeBaseScanWarning: "部分子目录无法读取：{path}（{error}）。已跳过该目录。",
   app_openFile: "打开 Markdown 文件",
   app_skipForNow: "稍后设置",
   app_saved: "已保存",
