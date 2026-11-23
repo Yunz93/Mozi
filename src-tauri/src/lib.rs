@@ -1887,6 +1887,25 @@ mod tests {
     }
 
     #[test]
+    fn opened_file_paths_from_args_preserves_unicode_and_spaces() {
+        let temp_dir = create_test_directory("opened-file-unicode");
+        let note_path = temp_dir.join("中文 空格 note.md");
+        fs::write(&note_path, "# Unicode\\n").expect("write unicode note");
+        let paths = opened_file_paths_from_args(
+            &[note_path.to_string_lossy().into_owned()],
+            temp_dir.to_str().expect("temp dir"),
+        );
+        assert_eq!(
+            paths,
+            vec![fs::canonicalize(&note_path)
+                .expect("canonical note path")
+                .to_string_lossy()
+                .into_owned()]
+        );
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[test]
     fn opened_file_paths_from_urls_accepts_file_urls() {
         let temp_dir = create_test_directory("opened-file-url");
         let note_path = temp_dir.join("note.markdown");
