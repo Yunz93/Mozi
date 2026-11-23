@@ -735,13 +735,6 @@ const App: React.FC = () => {
   );
 
   const handleSwitchKnowledgeBase = useCallback(async () => {
-    if (isStandaloneDocumentSession(rootFolderPath, files.length)) {
-      showNotification(
-        t("sidebar_openKnowledgeBaseDisabledStandalone"),
-        "error",
-      );
-      return;
-    }
     flushActiveEditorPendingChanges();
     const state = useAppStore.getState();
     const tabId = state.activeTabId;
@@ -778,7 +771,6 @@ const App: React.FC = () => {
       }
     }
   }, [
-    files.length,
     forceSave,
     openKnowledgeBase,
     rootFolderPath,
