@@ -16,6 +16,8 @@ interface OpenKnowledgeBaseOptions {
    * Interactive folder opens should leave this false so no tab opens until the user picks a file.
    */
   restoreLastOpenedFile?: boolean;
+  signal?: AbortSignal;
+  onProgress?: (directory: string) => void;
 }
 
 interface OpenKnowledgeBaseParams {
@@ -31,6 +33,7 @@ interface OpenKnowledgeBaseParams {
     fileExists?: (path: string) => Promise<boolean>;
     openDirectory: () => Promise<string | null>;
     readDirectory: (dirPath: string) => Promise<FileNode[]>;
+    readDirectoryWithProgress?: (dirPath: string, options: { signal?: AbortSignal; onProgress?: (directory: string) => void }) => Promise<FileNode[]>;
     readFile: (path: string) => Promise<string>;
   };
   hasOpenedKnowledgeBaseBefore: (path: string) => boolean;
@@ -116,7 +119,7 @@ export async function openKnowledgeBaseWorkspace(
   } = params;
 
   const dirPath = options?.path || (await fs.openDirectory());
-  if (!dirPath) return null;
+  if (!dirPath || options?.signal?.aborted) return null;
 
   try {
     await withTimeout(
@@ -160,12 +163,14 @@ export async function openKnowledgeBaseWorkspace(
   }
 
   const fileNodes = await withErrorHandling(
-    () => fs.readDirectory(dirPath),
+    () => fs.readDirectoryWithProgress
+      ? fs.readDirectoryWithProgress(dirPath, { signal: options?.signal, onProgress: options?.onProgress })
+      : fs.readDirectory(dirPath),
     "Failed to read knowledge base",
   );
 
   // 读取目录期间用户仍可编辑；替换缓冲前再保存，并拒绝已过期的切换请求。
-  if (!(await beforeCommit())) return null;
+  if (options?.signal?.aborted || !(await beforeCommit())) return null;
   clearAllCache();
   setCurrentFilePath(null);
   setFiles(fileNodes);
