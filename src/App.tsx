@@ -758,11 +758,17 @@ const App: React.FC = () => {
     const controller = new AbortController();
     activeDirectoryScanRef.current?.abort();
     activeDirectoryScanRef.current = controller;
+    let warningShown = false;
     try {
       await openKnowledgeBase(undefined, {
         signal: controller.signal,
         onProgress: (directory) => {
           if (!controller.signal.aborted) setScanningDirectory(directory);
+        },
+        onWarning: (directory, error) => {
+          if (controller.signal.aborted || warningShown) return;
+          warningShown = true;
+          showNotification(t("notifications_knowledgeBaseScanWarning", { path: directory, error }), "warning");
         },
       });
     } finally {
