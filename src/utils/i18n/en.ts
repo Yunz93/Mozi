@@ -149,6 +149,7 @@ export default {
   app_chooseKnowledgeBaseDesc:
     "Open a folder as your knowledge base to start writing.",
   app_openKnowledgeBase: "Open Knowledge Base",
+  app_scanningKnowledgeBase: "Scanning knowledge base folders…",
   app_openFile: "Open Markdown File",
   app_skipForNow: "Set Up Later",
   app_saved: "Saved",
