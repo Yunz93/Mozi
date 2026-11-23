@@ -919,6 +919,7 @@ pub fn run() {
             vault_watch::unsubscribe_vault,
             vault_watch::vault_watch_stats,
             take_opened_files,
+            open_default_apps_settings,
             open_file_in_new_window,
             open_new_window,
             get_secure_settings,
@@ -1337,6 +1338,22 @@ async fn read_file_prefix(app: tauri::AppHandle, path: String) -> Result<String,
 #[tauri::command]
 fn ping() -> Result<String, String> {
     Ok("pong".to_string())
+}
+
+#[tauri::command]
+fn open_default_apps_settings() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer.exe")
+            .arg("ms-settings:defaultapps")
+            .spawn()
+            .map_err(|error| format!("Failed to open Windows Default Apps settings: {error}"))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Default Apps settings is only available on Windows.".to_string())
+    }
 }
 
 #[tauri::command]
