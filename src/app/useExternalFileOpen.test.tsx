@@ -80,4 +80,18 @@ describe("useExternalFileOpen", () => {
       expect(unlisten).toHaveBeenCalled();
     });
   });
+  it("delivers a Windows second-instance file event once with duplicate paths removed", async () => {
+    let callback: ((event: { payload: unknown }) => void) | undefined;
+    listenMock.mockImplementation(async (_name, listener) => {
+      callback = listener;
+      return vi.fn();
+    });
+    const onRuntimePaths = vi.fn();
+    const { unmount } = render(<Harness onRuntimePaths={onRuntimePaths} />);
+    await waitFor(() => expect(callback).toEqual(expect.any(Function)));
+    callback?.({ payload: ["C:\\\\Notes\\\\a.md", "C:\\\\Notes\\\\a.md", "", null] });
+    expect(onRuntimePaths).toHaveBeenCalledWith(["C:\\\\Notes\\\\a.md"]);
+    unmount();
+  });
+
 });
