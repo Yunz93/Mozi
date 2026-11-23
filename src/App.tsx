@@ -210,6 +210,7 @@ const App: React.FC = () => {
 
   const {
     openDirectory,
+    openFile,
     openKnowledgeBase,
     openFilePath,
     readFile,
@@ -324,6 +325,7 @@ const App: React.FC = () => {
     useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
     useState(false);
+  const [skipKnowledgeBaseOnboarding, setSkipKnowledgeBaseOnboarding] = useState(false);
 
   useEffect(() => {
     if (!isCommandPaletteOpen) return;
@@ -1198,7 +1200,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (shouldShowKnowledgeBaseOnboarding) {
+  if (shouldShowKnowledgeBaseOnboarding && !skipKnowledgeBaseOnboarding) {
     return (
       <div
         className="workspace-root"
@@ -1208,8 +1210,15 @@ const App: React.FC = () => {
           uiScaleStyle={uiScaleStyle}
           uiFontFamily={uiFontFamily}
           onOpen={handleSwitchKnowledgeBase}
+          onOpenFile={() => { void openFile(); }}
+          onSkip={() => setSkipKnowledgeBaseOnboarding(true)}
         />
         {taskPanel}
+        {notification ? (
+          <div role="status" className="fixed bottom-6 right-6 z-[250] max-w-md rounded-lg border border-current/20 bg-[var(--workspace-menu)] p-4 shadow-lg">
+            {notification.msg}
+          </div>
+        ) : null}
         {isSettingsOpen ? (
           <SettingsModal
             isOpen
