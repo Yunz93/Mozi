@@ -4,7 +4,7 @@
  */
 
 import type { KeyBinding } from "@codemirror/view";
-import { insertNewlineAndIndent } from "@codemirror/commands";
+import { insertNewline, insertNewlineAndIndent } from "@codemirror/commands";
 import type { OrderedListMode } from "../../../types";
 import { wrapImeConfirmCommand, wrapImePassthroughCommand } from "./imeGuard";
 
@@ -190,7 +190,15 @@ export function createMarkdownKeyBindings(
   orderedListMode: OrderedListMode,
 ): KeyBinding[] {
   return [
-    { key: "Enter", run: wrapImeConfirmCommand(handleSmartEnter) },
+    {
+      key: "Enter",
+      run: wrapImeConfirmCommand(
+        // 普通正文只插入一个换行符，并保留光标后的空格。
+        (view) =>
+          handleSmartEnter(view) ||
+          (!view.state.readOnly && insertNewline(view)),
+      ),
+    },
     {
       key: "Shift-Enter",
       run: wrapImeConfirmCommand(insertNewlineAndIndent),
