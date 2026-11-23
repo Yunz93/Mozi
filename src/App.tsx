@@ -120,7 +120,6 @@ import {
   openNewAppWindow,
   openPathInNewAppWindow,
 } from "./utils/appWindow";
-import { isStandaloneDocumentSession } from "./utils/standaloneDocumentSession";
 import { shouldRestoreVaultOnBoot } from "./utils/bootOpenFile";
 
 // Layout constants moved to src/config/layout.ts
@@ -729,11 +728,6 @@ const App: React.FC = () => {
     [setOutlineWidth],
   );
 
-  const standaloneDocumentSession = isStandaloneDocumentSession(
-    rootFolderPath,
-    files.length,
-  );
-
   const handleSwitchKnowledgeBase = useCallback(async () => {
     flushActiveEditorPendingChanges();
     const state = useAppStore.getState();
@@ -1328,7 +1322,6 @@ const App: React.FC = () => {
             currentKnowledgeBasePath={rootFolderPath ?? undefined}
             onSwitchKnowledgeBase={handleSwitchKnowledgeBase}
             onOpenSettings={() => setSettingsOpen(true)}
-            disableOpenKnowledgeBase={false}
             isOpen={isSidebarOpen && !isFocusModeActive}
             searchFocusRequestKey={sidebarSearchRequestKey}
             locateCurrentFileRequestKey={sidebarLocateRequestKey}
