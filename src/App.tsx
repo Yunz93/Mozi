@@ -325,6 +325,8 @@ const App: React.FC = () => {
     useState(false);
   const [hasResolvedStartupKnowledgeBase, setHasResolvedStartupKnowledgeBase] =
     useState(false);
+  const [scanningDirectory, setScanningDirectory] = useState("");
+  const activeDirectoryScanRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!isCommandPaletteOpen) return;
@@ -754,11 +756,26 @@ const App: React.FC = () => {
         return;
       }
     }
-    await openDirectory();
+    const controller = new AbortController();
+    activeDirectoryScanRef.current?.abort();
+    activeDirectoryScanRef.current = controller;
+    try {
+      await openKnowledgeBase(undefined, {
+        signal: controller.signal,
+        onProgress: (directory) => {
+          if (!controller.signal.aborted) setScanningDirectory(directory);
+        },
+      });
+    } finally {
+      if (activeDirectoryScanRef.current === controller) {
+        activeDirectoryScanRef.current = null;
+        setScanningDirectory("");
+      }
+    }
   }, [
     files.length,
     forceSave,
-    openDirectory,
+    openKnowledgeBase,
     rootFolderPath,
     showNotification,
     t,
@@ -1196,6 +1213,19 @@ const App: React.FC = () => {
       />
     ) : null;
 
+  const directoryScanOverlay = scanningDirectory ? (
+    <div role="status" aria-live="polite" className="fixed inset-0 z-[260] flex items-center justify-center bg-black/40 p-6">
+      <div className="w-full max-w-lg rounded-xl bg-[var(--workspace-menu)] p-6 shadow-xl">
+        <p className="font-semibold">{t("app_scanningKnowledgeBase")}</p>
+        <p className="mt-2 break-all text-xs opacity-70">{scanningDirectory}</p>
+        <button type="button" className="mt-4 rounded-lg border border-current/20 px-4 py-2" onClick={() => {
+          activeDirectoryScanRef.current?.abort();
+          setScanningDirectory("");
+        }}>{t("common_cancel")}</button>
+      </div>
+    </div>
+  ) : null;
+
   if (shouldShowKnowledgeBaseLoading) {
     return (
       <KnowledgeBaseLoadingScreen
@@ -1220,6 +1250,7 @@ const App: React.FC = () => {
           onSkip={() => updateSettings({ skipKnowledgeBaseOnboarding: true })}
         />
         {taskPanel}
+        {directoryScanOverlay}
         {notification ? (
           <div role="status" className="fixed bottom-6 right-6 z-[250] max-w-md rounded-lg border border-current/20 bg-[var(--workspace-menu)] p-4 shadow-lg">
             {notification.msg}
@@ -1244,6 +1275,7 @@ const App: React.FC = () => {
         className={`workspace-root flex h-screen flex-col overflow-hidden text-sm${isFocusModeActive ? " is-focus-mode" : ""}`}
         style={{ ...uiScaleStyle, fontFamily: uiFontFamily }}
       >
+        {directoryScanOverlay}
         {(() => {
           const isMac =
             typeof navigator !== "undefined" &&
