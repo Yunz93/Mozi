@@ -141,23 +141,24 @@ fn opened_file_paths_from_urls(urls: &[tauri::Url]) -> Vec<String> {
         .collect()
 }
 
+fn opened_file_arg_path(arg: &str, cwd: &Path) -> Option<PathBuf> {
+    let candidate = Path::new(arg);
+    // 先识别原生绝对路径，避免 Windows 盘符被误认为 URL 协议。
+    if candidate.is_absolute() {
+        return Some(candidate.to_path_buf());
+    }
+    if let Ok(url) = tauri::Url::parse(arg) {
+        return url.to_file_path().ok();
+    }
+    Some(cwd.join(candidate))
+}
+
 fn opened_file_paths_from_args(args: &[String], cwd: &str) -> Vec<String> {
-    let cwd = PathBuf::from(cwd);
+    let cwd = Path::new(cwd);
 
     args.iter()
         .filter(|arg| !arg.starts_with('-'))
-        .filter_map(|arg| {
-            if let Ok(url) = tauri::Url::parse(arg) {
-                return url.to_file_path().ok();
-            }
-
-            let candidate = PathBuf::from(arg);
-            Some(if candidate.is_absolute() {
-                candidate
-            } else {
-                cwd.join(candidate)
-            })
-        })
+        .filter_map(|arg| opened_file_arg_path(arg, cwd))
         .filter_map(normalize_opened_file_path)
         .collect()
 }
@@ -1902,6 +1903,48 @@ mod tests {
                 .to_string_lossy()
                 .into_owned()]
         );
+        cleanup_test_directory(&temp_dir);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn opened_file_arg_path_preserves_native_windows_absolute_paths() {
+        let cwd = Path::new(r"D:\workspace");
+        for arg in [
+            r"C:\文档\空 格.md",
+            r"C:/文档/空 格.md",
+            r"\\server\share\空 格.md",
+            r"\\?\C:\文档\空 格.md",
+            r"\\?\UNC\server\share\空 格.md",
+        ] {
+            assert_eq!(opened_file_arg_path(arg, cwd), Some(PathBuf::from(arg)));
+        }
+    }
+
+    #[test]
+    fn opened_file_paths_from_args_accepts_file_urls_but_not_other_urls() {
+        let temp_dir = create_test_directory("opened-file-arg-url");
+        let note_path = temp_dir.join("中文 空格 note.markdown");
+        fs::write(&note_path, "# note\n").expect("write note");
+        let file_url = tauri::Url::from_file_path(&note_path).expect("file url");
+
+        let paths = opened_file_paths_from_args(
+            &[
+                "https://example.com/note.md".to_string(),
+                file_url.to_string(),
+            ],
+            temp_dir.to_str().expect("temp dir"),
+        );
+
+        assert_eq!(
+            paths,
+            vec![fs::canonicalize(&note_path)
+                .expect("canonical note path")
+                .to_string_lossy()
+                .into_owned()]
+        );
+        assert!(opened_file_arg_path("https://example.com/note.md", &temp_dir).is_none());
+
         cleanup_test_directory(&temp_dir);
     }
 

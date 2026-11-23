@@ -393,6 +393,36 @@ describe("cancellable knowledge base scans", () => {
     expect(params.clearAllCache).not.toHaveBeenCalled();
   });
 
+  it("preserves the old workspace when the user cancels during the pre-switch save", async () => {
+    const controller = new AbortController();
+    let finishSave!: (success: boolean) => void;
+    const saveFinished = new Promise<boolean>((resolve) => {
+      finishSave = resolve;
+    });
+    let markSaveStarted!: () => void;
+    const saveStarted = new Promise<void>((resolve) => {
+      markSaveStarted = resolve;
+    });
+    const params = createBaseParams({
+      beforeCommit: vi.fn(() => {
+        markSaveStarted();
+        return saveFinished;
+      }),
+      options: { path: "/vault", skipSampleNotes: true, signal: controller.signal },
+    });
+
+    const opening = openKnowledgeBaseWorkspace(params);
+    await saveStarted;
+    controller.abort();
+    finishSave(true);
+
+    expect(await opening).toBeNull();
+    expect(params.clearAllCache).not.toHaveBeenCalled();
+    expect(params.setCurrentFilePath).not.toHaveBeenCalled();
+    expect(params.setFiles).not.toHaveBeenCalled();
+    expect(params.setRootFolderPath).not.toHaveBeenCalled();
+  });
+
   it("passes progress callbacks through to the filesystem", async () => {
     const params = createBaseParams();
     const onProgress = vi.fn();
