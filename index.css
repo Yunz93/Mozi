@@ -25,21 +25,13 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-.editor-pane-layout,
-.preview-scroll-container,
-.editor-pane-layout .cm-scroller {
-  scrollbar-width: none;
+.editor-pane-layout .cm-scroller,
+.preview-scroll-container {
+  scrollbar-width: thin;
 }
 
 .preview-scroll-container {
   overflow-anchor: none;
-}
-
-.editor-pane-layout::-webkit-scrollbar,
-.preview-scroll-container::-webkit-scrollbar,
-.editor-pane-layout .cm-scroller::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 
 body {
