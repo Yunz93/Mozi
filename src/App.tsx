@@ -209,7 +209,6 @@ const App: React.FC = () => {
   const content = documentSession?.content ?? "";
 
   const {
-    openDirectory,
     openFile,
     openKnowledgeBase,
     openFilePath,
