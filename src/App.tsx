@@ -359,8 +359,15 @@ const App: React.FC = () => {
           if (isTauriEnvironment() && rootFolderPath) {
             const label = await getCurrentAppWindowLabel();
             if (isPrimaryAppWindow(label)) {
-              await openPathInNewAppWindow(path);
-              continue;
+              try {
+                await openPathInNewAppWindow(path);
+                continue;
+              } catch (error) {
+                console.warn("Failed to create a separate document window; opening in current window:", error);
+                showNotification(t("notifications_openInNewWindowFailed", {
+                  error: error instanceof Error ? error.message : String(error),
+                }), "warning");
+              }
             }
           }
           closeTaskCalendar();
@@ -373,7 +380,7 @@ const App: React.FC = () => {
         }
       }
     },
-    [closeTaskCalendar, openFilePath, rootFolderPath],
+    [closeTaskCalendar, openFilePath, rootFolderPath, showNotification, t],
   );
 
   const externalFileOpen = useExternalFileOpen({
