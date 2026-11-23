@@ -18,6 +18,7 @@ interface OpenKnowledgeBaseOptions {
   restoreLastOpenedFile?: boolean;
   signal?: AbortSignal;
   onProgress?: (directory: string) => void;
+  onWarning?: (directory: string, error: string) => void;
 }
 
 interface OpenKnowledgeBaseParams {
@@ -33,7 +34,7 @@ interface OpenKnowledgeBaseParams {
     fileExists?: (path: string) => Promise<boolean>;
     openDirectory: () => Promise<string | null>;
     readDirectory: (dirPath: string) => Promise<FileNode[]>;
-    readDirectoryWithProgress?: (dirPath: string, options: { signal?: AbortSignal; onProgress?: (directory: string) => void }) => Promise<FileNode[]>;
+    readDirectoryWithProgress?: (dirPath: string, options: { signal?: AbortSignal; onProgress?: (directory: string) => void; onWarning?: (directory: string, error: string) => void }) => Promise<FileNode[]>;
     readFile: (path: string) => Promise<string>;
   };
   hasOpenedKnowledgeBaseBefore: (path: string) => boolean;
@@ -164,7 +165,7 @@ export async function openKnowledgeBaseWorkspace(
 
   const fileNodes = await withErrorHandling(
     () => fs.readDirectoryWithProgress
-      ? fs.readDirectoryWithProgress(dirPath, { signal: options?.signal, onProgress: options?.onProgress })
+      ? fs.readDirectoryWithProgress(dirPath, { signal: options?.signal, onProgress: options?.onProgress, onWarning: options?.onWarning })
       : fs.readDirectory(dirPath),
     "Failed to read knowledge base",
   );
