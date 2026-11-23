@@ -6,7 +6,9 @@ export const KnowledgeBaseOnboarding: React.FC<{
   uiScaleStyle: React.CSSProperties;
   uiFontFamily: string;
   onOpen: () => void;
-}> = ({ uiScaleStyle, uiFontFamily, onOpen }) => {
+  onOpenFile: () => void;
+  onSkip: () => void;
+}> = ({ uiScaleStyle, uiFontFamily, onOpen, onOpenFile, onSkip }) => {
   const { t } = useI18n();
   return (
     <div
@@ -42,6 +44,14 @@ export const KnowledgeBaseOnboarding: React.FC<{
           </svg>
           {t("app_openKnowledgeBase")}
         </button>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <button type="button" onClick={onOpenFile} className="workspace-startup-open px-4 py-3 text-sm font-medium">
+            {t("app_openFile")}
+          </button>
+          <button type="button" onClick={onSkip} className="rounded-lg border border-current/20 px-4 py-3 text-sm">
+            {t("app_skipForNow")}
+          </button>
+        </div>
       </div>
     </div>
   );
