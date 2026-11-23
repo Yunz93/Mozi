@@ -36,6 +36,12 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": true
+      }
+    },
     "targets": ["app", "dmg", "nsis"],
     "fileAssociations": [
       {
