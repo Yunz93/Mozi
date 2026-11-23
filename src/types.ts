@@ -291,6 +291,8 @@ export interface AppSettings {
   shortcuts: ShortcutConfig;
   knowledgeBases: KnowledgeBaseMeta[];
   lastKnowledgeBasePath?: string;
+  /** Persist the explicit choice to use the editor without a knowledge base. */
+  skipKnowledgeBaseOnboarding?: boolean;
   lastOpenedFilePath?: string;
   themeMode: ThemeMode;
   /** 界面主题色，default 表示沿用明暗主题的默认强调色。 */
