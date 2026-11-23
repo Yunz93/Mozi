@@ -153,6 +153,7 @@ export default {
   settings_manageFileAssociations: "Manage Windows default apps",
   settings_fileAssociationsDesc: "Mozi does not change the default Markdown app automatically. Choose your preferred app in Windows Settings.",
   app_scanningKnowledgeBase: "Scanning knowledge base folders…",
+  notifications_knowledgeBaseScanWarning: "Some folders could not be read: {path} ({error}). This folder was skipped.",
   app_openFile: "Open Markdown File",
   app_skipForNow: "Set Up Later",
   app_saved: "Saved",
