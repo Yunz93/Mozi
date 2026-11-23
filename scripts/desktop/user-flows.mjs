@@ -161,7 +161,16 @@ export async function editorFlows(context, check) {
         "Opening Settings left Trash covering the focused settings dialog",
       );
       await d.screenshot(join(output, "trash-to-settings.png"));
-      await d.button("完成");
+      await d.click(
+        '//div[@role="dialog" and contains(concat(" ", normalize-space(@class), " "), " workspace-settings ")]//button[normalize-space(.)="关闭"]',
+      );
+      await until(
+        () =>
+          d.execute(
+            "return !document.querySelector('.workspace-settings[role=dialog]')",
+          ),
+        "Settings did not close after clicking its Close button",
+      );
       for (const [key, input] of [
         ["s", ".workspace-search input"],
         ["f", 'input[placeholder="搜索..."]'],
