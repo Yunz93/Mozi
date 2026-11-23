@@ -548,7 +548,7 @@ export class TauriFileSystem implements IFileSystem {
 
   async readDirectoryWithProgress(
     dirPath: string,
-    options: { signal?: AbortSignal; onProgress?: (directory: string) => void },
+    options: { signal?: AbortSignal; onProgress?: (directory: string) => void; onWarning?: (directory: string, error: string) => void },
   ): Promise<FileNode[]> {
     return this.readDirectory(dirPath, dirPath, false, undefined, false, options);
   }
@@ -562,7 +562,7 @@ export class TauriFileSystem implements IFileSystem {
     inTrash: boolean = false,
     reuseChildren?: FileNode[],
     strict: boolean = false,
-    scan?: { signal?: AbortSignal; onProgress?: (directory: string) => void },
+    scan?: { signal?: AbortSignal; onProgress?: (directory: string) => void; onWarning?: (directory: string, error: string) => void },
   ): Promise<FileNode[]> {
     try {
       if (scan?.signal?.aborted) throw new DOMException("Directory scan cancelled", "AbortError");
@@ -662,6 +662,7 @@ export class TauriFileSystem implements IFileSystem {
       if (strict || normalizedDir === normalizedRoot) {
         throw error;
       }
+      scan?.onWarning?.(dirPath, error instanceof Error ? error.message : String(error));
       return [];
     }
   }
