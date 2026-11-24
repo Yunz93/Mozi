@@ -9,10 +9,7 @@ import {
   reportUnhandledRuntimeError,
 } from "./src/utils/errorHandler";
 import { ensureExcalidrawAssetPath } from "./src/utils/excalidrawAssetPath";
-import {
-  ensureDynamicFontFaces,
-  getInitialFontSettingsFromLocalStorage,
-} from "./src/utils/fontSettings";
+import { ensureKatexFontFaces } from "./src/utils/fontSettings";
 
 const removeFileDropNavigationGuard = installFileDropNavigationGuard();
 if (import.meta.hot) import.meta.hot.dispose(removeFileDropNavigationGuard);
@@ -58,9 +55,9 @@ if (!rootElement) {
 
 async function bootstrap() {
   try {
-    await ensureDynamicFontFaces(getInitialFontSettingsFromLocalStorage());
+    await ensureKatexFontFaces();
   } catch {
-    // Fallback silently - App mount will retry font registration.
+    // 主窗口挂载后会重试字体注册。
   }
 
   const root = ReactDOM.createRoot(rootElement!);

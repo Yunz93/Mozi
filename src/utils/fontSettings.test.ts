@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { defaultSettings } from "../store/uiStore";
 import {
-  BUNDLED_FONT_PRESETS,
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_PREVIEW_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
   SYSTEM_DEFAULT_FONT_FAMILY,
-  getDefaultFontSettings,
-  getBundledPresetDisplayLabel,
-  getBundledPresetLabelForFontFamily,
   getResolvedCodeFontFamily,
   getResolvedEditorFontFamily,
   getResolvedPreviewFontFamily,
@@ -22,7 +19,7 @@ describe("fontSettings defaults", () => {
     expect(DEFAULT_EDITOR_FONT_FAMILY).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
     expect(DEFAULT_PREVIEW_FONT_FAMILY).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
     expect(DEFAULT_CODE_FONT_FAMILY).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
-    expect(getDefaultFontSettings()).toEqual({
+    expect(defaultSettings).toMatchObject({
       uiFontFamily: SYSTEM_DEFAULT_FONT_FAMILY,
       editorFontFamily: SYSTEM_DEFAULT_FONT_FAMILY,
       previewFontFamily: SYSTEM_DEFAULT_FONT_FAMILY,
@@ -31,7 +28,7 @@ describe("fontSettings defaults", () => {
   });
 
   it("resolves system defaults to zone-specific system font stacks", () => {
-    const defaults = getDefaultFontSettings();
+    const defaults = defaultSettings;
 
     expect(getResolvedUiFontFamily(defaults)).toContain("-apple-system");
     expect(getResolvedEditorFontFamily(defaults)).toContain("PingFang SC");
@@ -50,27 +47,20 @@ describe("fontSettings defaults", () => {
   });
 });
 
-describe("bundled font presets", () => {
-  it("shows locale-specific bundled labels while preserving legacy matching", () => {
-    const preset = BUNDLED_FONT_PRESETS.find(
-      (item) => item.id === "preset:tsanger-jinkai",
+describe("removed font presets", () => {
+  it.each([
+    "preset:tsanger-jinkai",
+    "Tsanger JinKai 02",
+    "TsangerJinKai02-W04",
+    "仓耳今楷",
+    '"MarkdownPressPresetTsangerJinKai02", sans-serif',
+  ])("falls back to the system default for %s", (legacyFontFamily) => {
+    expect(normalizeStoredEditorFontFamily(legacyFontFamily)).toBe(
+      SYSTEM_DEFAULT_FONT_FAMILY,
     );
 
-    expect(preset?.labelZh).toBe("仓耳今楷");
-    expect(preset?.labelEn).toBe("Tsanger JinKai");
-    expect(getBundledPresetDisplayLabel(preset!, "zh-CN")).toBe("仓耳今楷");
-    expect(getBundledPresetDisplayLabel(preset!, "en")).toBe("Tsanger JinKai");
-    expect(normalizeStoredEditorFontFamily("Tsanger JinKai 02")).toBe(
-      "preset:tsanger-jinkai",
-    );
-    expect(normalizeStoredEditorFontFamily("仓耳今楷")).toBe(
-      "preset:tsanger-jinkai",
-    );
     expect(
-      getBundledPresetLabelForFontFamily("Tsanger JinKai 02", "zh-CN"),
-    ).toBe("仓耳今楷");
-    expect(getBundledPresetLabelForFontFamily("Tsanger JinKai 02", "en")).toBe(
-      "Tsanger JinKai",
-    );
+      getResolvedEditorFontFamily({ editorFontFamily: legacyFontFamily }),
+    ).toBe(getResolvedEditorFontFamily(defaultSettings));
   });
 });

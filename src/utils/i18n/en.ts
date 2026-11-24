@@ -670,7 +670,7 @@ export default {
     "Pick a light or dark theme, or follow the operating system appearance automatically.",
   settings_uiFont: "UI font",
   settings_uiFontDesc:
-    "Applies only to the app UI. The default uses the system font, and you can switch to the bundled font or another system font.",
+    "Applies only to the app UI. Choose the system default or an installed font.",
   settings_systemDefaultFontOption: "System default font",
   settings_uiFontSize: "UI font size",
   settings_uiFontSizeDesc:
@@ -927,14 +927,12 @@ export default {
     "Controls Markdown reading styles for the editor, preview, and exported document. Each style supports both light and dark themes.",
   settings_englishFont: "English font",
   settings_englishFontDefaultOption: "Default English font (system)",
-  settings_englishFontBundledOption: "Bundled English font (Tsanger JinKai)",
   settings_englishFontDesc: "Used for Latin letters, numbers, and symbols.",
   settings_englishFontPreview: "English font preview: Mozi toolbar and sidebar",
   settings_chineseFont: "Chinese font",
   settings_chineseFontDefaultOption: "Default Chinese font (system)",
-  settings_chineseFontBundledOption: "Bundled Chinese font (Tsanger JinKai)",
   settings_chineseFontDesc:
-    "Defaults to the system Chinese font, with the bundled Tsanger JinKai available as an option.",
+    "Defaults to the system Chinese font.",
   settings_chineseFontPreview: "Chinese font preview: Mozi toolbar and sidebar",
   settings_wordWrap: "Word wrap",
   settings_attachments: "Attachments",

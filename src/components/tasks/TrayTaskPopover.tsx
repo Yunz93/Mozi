@@ -15,10 +15,7 @@ import { useUiAccentColor } from "../../hooks/useUiAccentColor";
 import { useI18n } from "../../hooks/useI18n";
 import { useCloseGuard } from "../../app/useCloseGuard";
 import { UpdateInstallGuard } from "../../app/UpdateInstallGuard";
-import {
-  ensureDynamicFontFaces,
-  getResolvedUiFontFamily,
-} from "../../utils/fontSettings";
+import { getResolvedUiFontFamily } from "../../utils/fontSettings";
 import { openPathInNewAppWindow } from "../../utils/appWindow";
 import { isImeComposingEvent } from "../../utils/imeKeyboard";
 import { isTauriEnvironment } from "../../types/filesystem";
@@ -37,9 +34,6 @@ export function TrayTaskPopover() {
   useThemeSync(settings.themeMode, settings.themeFollowSystem);
   useUiAccentColor(settings.uiAccentColor, settings.themeMode);
 
-  useEffect(() => {
-    void ensureDynamicFontFaces(settings).catch(() => {});
-  }, [settings]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);

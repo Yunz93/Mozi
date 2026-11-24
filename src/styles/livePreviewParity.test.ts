@@ -8,6 +8,24 @@ describe("live preview / reading visual parity", () => {
     "utf8",
   );
 
+  it("gives both document panes the same fixed-width scrollbar and thumb", () => {
+    const css = readFileSync(resolve(process.cwd(), "index.css"), "utf8");
+    const documentPanes =
+      String.raw`:is\(\.editor-pane-layout \.cm-scroller, \.preview-scroll-container\)`;
+
+    expect(css).toMatch(
+      new RegExp(`${documentPanes}::-webkit-scrollbar\\s*\\{[^}]*width:\\s*9px;`),
+    );
+    expect(css).toMatch(
+      new RegExp(
+        `${documentPanes}::-webkit-scrollbar-thumb\\s*\\{[^}]*background-clip:\\s*padding-box;[^}]*border-inline:\\s*2px solid transparent;`,
+      ),
+    );
+    expect(css).not.toMatch(
+      new RegExp(`${documentPanes}::-webkit-scrollbar[^\\s{]*:(?:hover|active)`),
+    );
+  });
+
   it("insets live block widgets to --pane-content-px like Reading padding", () => {
     expect(editorCss).toMatch(
       /\.cm-live-preview-callout,[\s\S]*?\.cm-live-preview-math-display\s*\{[^}]*margin-inline:\s*var\(--pane-content-px\)/,

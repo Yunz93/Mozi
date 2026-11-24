@@ -25,13 +25,24 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-.editor-pane-layout .cm-scroller,
-.preview-scroll-container {
-  scrollbar-width: thin;
-}
-
 .preview-scroll-container {
   overflow-anchor: none;
+}
+
+/* 正文滚动条固定为细滑块，透明边缘保留拖动区域。 */
+:is(.editor-pane-layout .cm-scroller, .preview-scroll-container)::-webkit-scrollbar {
+  width: 9px;
+  height: 0;
+}
+
+:is(.editor-pane-layout .cm-scroller, .preview-scroll-container)::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.5);
+  background-clip: padding-box;
+  border-inline: 2px solid transparent;
+}
+
+.dark :is(.editor-pane-layout .cm-scroller, .preview-scroll-container)::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.48);
 }
 
 body {

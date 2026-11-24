@@ -10,7 +10,6 @@ import {
   DEFAULT_PREVIEW_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
   FONT_DEFAULTS_VERSION,
-  LEGACY_DEFAULT_BUNDLED_FONT_FAMILY,
   LEGACY_DEFAULT_CODE_FONT_FAMILY,
   normalizeStoredCodeFontFamily,
   normalizeStoredEditorFontFamily,
@@ -88,11 +87,7 @@ function resolvePersistedFontFamily(
   }
 
   const normalized = normalize(value);
-  if (
-    migrateLegacyDefaults &&
-    (normalized === LEGACY_DEFAULT_BUNDLED_FONT_FAMILY ||
-      normalized === LEGACY_DEFAULT_CODE_FONT_FAMILY)
-  ) {
+  if (migrateLegacyDefaults && normalized === LEGACY_DEFAULT_CODE_FONT_FAMILY) {
     return fallback;
   }
 

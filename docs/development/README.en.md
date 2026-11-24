@@ -146,7 +146,7 @@ See [RELEASE_SMOKE_TEST.md](../release/SMOKE_TEST.md) for the manual checklist.
 - The preview pipeline supports wiki links, heading jumps, block references, and attachment resolution
 - Mermaid diagrams prefer beautiful-mermaid (flowchart, state, sequence, class, ER, xychart-beta); pie, gantt, and other types fall back to official Mermaid
 - Settings allow separate UI, editor, preview, and code font configuration
-- The default font is the system font, with 仓耳今楷 available as a bundled Chinese font option
+- Each font setting follows the system default and can be changed to an installed font
 - External file change watch: if a file is modified outside the app with no unsaved edits, it reloads automatically
 
 ## Tests and quality gates

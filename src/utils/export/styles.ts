@@ -5,27 +5,11 @@ import { flattenHeadingNodes, parseHeadings } from "../outline";
 import { PREVIEW_PANEL_WIDTH_PX } from "./types";
 import { getPaneLayoutMetrics } from "../paneLayout";
 import {
-  buildDynamicFontFaceCss,
-  type FontSettings,
-  getBundledPresetDataUrlOverrides,
-} from "../fontSettings";
-import {
   getMarkdownStyleCssVariables,
   getMarkdownStyleTokens,
   normalizeMarkdownStylePreset,
 } from "../markdownStyle";
 import type { MarkdownStylePreset } from "../../types";
-
-export async function buildExportFontFaceCss(
-  fontSettings?: FontSettings,
-): Promise<string> {
-  if (!fontSettings) {
-    return "";
-  }
-
-  const overrides = await getBundledPresetDataUrlOverrides(fontSettings);
-  return buildDynamicFontFaceCss(fontSettings, overrides);
-}
 
 export function renderProperties(
   frontmatter: Record<string, unknown> | null,
@@ -147,7 +131,6 @@ export function buildExportStyles(
   theme: "light" | "dark",
   fontFamily?: string,
   fontSize?: number,
-  fontFaceCss = "",
   codeFontFamily?: string,
   codeFontSize?: number,
   markdownStylePreset: MarkdownStylePreset = "nord",
@@ -215,7 +198,6 @@ export function buildExportStyles(
 `;
 
   const rawCss = `
-    ${fontFaceCss}
     ${githubMarkdownCss}
     ${katexCss}
 

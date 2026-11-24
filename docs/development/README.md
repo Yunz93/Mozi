@@ -150,7 +150,7 @@ npm run smoke:release
 - 预览层支持 wiki link、heading link、block ref 与附件解析
 - Mermaid 图表优先由 beautiful-mermaid 渲染（flowchart、state、sequence、class、ER、xychart-beta）；pie、gantt 等其余类型回退到官方 Mermaid
 - 设置页支持分别配置界面字体、编辑字体、预览字体和代码字体
-- 默认字体为系统字体，内置中文字体提供仓耳今楷选项
+- 各字体设置默认跟随系统，可选择已安装的字体
 - 支持外部文件变更监听，如果文件在外部被修改且无未保存编辑，会自动重新加载
 
 ## 链接与历史一致性约束

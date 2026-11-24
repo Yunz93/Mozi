@@ -49,7 +49,7 @@ export function shouldProtectInlineStylesForDOMReadback(): boolean {
  * 加载字体。必须绕过 CSS，用 JS Fetch + FontFace API 注册字体。
  *
  * 应对：
- * - fontSettings.ts 中 useTauriFontFaceApi 路径用 FontFace API 加载预设字体和 KaTeX 字体
+ * - fontSettings.ts 中 KaTeX 的字体加载分支使用 FontFace API
  * - 不要在任何 CSS 中写 src: url("tauri://...") 来加载字体
  */
 export function shouldUseFontFaceApi(): boolean {

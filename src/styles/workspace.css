@@ -84,7 +84,7 @@
 }
 
 .workspace-root .sidebar-shell {
-  background: var(--workspace-sidebar);
+  background: var(--workspace-canvas);
   box-shadow: none;
   border-right: 1px solid var(--workspace-divider);
 }
@@ -389,7 +389,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px;
+  padding: 2px 6px;
   border: 1px solid var(--workspace-border);
   border-radius: 7px;
   min-height: 40px;
@@ -514,7 +514,7 @@
 }
 .workspace-root .outline-panel {
   color: var(--workspace-muted);
-  background: var(--workspace-sidebar);
+  background: var(--workspace-canvas);
 }
 .workspace-document-footer {
   background: var(--workspace-canvas);

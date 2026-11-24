@@ -18,7 +18,6 @@ export {
 export {
   buildExportStyles,
   buildExportDocument,
-  buildExportFontFaceCss,
   renderProperties,
   generateTOC,
   injectExportHeadingIds,

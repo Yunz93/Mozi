@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { AppSettings } from "../types";
-import { ensureDynamicFontFaces } from "../utils/fontSettings";
+import { ensureKatexFontFaces } from "../utils/fontSettings";
 import { hydrateSensitiveSettingsSafely } from "./hydrateSensitiveSettingsSafely";
 
 interface UseAppBootstrapOptions {
@@ -50,19 +50,10 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): void {
   }, [settingsHydrated]);
 
   useEffect(() => {
-    ensureDynamicFontFaces(settings)
-      .then(() => {
-        if (typeof document !== "undefined") {
-          document.documentElement.style.setProperty(
-            "--font-loaded-timestamp",
-            Date.now().toString(),
-          );
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to ensure dynamic font faces:", error);
-      });
-  }, [settings]);
+    void ensureKatexFontFaces().catch((error) => {
+      console.error("Failed to ensure KaTeX font faces:", error);
+    });
+  }, []);
 
   useEffect(() => {
     if (!settingsHydrated || typeof document === "undefined") return;

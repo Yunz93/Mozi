@@ -138,13 +138,19 @@ describe("persisted font settings migration", () => {
     expect(settings.codeFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
   });
 
-  it("preserves an explicit bundled font after the default-font migration has run", () => {
+  it("restores system defaults for removed presets and preserves explicit system fonts", () => {
     const settings = resolvePersistedFontSettings({
       fontDefaultsVersion: FONT_DEFAULTS_VERSION,
+      uiFontFamily: "preset:tsanger-jinkai",
       editorFontFamily: "preset:tsanger-jinkai",
+      previewFontFamily: "system:Tsanger JinKai 02",
+      codeFontFamily: "system:Menlo",
     });
 
-    expect(settings.editorFontFamily).toBe("preset:tsanger-jinkai");
+    expect(settings.uiFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
+    expect(settings.editorFontFamily).toBe(SYSTEM_DEFAULT_FONT_FAMILY);
+    expect(settings.previewFontFamily).toBe("system:Tsanger JinKai 02");
+    expect(settings.codeFontFamily).toBe("system:Menlo");
   });
 });
 

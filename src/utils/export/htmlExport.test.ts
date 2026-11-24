@@ -1,9 +1,25 @@
 /** @vitest-environment happy-dom */
 
 import { describe, expect, it } from "vitest";
+import { SYSTEM_DEFAULT_FONT_FAMILY } from "../fontSettings";
 import { exportToHtml } from "./htmlExport";
 
 describe("exportToHtml", () => {
+  it("exports legacy preset settings with system font families", async () => {
+    const html = await exportToHtml("# 正文\n\n`code`", {
+      fontSettings: {
+        uiFontFamily: SYSTEM_DEFAULT_FONT_FAMILY,
+        editorFontFamily: SYSTEM_DEFAULT_FONT_FAMILY,
+        previewFontFamily: "preset:tsanger-jinkai",
+        codeFontFamily: "system:Menlo",
+      },
+    });
+
+    expect(html).toContain('font-family: -apple-system, BlinkMacSystemFont');
+    expect(html).toContain('font-family: "Menlo", "SFMono-Regular"');
+    expect(html).not.toMatch(/tsanger/i);
+  });
+
   it("forwards orderedListMode to markdown rendering", async () => {
     const md = "1. first\n   indent\n3. third";
     const looseHtml = await exportToHtml(md, {

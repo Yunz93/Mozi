@@ -9,7 +9,6 @@ import type { ExportOptions } from "./types";
 import {
   buildExportStyles,
   buildExportDocument,
-  buildExportFontFaceCss,
   renderProperties,
   generateTOC,
   injectExportHeadingIds,
@@ -61,12 +60,10 @@ export async function exportToHtml(
   const resolvedCodeFontFamily =
     codeFontFamily ||
     (fontSettings ? buildCodeExportFontFamily(fontSettings) : undefined);
-  const fontFaceCss = await buildExportFontFaceCss(fontSettings);
   const styles = buildExportStyles(
     theme,
     resolvedFontFamily,
     fontSize,
-    fontFaceCss,
     resolvedCodeFontFamily,
     codeFontSize,
     markdownStylePreset,

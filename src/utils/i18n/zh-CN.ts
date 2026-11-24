@@ -624,7 +624,7 @@ export default {
   settings_themeDesc: "选择浅色或深色主题，或跟随操作系统的外观设置自动切换。",
   settings_uiFont: "UI 字体",
   settings_uiFontDesc:
-    "只影响应用界面。默认使用系统字体，也可切换到内置或其他系统字体。",
+    "只影响应用界面。可使用系统默认字体或选择已安装的字体。",
   settings_systemDefaultFontOption: "系统默认字体",
   settings_uiFontSize: "UI 字体大小",
   settings_uiFontSizeDesc:
@@ -853,13 +853,11 @@ export default {
     "控制编辑区、预览区和导出文档的 Markdown 阅读样式；每种样式都同时支持浅色和深色主题。",
   settings_englishFont: "英文字体",
   settings_englishFontDefaultOption: "默认英文字体（系统字体）",
-  settings_englishFontBundledOption: "内置英文字体（仓耳今楷）",
   settings_englishFontDesc: "主要用于拉丁字母、数字和符号。",
   settings_englishFontPreview: "English font preview: Mozi toolbar and sidebar",
   settings_chineseFont: "中文字体",
   settings_chineseFontDefaultOption: "默认中文字体（系统字体）",
-  settings_chineseFontBundledOption: "内置中文字体（仓耳今楷）",
-  settings_chineseFontDesc: "默认使用系统中文字体，也可切换到内置的仓耳今楷。",
+  settings_chineseFontDesc: "默认使用系统中文字体。",
   settings_chineseFontPreview: "中文字体预览：墨知 工具栏与侧边栏",
   settings_attachments: "附件",
   settings_resourceFolder: "资源文件夹",
