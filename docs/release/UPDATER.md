@@ -104,6 +104,7 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
 ## Per-release checklist
 
 1. Choose beta by default, or stable only when explicitly requested, and create the corresponding unused tag. Tagged releases sync versions through `npm run release:sync-version`.
+   - Before creating a stable tag `vX.Y.Z`, read all published GitHub prerelease notes matching `vX.Y.Z-beta.N` in numeric order. Consolidate related changes, deduplicate repeated entries, and reconcile the notes against the stable candidate. Drop changes withdrawn during beta validation and include any user-facing changes added for the stable release. Commit the consolidated notes to `.github/release-body.md` in the commit being tagged. The release workflow reads that file from the tagged commit.
 2. Let GitHub Actions build the tagged release.
 3. After the workflow finishes, confirm the GitHub Release contains:
    - the Windows NSIS installer
@@ -114,7 +115,7 @@ npm run tauri signer generate -- --ci -w /secure/path/markdown-press-updater.key
 4. Install the new release on Windows, macOS, and a supported Linux desktop where an older build is already present.
 5. For stable releases, open `Settings -> About` and confirm:
    - the app detects the newer version
-   - release notes load
+   - the consolidated release notes appear on GitHub and load in the app
    - download and install complete successfully
    - macOS downloads the signed `.app.tar.gz` for the current architecture, verifies it before installation, and atomically replaces the app after all windows have saved
 6. For beta releases, confirm the Release is marked as a prerelease and stable install/update endpoints still resolve to the previous stable release. Enable **Receive beta updates** to check and install the beta, or download it manually. With the option off, publishing a beta must not trigger an update. Verify that a higher beta sequence and the final stable version of the same base version are both detected, and that turning the option off does not downgrade the app.

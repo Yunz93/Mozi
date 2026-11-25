@@ -94,7 +94,7 @@ git tag v2.3.6-beta.1
 git push origin v2.3.6-beta.1
 ```
 
-beta 会标记为 GitHub Pre-release，不成为 Latest。只有用户明确要求发布正式版本，才使用无后缀标签：
+beta 会标记为 GitHub Pre-release，不成为 Latest。准备正式版时，先整合同一版本下已发布的 Beta 说明，将整合稿提交到 `.github/release-body.md`，再打正式标签。具体步骤见[发布验收清单](../release/UPDATER.md#per-release-checklist)。只有用户明确要求发布正式版本，才使用无后缀标签：
 
 ```bash
 git tag v2.3.6

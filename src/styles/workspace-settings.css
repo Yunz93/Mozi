@@ -21,7 +21,7 @@
   background: var(--workspace-canvas);
 }
 .workspace-settings-nav {
-  background: var(--workspace-sidebar);
+  background: var(--workspace-canvas);
   border-color: var(--workspace-divider);
 }
 .workspace-settings-nav > [role="separator"]:is(:hover, :active) {

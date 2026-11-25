@@ -94,7 +94,7 @@ git tag v2.3.6-beta.1
 git push origin v2.3.6-beta.1
 ```
 
-Beta releases are marked as GitHub prereleases and never become Latest. Only an explicit request for a stable release authorizes a tag without a suffix:
+Beta releases are marked as GitHub prereleases and never become Latest. When preparing a stable release, consolidate the published beta notes for the same version and commit the result to `.github/release-body.md` before tagging. See the [per-release checklist](../release/UPDATER.md#per-release-checklist) for the full procedure. Only an explicit request for a stable release authorizes a tag without a suffix:
 
 ```bash
 git tag v2.3.6
