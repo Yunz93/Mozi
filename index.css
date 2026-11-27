@@ -25,13 +25,28 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-.editor-pane-layout .cm-scroller,
-.preview-scroll-container {
-  scrollbar-width: thin;
-}
-
 .preview-scroll-container {
   overflow-anchor: none;
+}
+
+/* 只隐藏滑块颜色，保留滚动条宽度和拖动区域。 */
+:is(.editor-pane-layout .cm-scroller, .preview-scroll-container)::-webkit-scrollbar {
+  width: 9px;
+  height: 0;
+}
+
+:is(.editor-pane-layout .cm-scroller, .preview-scroll-container)::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  background-clip: padding-box;
+  border-inline: 2px solid transparent;
+}
+
+:is(.editor-pane-layout .cm-scroller, .preview-scroll-container)[data-scrollbar-visible]::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.dark :is(.editor-pane-layout .cm-scroller, .preview-scroll-container)[data-scrollbar-visible]::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.48);
 }
 
 body {

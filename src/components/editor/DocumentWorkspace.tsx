@@ -35,6 +35,7 @@ import { findFileInTree } from "../../utils/fileTree";
 import { isExcalidrawWorkspaceFile } from "../../utils/fileTypes";
 
 const PANE_TRANSITION_MS = 200;
+const SCROLLBAR_HIDE_DELAY_MS = 700;
 
 interface DocumentWorkspaceProps {
   highlighter?: ShikiHighlighter | null;
@@ -80,6 +81,7 @@ export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = ({
   const visualMode = normalizeSessionViewMode(viewMode);
   const editorScrollPercentageRef = useRef(0);
   const previewScrollPercentageRef = useRef(0);
+  const scrollbarTimersRef = useRef(new Map<HTMLElement, number>());
   const transitionResyncTimerRef = useRef<number | null>(null);
   const transitionCleanupRef = useRef<(() => void) | null>(null);
   const scrollPositionsRef = useRef<
@@ -92,6 +94,40 @@ export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = ({
       }
     >
   >({});
+
+  const handleDocumentScroll = useCallback((event: React.UIEvent) => {
+    const scroller = event.target;
+    if (
+      !(scroller instanceof HTMLElement) ||
+      !scroller.matches(
+        ".editor-pane-layout .cm-scroller, .preview-scroll-container",
+      )
+    ) {
+      return;
+    }
+
+    const timers = scrollbarTimersRef.current;
+    window.clearTimeout(timers.get(scroller));
+    scroller.toggleAttribute("data-scrollbar-visible", true);
+    timers.set(
+      scroller,
+      window.setTimeout(() => {
+        scroller.removeAttribute("data-scrollbar-visible");
+        timers.delete(scroller);
+      }, SCROLLBAR_HIDE_DELAY_MS),
+    );
+  }, []);
+
+  useEffect(() => {
+    const timers = scrollbarTimersRef.current;
+    return () => {
+      for (const [scroller, timer] of timers) {
+        window.clearTimeout(timer);
+        scroller.removeAttribute("data-scrollbar-visible");
+      }
+      timers.clear();
+    };
+  }, []);
 
   const handleEditorScroll = useCallback((percentage: number) => {
     editorScrollPercentageRef.current = percentage;
@@ -290,7 +326,10 @@ export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = ({
         data-markdown-style={settings.markdownStylePreset}
         style={markdownStyleVariables as React.CSSProperties}
       >
-        <div className="flex-1 overflow-hidden relative flex flex-row">
+        <div
+          className="flex-1 overflow-hidden relative flex flex-row"
+          onScrollCapture={handleDocumentScroll}
+        >
           <div
             aria-hidden={!editorActive}
             className="h-full min-w-0 overflow-hidden flex flex-col relative"
