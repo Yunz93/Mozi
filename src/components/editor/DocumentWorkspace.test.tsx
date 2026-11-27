@@ -2,7 +2,13 @@
 
 import React, { forwardRef, useEffect, useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  waitFor,
+} from "@testing-library/react";
 import { useAppStore } from "../../store/appStore";
 import { ViewMode } from "../../types";
 
@@ -30,7 +36,11 @@ vi.mock("./EditorPane", () => ({
       editorOnScroll = props.onScroll;
     }, [props.onScroll]);
 
-    return <div data-testid="editor-pane" />;
+    return (
+      <div className="editor-pane-layout" data-testid="editor-pane">
+        <div className="cm-scroller" data-testid="editor-scroller" />
+      </div>
+    );
   }),
 }));
 
@@ -57,6 +67,7 @@ vi.mock("./PreviewPane", () => ({
 
     return (
       <div
+        className="preview-scroll-container"
         data-testid="preview-pane"
         data-layout-active={String(props.previewLayoutActive)}
         data-render-active={String(props.previewRenderActive)}
@@ -124,6 +135,39 @@ describe("DocumentWorkspace scroll handshake", () => {
       activeTabId: null,
       viewMode: ViewMode.LIVE,
     } as never);
+  });
+
+  it("shows each scrollbar only until its own scroll activity stops", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { getByTestId } = renderDocumentWorkspace();
+    const editor = getByTestId("editor-scroller");
+    const preview = getByTestId("preview-pane");
+    const isVisible = (element: HTMLElement) =>
+      element.hasAttribute("data-scrollbar-visible");
+
+    expect(isVisible(editor)).toBe(false);
+    expect(isVisible(preview)).toBe(false);
+
+    fireEvent.scroll(getByTestId("editor-pane"));
+    expect(isVisible(editor)).toBe(false);
+
+    fireEvent.scroll(editor);
+    expect(isVisible(editor)).toBe(true);
+    expect(isVisible(preview)).toBe(false);
+
+    act(() => vi.advanceTimersByTime(500));
+    fireEvent.scroll(editor);
+    act(() => vi.advanceTimersByTime(500));
+    fireEvent.scroll(preview);
+    expect(isVisible(editor)).toBe(true);
+    expect(isVisible(preview)).toBe(true);
+
+    act(() => vi.advanceTimersByTime(200));
+    expect(isVisible(editor)).toBe(false);
+    expect(isVisible(preview)).toBe(true);
+
+    act(() => vi.advanceTimersByTime(500));
+    expect(isVisible(preview)).toBe(false);
   });
 
   it("does not let a queued 250ms tab restore overwrite a newer heading jump", () => {
